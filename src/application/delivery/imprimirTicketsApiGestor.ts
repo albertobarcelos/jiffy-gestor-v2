@@ -1,5 +1,6 @@
 import { mapTicketToPrintDocument } from '@/src/application/delivery/mapTicketToPrintDocument'
 import { mapTicketToGraphicPrintDocument } from '@/src/application/delivery/mapTicketToGraphicPrintDocument'
+import { mapTicketToProducaoHibridoDocument } from '@/src/application/delivery/mapTicketToProducaoHibridoDocument'
 import {
   avisosProdutoSemImpressora,
   CODES_PRODUTO_SEM_IMPRESSORA,
@@ -155,22 +156,25 @@ export async function imprimirTicketsApiGestor(params: {
 
       let document
       try {
-        document =
-          cupomTemplate?.modoPapel === 'grafico'
-            ? await mapTicketToGraphicPrintDocument(response, ticket, {
-                nomeEmpresa,
-                template: cupomTemplate,
-              })
-            : mapTicketToPrintDocument(response, ticket, {
-                nomeEmpresa,
-                template: cupomTemplate,
-              })
+        if (ticket.tipoCupom === 'producao') {
+          document = mapTicketToProducaoHibridoDocument(response, ticket, { reimpressao })
+        } else if (cupomTemplate?.modoPapel === 'grafico') {
+          document = await mapTicketToGraphicPrintDocument(response, ticket, {
+            nomeEmpresa,
+            template: cupomTemplate,
+          })
+        } else {
+          document = mapTicketToPrintDocument(response, ticket, {
+            nomeEmpresa,
+            template: cupomTemplate,
+          })
+        }
       } catch (error) {
         falhas += 1
         const mensagem =
           error instanceof Error && error.message.trim()
             ? error.message
-            : 'Falha ao montar o cupom gráfico.'
+            : 'Falha ao montar o cupom.'
         warnImpressao('ticket.grafico_falhou', {
           mensagem,
           causa: error instanceof Error ? error.message : String(error),

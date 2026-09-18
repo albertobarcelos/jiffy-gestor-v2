@@ -22,6 +22,13 @@ export function printSizeFromFontePx(px: number): PrintSize {
   return 'normal'
 }
 
+/** CSS px de Font A 2/2 (48 dots de altura) na escala do cupom gráfico. */
+export function fonteProdutoEscPosA22Px(larguraMm: 58 | 80): number {
+  const dotsLargura = larguraMm === 58 ? 384 : 576
+  const cssLargura = larguraMm === 58 ? 220 : 300
+  return Math.max(16, Math.round((48 * cssLargura) / dotsLargura))
+}
+
 export function sectionFeedLines(densidade: DeliveryCupomTemplateConfig['densidade']): number {
   if (densidade === 'espacoso') return 2
   if (densidade === 'compacto') return 0

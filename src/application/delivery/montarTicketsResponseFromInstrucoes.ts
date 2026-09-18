@@ -28,6 +28,7 @@ import {
   planejarTicketsProducaoImpressora,
   ticketIdViaProducao,
 } from '@/src/application/delivery/planejarTicketsProducaoImpressora'
+import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
 
 function asRecord(v: unknown): Record<string, unknown> | null {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return null
@@ -282,14 +283,10 @@ function buildPagamento(
 }
 
 function buildObservacaoPedido(pedido: Record<string, unknown>): string | undefined {
-  const obs = Array.isArray(pedido.observacoes) ? pedido.observacoes : []
-  const texto = obs
-    .map(o => {
-      const r = asRecord(o)
-      return r ? asStr(r.observacao) : ''
-    })
-    .filter(Boolean)
-    .join('\n')
+  const texto =
+    textoFromObservacoesApi(pedido.observacoes) ||
+    asStr(pedido.observacaoPedido) ||
+    asStr(pedido.observacao)
   return texto || undefined
 }
 
@@ -577,8 +574,22 @@ export function montarTicketsResponseFromInstrucoes(params: {
     codigoVenda: asStr(pedido.codigoVenda) || undefined,
     numeroVenda: numeroFinito(pedido.numeroVenda),
     tipoVenda: tipoEntrega || null,
+    numeroMesa: pedido.numeroMesa as string | number | null | undefined,
+    identificacao: asStr(pedido.identificacao) || undefined,
+    senha: (pedido.senha ?? pedido.senhaNumero ?? pedido.numeroSenha) as string | number | null | undefined,
+    codigoTerminal: asStr(pedido.codigoTerminal) || undefined,
     dataPedido: isoOrEmpty(pedido.dataCriacao),
     dataPrevista: isoOrEmpty(pedido.previsaoEntregaEm ?? pedido.previsaoEntrega),
+    tiradoPor: (() => {
+      const raw = asRecord(pedido.tiradoPor) || asRecord(pedido.abertoPor)
+      const nome = asStr(raw?.nome) || asStr(pedido.tiradoPorNome) || asStr(pedido.abertoPorNome)
+      if (!nome && !raw) return null
+      return {
+        id: asStr(raw?.id) || undefined,
+        usuarioId: asStr(raw?.usuarioId) || asStr(pedido.abertoPorId) || undefined,
+        nome: nome || undefined,
+      }
+    })(),
     entregador: entregadorRaw
       ? {
           id: asStr(entregadorRaw.id) || undefined,

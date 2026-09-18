@@ -39,11 +39,6 @@ import {
 } from '@/src/infrastructure/api/estacoesImpressaoApi'
 import { montarMapeamentosEstacaoParaSalvar } from '@/src/infrastructure/api/normalizarEstacaoImpressaoMapeamentos'
 import { modosImpressaoPorImpressoraIdDeMapeamentos, type ModoImpressaoImpressora } from '@/src/domain/types/modoImpressaoImpressora'
-import { salvarModosImpressaoDaEstacao } from '@/src/infrastructure/api/salvarModosImpressaoDaEstacao'
-import {
-  lerModosImpressaoEstacaoLocal,
-  salvarModosImpressaoEstacaoLocal,
-} from '@/src/infrastructure/printing/modosImpressaoEstacaoStorage'
 import {
   limparEstacaoImpressaoId,
   salvarEstacaoImpressaoId,
@@ -160,10 +155,8 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
     (modos: Record<string, ModoImpressaoImpressora>) => {
       setModosImpressaoEstacao(modos)
       modosImpressaoEstacaoRef.current = modos
-      const estacaoId = estacaoIdSelecionada.trim()
-      if (estacaoId) salvarModosImpressaoEstacaoLocal(estacaoId, modos)
     },
-    [estacaoIdSelecionada]
+    []
   )
 
   const carregando =
@@ -254,10 +247,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
     setGestorDelivery(data.gestorDelivery === true)
     if (modosHidratadosEstacaoRef.current === data.estacaoId) return
     modosHidratadosEstacaoRef.current = data.estacaoId
-    setModosImpressaoEstacao({
-      ...modosImpressaoPorImpressoraIdDeMapeamentos(data.mapeamentos),
-      ...lerModosImpressaoEstacaoLocal(data.estacaoId),
-    })
+    setModosImpressaoEstacao(modosImpressaoPorImpressoraIdDeMapeamentos(data.mapeamentos))
   }, [open, estacaoImpressaoQuery.data])
 
   const handleGestorDeliveryChange = useCallback(
@@ -309,7 +299,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
       } else {
         salvarEstacaoImpressaoId(next)
         modosHidratadosEstacaoRef.current = ''
-        setModosImpressaoEstacao(lerModosImpressaoEstacaoLocal(next))
+        setModosImpressaoEstacao({})
       }
       invalidateDeliveryConfigQueries()
     },
@@ -404,14 +394,8 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
       const estacaoId = estacaoImpressaoQuery.data?.estacaoId?.trim()
       if (estacaoId) {
         const modos = modosImpressaoEstacaoRef.current
-        salvarModosImpressaoEstacaoLocal(estacaoId, modos)
         const mapeamentos = montarMapeamentosEstacaoParaSalvar(vinculosFisicos, modos)
         await salvarMapeamentosEstacao(token, estacaoId, mapeamentos)
-        try {
-          await salvarModosImpressaoDaEstacao(token, estacaoId, modos)
-        } catch {
-          /* a via desta estação já ficou gravada neste PC */
-        }
       }
       invalidateDeliveryConfigQueries()
       window.dispatchEvent(new Event('jiffy:empresa-me-updated'))

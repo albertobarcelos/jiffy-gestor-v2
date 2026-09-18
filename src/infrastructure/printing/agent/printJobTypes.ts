@@ -1,7 +1,7 @@
 export const PRINT_JOB_SCHEMA_VERSION = 1
 
 export type PrintAlign = 'left' | 'center' | 'right'
-export type PrintSize = 'small' | 'normal' | 'double'
+export type PrintSize = 'small' | 'normal' | 'double' | 'double-b'
 
 export type PrintContentBlock =
   | { type: 'text'; text: string; align?: PrintAlign; bold?: boolean; size?: PrintSize }

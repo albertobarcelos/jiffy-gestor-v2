@@ -4,7 +4,6 @@ import { fetchPedidoDeliveryDetalhe } from '@/src/infrastructure/api/fetchPedido
 import { buscarMapeamentosEstacao } from '@/src/infrastructure/api/estacoesImpressaoApi'
 import { fetchModosImpressaoDaEstacaoPorIds } from '@/src/infrastructure/api/fetchModosImpressaoDaEstacaoPorIds'
 import { getEstacaoImpressaoId } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
-import { lerModosImpressaoEstacaoLocal } from '@/src/infrastructure/printing/modosImpressaoEstacaoStorage'
 import {
   modosImpressaoPorImpressoraIdDeMapeamentos,
   type ModoImpressaoImpressora,
@@ -167,10 +166,6 @@ export async function carregarPayloadTicketsImpressaoDelivery(params: {
         })
       }
     }
-    modoPorImpressoraId = {
-      ...modoPorImpressoraId,
-      ...lerModosImpressaoEstacaoLocal(estacao),
-    }
   }
 
   try {
@@ -194,7 +189,6 @@ export async function carregarPayloadTicketsImpressaoDelivery(params: {
         .filter(t => t.tipoCupom === 'producao')
         .map(t => t.viaProducao?.kind ?? 'single'),
       modoCupom: data.modoImpressaoDelivery,
-      modosLocais: lerModosImpressaoEstacaoLocal(estacao),
       modoPorImpressoraId,
     })
 

@@ -26,6 +26,8 @@ import {
   sectionFeedLines,
   telefoneWhatsappE164,
 } from '@/src/application/delivery/cupomPrintLayout'
+import { detalheLinhasItemPedido } from '@/src/application/delivery/layoutProducao80mm'
+import { desenharPilulaProducaoPng } from '@/src/infrastructure/printing/pilulaProducaoPng'
 
 export interface MapTicketToPrintDocumentOptions {
   nomeEmpresa?: string
@@ -81,16 +83,6 @@ function valorComplemento(comp: VendaGestorTicketItemComplemento): number | null
   return numeroFinito(comp?.impressao?.valorFinal ?? comp?.impressao?.valorTotal ?? comp?.impressao?.valorUnitario)
 }
 
-function labelComplemento(comp: VendaGestorTicketItemComplemento): string {
-  const label =
-    (comp && typeof comp === 'object' && (comp.nome || comp.descricao)
-      ? String(comp.nome ?? comp.descricao)
-      : '') || ''
-  if (!label.trim()) return ''
-  const q = numeroFinito(comp.impressao?.quantidade ?? comp.quantidade) ?? 1
-  return `${q > 1 ? `${q} X ` : ''}${label.trim()}`
-}
-
 function normalizarTipoVenda(root: VendaGestorTicketsResponse): string {
   const raw = String(root.tipoVenda || '').trim().toLowerCase()
   if (!raw) return 'Entrega'
@@ -112,12 +104,6 @@ function nomeEmpresa(root: VendaGestorTicketsResponse, fallback: string): string
     root.empresa?.razaoSocial?.trim() ||
     fallback
   )
-}
-
-function nomeEntregador(root: VendaGestorTicketsResponse): string {
-  const e = root.entregador
-  if (!e) return ''
-  return typeof e === 'string' ? e.trim() : e.nome?.trim() || ''
 }
 
 function enderecoObj(ent: VendaGestorTicketsResponse['enderecoEntrega']): VendaGestorTicketsEndereco {
@@ -160,34 +146,48 @@ function mapItens(
   ticket: VendaGestorTicket,
   mostrarValores: boolean,
   destacar: boolean,
-  size: PrintSize,
-  bold: boolean
+  bold: boolean,
+  size: PrintSize
 ): PrintContentBlock[] {
   const blocks: PrintContentBlock[] = []
+  const extraSize: PrintSize = 'normal'
   for (const item of ticket.itens ?? []) {
-    const q = quantidadeItem(item)
-    const nome = (item.nomeProduto ?? 'Item').trim() || 'Item'
-    const titulo = `${q} X ${nome}`
+    const detalhe = detalheLinhasItemPedido(item, { permitirQuantidadeZero: !mostrarValores })
     const valor = mostrarValores ? valorItem(item) : null
     if (valor != null) {
-      blocks.push({ type: 'row', left: titulo, right: fmtBrl(valor), bold: bold && destacar, size })
+      blocks.push({
+        type: 'row',
+        left: detalhe.produto,
+        right: fmtBrl(valor),
+        bold: bold && destacar,
+        size,
+      })
     } else {
-      blocks.push({ type: 'item', quantity: q, name: nome, bold: bold && destacar, size })
+      blocks.push({
+        type: 'text',
+        text: detalhe.produto,
+        bold: bold && destacar,
+        size,
+      })
     }
-    const comps = Array.isArray(item.complementos) ? item.complementos : []
-    for (const comp of comps) {
-      const label = labelComplemento(comp)
-      if (!label) continue
-      const valorComp = mostrarValores ? valorComplemento(comp) : null
+    for (const extra of detalhe.complementos) {
+      const valorComp = mostrarValores ? valorComplemento(extra.origem) : null
       if (valorComp != null) {
-        blocks.push({ type: 'row', left: `  ${label}`, right: fmtBrl(valorComp), size: 'small' })
+        blocks.push({
+          type: 'row',
+          left: extra.texto,
+          right: fmtBrl(valorComp),
+          bold: true,
+          size: extraSize,
+        })
       } else {
-        pushText(blocks, `  ${label}`, { size: 'small' })
+        blocks.push({ type: 'text', text: extra.texto, size: extraSize, bold: true })
       }
     }
-    if (typeof item.observacao === 'string' && item.observacao.trim()) {
-      pushText(blocks, `  ${item.observacao.trim()}`, { size: 'small' })
+    if (detalhe.observacao) {
+      blocks.push({ type: 'text', text: detalhe.observacao, size: extraSize, bold: true })
     }
+    blocks.push({ type: 'divider' })
   }
   return blocks
 }
@@ -288,8 +288,8 @@ function mapResumo(
 }
 
 /**
- * Converte o ticket delivery no Document do agente (sem ESC/POS).
- * Espelha o preview HTML o máximo que a térmica permite.
+ * Cupom de expedição em ESC/POS (modo texto).
+ * A via de produção não passa por aqui — usa o documento híbrido.
  */
 export function mapTicketToPrintDocument(
   root: VendaGestorTicketsResponse,
@@ -297,40 +297,27 @@ export function mapTicketToPrintDocument(
   options?: MapTicketToPrintDocumentOptions
 ): PrintDocument {
   const template = mergeCupomTemplate(options?.template)
-  const fontes = cupomPrintFontes(template, ticket.tipoCupom)
-  const negrito = cupomPrintNegrito(template, ticket.tipoCupom)
+  const fontes = cupomPrintFontes(template, 'expedicao')
+  const negrito = cupomPrintNegrito(template, 'expedicao')
   const gap = sectionFeedLines(template.densidade)
   const empresa = nomeEmpresa(root, options?.nomeEmpresa?.trim() || 'Jiffy Gestor')
   const tipoVenda = normalizarTipoVenda(root)
   const codigo = codigoPedido(root)
   const numero = root.numeroVenda != null ? `Pedido #${root.numeroVenda}` : 'Pedido'
-  const titulo = `${numero} ${tipoVenda}${codigo ? ` ${codigo}` : ''}`.trim()
-  const producao = ticket.tipoCupom === 'producao'
+  const titulo = `${numero} ${tipoVenda}`.trim()
   const content: PrintContentBlock[] = []
 
   if (template.mostrarLogoTexto) {
     pushText(content, empresa, { align: 'center', bold: negrito.cabecalho, size: fontes.cabecalho })
   }
-  pushText(content, titulo, { align: 'center', bold: negrito.cabecalho, size: 'double' })
-  if (producao && ticket.viaProducao?.kind === 'conference') {
-    pushText(content, '*** VIA DE CONFERENCIA ***', {
-      align: 'center',
-      bold: true,
-      size: 'double',
-    })
-  }
-  if (
-    producao &&
-    ticket.viaProducao?.kind === 'unit' &&
-    ticket.viaProducao.unitIndex != null &&
-    ticket.viaProducao.unitTotal != null
-  ) {
-    const codigoVia = root.codigoVenda || String(root.numeroVenda ?? '')
-    pushText(
-      content,
-      `PEDIDO ${codigoVia} - ${ticket.viaProducao.unitIndex} DE ${ticket.viaProducao.unitTotal}`,
-      { align: 'center', bold: true, size: 'double' }
-    )
+  pushText(content, titulo, { align: 'center', bold: negrito.cabecalho, size: fontes.cabecalho })
+  if (codigo) {
+    const pilula = desenharPilulaProducaoPng(codigo, 'identidade')
+    if (pilula) {
+      content.push({ type: 'image', data: pilula, align: 'center' })
+    } else {
+      pushText(content, codigo, { align: 'center', bold: true, size: 'double' })
+    }
   }
   if (template.cabecalhoExtra.trim()) {
     pushText(content, template.cabecalhoExtra.trim(), { align: 'center', bold: negrito.cabecalho, size: fontes.cabecalho })
@@ -342,32 +329,23 @@ export function mapTicketToPrintDocument(
   const dataPrevista = fmtDateTime(root.dataPrevista)
   if (dataPedido) pushText(content, `Data: ${dataPedido}`, { size: fontes.pedido, bold: negrito.pedido })
   if (dataPrevista) pushText(content, `Data Prevista: ${dataPrevista}`, { size: fontes.pedido, bold: negrito.pedido })
-  if (producao) {
-    const entregador = nomeEntregador(root)
-    if (entregador) {
-      content.push({ type: 'divider' })
-      pushText(content, `Entregador: ${entregador}`, { size: fontes.pedido, bold: negrito.pedido })
-    }
-  }
 
   const cliente = root.cliente?.nome?.trim() || '—'
   const tel =
     (typeof root.cliente?.telefone === 'string' && root.cliente.telefone.trim()) ||
     (typeof root.cliente?.celular === 'string' && root.cliente.celular.trim()) ||
     ''
-  pushText(content, producao ? `Cliente: ${cliente}` : `CLIENTE: ${cliente}`, {
+  pushText(content, `CLIENTE: ${cliente}`, {
     bold: negrito.cliente,
     size: fontes.cliente,
   })
-  if (!producao && template.mostrarTelefoneCliente && tel) {
+  if (template.mostrarTelefoneCliente && tel) {
     pushText(content, `TELEFONE: ${formatTelefone(tel)}`, { size: fontes.cliente, bold: negrito.cliente })
   }
 
-  if (!producao) {
-    content.push(...mapEndereco(root, template, fontes.cliente, negrito.cliente))
-    if (template.mostrarTelefoneCliente) {
-      content.push(...mapWhatsappQr(tel, template.larguraMm))
-    }
+  content.push(...mapEndereco(root, template, fontes.cliente, negrito.cliente))
+  if (template.mostrarTelefoneCliente) {
+    content.push(...mapWhatsappQr(tel, template.larguraMm))
   }
 
   content.push({ type: 'divider' })
@@ -375,13 +353,7 @@ export function mapTicketToPrintDocument(
   const totalItens = (ticket.itens ?? []).reduce((acc, item) => acc + quantidadeItem(item), 0)
   pushText(content, `ITENS DO PEDIDO (${totalItens})`, { bold: negrito.itens, size: fontes.itens })
   content.push(
-    ...mapItens(
-      ticket,
-      producao ? false : template.mostrarValores,
-      template.destacarProdutos,
-      fontes.itens,
-      negrito.itens
-    )
+    ...mapItens(ticket, template.mostrarValores, template.destacarProdutos, negrito.itens, fontes.itens)
   )
 
   if (template.mostrarObservacaoPedido && root.observacaoPedido?.trim()) {
@@ -391,7 +363,7 @@ export function mapTicketToPrintDocument(
     content.push({ type: 'divider' })
   }
 
-  if (!producao && template.mostrarValores) {
+  if (template.mostrarValores) {
     content.push(...mapResumo(root, ticket, fontes.resumo, negrito.resumo))
     content.push(...mapPagamento(root, fontes.pagamento, negrito.pagamento))
   }
@@ -404,7 +376,7 @@ export function mapTicketToPrintDocument(
   if (template.mostrarDataHora) {
     pushText(content, new Date().toLocaleString('pt-BR'), { align: 'center', size: 'small' })
   }
-  content.push({ type: 'feed', lines: producao || template.densidade === 'compacto' ? 3 : 4 })
+  content.push({ type: 'feed', lines: template.densidade === 'compacto' ? 3 : 4 })
   content.push({ type: 'cut' })
 
   return {

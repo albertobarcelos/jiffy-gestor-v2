@@ -34,7 +34,7 @@ export interface EstacaoImpressaoMapeamento {
   impressoraId: string
   nomeImpressora: string
   nomeImpressoraWindows: string
-  /** Homolog: modo da via de produção nesta estação (`impressora_terminal_map`). */
+  /** Homolog: modo da via nesta estação (`PUT/GET .../estacoes-impressao/{id}/impressoras`). */
   modoImpressao?: ModoImpressaoImpressora
 }
 
@@ -202,7 +202,7 @@ export async function salvarMapeamentosEstacao(
   mapeamentos: Array<{
     impressoraId: string
     nomeImpressoraWindows: string
-    modoImpressao?: ModoImpressaoImpressora
+    modoImpressao: ModoImpressaoImpressora
   }>
 ): Promise<EstacaoImpressaoMapeamento[]> {
   const data = normalizarListaMapeamentosEstacao(

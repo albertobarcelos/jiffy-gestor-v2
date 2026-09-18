@@ -70,8 +70,6 @@ describe('montarMapeamentosEstacaoParaSalvar', () => {
         impressoraId: 'imp-1',
         nomeImpressoraWindows: 'EPSON_COZ',
         modoImpressao: 'agrupado',
-        modo_impressao: 'agrupado',
-        modoFicha: false,
       },
     ])
   })
@@ -84,8 +82,6 @@ describe('montarMapeamentosEstacaoParaSalvar', () => {
         impressoraId: 'imp-1',
         nomeImpressoraWindows: 'EPSON_COZ',
         modoImpressao: 'normal',
-        modo_impressao: 'normal',
-        modoFicha: false,
       },
     ])
   })

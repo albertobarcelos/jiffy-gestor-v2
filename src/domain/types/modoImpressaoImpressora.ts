@@ -1,5 +1,5 @@
 /**
- * Modo de via de produção da impressora (`impressora_terminal_map.modo_impressao`).
+ * Modo de via de produção da impressora no mapeamento da estação.
  * Independente de `modoImpressaoDelivery` (unificado/separado) e de `modoPapel` (texto/gráfico).
  */
 export const MODOS_IMPRESSAO_IMPRESSORA = ['normal', 'agrupado', 'porUnidade', 'ficha'] as const

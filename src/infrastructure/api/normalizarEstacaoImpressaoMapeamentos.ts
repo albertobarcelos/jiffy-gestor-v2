@@ -54,8 +54,6 @@ export type MapeamentoEstacaoParaSalvar = {
   impressoraId: string
   nomeImpressoraWindows: string
   modoImpressao: ModoImpressaoImpressora
-  modo_impressao: ModoImpressaoImpressora
-  modoFicha: boolean
 }
 
 /** Vínculo físico + via de produção desta estação. Sem destino físico, o item não entra. */
@@ -68,13 +66,10 @@ export function montarMapeamentosEstacaoParaSalvar(
     const impressoraId = impressoraIdRaw.trim()
     const nomeImpressoraWindows = nomeRaw.trim()
     if (!impressoraId || !nomeImpressoraWindows) continue
-    const modoImpressao = parseModoImpressaoImpressora(modos[impressoraId])
     result.push({
       impressoraId,
       nomeImpressoraWindows,
-      modoImpressao,
-      modo_impressao: modoImpressao,
-      modoFicha: modoImpressao === 'ficha',
+      modoImpressao: parseModoImpressaoImpressora(modos[impressoraId]),
     })
   }
   return result
