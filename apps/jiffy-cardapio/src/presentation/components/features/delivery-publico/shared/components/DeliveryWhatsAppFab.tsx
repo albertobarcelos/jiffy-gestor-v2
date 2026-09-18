@@ -57,7 +57,7 @@ export function DeliveryWhatsAppFab({
       style={{
         backgroundColor: '#25D366',
         right: 'max(1rem, env(safe-area-inset-right, 0px))',
-        bottom: 'max(6rem, calc(5.5rem + env(safe-area-inset-bottom, 0px)))',
+        bottom: 'calc(6.5rem + env(safe-area-inset-bottom, 0px))',
       }}
     >
       <WhatsAppGlyph className="h-7 w-7" />

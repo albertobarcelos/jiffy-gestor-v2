@@ -140,6 +140,23 @@ html.delivery-publico-ios-lock select {
 }
 
 /**
+ * Overlay aberto: o catálogo deixa de ser scrollport.
+ * Sem `touch-action: none` — o gesto herdaria e travaria o scroll interno do modal.
+ */
+.delivery-publico-scroll--locked {
+  overflow-y: hidden;
+  overscroll-behavior: none;
+}
+
+/**
+ * Reserva o rodapé “Ver carrinho” + home indicator.
+ * Sem inset (Android/desktop) equivale a `pb-24`.
+ */
+.delivery-home-bottom-spacer {
+  padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+}
+
+/**
  * Overlays full-screen (checkout, produto) — mesma altura/largura útil do teclado.
  */
 .delivery-vv-overlay {

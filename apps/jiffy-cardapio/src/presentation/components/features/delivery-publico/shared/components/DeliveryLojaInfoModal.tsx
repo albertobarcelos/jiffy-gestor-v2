@@ -54,7 +54,10 @@ export function DeliveryLojaInfoModal({
   const temAlgumHorario = agenda.some(dia => dia.aberto)
 
   return (
-    <div className="fixed inset-0 z-[100] flex overscroll-none items-end justify-center sm:items-center sm:px-4 sm:py-6">
+    <div
+      className="delivery-vv-overlay z-[100] flex overscroll-none items-end justify-center sm:items-center sm:px-4 sm:py-6"
+      style={{ zIndex: 100 }}
+    >
       <button
         type="button"
         className="absolute inset-0"
@@ -64,7 +67,7 @@ export function DeliveryLojaInfoModal({
       />
 
       <div
-        className="relative flex h-[95dvh] max-h-[95dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl shadow-xl sm:h-auto sm:max-h-[85vh] sm:rounded-2xl"
+        className="relative flex h-[95%] max-h-[95%] w-full max-w-md flex-col overflow-hidden rounded-t-2xl shadow-xl sm:h-auto sm:max-h-[85%] sm:rounded-2xl"
         style={{ backgroundColor: 'var(--delivery-surface, #ffffff)' }}
         role="dialog"
         aria-modal="true"
@@ -83,7 +86,10 @@ export function DeliveryLojaInfoModal({
           <X className="h-5 w-5" aria-hidden />
         </button>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-5 pt-6">
+        <div
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pt-6"
+          style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom, 0px))' }}
+        >
           <div className="flex flex-col items-center text-center">
             {logo ? (
               // eslint-disable-next-line @next/next/no-img-element

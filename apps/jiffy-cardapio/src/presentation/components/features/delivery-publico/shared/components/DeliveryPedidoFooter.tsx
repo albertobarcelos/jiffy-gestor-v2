@@ -123,6 +123,7 @@ export function DeliveryPedidoFooter({
           backgroundColor: 'var(--delivery-primary-dark, #171717)',
           color: 'var(--delivery-btn-text, #ffffff)',
           minHeight: '3.5rem',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         }}
       >
         <div className="flex min-h-[3.5rem] min-w-0 items-center px-5 py-2">

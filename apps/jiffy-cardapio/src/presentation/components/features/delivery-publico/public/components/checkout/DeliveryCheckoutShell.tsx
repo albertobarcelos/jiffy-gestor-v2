@@ -301,9 +301,12 @@ export function DeliveryCheckoutShell({
             animate="center"
             exit="exit"
             transition={SLIDE_TRANSITION}
-            className="absolute inset-0 max-w-full touch-pan-y overflow-x-hidden overflow-y-auto overscroll-y-contain px-4 py-4"
+            className="absolute inset-0 max-w-full overflow-hidden"
           >
-            {children}
+            {/* Scroll fora do nó com transform — o Safari iOS vaza o gesto se os dois coincidem. */}
+            <div className="h-full min-h-0 touch-pan-y overflow-x-hidden overflow-y-auto overscroll-y-contain px-4 py-4">
+              {children}
+            </div>
           </motion.div>
         </AnimatePresence>
       </div>

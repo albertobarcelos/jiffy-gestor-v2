@@ -19,7 +19,10 @@ export function DeliveryComplementosObrigatoriosAlertDialog({
   if (gruposPendentes.length === 0) return null
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center px-4">
+    <div
+      className="delivery-vv-overlay z-[70] flex items-center justify-center overscroll-none px-4"
+      style={{ zIndex: 70 }}
+    >
       <div
         className="absolute inset-0"
         style={{ backgroundColor: 'var(--delivery-overlay, rgba(0, 0, 0, 0.55))' }}
