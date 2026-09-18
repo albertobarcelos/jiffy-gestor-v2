@@ -3,6 +3,7 @@ import {
   atorUsuarioId,
   copiarNomeEntreIdsDoAtor,
   idUsuarioGestorConsultavel,
+  idUsuarioParaConsulta,
   idsConsultaveisDoAtor,
   nomeAtorPedido,
   nomeUsuarioDePayloadApi,
@@ -20,6 +21,15 @@ describe('idUsuarioGestorConsultavel', () => {
     expect(idUsuarioGestorConsultavel('65999745637')).toBe(false)
     expect(idUsuarioGestorConsultavel('6599974563')).toBe(false)
   })
+
+  it('aceita ator migrado pelo CUID real, não pelo prefixo', () => {
+    expect(
+      idUsuarioParaConsulta('migr_ator_usuario_gestor_cmc6u1ek90012jkwxoft21ykp')
+    ).toBe('cmc6u1ek90012jkwxoft21ykp')
+    expect(
+      idUsuarioGestorConsultavel('migr_ator_usuario_gestor_cmc6u1ek90012jkwxoft21ykp')
+    ).toBe(true)
+  })
 })
 
 describe('atorUsuarioId', () => {
@@ -34,6 +44,15 @@ describe('atorUsuarioId', () => {
 
   it('mantém o telefone quando o ator é o cliente do cardápio', () => {
     expect(atorUsuarioId({ sourceReference: '65999745637' })).toBe('65999745637')
+  })
+
+  it('desfaz o prefixo de ator migrado', () => {
+    expect(
+      atorUsuarioId({
+        id: 'migr_ator_usuario_gestor_cmc6u1ek90012jkwxoft21ykp',
+        nome: 'Funcionário',
+      })
+    ).toBe('cmc6u1ek90012jkwxoft21ykp')
   })
 })
 

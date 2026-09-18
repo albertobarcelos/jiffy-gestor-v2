@@ -4,14 +4,32 @@
  * que não é ID de usuário gestor.
  */
 
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const CUID = /^[cC][a-z0-9]{20,}$/
+const PREFIXO_ATOR_MIGRADO = /^migr_ator_.+_([0-9a-fA-F-]{20,}|[cC][a-z0-9]{20,})$/
+
+/**
+ * Id de funcionário que a API de pessoas aceita.
+ * Ator migrado chega como `migr_ator_usuario_gestor_<cuid>` — o sufixo é o id real.
+ */
+export function idUsuarioParaConsulta(id: string | null | undefined): string | null {
+  const v = String(id ?? '').trim()
+  if (!v) return null
+
+  const migrado = v.match(PREFIXO_ATOR_MIGRADO)
+  if (migrado?.[1]) return idUsuarioParaConsulta(migrado[1])
+
+  if (/^\d{8,15}$/.test(v)) return null
+  if (UUID.test(v) || CUID.test(v)) return v
+  if (v.startsWith('migr_ator_')) return null
+  if (/[a-zA-Z]/.test(v) && /^[a-zA-Z0-9_-]{16,}$/.test(v)) return v
+  return null
+}
+
 /** CUID/UUID (ou id alfanumérico). Só dígitos (telefone) não é funcionário. */
 export function idUsuarioGestorConsultavel(id: string | null | undefined): boolean {
-  const v = String(id ?? '').trim()
-  if (!v) return false
-  if (/^\d{8,15}$/.test(v)) return false
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)) return true
-  if (/^[cC][a-z0-9]{20,}$/i.test(v)) return true
-  return /[a-zA-Z]/.test(v) && /^[a-zA-Z0-9_-]{16,}$/.test(v)
+  return idUsuarioParaConsulta(id) != null
 }
 
 export function atorUsuarioId(ator: unknown): string | null {
@@ -23,9 +41,7 @@ export function atorUsuarioId(ator: unknown): string | null {
   const a = ator as Record<string, unknown>
   const id = String(a.id ?? '').trim()
   const ref = String(a.sourceReference ?? '').trim()
-  if (idUsuarioGestorConsultavel(id)) return id
-  if (idUsuarioGestorConsultavel(ref)) return ref
-  return id || ref || null
+  return idUsuarioParaConsulta(id) || idUsuarioParaConsulta(ref) || id || ref || null
 }
 
 /** IDs de funcionário no ator (vinculo gestor, identidade, sourceReference). */
@@ -38,8 +54,8 @@ export function idsConsultaveisDoAtor(ator: unknown): string[] {
   const a = ator as Record<string, unknown>
   const out: string[] = []
   for (const candidato of [a.id, a.sourceReference, a.usuarioId, a.userId, a.usuarioGestorId]) {
-    const v = String(candidato ?? '').trim()
-    if (!v || !idUsuarioGestorConsultavel(v) || out.includes(v)) continue
+    const v = idUsuarioParaConsulta(String(candidato ?? ''))
+    if (!v || out.includes(v)) continue
     out.push(v)
   }
   return out

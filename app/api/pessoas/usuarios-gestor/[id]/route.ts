@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
+import { idUsuarioParaConsulta } from '@/src/application/mappers/atorPedidoDelivery'
 
 /**
  * GET /api/pessoas/usuarios-gestor/[id]
@@ -17,7 +18,8 @@ export async function GET(
     }
     const { tokenInfo } = validation
 
-    const { id } = await params
+    const { id: idBruto } = await params
+    const id = idUsuarioParaConsulta(idBruto) || idBruto
     if (!id) {
       return NextResponse.json({ error: 'ID do usuário gestor é obrigatório' }, { status: 400 })
     }

@@ -22,7 +22,7 @@ import { deveUsarModuloDeliveryParaDetalhe } from '@/src/application/mappers/Ped
 import {
   atorUsuarioId,
   copiarNomeEntreIdsDoAtor,
-  idUsuarioGestorConsultavel,
+  idUsuarioParaConsulta,
   idsConsultaveisDoAtor,
   nomeUsuarioDePayloadApi,
   rotuloAtorPedido,
@@ -188,12 +188,25 @@ async function resolverNomesUsuarios(
 ): Promise<Record<string, string>> {
   const mapUsuarios: Record<string, string> = { ...nomesEmbutidos }
 
+  const aliasesPorConsulta = new Map<string, string[]>()
+  for (const usuarioId of idsUsuarios) {
+    const consultaId = idUsuarioParaConsulta(usuarioId)
+    if (!consultaId) continue
+    const aliases = aliasesPorConsulta.get(consultaId) ?? []
+    aliases.push(usuarioId)
+    aliasesPorConsulta.set(consultaId, aliases)
+  }
+
   await Promise.all(
-    Array.from(idsUsuarios).map(async usuarioId => {
-      if (mapUsuarios[usuarioId]) return
-      if (!idUsuarioGestorConsultavel(usuarioId)) return
-      const nome = await buscarNomeUsuarioPedido(repo, usuarioId, tabelaOrigemVenda, token)
-      if (nome) mapUsuarios[usuarioId] = nome
+    Array.from(aliasesPorConsulta.entries()).map(async ([consultaId, aliases]) => {
+      const nomeJaResolvido =
+        mapUsuarios[consultaId] || aliases.map(id => mapUsuarios[id]).find(Boolean) || ''
+      const nome =
+        nomeJaResolvido ||
+        (await buscarNomeUsuarioPedido(repo, consultaId, tabelaOrigemVenda, token))
+      if (!nome) return
+      mapUsuarios[consultaId] = nome
+      for (const alias of aliases) mapUsuarios[alias] = nome
     })
   )
 
