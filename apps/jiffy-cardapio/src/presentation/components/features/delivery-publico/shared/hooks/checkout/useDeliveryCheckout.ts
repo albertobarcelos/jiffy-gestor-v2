@@ -56,6 +56,8 @@ export function useDeliveryCheckout(slug: string, options?: UseDeliveryCheckoutO
   const clienteLookupBridgeRef = useRef<{ cliente: ClienteDeliveryPublicoDTO | null }>({
     cliente: null,
   })
+  /** Total sob o qual os pagamentos atuais foram lançados / validados. */
+  const totalPagamentosBaselineRef = useRef<number | null>(null)
 
   const resolveTelefoneApi = useCallback((formData: CheckoutFormData) => {
     return (
@@ -73,23 +75,37 @@ export function useDeliveryCheckout(slug: string, options?: UseDeliveryCheckoutO
     telefoneDigitsRef,
   })
 
-  const limparCotacaoComPagamentos = useCallback(() => {
+  /**
+   * Invalida só o token de cotação.
+   * Pagamentos só caem quando o total oficial muda (`deveLimparPagamentosPorMudancaTotal`)
+   * ou em reset explícito do carrinho após pedido.
+   */
+  const limparCotacao = useCallback(() => {
     cotacaoApi.limparCotacao()
+  }, [cotacaoApi.limparCotacao])
+
+  const limparPagamentos = useCallback(() => {
     if (formRef.current.pagamentos.length === 0) return
     const next = { ...formRef.current, pagamentos: [] }
     formRef.current = next
     setForm(next)
-  }, [cotacaoApi.limparCotacao])
+    totalPagamentosBaselineRef.current = null
+  }, [])
+
+  const limparCotacaoEPagamentos = useCallback(() => {
+    limparCotacao()
+    limparPagamentos()
+  }, [limparCotacao, limparPagamentos])
 
   useEffect(() => {
-    limparCotacaoComPagamentos()
-  }, [itens, limparCotacaoComPagamentos])
+    limparCotacao()
+  }, [itens, limparCotacao])
 
   const clienteApi = useCheckoutCliente({
     formRef,
     setForm,
     telefoneDigitsRef,
-    limparCotacao: limparCotacaoComPagamentos,
+    limparCotacao,
     cotacaoRef: cotacaoApi.cotacaoRef,
     cotacaoSeqRef: cotacaoApi.cotacaoSeqRef,
     setCotacao: cotacaoApi.setCotacao,
@@ -177,9 +193,6 @@ export function useDeliveryCheckout(slug: string, options?: UseDeliveryCheckoutO
   const cotacaoPronta =
     Boolean(cotacaoApi.cotacao?.tokenCotacao) && !cotacaoApi.cotacaoLoading
 
-  /** Total sob o qual os pagamentos atuais foram lançados / validados. */
-  const totalPagamentosBaselineRef = useRef<number | null>(null)
-
   useEffect(() => {
     const pagamentos = formRef.current.pagamentos
     const baseline = totalPagamentosBaselineRef.current
@@ -203,9 +216,9 @@ export function useDeliveryCheckout(slug: string, options?: UseDeliveryCheckoutO
   }, [totalOficial])
 
   const limparCarrinhoAposPedido = useCallback(() => {
-    limparCotacaoComPagamentos()
+    limparCotacaoEPagamentos()
     limpar(slug)
-  }, [limpar, slug, limparCotacaoComPagamentos])
+  }, [limpar, slug, limparCotacaoEPagamentos])
 
   return {
     itens,
@@ -218,7 +231,7 @@ export function useDeliveryCheckout(slug: string, options?: UseDeliveryCheckoutO
     cotacaoPronta,
     recotarPedido: cotacaoApi.recotarPedido,
     aplicarCotacaoAtualizada: cotacaoApi.aplicarCotacaoAtualizada,
-    limparCotacao: limparCotacaoComPagamentos,
+    limparCotacao,
     limparCarrinhoAposPedido,
     foraCoberturaDialogAberto: cotacaoApi.foraCoberturaDialogAberto,
     fecharForaCoberturaDialog: cotacaoApi.fecharForaCoberturaDialog,
