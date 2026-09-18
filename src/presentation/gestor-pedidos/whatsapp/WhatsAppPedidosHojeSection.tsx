@@ -11,7 +11,7 @@ import {
 } from '@/src/presentation/hooks/useVendas'
 import { useEntregaTransicoesKanban } from '@/src/presentation/components/features/delivery/kanban-panels/useEntregaTransicoesKanban'
 import { DeliveryConfiguracoesModal } from '@/src/presentation/components/features/delivery/configuracoes/DeliveryConfiguracoesModal'
-import { KanbanVendaCard } from '@/src/presentation/components/features/kanban/components/KanbanVendaCard'
+import { WhatsAppPedidoHojeResumoCard } from './WhatsAppPedidoHojeResumoCard'
 import { NovoPedidoModal } from '@/src/presentation/components/features/pedidos/NovoPedidoModal'
 import { EmitirNfeModal } from '@/src/presentation/components/features/fiscal/EmitirNfeModal'
 import { AlertaCbenefEmissaoDialog } from '@/src/presentation/components/features/fiscal/AlertaCbenefEmissaoDialog'
@@ -153,7 +153,6 @@ export function WhatsAppPedidosHojeSection({ telefone, clienteNome, onOverlayAbe
   const {
     avancandoEtapaIds,
     etapaLocalPorVendaId,
-    timestampsEtapaEntregaLocal,
     handleAvancarEtapa,
   } = useEntregaTransicoesKanban({
     executarTransicao: payload => transicaoPedidoDelivery.mutateAsync(payload),
@@ -180,7 +179,7 @@ export function WhatsAppPedidosHojeSection({ telefone, clienteNome, onOverlayAbe
 
   const emitirNotaDelivery = useEmitirNfeDelivery()
   const [, setPrimeiroPorColuna] = useState<Record<string, string>>({})
-  const { acaoFiscalEmAndamentoPorVenda, handleEmitirNfe, alertaCbenef, handleContinuarCbenefKanban, handleConfigurarCbenefKanban, handleCancelarCbenefKanban } = useFiscalEmissaoKanban({
+  const { alertaCbenef, handleContinuarCbenefKanban, handleConfigurarCbenefKanban, handleCancelarCbenefKanban } = useFiscalEmissaoKanban({
     reemitirNfePdv: async () => undefined,
     reemitirNfeGestor: async () => undefined,
     emitirNotaPdv: async () => undefined,
@@ -210,11 +209,6 @@ export function WhatsAppPedidosHojeSection({ telefone, clienteNome, onOverlayAbe
     invalidateKanbanVendasListagens(queryClient)
   }, [query, queryClient])
 
-  const [paineisCardAbertos, setPaineisCardAbertos] = useState(0)
-  const onPainelCardAbertoChange = useCallback((aberto: boolean) => {
-    setPaineisCardAbertos(n => Math.max(0, n + (aberto ? 1 : -1)))
-  }, [])
-
   useEffect(() => {
     if (!enabled || !query.hasNextPage || query.isFetchingNextPage) return
     void query.fetchNextPage()
@@ -222,7 +216,6 @@ export function WhatsAppPedidosHojeSection({ telefone, clienteNome, onOverlayAbe
 
   useEffect(() => {
     const aberto =
-      paineisCardAbertos > 0 ||
       Boolean(alertaCbenef) ||
       modais.novoPedidoModalVisualizacaoOpen ||
       modais.novoPedidoModalEdicaoProdutosOpen ||
@@ -233,7 +226,6 @@ export function WhatsAppPedidosHojeSection({ telefone, clienteNome, onOverlayAbe
     return () => onOverlayAberto?.(false)
   }, [
     alertaCbenef,
-    paineisCardAbertos,
     modais.novoPedidoModalVisualizacaoOpen,
     modais.novoPedidoModalEdicaoProdutosOpen,
     modais.emitirNfeModalOpen,
@@ -261,39 +253,14 @@ export function WhatsAppPedidosHojeSection({ telefone, clienteNome, onOverlayAbe
           const etapa = getEtapaKanbanParaExibicao(venda) as ColunaKanbanId
           const coluna = colunasPorId.get(etapa) ?? colunasPorId.get('NOVOS_PEDIDOS')!
           return (
-            <article
+            <WhatsAppPedidoHojeResumoCard
               key={venda.id}
-              className={`min-w-0 overflow-hidden rounded-xl border ${coluna.borderColor} shadow-sm ${coluna.color}`}
-            >
-              <div className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-primary-text">
-                {coluna.icon}
-                <span className="min-w-0 truncate">{coluna.title}</span>
-              </div>
-              <div className="border-t border-black/5 bg-white/90">
-                <KanbanVendaCard
-                  venda={venda}
-                  column={coluna}
-                  modoKanbanVendas="delivery"
-                  acaoFiscalEmAndamentoPorVenda={acaoFiscalEmAndamentoPorVenda}
-                  avancandoEtapaIds={avancandoEtapaIds}
-                  timestampsEtapaEntregaLocal={timestampsEtapaEntregaLocal}
-                  onViewDetails={modais.handleViewDetails}
-                  onEditarProdutos={modais.handleEditarProdutos}
-                  onAvancarEtapa={(vendaAtual, colunaAtual) =>
-                    void handleAvancarEtapa(vendaAtual, colunaAtual)
-                  }
-                  onEmitirNfe={vendaAtual => void handleEmitirNfe(vendaAtual)}
-                  onReimprimirCupomDelivery={(vendaAtual, colunaAtual) =>
-                    preTransicao.reimprimirCupomEntrega(vendaAtual, colunaAtual)
-                  }
-                  entregadorVinculadoId={entregador.entregadorPorVendaId[venda.id] ?? null}
-                  onEntregadorAtualizado={entregador.handleEntregadorAtualizado}
-                  nomesMeiosPagamento={nomesMeiosPagamento}
-                  arrastarDesabilitado
-                  onPainelAbertoChange={onPainelCardAbertoChange}
-                />
-              </div>
-            </article>
+              venda={venda}
+              coluna={coluna}
+              avancando={Boolean(avancandoEtapaIds[venda.id])}
+              onAbrir={modais.handleViewDetails}
+              onAvancar={(vendaAtual, colunaAtual) => void handleAvancarEtapa(vendaAtual, colunaAtual)}
+            />
           )
         })
       )}
