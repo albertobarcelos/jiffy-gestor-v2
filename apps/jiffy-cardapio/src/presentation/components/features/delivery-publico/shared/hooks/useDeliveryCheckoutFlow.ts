@@ -66,6 +66,14 @@ export function useDeliveryCheckoutFlow({
   const goToCheckoutStep = useCallback((next: DeliveryCheckoutStep) => {
     setCheckoutDirection(calcularDirecaoSlide(prevCheckoutStepRef.current, next))
     prevCheckoutStepRef.current = next
+    /**
+     * `voltarParaRevisao` só vale enquanto o usuário está fora da revisão editando
+     * um passo. Ao chegar de novo em `revisao`, o “retorno” já ocorreu — limpar
+     * evita o loop revisão → pagamento → revisão no botão Voltar.
+     */
+    if (next === 'revisao') {
+      setVoltarParaRevisao(false)
+    }
     setCheckoutStep(next)
   }, [])
 

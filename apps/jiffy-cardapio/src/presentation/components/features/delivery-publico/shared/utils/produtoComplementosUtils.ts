@@ -116,3 +116,90 @@ export function validarGruposComplementos(
     mensagem: `Selecione pelo menos ${primeiro.quantidadeMinima} em "${primeiro.nome}"`,
   }
 }
+
+export type GrupoComplementoAcimaDoMaximo = {
+  id: string
+  nome: string
+  quantidadeMaxima: number
+  quantidadeSelecionada: number
+}
+
+/** `qtdMaxima` 0 significa ilimitado — o mesmo critério do modal. */
+export function listarGruposComplementosAcimaDoMaximo(
+  grupos: GrupoComplementoResolvido[],
+  quantidades: Record<string, number>
+): GrupoComplementoAcimaDoMaximo[] {
+  return grupos.flatMap(grupo => {
+    if (grupo.qtdMaxima <= 0) return []
+    const quantidadeSelecionada = somarQuantidadeNoGrupo(quantidades, grupo.id)
+    if (quantidadeSelecionada <= grupo.qtdMaxima) return []
+
+    return [{
+      id: grupo.id,
+      nome: grupo.nome,
+      quantidadeMaxima: grupo.qtdMaxima,
+      quantidadeSelecionada,
+    }]
+  })
+}
+
+export type ComplementoQuantidadeCarrinho = {
+  complementoId: string
+  grupoComplementoId: string
+  quantidade: number
+}
+
+export function quantidadesComplementosCarrinho(
+  complementos: ComplementoQuantidadeCarrinho[]
+): Record<string, number> {
+  const quantidades: Record<string, number> = {}
+  for (const complemento of complementos) {
+    const key = chaveComplemento(complemento.grupoComplementoId, complemento.complementoId)
+    const atual = quantidades[key] ?? 0
+    quantidades[key] = atual + Math.max(0, Math.floor(complemento.quantidade))
+  }
+  return quantidades
+}
+
+export type AvaliacaoComplementosItemCarrinho =
+  | { status: 'ok' }
+  | { status: 'indefinido' }
+  | {
+      status: 'invalido'
+      produtoNome: string
+      pendentes: GrupoComplementoPendente[]
+      acimaDoMaximo: GrupoComplementoAcimaDoMaximo[]
+    }
+
+/**
+ * Confere mínimo e máximo do item contra o catálogo.
+ * Sem produto ou sem cache de grupos, devolve `indefinido` — não dá para saber se o complemento é obrigatório.
+ */
+export function avaliarComplementosItemCarrinho(input: {
+  produto: CatalogoPublicoProdutoDTO | null
+  cache: ComplementosCatalogoCache | null
+  produtoNome: string
+  complementos: ComplementoQuantidadeCarrinho[]
+}): AvaliacaoComplementosItemCarrinho {
+  if (!input.produto) return { status: 'indefinido' }
+  if (!produtoTemComplementosAtivos(input.produto)) return { status: 'ok' }
+  if (!cacheComplementosCobreProduto(input.cache, input.produto)) {
+    return { status: 'indefinido' }
+  }
+
+  const grupos = resolveGruposComplementos(input.cache, input.produto)
+  const quantidades = quantidadesComplementosCarrinho(input.complementos)
+  const pendentes = listarGruposComplementosPendentes(grupos, quantidades)
+  const acimaDoMaximo = listarGruposComplementosAcimaDoMaximo(grupos, quantidades)
+
+  if (pendentes.length === 0 && acimaDoMaximo.length === 0) {
+    return { status: 'ok' }
+  }
+
+  return {
+    status: 'invalido',
+    produtoNome: input.produtoNome,
+    pendentes,
+    acimaDoMaximo,
+  }
+}

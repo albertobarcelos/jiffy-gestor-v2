@@ -22,6 +22,7 @@ import {
   type DeliveryCheckoutCotacaoState,
   isTokenCotacaoExpirado,
   mapCotacaoDtoToCheckoutState,
+  tokenCotacaoPertoDeVencer,
 } from '../../utils/deliveryCheckoutCotacaoUtils'
 import type { RecotarPedidoResult } from './types'
 
@@ -88,6 +89,8 @@ export function useCheckoutCotacao({
     async (options?: {
       silencioso?: boolean
       chaveAuto?: string
+      /** Ignora cache quando o token está perto de vencer. Falha não apaga a cotação atual. */
+      forcar?: boolean
     }): Promise<RecotarPedidoResult> => {
       const bloqueio = cotacaoAutoBloqueioRef.current
       if (Date.now() < bloqueio.rateLimitAte) {
@@ -123,7 +126,13 @@ export function useCheckoutCotacao({
         fingerprintItens: fingerprintItensCotacao(itens),
       })
       const cached = queryClient.getQueryData<CotacaoQueryCacheEntry>(queryKey)
-      if (cached?.state && !isTokenCotacaoExpirado(cached.state.expiresAt)) {
+      const cacheUtil =
+        cached?.state && !isTokenCotacaoExpirado(cached.state.expiresAt)
+      const renovarCache =
+        options?.forcar &&
+        cached?.state != null &&
+        tokenCotacaoPertoDeVencer(cached.state.expiresAt)
+      if (cacheUtil && !renovarCache) {
         cotacaoSeqRef.current += 1
         setCotacao(cached.state)
         setCotacaoLoading(false)
@@ -148,7 +157,7 @@ export function useCheckoutCotacao({
         if (seq !== cotacaoSeqRef.current) return { ok: false, reason: 'bloqueado' }
 
         if (!resultado.ok) {
-          setCotacao(null)
+          if (!options?.forcar) setCotacao(null)
           if (options?.chaveAuto) {
             const ate =
               resultado.httpStatus === 429
@@ -184,7 +193,7 @@ export function useCheckoutCotacao({
         return { ok: true }
       } catch (error) {
         if (seq !== cotacaoSeqRef.current) return { ok: false, reason: 'bloqueado' }
-        setCotacao(null)
+        if (!options?.forcar) setCotacao(null)
         if (options?.chaveAuto) {
           cotacaoAutoBloqueioRef.current = {
             chaveFalha: options.chaveAuto,

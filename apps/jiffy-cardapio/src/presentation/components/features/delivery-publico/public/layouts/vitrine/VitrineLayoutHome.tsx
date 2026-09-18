@@ -1,12 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { DeliveryBuscaProdutos } from '../../../shared/components/DeliveryBuscaProdutos'
 import { DeliveryPedidoFooter } from '../../../shared/components/DeliveryPedidoFooter'
 import { filterViewModelByBusca } from '../../../shared/utils/filterViewModelByBusca'
 import type { DeliveryLayoutHomeProps } from '../DeliveryLayoutHomeProps'
 import { DeliveryVitrineHeader } from './components/DeliveryVitrineHeader'
 import { DeliveryVitrineCategoriaTabs } from './components/DeliveryVitrineCategoriaTabs'
+import { DeliveryBasicoCatalogStickyNav } from '../basico/DeliveryBasicoCatalogStickyNav'
 import { DeliveryVitrineSecaoGrupo } from './components/DeliveryVitrineSecaoGrupo'
 import { DeliveryPublicoLojaFooter } from '../../../shared/components/DeliveryPublicoLojaFooter'
 import { DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID } from '../../../shared/constants/deliveryPublicoSugestoes'
@@ -37,6 +38,7 @@ export function VitrineLayoutHome({
   }, [filtered.grupos, activeGrupoId])
 
   const stickyFooterVisible = viewModel.carrinho.quantidadeItens > 0
+  const catalogRootRef = useRef<HTMLDivElement>(null)
 
   const handleGrupoClick = useCallback(
     (grupoId: string) => {
@@ -47,19 +49,21 @@ export function VitrineLayoutHome({
   )
 
   return (
-    <div className="flex min-h-full flex-col pb-24">
+    <div ref={catalogRootRef} className="delivery-home-bottom-spacer flex min-h-full flex-col">
       <DeliveryVitrineHeader
         config={config}
         disponivel={viewModel.disponivel}
       />
 
-      <DeliveryVitrineCategoriaTabs
-        grupos={filtered.grupos}
-        activeGrupoId={activeGrupoId}
-        interactive={interactive}
-        onGrupoClick={handleGrupoClick}
-        onSearchToggle={() => setBuscaAberta(current => !current)}
-      />
+      <DeliveryBasicoCatalogStickyNav catalogRootRef={catalogRootRef}>
+        <DeliveryVitrineCategoriaTabs
+          grupos={filtered.grupos}
+          activeGrupoId={activeGrupoId}
+          interactive={interactive}
+          onGrupoClick={handleGrupoClick}
+          onSearchToggle={() => setBuscaAberta(current => !current)}
+        />
+      </DeliveryBasicoCatalogStickyNav>
 
       {buscaAberta ? (
         <DeliveryBuscaProdutos

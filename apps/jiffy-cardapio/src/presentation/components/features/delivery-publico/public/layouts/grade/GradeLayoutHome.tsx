@@ -34,7 +34,7 @@ export function GradeLayoutHome({
 
   return (
     <div
-      className="flex min-h-full flex-col pb-24"
+      className="delivery-home-bottom-spacer flex min-h-full flex-col"
       style={{ backgroundColor: 'var(--delivery-primary-dark)' }}
     >
       <DeliveryGradeHeader

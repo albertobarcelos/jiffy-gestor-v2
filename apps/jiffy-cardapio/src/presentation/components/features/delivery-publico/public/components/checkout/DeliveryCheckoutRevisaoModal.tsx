@@ -56,6 +56,7 @@ type DeliveryCheckoutRevisaoModalProps = {
   observacaoPedido: string
   cpfNotaFiscal: string
   enviando?: boolean
+  etapaEnvio?: 'validando' | 'salvando_endereco' | 'enviando_pedido' | null
   onClose?: () => void
   onVoltar: () => void
   onEditarTipoEntrega?: () => void
@@ -162,6 +163,7 @@ export function DeliveryCheckoutRevisaoModal({
   observacaoPedido,
   cpfNotaFiscal,
   enviando = false,
+  etapaEnvio = null,
   onClose: _onClose,
   onVoltar,
   onEditarTipoEntrega,
@@ -191,9 +193,11 @@ export function DeliveryCheckoutRevisaoModal({
   const subtotalExibicao = subtotalOficial ?? total
   const taxaExibicao = taxaEntregaOficial ?? 0
   const exibirTaxaEntrega = isEntrega
-  const taxaEntregaTexto = cotacaoLoading
-    ? 'Calculando...'
-    : formatDeliveryCurrency(taxaExibicao)
+  const temValoresOficiais = totalOficial != null
+  const taxaEntregaTexto =
+    cotacaoLoading && !enviando && !temValoresOficiais
+      ? 'Calculando...'
+      : formatDeliveryCurrency(taxaExibicao)
   const trocoReceber = calcularTrocoCheckout(
     totalExibicao,
     pagamentos.map(p => ({ meioPagamentoId: p.meioPagamentoId, valor: p.valor })),
@@ -255,13 +259,17 @@ export function DeliveryCheckoutRevisaoModal({
           <DeliveryCheckoutFooterActions
             onVoltar={onVoltar}
             onContinuar={() => onEnviar?.()}
-            continuarDisabled={enviando || cotacaoLoading || !cotacaoPronta}
+            continuarDisabled={enviando || !cotacaoPronta}
             continuarLabel={
-              cotacaoLoading
-                ? 'Atualizando valores...'
-                : enviando
-                  ? 'Enviando...'
-                  : 'Enviar pedido'
+              etapaEnvio === 'validando'
+                ? 'Validando valores...'
+                : etapaEnvio === 'salvando_endereco'
+                  ? 'Salvando endereço...'
+                  : etapaEnvio === 'enviando_pedido' || enviando
+                    ? 'Enviando pedido...'
+                    : cotacaoLoading && !cotacaoPronta
+                      ? 'Atualizando valores...'
+                      : 'Enviar pedido'
             }
           />
         )}
@@ -597,7 +605,7 @@ export function DeliveryCheckoutRevisaoModal({
         )}
 
         <div className="space-y-2 pt-3">
-          {cotacaoLoading ? (
+          {cotacaoLoading && !enviando && !temValoresOficiais ? (
             <p className="text-xs delivery-text-secondary">Calculando valores oficiais...</p>
           ) : null}
           <div className="flex items-center justify-between text-sm">

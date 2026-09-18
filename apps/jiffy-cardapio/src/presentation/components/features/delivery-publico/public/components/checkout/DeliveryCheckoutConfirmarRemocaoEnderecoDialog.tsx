@@ -23,7 +23,13 @@ export function DeliveryCheckoutConfirmarRemocaoEnderecoDialog({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[100] flex overscroll-none items-end justify-center px-4 pb-6 sm:items-center">
+    <div
+      className="delivery-vv-overlay z-[100] flex overscroll-none items-end justify-center px-4 sm:items-center"
+      style={{
+        zIndex: 100,
+        paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 0px))',
+      }}
+    >
       <button
         type="button"
         className="absolute inset-0"

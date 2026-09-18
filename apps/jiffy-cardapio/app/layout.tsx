@@ -9,7 +9,10 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  interactiveWidget: 'resizes-content',
+  /**
+   * Sem `interactiveWidget`: o shell já sincroniza `visualViewport`.
+   * Os dois juntos redimensionam o layout duas vezes no Safari iOS.
+   */
 }
 
 export const metadata = {

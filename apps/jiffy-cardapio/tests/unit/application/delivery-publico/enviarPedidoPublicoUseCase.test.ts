@@ -93,6 +93,31 @@ describe('EnviarPedidoPublicoUseCase', () => {
     expect(publicDeliveryApi.atualizarClienteDeliveryPublico).not.toHaveBeenCalled()
   })
 
+  it('avisa a etapa de endereço e a de envio', async () => {
+    const etapas: string[] = []
+    const garantir = criarGarantirUseCase()
+    vi.spyOn(garantir, 'execute').mockResolvedValue({ enderecoId: 'end-1', cliente: null })
+    const useCase = criarEnviarUseCase(garantir)
+
+    await useCase.execute({
+      slug: 'loja',
+      telefoneApi: '11999999999',
+      nomeEfetivo: 'Cliente',
+      itens: [item],
+      total: 20,
+      form: formBase({
+        tipoEntrega: 'entrega',
+        modoEndereco: 'existente',
+        enderecoIdSelecionado: 'end-1',
+      }),
+      clienteLookup: null,
+      tokenCotacao,
+      onEtapa: etapa => etapas.push(etapa),
+    })
+
+    expect(etapas).toEqual(['salvando_endereco', 'enviando_pedido'])
+  })
+
   it('faz PATCH de CPF quando cliente existe sem CPF', async () => {
     vi.mocked(publicDeliveryApi.buscarClienteDeliveryPublico).mockResolvedValue({
       telefone: '11999999999',

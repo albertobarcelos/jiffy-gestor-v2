@@ -32,7 +32,7 @@ export function BasicoLayoutHome({
   const catalogRootRef = useRef<HTMLDivElement>(null)
 
   return (
-    <div ref={catalogRootRef} className="delivery-basico-catalog-root flex min-h-full flex-col pb-24">
+    <div ref={catalogRootRef} className="delivery-basico-catalog-root delivery-home-bottom-spacer flex min-h-full flex-col">
       <DeliveryBasicoTopNav
         config={config}
         carrinhoQuantidade={viewModel.carrinho.quantidadeItens}

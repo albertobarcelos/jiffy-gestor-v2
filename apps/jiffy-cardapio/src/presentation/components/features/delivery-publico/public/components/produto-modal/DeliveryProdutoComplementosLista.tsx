@@ -42,7 +42,8 @@ export function DeliveryProdutoComplementosLista({
               {grupo.obrigatorio ? <span className="ml-1 text-red-400">*</span> : null}
             </p>
             <span className="shrink-0 text-xs font-medium tabular-nums opacity-90">
-              Min: {grupo.qtdMinima} - Max: {grupo.qtdMaxima}
+              Min: {grupo.qtdMinima} - Max:{' '}
+              {grupo.qtdMaxima > 0 ? grupo.qtdMaxima : '∞'}
             </span>
           </div>
           <div

@@ -1,10 +1,19 @@
 'use client'
 
 import { MdClose } from 'react-icons/md'
-import type { GrupoComplementoPendente } from '../../shared/utils/produtoComplementosUtils'
+import type {
+  GrupoComplementoAcimaDoMaximo,
+  GrupoComplementoPendente,
+} from '../../shared/utils/produtoComplementosUtils'
+
+type GrupoPendenteAlerta = GrupoComplementoPendente & { produtoNome?: string }
+type GrupoAcimaDoMaximoAlerta = GrupoComplementoAcimaDoMaximo & { produtoNome?: string }
 
 type DeliveryComplementosObrigatoriosAlertDialogProps = {
-  gruposPendentes: GrupoComplementoPendente[]
+  gruposPendentes: GrupoPendenteAlerta[]
+  gruposAcimaDoMaximo?: GrupoAcimaDoMaximoAlerta[]
+  /** No carrinho a frase do detalhe do produto não cabe: o item já está na lista. */
+  origem?: 'detalhe-produto' | 'remocao-carrinho'
   onConfirmar: () => void
 }
 
@@ -12,14 +21,32 @@ function formatarQuantidadeItens(quantidade: number): string {
   return quantidade === 1 ? '1 item' : `${quantidade} itens`
 }
 
+function rotuloProduto(produtoNome: string | undefined) {
+  if (!produtoNome) return null
+  return (
+    <>
+      {' '}
+      do produto <strong className="delivery-text-primary">{produtoNome}</strong>
+    </>
+  )
+}
+
 export function DeliveryComplementosObrigatoriosAlertDialog({
   gruposPendentes,
+  gruposAcimaDoMaximo = [],
+  origem = 'detalhe-produto',
   onConfirmar,
 }: DeliveryComplementosObrigatoriosAlertDialogProps) {
-  if (gruposPendentes.length === 0) return null
+  if (gruposPendentes.length === 0 && gruposAcimaDoMaximo.length === 0) return null
+
+  const somenteMaximo = gruposPendentes.length === 0
+  const remocaoCarrinho = origem === 'remocao-carrinho'
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center px-4">
+    <div
+      className="delivery-vv-overlay z-[70] flex items-center justify-center overscroll-none px-4"
+      style={{ zIndex: 70 }}
+    >
       <div
         className="absolute inset-0"
         style={{ backgroundColor: 'var(--delivery-overlay, rgba(0, 0, 0, 0.55))' }}
@@ -56,7 +83,11 @@ export function DeliveryComplementosObrigatoriosAlertDialog({
           id="delivery-complementos-obrigatorios-titulo"
           className="delivery-font-title mt-4 text-center text-base font-bold leading-snug delivery-text-primary"
         >
-          Ops! Separei alguns complementos obrigatórios para você olhar!
+          {remocaoCarrinho
+            ? 'Ops! Você não pode remover este complemento.'
+            : somenteMaximo
+              ? 'Ops! Alguns complementos passaram do máximo permitido.'
+              : 'Ops! Separei alguns complementos obrigatórios para você olhar!'}
         </p>
 
         <ul
@@ -64,7 +95,7 @@ export function DeliveryComplementosObrigatoriosAlertDialog({
           className="mt-4 space-y-3 text-center text-sm leading-relaxed delivery-text-secondary"
         >
           {gruposPendentes.map(grupo => (
-            <li key={grupo.id}>
+            <li key={`${grupo.produtoNome ?? ''}-${grupo.id}`}>
               <p>
                 É obrigatório escolher no mínimo{' '}
                 <strong className="delivery-text-primary">
@@ -72,8 +103,9 @@ export function DeliveryComplementosObrigatoriosAlertDialog({
                 </strong>{' '}
                 na opção{' '}
                 <strong className="delivery-text-primary">{grupo.nome}</strong>
+                {rotuloProduto(grupo.produtoNome)}
               </p>
-              {grupo.obrigatorio ? (
+              {grupo.obrigatorio && !remocaoCarrinho ? (
                 <p className="mt-1">
                   A opção{' '}
                   <strong className="delivery-text-primary">{grupo.nome}</strong> é obrigatória
@@ -81,7 +113,26 @@ export function DeliveryComplementosObrigatoriosAlertDialog({
               ) : null}
             </li>
           ))}
+          {gruposAcimaDoMaximo.map(grupo => (
+            <li key={`max-${grupo.produtoNome ?? ''}-${grupo.id}`}>
+              <p>
+                É permitido no máximo{' '}
+                <strong className="delivery-text-primary">
+                  {formatarQuantidadeItens(grupo.quantidadeMaxima)}
+                </strong>{' '}
+                na opção{' '}
+                <strong className="delivery-text-primary">{grupo.nome}</strong>
+                {rotuloProduto(grupo.produtoNome)}
+              </p>
+            </li>
+          ))}
         </ul>
+
+        {remocaoCarrinho ? (
+          <p className="mt-3 text-center text-[11px] leading-snug delivery-text-secondary">
+            Caso queira, clique no produto e troque o complemento.
+          </p>
+        ) : null}
 
         <button
           type="button"
