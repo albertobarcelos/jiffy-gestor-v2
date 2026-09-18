@@ -39,7 +39,7 @@ import {
 } from '../../shared/utils/produtoComplementosUtils'
 import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPublicaEndereco'
 import { formatDeliveryCurrency } from '../../shared/utils/formatDeliveryCurrency'
-import { isTokenCotacaoExpirado } from '../../shared/utils/deliveryCheckoutCotacaoUtils'
+import { isTokenCotacaoExpirado, MARGEM_RENOVACAO_TOKEN_COTACAO_MS } from '../../shared/utils/deliveryCheckoutCotacaoUtils'
 import { deliveryPublicoPedidoPath } from '../../shared/utils/deliveryPublicoRoutes'
 import { salvarPedidoPublicoConfirmado } from '../../shared/utils/pedidoConfirmadoStorage'
 import { useLocalizacaoEmpresaPublica } from '../../shared/hooks/useLocalizacaoEmpresaPublica'
@@ -225,6 +225,7 @@ export function DeliveryPublicoCarrinhoScreen({
     meiosPagamento,
     loadingMeios,
     enviando,
+    etapaEnvio,
     enviarPedido,
     salvarNomeCliente,
     limparIdentificacaoCliente,
@@ -424,6 +425,20 @@ export function DeliveryPublicoCarrinhoScreen({
     cotacaoValidaParaPagamento,
     itens,
   ])
+
+  useEffect(() => {
+    if (checkoutStep !== 'revisao' || enviando) return
+    const expiresAt = cotacao?.expiresAt
+    if (!expiresAt) return
+    const ts = Date.parse(expiresAt)
+    if (Number.isNaN(ts)) return
+
+    const atraso = Math.max(0, ts - MARGEM_RENOVACAO_TOKEN_COTACAO_MS - Date.now())
+    const timer = window.setTimeout(() => {
+      void recotarPedidoRef.current({ silencioso: true, forcar: true })
+    }, atraso)
+    return () => window.clearTimeout(timer)
+  }, [checkoutStep, cotacao?.expiresAt, enviando])
 
   useEffect(() => {
     if (!itemEditando) return
@@ -951,11 +966,16 @@ export function DeliveryPublicoCarrinhoScreen({
             taxaEntregaOficial={taxaEntregaOficial}
             totalOficial={totalOficial}
             cotacaoLoading={cotacaoLoading}
-            cotacaoPronta={cotacaoPronta}
+            cotacaoPronta={
+              cotacao != null &&
+              Boolean(cotacao.tokenCotacao) &&
+              !isTokenCotacaoExpirado(cotacao.expiresAt)
+            }
             pagamentos={pagamentosRevisao}
             observacaoPedido={form.observacaoPedido}
             cpfNotaFiscal={form.cpfNotaFiscal}
             enviando={enviando}
+            etapaEnvio={etapaEnvio}
             onClose={fecharCheckout}
             onVoltar={() => {
               goToCheckoutStep('pagamento')

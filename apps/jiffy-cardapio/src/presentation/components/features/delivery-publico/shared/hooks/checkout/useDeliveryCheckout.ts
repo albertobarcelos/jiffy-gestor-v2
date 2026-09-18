@@ -194,6 +194,8 @@ export function useDeliveryCheckout(slug: string, options?: UseDeliveryCheckoutO
     Boolean(cotacaoApi.cotacao?.tokenCotacao) && !cotacaoApi.cotacaoLoading
 
   useEffect(() => {
+    if (pedidoApi.enviando) return
+
     const pagamentos = formRef.current.pagamentos
     const baseline = totalPagamentosBaselineRef.current
 
@@ -213,7 +215,7 @@ export function useDeliveryCheckout(slug: string, options?: UseDeliveryCheckoutO
     if (baseline == null && totalOficial != null) {
       totalPagamentosBaselineRef.current = totalOficial
     }
-  }, [totalOficial])
+  }, [totalOficial, pedidoApi.enviando])
 
   const limparCarrinhoAposPedido = useCallback(() => {
     limparCotacaoEPagamentos()
@@ -254,6 +256,7 @@ export function useDeliveryCheckout(slug: string, options?: UseDeliveryCheckoutO
     meiosPagamento: pedidoApi.meiosPagamento,
     loadingMeios: pedidoApi.loadingMeios,
     enviando: pedidoApi.enviando,
+    etapaEnvio: pedidoApi.etapaEnvio,
     enviarPedido: pedidoApi.enviarPedido,
   }
 }

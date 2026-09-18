@@ -6,6 +6,7 @@ import { isIdentificacaoCheckoutCompleta } from '../../../public/components/chec
 import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
 import { isErroCoberturaEntregaPublica } from '@/src/application/errors/publicDeliveryErrors'
 import { enviarPedidoPublicoUseCase } from '@/src/infrastructure/di/deliveryPublicoUseCases'
+import type { EtapaEnvioPedidoPublico } from '@/src/application/use-cases/delivery-publico/EnviarPedidoPublicoUseCase'
 import { usePublicDeliveryMeiosPagamento } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import { showToast } from '@/src/shared/utils/toast'
 import type { DeliveryCarrinhoItem } from '../../stores/deliveryCarrinhoStore'
@@ -39,6 +40,8 @@ type UseCheckoutPedidoParams = {
   setForaCoberturaDialogAberto: (open: boolean) => void
 }
 
+export type EtapaEnvioCheckout = 'validando' | EtapaEnvioPedidoPublico
+
 export function useCheckoutPedido({
   slug,
   options,
@@ -55,6 +58,7 @@ export function useCheckoutPedido({
   setForaCoberturaDialogAberto,
 }: UseCheckoutPedidoParams) {
   const [enviando, setEnviando] = useState(false)
+  const [etapaEnvio, setEtapaEnvio] = useState<EtapaEnvioCheckout | null>(null)
 
   const identificacaoCompletaParaMeios = useMemo(
     () =>
@@ -92,20 +96,30 @@ export function useCheckoutPedido({
       form.nome.trim() || clienteLookup.cliente?.nome?.trim() || null
 
     let tokenCotacao = cotacaoRef.current?.tokenCotacao ?? ''
-    if (
+    const precisaRecotar =
       !tokenCotacao ||
-      (cotacaoRef.current && isTokenCotacaoExpirado(cotacaoRef.current.expiresAt))
-    ) {
+      (cotacaoRef.current != null && isTokenCotacaoExpirado(cotacaoRef.current.expiresAt))
+
+    if (precisaRecotar) {
+      setEtapaEnvio('validando')
+      setEnviando(true)
       const cotou = await recotarPedido()
-      if (!cotou.ok) return { ok: false }
+      if (!cotou.ok) {
+        setEnviando(false)
+        setEtapaEnvio(null)
+        return { ok: false }
+      }
       tokenCotacao = cotacaoRef.current?.tokenCotacao ?? ''
     }
 
     if (!tokenCotacao) {
+      setEnviando(false)
+      setEtapaEnvio(null)
       showToast.error('Não foi possível validar os valores do pedido')
       return { ok: false }
     }
 
+    setEtapaEnvio(atual => atual ?? 'enviando_pedido')
     setEnviando(true)
     try {
       const resultado = await enviarPedidoPublicoUseCase.execute({
@@ -117,6 +131,7 @@ export function useCheckoutPedido({
         form,
         clienteLookup: clienteLookup.cliente,
         tokenCotacao,
+        onEtapa: setEtapaEnvio,
       })
 
       if (!resultado.ok) {
@@ -161,6 +176,7 @@ export function useCheckoutPedido({
       return { ok: false }
     } finally {
       setEnviando(false)
+      setEtapaEnvio(null)
     }
   }, [
     slug,
@@ -180,6 +196,7 @@ export function useCheckoutPedido({
     meiosPagamento: meiosData?.meiosPagamento ?? [],
     loadingMeios,
     enviando,
+    etapaEnvio,
     enviarPedido,
   }
 }
