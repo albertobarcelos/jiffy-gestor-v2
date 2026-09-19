@@ -19,27 +19,25 @@ export interface KanbanVendaCardTipoVendaViewModel {
 
 export function derivarTipoVendaCardKanban(venda: Venda): KanbanVendaCardTipoVendaViewModel {
   const tipoVendaStr = String(venda.tipoVenda ?? '').trim().toLowerCase()
-  const isDeliveryOuRetirada =
-    tipoVendaStr === 'entrega' || tipoVendaStr === 'retirada' || tipoVendaStr === 'delivery'
+  const tipoEntrega = venda.tipoAtendimento()
+  const isDeliveryOuRetirada = tipoVendaStr === 'delivery'
   const isPedidoBalcaoGestor = venda.tabelaOrigem === 'venda_gestor' && !isDeliveryOuRetirada
 
   const tipoVendaExibicao: TipoVendaExibicaoCard =
     venda.tabelaOrigem === 'venda_gestor'
       ? isDeliveryOuRetirada
-        ? tipoVendaStr === 'delivery'
-          ? 'entrega'
-          : tipoVendaStr
+        ? tipoEntrega ?? 'entrega'
         : 'gestor'
       : (venda.tipoVenda ?? '')
 
   const prefixoLinhaOrigemCard =
     venda.tabelaOrigem === 'venda_gestor' && isDeliveryOuRetirada
-      ? tipoVendaStr === 'retirada'
+      ? tipoEntrega === 'retirada'
         ? 'Retirada'
         : 'Entrega'
       : isPedidoBalcaoGestor
         ? 'Balcão'
-        : venda.origem
+        : (venda.origem ?? '')
 
   const exibirColunaTipoVenda = Boolean(
     tipoVendaExibicao &&

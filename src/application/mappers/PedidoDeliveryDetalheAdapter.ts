@@ -70,9 +70,14 @@ export function adaptPedidoDeliveryToVendaGestorApiResponse(
       ? (registro.entregador as Record<string, unknown>)
       : null
 
-  const tipoEntrega = String(registro.tipoEntrega ?? registro.tipoVenda ?? '')
+  const tipoVenda = String(registro.tipoVenda ?? 'delivery')
+    .trim()
+    .toLowerCase() || 'delivery'
+  const tipoEntregaRaw = String(registro.tipoEntrega ?? '')
     .trim()
     .toLowerCase()
+  const tipoEntrega =
+    tipoEntregaRaw === 'entrega' || tipoEntregaRaw === 'retirada' ? tipoEntregaRaw : null
 
   const cobrancas = Array.isArray(registro.cobrancas) ? registro.cobrancas : []
   const pagamentos = cobrancas
@@ -126,7 +131,8 @@ export function adaptPedidoDeliveryToVendaGestorApiResponse(
     enderecoEntrega: enderecoSnapshot ?? registro.enderecoEntrega,
     id: registro.id != null ? String(registro.id) : undefined,
     origem: registro.origem != null ? String(registro.origem) : 'GESTOR',
-    tipoVenda: tipoEntrega || String(registro.tipoVenda ?? ''),
+    tipoVenda,
+    tipoEntrega,
     statusVenda: dataFinalizacao || pedidoDeliveryFinalizado ? 'FINALIZADA' : 'ABERTA',
     statusEtapaOperacional: statusDelivery || undefined,
     statusOperacional: statusDelivery || undefined,

@@ -169,7 +169,7 @@ export function KanbanListaRenderer(props: KanbanBoardRendererProps) {
                     <tbody>
                       {vendas.map((venda: Venda) => {
                         const relogio = relogioPedidoKanban(venda, agoraMs)
-                        const tipo = tipoAtendimentoKanban(venda.tipoVenda)
+                        const tipo = tipoAtendimentoKanban(venda.tipoAtendimento())
                         const cancelada = venda.isCancelada()
                         return (
                           <tr

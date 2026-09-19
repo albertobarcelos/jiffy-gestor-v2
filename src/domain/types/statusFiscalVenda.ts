@@ -1,13 +1,10 @@
 /**
- * Status fiscal canônico da venda no Gestor (listagem unificada / resumo).
- * Não misturar com etapa operacional. `NFeStatus` da entidade é este vocabulário.
+ * Status fiscal do documento — enum do Swagger (`resumoFiscal.status` / documento fiscal).
+ * `PENDENTE_EMISSAO` é coluna do Kanban (`solicitarEmissaoFiscal`), não status.
  */
 export const STATUS_FISCAIS_VENDA = [
   'PENDENTE',
-  'PENDENTE_EMISSAO',
   'EMITINDO',
-  'PENDENTE_AUTORIZACAO',
-  'CONTINGENCIA',
   'EMITIDA',
   'REJEITADA',
   'DENEGADA',

@@ -179,7 +179,7 @@ export class CarregarPedidoKanbanQuickViewUseCase {
     vendaId: string
     tabelaOrigem: TabelaOrigemVenda
     token: string
-    tipoVenda?: 'entrega' | 'retirada' | null
+    tipoVenda?: string | null
     /** Texto já conhecido no card do Kanban (GET unificado) — fallback se o GET detalhe vier vazio. */
     observacaoPedidoHint?: string | null
   }): Promise<PedidoKanbanQuickViewData> {

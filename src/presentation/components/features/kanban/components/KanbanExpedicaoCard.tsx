@@ -39,7 +39,7 @@ export function KanbanExpedicaoCard({
   onViewDetails,
   onAvancarEtapa,
 }: KanbanExpedicaoCardProps) {
-  const tipo = tipoAtendimentoKanban(venda.tipoVenda)
+  const tipo = tipoAtendimentoKanban(venda.tipoAtendimento())
   const relogio = relogioPedidoKanban(venda, agoraMs)
   const cancelada = venda.isCancelada()
   const finalizada = colunaId === 'FINALIZADAS'

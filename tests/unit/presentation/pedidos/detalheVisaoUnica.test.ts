@@ -24,7 +24,7 @@ function dtoDetalhe(
     fluxoPagamentoEntrega: 'cobrar_entregador',
     detalhesPedidoMeta: {
       statusEtapaOperacional: 'EM_PREPARO',
-      tipoVenda: 'entrega',
+      tipoVenda: 'delivery',
     },
     resumoFiscal: null,
     resumoFinanceiroDetalhes: null,
@@ -124,18 +124,20 @@ describe('rotuloTipoAtendimento', () => {
   it('nomeia entrega, retirada e balcão', () => {
     expect(rotuloTipoAtendimento('entrega')).toBe('Entrega')
     expect(rotuloTipoAtendimento('retirada')).toBe('Retirada')
+    expect(rotuloTipoAtendimento('delivery')).toBe('Delivery')
     expect(rotuloTipoAtendimento('balcao')).toBe('Balcão')
   })
 })
 
 describe('deveUsarVisaoUnicaDetalhePedido', () => {
-  it('usa o resumo de delivery só em entrega/retirada', () => {
+  it('usa o resumo de delivery só com tipoVenda delivery', () => {
     expect(deveUsarVisaoUnicaDetalhePedido({ tipoInicioPedido: 'entrega' })).toBe(true)
     expect(deveUsarVisaoUnicaDetalhePedido({ tipoInicioPedido: 'balcao' })).toBe(false)
     expect(
-      deveUsarVisaoUnicaDetalhePedido({ tipoInicioPedido: 'balcao', tipoVenda: 'entrega' })
+      deveUsarVisaoUnicaDetalhePedido({ tipoInicioPedido: 'balcao', tipoVenda: 'delivery' })
     ).toBe(false)
-    expect(deveUsarVisaoUnicaDetalhePedido({ tipoVenda: 'retirada' })).toBe(true)
+    expect(deveUsarVisaoUnicaDetalhePedido({ tipoVenda: 'delivery' })).toBe(true)
+    expect(deveUsarVisaoUnicaDetalhePedido({ tipoVenda: 'retirada' })).toBe(false)
     expect(deveUsarVisaoUnicaDetalhePedido({ tipoVenda: 'balcao' })).toBe(false)
   })
 })

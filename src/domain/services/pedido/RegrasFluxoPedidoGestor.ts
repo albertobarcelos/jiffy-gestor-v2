@@ -39,13 +39,12 @@ export function podeExibirAbaNotaFiscalDetalhe(params: {
 
 export function podeExibirAbaDadosEntregaDetalhe(params: {
   modoVisualizacao: boolean | undefined
-  tipoVenda: string | null | undefined
+  tipoEntrega: string | null | undefined
 }): boolean {
   if (!params.modoVisualizacao) return false
-  const tipo = String(params.tipoVenda ?? '')
+  return String(params.tipoEntrega ?? '')
     .trim()
-    .toLowerCase()
-  return tipo === 'entrega'
+    .toLowerCase() === 'entrega'
 }
 
 export function podeExibirCancelarNotaFiscalDetalhe(params: {
@@ -87,12 +86,12 @@ export function podeExibirCancelarPedidoDeliveryOperacional(params: {
   const tipo = String(params.tipoVenda ?? '')
     .trim()
     .toLowerCase()
-  if (tipo !== 'entrega' && tipo !== 'retirada') return false
+  if (tipo !== 'delivery') return false
 
   return statusEtapaPermiteCancelarPedidoDelivery(params.statusEtapaOperacional)
 }
 
-const ORIGENS_JIFFY_PERMITEM_EDITAR_ITENS = new Set(['GESTOR', 'DELIVERY', 'JIFFY_DELIVERY'])
+const ORIGENS_JIFFY_PERMITEM_EDITAR_ITENS = new Set(['GESTOR', 'JIFFY_DELIVERY'])
 
 export function statusEtapaPermiteEditarItensPedidoDelivery(
   statusEtapaOperacional: string | null | undefined
@@ -121,7 +120,7 @@ export function podeEditarItensPedidoDeliveryDetalhe(params: {
   const tipo = String(params.tipoVenda ?? '')
     .trim()
     .toLowerCase()
-  if (tipo !== 'entrega' && tipo !== 'retirada') return false
+  if (tipo !== 'delivery') return false
 
   const origem = String(params.origem ?? '')
     .trim()

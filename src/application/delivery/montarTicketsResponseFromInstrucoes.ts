@@ -557,7 +557,10 @@ export function montarTicketsResponseFromInstrucoes(params: {
   }))
 
   const vendaId = asStr(pedido.id)
-  const tipoEntrega = asStr(pedido.tipoEntrega ?? pedido.tipoVenda)
+  const tipoVenda = asStr(pedido.tipoVenda) || 'delivery'
+  const tipoEntregaRaw = asStr(pedido.tipoEntrega).toLowerCase()
+  const tipoEntrega =
+    tipoEntregaRaw === 'entrega' || tipoEntregaRaw === 'retirada' ? tipoEntregaRaw : null
 
   return {
     rastreamento: {
@@ -573,7 +576,8 @@ export function montarTicketsResponseFromInstrucoes(params: {
     estacaoImpressaoId: estacaoImpressaoId ?? undefined,
     codigoVenda: asStr(pedido.codigoVenda) || undefined,
     numeroVenda: numeroFinito(pedido.numeroVenda),
-    tipoVenda: tipoEntrega || null,
+    tipoVenda: tipoVenda || null,
+    tipoEntrega,
     numeroMesa: pedido.numeroMesa as string | number | null | undefined,
     identificacao: asStr(pedido.identificacao) || undefined,
     senha: (pedido.senha ?? pedido.senhaNumero ?? pedido.numeroSenha) as string | number | null | undefined,

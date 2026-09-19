@@ -120,7 +120,7 @@ export function KanbanVendaCardActions(props: KanbanVendaCardActionsProps) {
     mostrarEmitirNota ||
     mostrarInutilizada ||
     mostrarVerDocumento
-  const rotuloAvancar = rotuloBotaoAvancarEtapaKanban(colunaAtual, venda.tipoVenda)
+  const rotuloAvancar = rotuloBotaoAvancarEtapaKanban(colunaAtual, venda.tipoAtendimento())
   const [reimprimindo, setReimprimindo] = useState(false)
   const reimprimindoLockRef = useRef(false)
 

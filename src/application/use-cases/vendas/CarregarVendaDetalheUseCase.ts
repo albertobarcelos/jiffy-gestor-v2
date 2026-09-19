@@ -50,7 +50,7 @@ export interface CarregarVendaDetalheParams {
   token: string
   modoVisualizacao?: boolean
   meiosPagamentoCache?: MeioPagamentoCacheItem[]
-  /** Hint do Kanban/unificado (`entrega`, `retirada`, `balcao`) para escolher GET delivery vs gestor. */
+  /** Hint do Kanban (`delivery` vs balcão) para escolher GET delivery vs gestor. */
   tipoVendaGestor?: string | null
 }
 
@@ -59,6 +59,12 @@ function mapDetalhesPedidoMeta(vendaData: Record<string, unknown>): DetalhesPedi
     numeroVenda: (vendaData.numeroVenda as number | null | undefined) ?? null,
     codigoVenda: vendaData.codigoVenda != null ? String(vendaData.codigoVenda) : null,
     tipoVenda: vendaData.tipoVenda != null ? String(vendaData.tipoVenda) : null,
+    tipoEntrega: (() => {
+      const t = String(vendaData.tipoEntrega ?? '')
+        .trim()
+        .toLowerCase()
+      return t === 'entrega' || t === 'retirada' ? t : null
+    })(),
     numeroMesa: (vendaData.numeroMesa as string | number | null | undefined) ?? null,
     statusMesa: vendaData.statusMesa != null ? String(vendaData.statusMesa) : null,
     abertoPorId: vendaData.abertoPorId != null ? String(vendaData.abertoPorId) : null,
@@ -479,12 +485,13 @@ export class CarregarVendaDetalheUseCase {
     const tipoVendaCarregada = String(vendaData.tipoVenda ?? '')
       .trim()
       .toLowerCase()
+    const isDeliveryPedido = tipoVendaCarregada === 'delivery'
 
     let clienteId: string | null = null
     let clienteNome: string | null = null
     let detalhesEntregaPedido: DetalhesEntregaPedido | null = null
 
-    if (tipoVendaCarregada === 'entrega' || tipoVendaCarregada === 'retirada') {
+    if (isDeliveryPedido) {
       let detalhesEntrega = mapDetalhesEntregaFromVendaApi(vendaData)
       const clienteIdVenda = String(vendaData.clienteId ?? '').trim()
       let clienteData: Record<string, unknown> | null = null
@@ -570,7 +577,7 @@ export class CarregarVendaDetalheUseCase {
     const produtosResult = mapProdutosDetalheVenda(vendaData)
     let resumoFinanceiroDetalhes = produtosResult.resumoFinanceiroDetalhes
 
-    if (tipoVendaCarregada === 'entrega' || tipoVendaCarregada === 'retirada') {
+    if (isDeliveryPedido) {
       const taxaEntrega = await resolverTaxaEntregaDetalhe(
         vendaData,
         token,
@@ -596,7 +603,7 @@ export class CarregarVendaDetalheUseCase {
     }
 
     const valorFinalVendaNormalizado =
-      tipoVendaCarregada === 'entrega' || tipoVendaCarregada === 'retirada'
+      isDeliveryPedido
         ? (resumoFinanceiroDetalhes?.totalDosItens ?? valorFinalVenda)
         : valorFinalVenda
 

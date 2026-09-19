@@ -105,22 +105,27 @@ export function linhaHoraAtendente(hora: string, atendente: string): string {
 
 export type BaseIdentidadeProducao = 'MESA' | 'BALCAO' | 'ENTREGA' | 'RETIRADA'
 
-export function baseIdentidadeProducao(tipoVenda?: string | null): BaseIdentidadeProducao {
-  const raw = String(tipoVenda ?? '').trim().toLowerCase()
-  if (raw.includes('mesa')) return 'MESA'
-  if (raw.includes('balc')) return 'BALCAO'
-  if (raw.includes('retir') || raw.includes('pickup') || raw.includes('take')) return 'RETIRADA'
+export function baseIdentidadeProducao(
+  tipoVenda?: string | null,
+  tipoEntrega?: string | null
+): BaseIdentidadeProducao {
+  const venda = String(tipoVenda ?? '').trim().toLowerCase()
+  const atendimento = String(tipoEntrega ?? '').trim().toLowerCase()
+  if (venda.includes('mesa')) return 'MESA'
+  if (venda.includes('balc') || venda === 'gestor') return 'BALCAO'
+  if (atendimento === 'retirada') return 'RETIRADA'
   return 'ENTREGA'
 }
 
 export function textosIdentidadeProducao(params: {
   tipoVenda?: string | null
+  tipoEntrega?: string | null
   codigoVenda?: string | null
   numeroMesa?: string | number | null
   identificacao?: string | null
   viaUnitaria?: boolean
 }): { primaria: string; secundaria: string | null } {
-  const base = baseIdentidadeProducao(params.tipoVenda)
+  const base = baseIdentidadeProducao(params.tipoVenda, params.tipoEntrega)
   const codigo = textoEscPosProducao(String(params.codigoVenda ?? '')).toUpperCase()
   const mesa = textoEscPosProducao(String(params.numeroMesa ?? ''))
   const ident = textoEscPosProducao(params.identificacao ?? '').toUpperCase()
@@ -269,6 +274,7 @@ export type ModeloProducao80mm = {
 
 export type OrigemModeloProducao80mm = {
   tipoVenda?: string | null
+  tipoEntrega?: 'entrega' | 'retirada' | null
   codigoVenda?: string | null
   numeroMesa?: string | number | null
   identificacao?: string | null
@@ -340,6 +346,7 @@ export function montarModeloProducao80mm(origem: OrigemModeloProducao80mm): Mode
     unidade,
     identidade: textosIdentidadeProducao({
       tipoVenda: origem.tipoVenda,
+      tipoEntrega: origem.tipoEntrega,
       codigoVenda: codigo,
       numeroMesa: origem.numeroMesa,
       identificacao: identificacao || null,

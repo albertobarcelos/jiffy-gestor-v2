@@ -172,6 +172,7 @@ export interface VendaGestorTicketsResponse {
   codigoVenda?: string
   numeroVenda: number
   tipoVenda?: string | null
+  tipoEntrega?: 'entrega' | 'retirada' | null
   numeroMesa?: string | number | null
   identificacao?: string | null
   senha?: string | number | null

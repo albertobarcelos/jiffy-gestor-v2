@@ -270,17 +270,27 @@ function extrairEtapaKanbanBalcao(item: Record<string, unknown>): EtapaKanbanBal
   return null
 }
 
-function normalizarOrigemUnificado(raw: unknown): VendaUnificadaDTO['origem'] {
+export type OrigemVendaUnificada = 'PDV' | 'GESTOR' | 'JIFFY_DELIVERY' | 'AIQFOME'
+
+export type TipoEntregaUnificada = 'entrega' | 'retirada'
+
+function normalizarOrigemUnificado(raw: unknown): OrigemVendaUnificada | null {
   const s = String(raw ?? '')
     .trim()
     .toUpperCase()
-  if (s === 'PDV') return 'PDV'
-  if (s === 'GESTOR') return 'GESTOR'
-  if (s === 'JIFFY_DELIVERY' || s === 'DELIVERY') {
-    return 'JIFFY_DELIVERY'
+  if (s === 'PDV' || s === 'GESTOR' || s === 'JIFFY_DELIVERY' || s === 'AIQFOME') {
+    return s
   }
-  if (s === 'AIQFOME') return 'AIQFOME'
-  return 'GESTOR'
+  return null
+}
+
+function extrairTipoEntregaUnificado(item: Record<string, unknown>): TipoEntregaUnificada | null {
+  const raw = item.tipoEntrega ?? item.tipo_entrega
+  const s = String(raw ?? '')
+    .trim()
+    .toLowerCase()
+  if (s === 'entrega' || s === 'retirada') return s
+  return null
 }
 
 /** Resolve tabelaOrigem do unificado; se ausente/ambíguo, deriva da origem. */
@@ -326,7 +336,7 @@ export class VendaUnificadaDTO {
     public readonly numeroVenda: number,
     public readonly codigoVenda: string,
     public readonly tipoVenda: string | null,
-    public readonly origem: 'PDV' | 'GESTOR' | 'JIFFY_DELIVERY' | 'AIQFOME',
+    public readonly origem: OrigemVendaUnificada | null,
     public readonly tabelaOrigem: 'venda' | 'venda_gestor',
     public readonly valorFinal: number,
     public readonly totalDesconto: number,
@@ -377,7 +387,9 @@ export class VendaUnificadaDTO {
     /** Delivery Kanban: contexto de entrega com endereço (summary). */
     public readonly contextoEntrega?: ContextoEntregaDeliveryApi | null,
     /** Kanban balcão: coluna resolvida no backend (source of truth). */
-    public readonly etapaKanbanBalcao?: EtapaKanbanBalcao | null
+    public readonly etapaKanbanBalcao?: EtapaKanbanBalcao | null,
+    /** Delivery: `entrega` | `retirada`. Não substitui `tipoVenda`. */
+    public readonly tipoEntrega?: TipoEntregaUnificada | null
   ) {}
 
   private possuiDocumentoFiscal(): boolean {
@@ -412,12 +424,17 @@ export class VendaUnificadaDTO {
   }
 
   isDelivery(): boolean {
-    const tipo = String(this.tipoVenda ?? '')
+    return String(this.tipoVenda ?? '')
       .trim()
-      .toLowerCase()
-    if (tipo === 'delivery' || tipo === 'entrega' || tipo === 'retirada') return true
-    const o = String(this.origem).toUpperCase()
-    return o === 'JIFFY_DELIVERY' || o === 'AIQFOME'
+      .toLowerCase() === 'delivery'
+  }
+
+  /** Atendimento logístico: só `tipoEntrega` do contrato. */
+  tipoAtendimento(): TipoEntregaUnificada | null {
+    if (this.tipoEntrega === 'entrega' || this.tipoEntrega === 'retirada') {
+      return this.tipoEntrega
+    }
+    return null
   }
 
   /** Venda cancelada: por dataCancelamento ou por statusFiscal CANCELADA (API pode não enviar dataCancelamento) */
@@ -425,14 +442,10 @@ export class VendaUnificadaDTO {
     return !!this.dataCancelamento || (StatusFiscalVenda.tryParse(this.statusFiscal)?.isCancelada() ?? false)
   }
 
-  /** `tipoVenda` entrega/retirada/delivery ou etapa logística — vendas do módulo delivery no Kanban operacional. */
+  /** Pedido do módulo delivery (`tipoVenda=delivery`) no Kanban operacional. */
   isPedidoEntregaGestor(): boolean {
     if (this.isCancelada()) return false
-    return isPedidoEntregaKanban(
-      this.tabelaOrigem,
-      this.tipoVenda,
-      this.statusEtapaOperacional
-    )
+    return isPedidoEntregaKanban(this.tabelaOrigem, this.tipoVenda)
   }
 
   /** Delivery gestor ainda sem pagamento quitado (bloqueia finalizar no Kanban). */
@@ -456,13 +469,18 @@ export class VendaUnificadaDTO {
     return null
   }
 
-  /** Balcão (POS + Gestor) e delivery já encerrado: só coluna fiscal. Nunca `ABERTA`. */
-  private colunaKanbanFiscalOuFinalizadas(): string {
+  /**
+   * Espelha `ResolverColunaKanbanBalcao` quando o backend não enviou a coluna.
+   * Venda aberta sem fiscal → string vazia (fora do quadro).
+   */
+  private projetarColunaKanbanBalcao(): string {
     if (this.etapaKanbanBalcao) return this.etapaKanbanBalcao
-    const colunaFiscal = StatusFiscalVenda.tryParse(this.statusFiscal)?.colunaKanbanFiscal()
-    if (colunaFiscal) return colunaFiscal
+    const fiscal = StatusFiscalVenda.tryParse(this.statusFiscal)
+    if (fiscal?.isRejeitada()) return 'REJEITADAS'
+    if (fiscal) return fiscal.colunaKanbanFiscal()
     if (this.isPendenteEmissao()) return 'PENDENTE_EMISSAO'
-    return 'FINALIZADAS'
+    if (this.dataFinalizacao) return 'FINALIZADAS'
+    return ''
   }
 
   getEtapaKanban(): string {
@@ -471,7 +489,7 @@ export class VendaUnificadaDTO {
       if (colunaOp !== null) return colunaOp
     }
 
-    return this.colunaKanbanFiscalOuFinalizadas()
+    return this.projetarColunaKanbanBalcao()
   }
 }
 
@@ -579,7 +597,8 @@ export function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): Ve
     extrairCobrancasDelivery(v),
     extrairEntregadorDelivery(v),
     extrairContextoEntregaDelivery(v),
-    extrairEtapaKanbanBalcao(v)
+    extrairEtapaKanbanBalcao(v),
+    extrairTipoEntregaUnificado(v)
   )
 }
 

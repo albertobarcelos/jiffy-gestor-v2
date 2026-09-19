@@ -4,7 +4,7 @@ import { podeEditarItensPedidoDeliveryDetalhe } from '@/src/domain/services/pedi
 const BASE = {
   modoVisualizacao: true,
   tabelaOrigemVenda: 'venda_gestor' as const,
-  tipoVenda: 'entrega',
+  tipoVenda: 'delivery',
   origem: 'GESTOR',
   vendaId: 'venda-1',
   vendaGestorJaCancelada: false,
@@ -50,10 +50,11 @@ describe('podeEditarItensPedidoDeliveryDetalhe', () => {
     )
   })
 
-  it('libera pedidos Jiffy (GESTOR, DELIVERY e JIFFY_DELIVERY)', () => {
-    expect(podeEditarItensPedidoDeliveryDetalhe({ ...BASE, origem: 'DELIVERY' })).toBe(true)
+  it('libera pedidos Jiffy (GESTOR e JIFFY_DELIVERY)', () => {
+    expect(podeEditarItensPedidoDeliveryDetalhe({ ...BASE, origem: 'GESTOR' })).toBe(true)
     expect(
       podeEditarItensPedidoDeliveryDetalhe({ ...BASE, origem: 'JIFFY_DELIVERY' })
     ).toBe(true)
+    expect(podeEditarItensPedidoDeliveryDetalhe({ ...BASE, origem: 'DELIVERY' })).toBe(false)
   })
 })

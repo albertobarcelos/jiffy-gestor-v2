@@ -117,9 +117,9 @@ export function useNovoPedidoOrchestratorFlags({
     () =>
       podeExibirAbaDadosEntregaDetalhe({
         modoVisualizacao,
-        tipoVenda: detalhesPedidoMeta?.tipoVenda,
+        tipoEntrega: detalhesPedidoMeta?.tipoEntrega,
       }),
-    [modoVisualizacao, detalhesPedidoMeta?.tipoVenda]
+    [modoVisualizacao, detalhesPedidoMeta?.tipoEntrega]
   )
 
   const statusDisponiveis = [

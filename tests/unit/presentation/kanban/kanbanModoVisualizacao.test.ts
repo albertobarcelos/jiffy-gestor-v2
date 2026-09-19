@@ -32,7 +32,7 @@ function criarVenda(partial: Partial<VendaUnificadaDTO> = {}): VendaUnificadaDTO
     'ped-1',
     8360,
     'ABC',
-    'entrega',
+    'delivery',
     'GESTOR',
     'venda_gestor',
     80,
@@ -103,6 +103,7 @@ describe('kanbanPedidoIdentidade', () => {
     expect(nomeClienteCurtoKanban('Ana')).toBe('Ana')
     expect(nomeClienteCurtoKanban('')).toBe('—')
     expect(tipoAtendimentoKanban('retirada')).toBe('retirada')
+    expect(tipoAtendimentoKanban('delivery')).toBe('balcao')
     expect(rotuloTipoAtendimentoKanban('entrega')).toBe('Entrega')
     expect(rotuloStatusFinanceiroKanban('pendente')).toBe('Pendente')
     expect(classeDestaquePagamentoKanban('pendente')).toContain('amber')

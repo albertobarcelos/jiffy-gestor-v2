@@ -44,7 +44,7 @@ function isoDeCampoApi(valor: unknown): string | null {
   return texto || null
 }
 
-/** Extrai campos operacionais da resposta de POST /vendas/gestor/:id/transicoes (legado). */
+/** Extrai campos operacionais da resposta de POST /vendas/gestor/:id/transicoes. */
 export function extrairPatchKanbanDeTransicaoGestor(data: unknown): KanbanVendaCachePatch {
   const registro =
     data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
@@ -163,7 +163,8 @@ export function cloneVendaUnificadaDTO(
       ? normalizarEntregadorKanbanPatch(patch.entregador)
       : venda.entregador,
     venda.contextoEntrega,
-    patch.etapaKanbanBalcao !== undefined ? patch.etapaKanbanBalcao : venda.etapaKanbanBalcao
+    patch.etapaKanbanBalcao !== undefined ? patch.etapaKanbanBalcao : venda.etapaKanbanBalcao,
+    venda.tipoEntrega
   )
 }
 
@@ -714,7 +715,7 @@ export async function sincronizarStatusFiscalVendaKanban(
       .trim()
       .toLowerCase()
     const usarDelivery =
-      venda.tabelaOrigem === 'venda_gestor' && (tipo === 'entrega' || tipo === 'retirada')
+      venda.tabelaOrigem === 'venda_gestor' && tipo === 'delivery'
 
     const url = usarDelivery
       ? `/api/delivery/pedidos/${encodeURIComponent(venda.id)}`

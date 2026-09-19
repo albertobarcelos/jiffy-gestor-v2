@@ -10,7 +10,6 @@
  * | JIFFY_DELIVERY    | JIFFY_DELIVERY            | App / rota pública Jiffy |
  * | AIQFOME           | AIQFOME                   | Integração Aiqfome |
  * | PDV               | omitido                   | Não se aplica à listagem delivery |
- * | DELIVERY (legado) | JIFFY_DELIVERY            | Snapshot antigo da toolbar |
  *
  * Datas: o Kanban hoje envia `dataFinalizacaoInicio/Fim` ao unificado; na API delivery
  * os nomes são `dataFinalizacaoInicial/Final` (mapeados em `montarPedidosDeliveryQueryParams`).
@@ -26,17 +25,13 @@ import type {
 } from '@/src/application/dto/api/pedidoDeliveryApi'
 import { PEDIDOS_DELIVERY_KANBAN_PAGE_SIZE } from '@/src/application/dto/api/pedidoDeliveryListApi'
 
-/**
- * Espelho de `OrigemFiltro` do Kanban — origem real (sem `DELIVERY` como origem).
- * `DELIVERY` permanece só como legado de snapshot antigo → mapeia para JIFFY_DELIVERY.
- */
+/** Origem real da toolbar. Canal `DELIVERY` não entra aqui. */
 export type OrigemFiltroKanbanListagem =
   | ''
   | 'PDV'
   | 'GESTOR'
   | 'JIFFY_DELIVERY'
   | 'AIQFOME'
-  | 'DELIVERY'
 
 /** Filtros do hook `useKanbanFilters` adaptados para a listagem delivery. */
 export interface FiltrosKanbanParaPedidosDelivery {
@@ -68,7 +63,7 @@ export function mapOrigemFiltroKanbanParaApi(
 ): OrigemPedidoDeliveryApi | undefined {
   if (!origem || origem === 'PDV') return undefined
   if (origem === 'GESTOR') return 'GESTOR'
-  if (origem === 'JIFFY_DELIVERY' || origem === 'DELIVERY') return 'JIFFY_DELIVERY'
+  if (origem === 'JIFFY_DELIVERY') return 'JIFFY_DELIVERY'
   if (origem === 'AIQFOME') return 'AIQFOME'
   return undefined
 }

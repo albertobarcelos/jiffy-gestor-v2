@@ -10,6 +10,7 @@ function makeVenda(overrides: {
   etapaKanbanBalcao?: VendaUnificadaDTO['etapaKanbanBalcao']
   solicitarEmissaoFiscal?: boolean
   tipoVenda?: string | null
+  tipoEntrega?: 'entrega' | 'retirada' | null
   tabelaOrigem?: 'venda' | 'venda_gestor'
   statusEtapaOperacional?: string | null
   dataFinalizacao?: string | null
@@ -25,7 +26,9 @@ function makeVenda(overrides: {
     /* 08 totalDesconto           */ 0,
     /* 09 totalAcrescimo          */ 0,
     /* 10 dataCriacao             */ '2026-07-01T10:00:00.000Z',
-    /* 11 dataFinalizacao         */ overrides.dataFinalizacao ?? '2026-07-01T11:00:00.000Z',
+    /* 11 dataFinalizacao         */ Object.prototype.hasOwnProperty.call(overrides, 'dataFinalizacao')
+      ? (overrides.dataFinalizacao ?? null)
+      : '2026-07-01T11:00:00.000Z',
     /* 12 dataCancelamento        */ null,
     /* 13 cliente                 */ null,
     /* 14 solicitarEmissaoFiscal  */ overrides.solicitarEmissaoFiscal ?? false,
@@ -49,7 +52,8 @@ function makeVenda(overrides: {
     /* 32 cobrancasDelivery       */ undefined,
     /* 33 entregador              */ undefined,
     /* 34 contextoEntrega         */ undefined,
-    /* 35 etapaKanbanBalcao       */ overrides.etapaKanbanBalcao ?? null
+    /* 35 etapaKanbanBalcao       */ overrides.etapaKanbanBalcao ?? null,
+    /* 36 tipoEntrega             */ overrides.tipoEntrega ?? null
   )
 }
 
@@ -129,21 +133,26 @@ describe('VendaUnificadaDTO.getEtapaKanban — balcão fiscal (POS + Gestor, eta
     expect(venda.getEtapaKanban()).toBe('FINALIZADAS')
   })
 
-  it('statusEtapaOperacional=FINALIZADO sem dataFinalizacao → FINALIZADAS', () => {
+  it('venda aberta sem fiscal e sem etapaKanbanBalcao fica fora do quadro', () => {
     const venda = makeVenda({
       statusFiscal: null,
       solicitarEmissaoFiscal: false,
       dataFinalizacao: null,
       statusEtapaOperacional: 'FINALIZADO',
     })
-    expect(venda.getEtapaKanban()).toBe('FINALIZADAS')
+    expect(venda.getEtapaKanban()).toBe('')
+  })
+
+  it('UNKNOWN fiscal vai para COM_FISCAL', () => {
+    const venda = makeVenda({ statusFiscal: 'UNKNOWN', dataFinalizacao: null })
+    expect(venda.getEtapaKanban()).toBe('COM_FISCAL')
   })
 })
 
 describe('VendaUnificadaDTO.getEtapaKanban — delivery operacional (prioridade logística)', () => {
   it('pedido entrega em EM_PREPARO → EM_PREPARO (ignora fiscal)', () => {
     const venda = makeVenda({
-      tipoVenda: 'entrega',
+      tipoVenda: 'delivery',
       tabelaOrigem: 'venda_gestor',
       statusEtapaOperacional: 'EM_PREPARO',
       statusFiscal: 'EMITIDA',
@@ -154,7 +163,8 @@ describe('VendaUnificadaDTO.getEtapaKanban — delivery operacional (prioridade 
 
   it('pedido retirada em PRONTO → PRONTO_ENTREGA', () => {
     const venda = makeVenda({
-      tipoVenda: 'retirada',
+      tipoVenda: 'delivery',
+      tipoEntrega: 'retirada',
       tabelaOrigem: 'venda_gestor',
       statusEtapaOperacional: 'PRONTO',
       etapaKanbanBalcao: null,
@@ -164,7 +174,7 @@ describe('VendaUnificadaDTO.getEtapaKanban — delivery operacional (prioridade 
 
   it('pedido entrega FINALIZADO cai para regras fiscais (etapaKanbanBalcao)', () => {
     const venda = makeVenda({
-      tipoVenda: 'entrega',
+      tipoVenda: 'delivery',
       tabelaOrigem: 'venda_gestor',
       statusEtapaOperacional: 'FINALIZADO',
       etapaKanbanBalcao: 'FINALIZADAS',
@@ -174,7 +184,7 @@ describe('VendaUnificadaDTO.getEtapaKanban — delivery operacional (prioridade 
 
   it('pedido entregue com nota emitida e sem statusDelivery permanece no fiscal', () => {
     const venda = makeVenda({
-      tipoVenda: 'entrega',
+      tipoVenda: 'delivery',
       tabelaOrigem: 'venda_gestor',
       statusEtapaOperacional: null,
       statusFiscal: 'EMITIDA',
@@ -186,14 +196,14 @@ describe('VendaUnificadaDTO.getEtapaKanban — delivery operacional (prioridade 
 
   it('delivery sem etapa operacional não inventa NOVOS_PEDIDOS', () => {
     const venda = makeVenda({
-      tipoVenda: 'entrega',
+      tipoVenda: 'delivery',
       tabelaOrigem: 'venda_gestor',
       statusEtapaOperacional: null,
       statusFiscal: null,
       dataFinalizacao: null,
       etapaKanbanBalcao: null,
     })
-    expect(venda.getEtapaKanban()).toBe('FINALIZADAS')
+    expect(venda.getEtapaKanban()).toBe('')
   })
 })
 

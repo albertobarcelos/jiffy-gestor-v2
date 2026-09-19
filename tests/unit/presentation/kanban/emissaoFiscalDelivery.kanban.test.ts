@@ -7,7 +7,7 @@ describe('vendaKanbanPermiteEmissaoFiscalDelivery', () => {
       vendaKanbanPermiteEmissaoFiscalDelivery(
         {
           tabelaOrigem: 'venda_gestor',
-          tipoVenda: 'entrega',
+          tipoVenda: 'delivery',
           statusEtapaOperacional: 'EM_PREPARO',
         },
         'PENDENTE_EMISSAO'
@@ -19,7 +19,7 @@ describe('vendaKanbanPermiteEmissaoFiscalDelivery', () => {
     expect(
       vendaKanbanPermiteEmissaoFiscalDelivery({
         tabelaOrigem: 'venda_gestor',
-        tipoVenda: 'entrega',
+        tipoVenda: 'delivery',
         statusEtapaOperacional: 'FINALIZADO',
       })
     ).toBe(true)
@@ -30,7 +30,7 @@ describe('vendaKanbanPermiteEmissaoFiscalDelivery', () => {
       vendaKanbanPermiteEmissaoFiscalDelivery(
         {
           tabelaOrigem: 'venda_gestor',
-          tipoVenda: 'entrega',
+          tipoVenda: 'delivery',
           statusEtapaOperacional: null,
         },
         'REJEITADAS'
@@ -40,7 +40,7 @@ describe('vendaKanbanPermiteEmissaoFiscalDelivery', () => {
       vendaKanbanPermiteEmissaoFiscalDelivery(
         {
           tabelaOrigem: 'venda_gestor',
-          tipoVenda: 'entrega',
+          tipoVenda: 'delivery',
           statusEtapaOperacional: null,
         },
         'EM_PREPARO'

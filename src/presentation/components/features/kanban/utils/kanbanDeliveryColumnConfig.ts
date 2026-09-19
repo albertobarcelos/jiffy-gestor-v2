@@ -114,11 +114,7 @@ export function vendaPertenceColunaDeliveryKanban(
     case 'FINALIZADAS':
       if (
         pedidoDeliveryCancelado(venda) &&
-        isPedidoEntregaKanban(
-          venda.tabelaOrigem,
-          venda.tipoVenda,
-          venda.statusEtapaOperacional
-        )
+        isPedidoEntregaKanban(venda.tabelaOrigem, venda.tipoVenda)
       ) {
         return true
       }

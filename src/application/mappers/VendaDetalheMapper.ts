@@ -160,7 +160,7 @@ export async function resolverEnderecoEntregaDetalhePedido(args: {
   const { vendaData, detalhesEntrega, clienteApi, preferirModuloDelivery, fetchClienteDelivery } =
     args
 
-  const tipo = String(vendaData.tipoEntrega ?? vendaData.tipoVenda ?? '')
+  const tipo = String(vendaData.tipoEntrega ?? '')
     .trim()
     .toLowerCase()
   if (tipo === 'retirada') {

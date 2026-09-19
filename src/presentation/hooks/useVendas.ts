@@ -1085,7 +1085,7 @@ export function useReemitirNfeDelivery() {
   )
 }
 
-/** Indica se a emissão fiscal deve usar o módulo delivery (entrega/retirada gestor). */
+/** Indica se a emissão fiscal deve usar o módulo delivery (`tipoVenda=delivery`). */
 export function deveUsarModuloDeliveryParaEmissaoFiscal(
   tabelaOrigem: 'venda' | 'venda_gestor',
   tipoVenda?: string | null

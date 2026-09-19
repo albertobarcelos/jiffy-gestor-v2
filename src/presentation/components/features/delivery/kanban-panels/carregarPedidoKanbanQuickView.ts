@@ -25,7 +25,7 @@ export async function carregarPedidoKanbanQuickView(args: {
   vendaId: string
   tabelaOrigem: 'venda' | 'venda_gestor'
   token: string
-  tipoVenda?: 'entrega' | 'retirada' | null
+  tipoVenda?: string | null
   observacaoPedidoHint?: string | null
   /** Quando true, ignora cache em memória e busca dados frescos. */
   forcarAtualizacao?: boolean

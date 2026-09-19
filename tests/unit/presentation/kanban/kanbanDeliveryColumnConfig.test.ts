@@ -39,7 +39,7 @@ describe('vendaPertenceColunaDeliveryKanban', () => {
   it('Entregues inclui pedido delivery cancelado', () => {
     const cancelado = {
       tabelaOrigem: 'venda_gestor',
-      tipoVenda: 'entrega',
+      tipoVenda: 'delivery',
       statusEtapaOperacional: 'CANCELADO',
       dataCancelamento: '2026-09-17T12:00:00.000Z',
     } as VendaUnificadaDTO
@@ -109,10 +109,10 @@ describe('vendaAtendeFiltroStatusEntregues', () => {
     ).toBe(true)
   })
 
-  it('AUTORIZADA e dataEmissaoFiscal entram no filtro Emitida', () => {
+  it('EMITIDA e dataEmissaoFiscal entram no filtro Emitida', () => {
     expect(
       vendaAtendeFiltroStatusEntregues(
-        vendaComStatus('AUTORIZADA'),
+        vendaComStatus('EMITIDA'),
         'EMITIDA',
         () => 'COM_FISCAL'
       )
@@ -153,7 +153,7 @@ describe('vendaAtendeFiltroStatusEntregues', () => {
         vendaComStatus(null, {
           dataCancelamento: '2026-09-17T12:00:00.000Z',
           tabelaOrigem: 'venda_gestor',
-          tipoVenda: 'entrega',
+          tipoVenda: 'delivery',
           statusEtapaOperacional: 'CANCELADO',
         }),
         'CANCELADA',

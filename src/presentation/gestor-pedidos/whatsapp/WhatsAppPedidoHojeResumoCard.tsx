@@ -35,7 +35,7 @@ export function WhatsAppPedidoHojeResumoCard({
 }: Props) {
   const etapa = coluna.id as ColunaKanbanId
   const podeAvancar = COLUNAS_ENTREGA_OPERACIONAIS.includes(etapa)
-  const avancar = rotuloBotaoAvancarEtapaKanban(etapa, venda.tipoVenda)
+  const avancar = rotuloBotaoAvancarEtapaKanban(etapa, venda.tipoAtendimento())
 
   return (
     <article className={`overflow-hidden rounded-xl border ${coluna.borderColor} ${coluna.color}`}>

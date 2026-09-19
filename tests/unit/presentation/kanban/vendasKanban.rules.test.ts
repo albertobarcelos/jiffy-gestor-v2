@@ -106,7 +106,7 @@ describe('vendaElegivelParaReemissaoAutomaticaLote', () => {
       statusFiscal: 'REJEITADA',
       documentoFiscalId: 'doc-op',
       tabelaOrigem: 'venda_gestor',
-      tipoVenda: 'entrega',
+      tipoVenda: 'delivery',
       statusEtapaOperacional: 'EM_PREPARO',
     })
     expect(vendaElegivelParaReemissaoAutomaticaLote(venda, SEM_ACAO_EM_ANDAMENTO)).toBe(false)
@@ -117,7 +117,7 @@ describe('vendaElegivelParaReemissaoAutomaticaLote', () => {
       statusFiscal: 'REJEITADA',
       documentoFiscalId: null,
       tabelaOrigem: 'venda_gestor',
-      tipoVenda: 'entrega',
+      tipoVenda: 'delivery',
       statusEtapaOperacional: 'FINALIZADO',
     })
     expect(vendaElegivelParaReemissaoAutomaticaLote(venda, SEM_ACAO_EM_ANDAMENTO)).toBe(true)

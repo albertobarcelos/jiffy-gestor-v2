@@ -5,12 +5,6 @@ import {
   type StatusFiscalVendaValor,
 } from '@/src/domain/types/statusFiscalVenda'
 
-const ALIAS_PARA_CANONICO: Record<string, StatusFiscalVendaValor> = {
-  AUTORIZADA: 'EMITIDA',
-  AUTORIZADO: 'EMITIDA',
-  EM_PROCESSAMENTO: 'PENDENTE_AUTORIZACAO',
-}
-
 export class StatusFiscalVenda {
   private constructor(private readonly _valor: StatusFiscalVendaValor) {}
 
@@ -22,8 +16,7 @@ export class StatusFiscalVenda {
     if (STATUS_FISCAIS_VENDA_SET.has(normalizado)) {
       return new StatusFiscalVenda(normalizado as StatusFiscalVendaValor)
     }
-    const alias = ALIAS_PARA_CANONICO[normalizado]
-    return alias ? new StatusFiscalVenda(alias) : null
+    return null
   }
 
   static create(raw: string): StatusFiscalVenda {
@@ -58,26 +51,20 @@ export class StatusFiscalVenda {
     return this._valor === 'INUTILIZADA'
   }
 
+  isUnknown(): boolean {
+    return this._valor === 'UNKNOWN'
+  }
+
   isPendenteAutorizacao(): boolean {
-    return this._valor === 'PENDENTE' || this._valor === 'PENDENTE_AUTORIZACAO'
+    return this._valor === 'PENDENTE'
   }
 
   aguardandoSefaz(): boolean {
-    return (
-      this._valor === 'PENDENTE' ||
-      this._valor === 'PENDENTE_AUTORIZACAO' ||
-      this._valor === 'EMITINDO' ||
-      this._valor === 'CONTINGENCIA'
-    )
+    return this._valor === 'PENDENTE' || this._valor === 'EMITINDO'
   }
 
   permiteAbaNotaFiscal(): boolean {
-    return (
-      this.isEmitida() ||
-      this._valor === 'REJEITADA' ||
-      this._valor === 'PENDENTE' ||
-      this._valor === 'PENDENTE_AUTORIZACAO'
-    )
+    return this.isEmitida() || this._valor === 'REJEITADA' || this._valor === 'PENDENTE'
   }
 
   permiteCancelarNota(): boolean {
@@ -88,10 +75,9 @@ export class StatusFiscalVenda {
     return this.isEmitida() || this.isCancelada()
   }
 
-  colunaKanbanFiscal(): ColunaKanbanFiscalId | null {
-    if (this._valor === 'UNKNOWN') return null
+  /** Espelha `ResolverColunaKanbanBalcao`: qualquer status (inclui UNKNOWN) → COM_FISCAL, salvo rejeição. */
+  colunaKanbanFiscal(): ColunaKanbanFiscalId {
     if (this.isRejeitada()) return 'REJEITADAS'
-    if (this._valor === 'PENDENTE_EMISSAO') return 'PENDENTE_EMISSAO'
     return 'COM_FISCAL'
   }
 
@@ -99,12 +85,7 @@ export class StatusFiscalVenda {
     if (this.isCancelada() || this.isInutilizada()) return 'CANCELADA'
     if (this.isEmitida()) return 'EMITIDA'
     if (this.isRejeitada()) return 'REJEITADA'
-    if (
-      this.aguardandoSefaz() ||
-      this._valor === 'PENDENTE_EMISSAO'
-    ) {
-      return 'PENDENTE'
-    }
+    if (this.aguardandoSefaz() || this.isUnknown()) return 'PENDENTE'
     return null
   }
 }

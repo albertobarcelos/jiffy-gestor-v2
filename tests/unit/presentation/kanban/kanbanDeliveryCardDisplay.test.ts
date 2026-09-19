@@ -11,7 +11,7 @@ function criarVendaDelivery(partial: Partial<VendaUnificadaDTO> = {}): VendaUnif
     'ped-1',
     10,
     'V0010',
-    'entrega',
+    'delivery',
     'GESTOR',
     'venda_gestor',
     80,
@@ -52,6 +52,7 @@ describe('kanbanDeliveryCardDisplay', () => {
     expect(rotuloFormaCobrancaKanbanCard('retirada', 'cobrar_entregador')).toBe(
       'Cobrança na retirada'
     )
+    expect(rotuloFormaCobrancaKanbanCard(null, 'cobrar_entregador')).toBe('A cobrar')
   })
 
   it('formata forma de pagamento pelos ids das cobranças', () => {

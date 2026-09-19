@@ -11,11 +11,12 @@ import {
 } from '@/src/domain/services/pedido/RegrasEmissaoFiscalDelivery'
 
 describe('PedidoModuloDelivery', () => {
-  it('reconhece só venda_gestor entrega/retirada', () => {
-    expect(ehPedidoModuloDelivery('venda_gestor', 'entrega')).toBe(true)
-    expect(ehPedidoModuloDelivery('venda_gestor', 'retirada')).toBe(true)
+  it('reconhece só venda_gestor com tipoVenda delivery', () => {
+    expect(ehPedidoModuloDelivery('venda_gestor', 'delivery')).toBe(true)
+    expect(ehPedidoModuloDelivery('venda_gestor', 'entrega')).toBe(false)
+    expect(ehPedidoModuloDelivery('venda_gestor', 'retirada')).toBe(false)
     expect(ehPedidoModuloDelivery('venda_gestor', 'balcao')).toBe(false)
-    expect(ehPedidoModuloDelivery('venda', 'entrega')).toBe(false)
+    expect(ehPedidoModuloDelivery('venda', 'delivery')).toBe(false)
   })
 })
 
@@ -52,14 +53,14 @@ describe('RegrasEmissaoFiscalDelivery', () => {
     expect(
       avaliarEmissaoFiscalDelivery({
         tabelaOrigem: 'venda_gestor',
-        tipoVenda: 'entrega',
+        tipoVenda: 'delivery',
         statusEtapaOperacional: 'EM_PREPARO',
       })
     ).toBe('bloqueado')
     expect(
       avaliarEmissaoFiscalDelivery({
         tabelaOrigem: 'venda_gestor',
-        tipoVenda: 'retirada',
+        tipoVenda: 'delivery',
         statusEtapaOperacional: 'EM_ROTA',
       })
     ).toBe('bloqueado')
@@ -69,7 +70,7 @@ describe('RegrasEmissaoFiscalDelivery', () => {
     expect(
       pedidoDeliveryPermiteEmissaoFiscal({
         tabelaOrigem: 'venda_gestor',
-        tipoVenda: 'entrega',
+        tipoVenda: 'delivery',
         statusEtapaOperacional: 'FINALIZADO',
       })
     ).toBe(true)
@@ -79,14 +80,14 @@ describe('RegrasEmissaoFiscalDelivery', () => {
     expect(
       avaliarEmissaoFiscalDelivery({
         tabelaOrigem: 'venda_gestor',
-        tipoVenda: 'entrega',
+        tipoVenda: 'delivery',
         statusEtapaOperacional: null,
       })
     ).toBe('indeterminado')
     expect(
       avaliarEmissaoFiscalDelivery({
         tabelaOrigem: 'venda_gestor',
-        tipoVenda: 'entrega',
+        tipoVenda: 'delivery',
         statusEtapaOperacional: 'COZINHA',
       })
     ).toBe('indeterminado')
@@ -96,7 +97,7 @@ describe('RegrasEmissaoFiscalDelivery', () => {
     expect(
       avaliarEmissaoFiscalDelivery({
         tabelaOrigem: 'venda_gestor',
-        tipoVenda: 'entrega',
+        tipoVenda: 'delivery',
         statusEtapaOperacional: 'NOVOS_PEDIDOS',
       })
     ).toBe('bloqueado')
@@ -106,7 +107,7 @@ describe('RegrasEmissaoFiscalDelivery', () => {
     expect(
       pedidoDeliveryPermiteEmissaoFiscal({
         tabelaOrigem: 'venda_gestor',
-        tipoVenda: 'entrega',
+        tipoVenda: 'delivery',
         statusEtapaOperacional: 'FINALIZADO',
         cancelado: true,
       })

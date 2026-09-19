@@ -22,9 +22,9 @@ export interface KanbanAvancarEtapaCompactoProps {
 
 function rotuloCurtoOperacao(
   colunaAtual: ColunaKanbanId,
-  tipoVenda?: string | null
+  tipoEntrega?: string | null
 ): { label: string; loading: string } {
-  const retirada = String(tipoVenda ?? '').trim().toLowerCase() === 'retirada'
+  const retirada = String(tipoEntrega ?? '').trim().toLowerCase() === 'retirada'
   if (colunaAtual === 'NOVOS_PEDIDOS') return { label: 'Preparo', loading: '…' }
   if (colunaAtual === 'EM_PREPARO') return { label: 'Pronto', loading: '…' }
   if (colunaAtual === 'PRONTO_ENTREGA') {
@@ -47,9 +47,9 @@ export function KanbanAvancarEtapaCompacto({
   if (!pedidoPermiteAvancarEtapaKanban(venda, colunaAtual)) return null
 
   const rotulo = destaque
-    ? rotuloCurtoOperacao(colunaAtual, venda.tipoVenda)
-    : rotuloBotaoAvancarEtapaKanban(colunaAtual, venda.tipoVenda)
-  const rotuloCompleto = rotuloBotaoAvancarEtapaKanban(colunaAtual, venda.tipoVenda)
+    ? rotuloCurtoOperacao(colunaAtual, venda.tipoAtendimento())
+    : rotuloBotaoAvancarEtapaKanban(colunaAtual, venda.tipoAtendimento())
+  const rotuloCompleto = rotuloBotaoAvancarEtapaKanban(colunaAtual, venda.tipoAtendimento())
 
   return (
     <button

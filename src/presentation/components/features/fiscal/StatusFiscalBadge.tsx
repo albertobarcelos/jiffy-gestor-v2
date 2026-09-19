@@ -1,7 +1,7 @@
 'use client'
 
 import { Badge } from '@/src/presentation/components/ui/badge'
-import { MdSchedule, MdCheckCircle, MdError, MdWarning, MdCancel, MdBlock } from 'react-icons/md'
+import { MdSchedule, MdCheckCircle, MdError, MdWarning, MdCancel, MdBlock, MdHelpOutline } from 'react-icons/md'
 import { CircularProgress } from '@mui/material'
 
 import type { StatusFiscalVendaValor } from '@/src/domain/types/statusFiscalVenda'
@@ -25,7 +25,7 @@ export function StatusFiscalBadge({ status, className, tone = 'default' }: Statu
   const statusUpper = (StatusFiscalVenda.tryParse(status)?.valor ??
     String(status).trim().toUpperCase()) as StatusFiscal
 
-  const getStatusConfig = (status: StatusFiscal) => {
+  const getStatusConfig = (status: string) => {
     switch (status) {
       case 'PENDENTE':
         return {
@@ -48,19 +48,12 @@ export function StatusFiscalBadge({ status, className, tone = 'default' }: Statu
           bgColor: '#DBEAFE',
           icon: <CircularProgress size={12} sx={{ color: '#3B82F6' }} />,
         }
-      case 'PENDENTE_AUTORIZACAO':
+      case 'UNKNOWN':
         return {
-          label: 'Em emissão',
-          color: '#3B82F6', // Azul
-          bgColor: '#DBEAFE',
-          icon: <CircularProgress size={12} sx={{ color: '#3B82F6' }} />,
-        }
-      case 'CONTINGENCIA':
-        return {
-          label: 'Em contingência',
-          color: '#F97316', // Laranja
-          bgColor: '#FFEDD5',
-          icon: <MdWarning className="h-3.5 w-3.5" />,
+          label: 'Status desconhecido',
+          color: '#7C3AED',
+          bgColor: '#EDE9FE',
+          icon: <MdHelpOutline className="h-3.5 w-3.5" />,
         }
       case 'EMITIDA':
         return {

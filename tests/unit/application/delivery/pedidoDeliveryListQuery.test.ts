@@ -9,9 +9,9 @@ import {
 import { PEDIDOS_DELIVERY_KANBAN_PAGE_SIZE } from '@/src/application/dto/api/pedidoDeliveryListApi'
 
 describe('pedidoDeliveryListQuery — origem toolbar ↔ API', () => {
-  it('mapeia GESTOR e DELIVERY para valores da API', () => {
+  it('mapeia GESTOR e JIFFY_DELIVERY', () => {
     expect(mapOrigemFiltroKanbanParaApi('GESTOR')).toBe('GESTOR')
-    expect(mapOrigemFiltroKanbanParaApi('DELIVERY')).toBe('JIFFY_DELIVERY')
+    expect(mapOrigemFiltroKanbanParaApi('JIFFY_DELIVERY')).toBe('JIFFY_DELIVERY')
   })
 
   it('todas e PDV não enviam filtro de origem', () => {
@@ -41,7 +41,7 @@ describe('pedidoDeliveryListQuery — serialização', () => {
   it('monta params do Kanban com cancelado=false e datas de finalização renomeadas', () => {
     const params = montarPedidosDeliveryQueryParams({
       q: '  cliente  ',
-      origemFiltroKanban: 'DELIVERY',
+      origemFiltroKanban: 'JIFFY_DELIVERY',
       dataCriacaoInicial: '2026-06-01T00:00:00.000Z',
       dataCriacaoFinal: '2026-06-01T23:59:59.999Z',
       dataFinalizacaoInicio: '2026-06-02T00:00:00.000Z',

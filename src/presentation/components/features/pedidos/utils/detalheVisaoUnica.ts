@@ -60,9 +60,9 @@ export function resolverColunaDetalhePedido(args: {
 
 export function rotuloEtapaDetalhePedido(
   coluna: ColunaKanbanId,
-  tipoVenda?: string | null
+  tipoEntrega?: string | null
 ): string {
-  const retirada = String(tipoVenda ?? '').trim().toLowerCase() === 'retirada'
+  const retirada = String(tipoEntrega ?? '').trim().toLowerCase() === 'retirada'
   if (coluna === 'NOVOS_PEDIDOS') return 'Recebido'
   if (coluna === 'EM_PREPARO') return 'Em preparo'
   if (coluna === 'PRONTO_ENTREGA') return 'Pronto'
@@ -71,23 +71,23 @@ export function rotuloEtapaDetalhePedido(
   return 'Em andamento'
 }
 
-export function rotuloTipoAtendimento(tipoVenda?: string | null): string {
-  const tipo = String(tipoVenda ?? '').trim().toLowerCase()
-  if (tipo === 'retirada') return 'Retirada'
-  if (tipo === 'entrega' || tipo === 'delivery') return 'Entrega'
-  if (tipo === 'balcao' || tipo === 'mesa' || tipo === 'gestor') return 'Balcão'
-  return tipo ? tipo : '—'
+export function rotuloTipoAtendimento(tipo?: string | null): string {
+  const valor = String(tipo ?? '').trim().toLowerCase()
+  if (valor === 'retirada') return 'Retirada'
+  if (valor === 'entrega') return 'Entrega'
+  if (valor === 'delivery') return 'Delivery'
+  if (valor === 'balcao' || valor === 'mesa' || valor === 'gestor') return 'Balcão'
+  return valor ? valor : '—'
 }
 
-/** Resumo estilo delivery (trilha Preparo/Rota) só para entrega ou retirada. */
+/** Resumo estilo delivery (trilha Preparo/Rota) só para `tipoVenda=delivery`. */
 export function deveUsarVisaoUnicaDetalhePedido(params: {
   tipoInicioPedido?: 'balcao' | 'entrega' | null
   tipoVenda?: string | null
 }): boolean {
   if (params.tipoInicioPedido === 'entrega') return true
   if (params.tipoInicioPedido === 'balcao') return false
-  const tipo = String(params.tipoVenda ?? '').trim().toLowerCase()
-  return tipo === 'entrega' || tipo === 'retirada' || tipo === 'delivery'
+  return String(params.tipoVenda ?? '').trim().toLowerCase() === 'delivery'
 }
 
 export interface HintKanbanDetalhePedido {

@@ -464,7 +464,7 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
         tabelaOrigem: venda.tabelaOrigem,
         numeroVenda: venda.numeroVenda,
         codigoVenda: venda.codigoVenda,
-        origemVenda: venda.origem,
+        origemVenda: venda.origem ?? undefined,
         clienteId: venda.cliente?.id ?? null,
         clienteNome: venda.cliente?.nome ?? null,
         tipoVenda: venda.tipoVenda,

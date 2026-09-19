@@ -3,12 +3,15 @@ import { deveExibirBotaoAlterarEnderecoEntregaKanban } from '@/src/presentation/
 import type { Venda } from '@/src/presentation/components/features/kanban/types'
 
 function vendaMock(partial: Partial<Venda> = {}): Venda {
+  const tipoEntrega = partial.tipoEntrega ?? 'entrega'
   return {
     id: 'v1',
     numeroVenda: 1,
-    tipoVenda: 'entrega',
+    tipoVenda: 'delivery',
+    tipoEntrega,
     tabelaOrigem: 'venda_gestor',
-    isDelivery: () => false,
+    tipoAtendimento: () => tipoEntrega,
+    isDelivery: () => true,
     isPedidoEntregaGestor: () => true,
     ...partial,
   } as Venda
@@ -33,7 +36,7 @@ describe('deveExibirBotaoAlterarEnderecoEntregaKanban', () => {
     expect(
       deveExibirBotaoAlterarEnderecoEntregaKanban(
         'NOVOS_PEDIDOS',
-        vendaMock({ tipoVenda: 'retirada' }),
+        vendaMock({ tipoEntrega: 'retirada' }),
         'delivery'
       )
     ).toBe(false)

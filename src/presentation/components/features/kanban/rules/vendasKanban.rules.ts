@@ -54,7 +54,7 @@ export const LABEL_SEM_CLIENTE = 'SEM CLIENTE'
 
 /** Pedidos de retirada não exigem entregador para avançar até Em Rota / Retirada. */
 export function vendaExigeEntregadorParaDespachar(venda: Venda): boolean {
-  return isPedidoEntregaComEntregador(venda.tipoVenda)
+  return isPedidoEntregaComEntregador(venda.tipoEntrega)
 }
 
 /** Fiscal: arrastar entre Finalizadas ↔ Pendente emissão (e para Com nota). */
@@ -85,7 +85,7 @@ export function getLinhaTempoPedidoEntregaKanban(
   isoLocalTransicao?: string
 ): { prefixo: string; iso: string } | null {
   const entregaGestor =
-    isPedidoEntregaKanban(v.tabelaOrigem, v.tipoVenda, v.statusEtapaOperacional)
+    isPedidoEntregaKanban(v.tabelaOrigem, v.tipoVenda)
   if (!entregaGestor || !COLUNAS_ENTREGA_OPERACIONAIS.includes(columnId)) return null
 
   if (columnId === 'NOVOS_PEDIDOS') {
@@ -140,16 +140,16 @@ export type RotuloAvancarEtapaKanban = {
   loading: string
 }
 
-function vendaEhRetiradaKanban(tipoVenda?: string | null): boolean {
-  return String(tipoVenda ?? '').trim().toLowerCase() === 'retirada'
+function vendaEhRetiradaKanban(tipoEntrega?: string | null): boolean {
+  return String(tipoEntrega ?? '').trim().toLowerCase() === 'retirada'
 }
 
 /** Texto do botão de avanço: diz a próxima etapa (entrega ≠ retirada nos dois últimos). */
 export function rotuloBotaoAvancarEtapaKanban(
   colunaAtual: ColunaKanbanId,
-  tipoVenda?: string | null
+  tipoEntrega?: string | null
 ): RotuloAvancarEtapaKanban {
-  const retirada = vendaEhRetiradaKanban(tipoVenda)
+  const retirada = vendaEhRetiradaKanban(tipoEntrega)
 
   if (colunaAtual === 'NOVOS_PEDIDOS') {
     return { label: 'Iniciar preparo', loading: 'Iniciando…' }
@@ -332,7 +332,7 @@ export function deveExibirBotaoEmitirNotaNoKanban(
   return false
 }
 
-/** Delivery (gestor entrega/retirada ou integradores): pedido já concluído na operação. */
+/** Pedido do módulo delivery (`tipoVenda=delivery`). */
 export function isPedidoTipoDeliveryKanban(venda: VendaUnificadaDTO): boolean {
   return venda.isDelivery() || venda.isPedidoEntregaGestor()
 }
@@ -621,9 +621,8 @@ const ORIGENS_CUPOM_PUBLICO_NFCE = new Set([
 export function kanbanVendaUsaCupomPublicoNfce(
   v: Pick<Venda, 'origem' | 'tipoDocFiscal'>
 ): boolean {
-  return (
-    v.tipoDocFiscal === 'NFCE' && ORIGENS_CUPOM_PUBLICO_NFCE.has(v.origem)
-  )
+  const origem = v.origem
+  return v.tipoDocFiscal === 'NFCE' && origem != null && ORIGENS_CUPOM_PUBLICO_NFCE.has(origem)
 }
 
 /**
@@ -690,7 +689,7 @@ export function podeEditarClienteNaKanbanCard(
 
 /**
  * Permite alterar os produtos do pedido delivery (botão "Editar produtos" no card).
- * Liberado apenas nas etapas anteriores a EM_ROTA, em pedidos de entrega/retirada do gestor.
+ * Liberado apenas nas etapas anteriores a EM_ROTA, em pedidos `tipoVenda=delivery`.
  */
 export function podeEditarProdutosNaKanbanCard(
   columnId: ColunaKanbanId,
@@ -767,7 +766,6 @@ export function rotuloBotaoEmissaoKanban(
     }
     return 'Reemitir nota'
   }
-  if (venda.statusFiscal === 'PENDENTE_EMISSAO') return 'Em emissão'
   if (statusFiscalAguardandoSefaz(venda)) return 'Em emissão'
   return 'Emitir Nota'
 }

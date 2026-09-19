@@ -34,7 +34,7 @@ describe('VendaDetalheReadRepository.loadVenda', () => {
       if (path.includes('/api/vendas/gestor/')) {
         return jsonResponse(200, {
           id: 'venda-rota',
-          tipoVenda: 'entrega',
+          tipoVenda: 'delivery',
           numeroVenda: 24,
           codigoVenda: 'ABC',
         })

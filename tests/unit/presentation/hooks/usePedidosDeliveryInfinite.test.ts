@@ -11,7 +11,7 @@ function criarDto(id: string): VendaUnificadaDTO {
     id,
     1,
     'V0001',
-    'entrega',
+    'delivery',
     'GESTOR',
     'venda_gestor',
     50,

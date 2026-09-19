@@ -222,8 +222,7 @@ export function KanbanModaisRenderer({
           tipoVendaGestor={pedidoVisualizacaoContext.tipoVenda}
           tipoInicioPedido={
             modoKanbanVendas === 'delivery' ||
-            pedidoVisualizacaoContext.tipoVenda === 'entrega' ||
-            pedidoVisualizacaoContext.tipoVenda === 'retirada'
+            pedidoVisualizacaoContext.tipoVenda === 'delivery'
               ? 'entrega'
               : 'balcao'
           }

@@ -21,7 +21,7 @@ function criarVendaKanban(partial: Partial<VendaUnificadaDTO> = {}): VendaUnific
     'venda-1',
     74,
     'V0074',
-    'entrega',
+    'delivery',
     'GESTOR',
     'venda_gestor',
     50,
