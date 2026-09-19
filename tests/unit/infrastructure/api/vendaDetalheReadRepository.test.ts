@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { invalidarPedidoDeliveryDetalheCache } from '@/src/infrastructure/api/pedidoDeliveryDetalheCache'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { fetchGestorApi } from '@/src/infrastructure/api/fetchGestorApi'
 
-vi.mock('@/src/presentation/utils/fetchGestorApi', () => ({
+vi.mock('@/src/infrastructure/api/fetchGestorApi', () => ({
   fetchGestorApi: vi.fn(),
 }))
 
