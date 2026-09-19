@@ -4,18 +4,10 @@ import { Badge } from '@/src/presentation/components/ui/badge'
 import { MdSchedule, MdCheckCircle, MdError, MdWarning, MdCancel, MdBlock } from 'react-icons/md'
 import { CircularProgress } from '@mui/material'
 
-type StatusFiscal =
-  | 'PENDENTE'
-  | 'PENDENTE_EMISSAO'
-  | 'EMITINDO'
-  | 'PENDENTE_AUTORIZACAO'
-  | 'CONTINGENCIA'
-  | 'EMITIDA'
-  | 'REJEITADA'
-  | 'DENEGADA'
-  | 'CANCELADA'
-  | 'INUTILIZADA'
-  | 'UNKNOWN'
+import type { StatusFiscalVendaValor } from '@/src/domain/types/statusFiscalVenda'
+import { StatusFiscalVenda } from '@/src/domain/value-objects/StatusFiscalVenda'
+
+type StatusFiscal = StatusFiscalVendaValor
 
 interface StatusFiscalBadgeProps {
   status: StatusFiscal | string | null | undefined
@@ -30,7 +22,8 @@ interface StatusFiscalBadgeProps {
 export function StatusFiscalBadge({ status, className, tone = 'default' }: StatusFiscalBadgeProps) {
   if (status == null || status === '') return null
 
-  const statusUpper = String(status).trim().toUpperCase() as StatusFiscal
+  const statusUpper = (StatusFiscalVenda.tryParse(status)?.valor ??
+    String(status).trim().toUpperCase()) as StatusFiscal
 
   const getStatusConfig = (status: StatusFiscal) => {
     switch (status) {

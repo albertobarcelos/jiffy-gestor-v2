@@ -11,7 +11,7 @@ import {
   numeroOpcionalReemitirNotaDelivery,
 } from '@/src/domain/services/pedido/RegrasEmissaoFiscalDelivery'
 import { vendaKanbanPermiteEmissaoFiscalDelivery } from '../rules/emissaoFiscalDelivery.kanban'
-import { STATUS_FISCAL_AGUARDANDO_SEFAZ } from '../rules/vendasKanban.rules'
+import { statusFiscalTextoAguardandoSefaz } from '../rules/vendasKanban.rules'
 import {
   aplicarPatchFiscalKanbanSemRefetch,
   extrairPatchFiscalKanban,
@@ -86,8 +86,7 @@ function normalizarStatusFiscal(status: string | null | undefined): string {
 }
 
 function statusFiscalAguardando(status: string | null | undefined): boolean {
-  const s = normalizarStatusFiscal(status)
-  return STATUS_FISCAL_AGUARDANDO_SEFAZ.has(s)
+  return statusFiscalTextoAguardandoSefaz(status)
 }
 
 /**

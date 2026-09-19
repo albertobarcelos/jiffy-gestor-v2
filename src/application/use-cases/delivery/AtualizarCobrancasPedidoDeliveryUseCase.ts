@@ -2,7 +2,6 @@ import type { INovoPedidoReadRepository } from '@/src/domain/repositories/INovoP
 import type { FluxoPagamentoEntrega } from '@/src/domain/types/vendaDetalhe'
 import { pagamentoPendenteNaEntrega } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
-import { novoPedidoReadRepository } from '@/src/infrastructure/api/repositories/NovoPedidoReadRepository'
 import {
   buildAtualizarCobrancasPedidoDeliveryPatch,
   buildConfirmarCobrancasPendentesPedidoDeliveryPatch,
@@ -12,7 +11,7 @@ import {
 } from '@/src/application/mappers/CobrancaPedidoDeliveryPayloadMapper'
 
 export class AtualizarCobrancasPedidoDeliveryUseCase {
-  constructor(private readonly repo: INovoPedidoReadRepository = novoPedidoReadRepository) {}
+  constructor(private readonly repo: INovoPedidoReadRepository) {}
 
   async execute(
     pedidoId: string,
@@ -57,5 +56,3 @@ export class AtualizarCobrancasPedidoDeliveryUseCase {
     return true
   }
 }
-
-export const atualizarCobrancasPedidoDeliveryUseCase = new AtualizarCobrancasPedidoDeliveryUseCase()

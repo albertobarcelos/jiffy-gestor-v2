@@ -30,7 +30,6 @@ import {
 } from '@/src/application/mappers/atorPedidoDelivery'
 import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
 import type { IVendaDetalheReadRepository } from '@/src/domain/repositories/IVendaDetalheReadRepository'
-import { vendaDetalheReadRepository } from '@/src/infrastructure/api/repositories/VendaDetalheReadRepository'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
 import type {
   DetalhesEntregaPedido,
@@ -438,7 +437,7 @@ function propagarNomesEntreAtoresRelacionados(
 
 export class CarregarVendaDetalheUseCase {
   constructor(
-    private readonly vendaDetalheRepo: IVendaDetalheReadRepository = vendaDetalheReadRepository
+    private readonly vendaDetalheRepo: IVendaDetalheReadRepository
   ) {}
 
   async execute(params: CarregarVendaDetalheParams): Promise<VendaDetalheCarregadaDTO> {

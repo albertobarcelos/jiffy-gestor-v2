@@ -1,4 +1,4 @@
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { fetchGestorApi } from '@/src/infrastructure/api/fetchGestorApi'
 import { MIN_CARACTERES_BUSCA_CATALOGO_VENDA } from '@/src/domain/policies/pedido/CatalogoVendaPolicy'
 import { Produto } from '@/src/domain/entities/Produto'
 import type { INovoPedidoReadRepository } from '@/src/domain/repositories/INovoPedidoReadRepository'

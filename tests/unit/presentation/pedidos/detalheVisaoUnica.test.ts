@@ -50,6 +50,8 @@ describe('colunaKanbanDeStatusEtapa', () => {
     expect(colunaKanbanDeStatusEtapa('DESPACHADO')).toBe('EM_ROTA')
     expect(colunaKanbanDeStatusEtapa('FINALIZADAS')).toBe('FINALIZADAS')
     expect(colunaKanbanDeStatusEtapa('ENTREGUE')).toBe('FINALIZADAS')
+    expect(colunaKanbanDeStatusEtapa(null)).toBeNull()
+    expect(colunaKanbanDeStatusEtapa('ABERTA')).toBeNull()
   })
 })
 

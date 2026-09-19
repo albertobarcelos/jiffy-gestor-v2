@@ -1,9 +1,8 @@
 import { Cliente } from '@/src/domain/entities/Cliente'
 import type { INovoPedidoReadRepository } from '@/src/domain/repositories/INovoPedidoReadRepository'
-import { novoPedidoReadRepository } from '@/src/infrastructure/api/repositories/NovoPedidoReadRepository'
 
 export class BuscarClienteParaEntregaUseCase {
-  constructor(private readonly repo: INovoPedidoReadRepository = novoPedidoReadRepository) {}
+  constructor(private readonly repo: INovoPedidoReadRepository) {}
 
   async execute(clienteId: string, token: string): Promise<Cliente | null> {
     const id = clienteId?.trim()
@@ -13,5 +12,3 @@ export class BuscarClienteParaEntregaUseCase {
     return Cliente.fromJSON(data)
   }
 }
-
-export const buscarClienteParaEntregaUseCase = new BuscarClienteParaEntregaUseCase()

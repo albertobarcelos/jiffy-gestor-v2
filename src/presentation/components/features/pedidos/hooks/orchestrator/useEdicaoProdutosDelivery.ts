@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { montarDiffProdutosPedidoDelivery } from '@/src/application/delivery/montarDiffProdutosPedidoDelivery'
-import { AtualizarProdutosPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/AtualizarProdutosPedidoDeliveryUseCase'
+import { atualizarProdutosPedidoDeliveryUseCase } from '@/src/infrastructure/composition/pedidoUseCases'
 import type { ProdutoSelecionado } from '../../types'
 import { validarObservacoesPedido } from '@/src/shared/helpers/observacaoPedido'
 import { showToast } from '@/src/shared/utils/toast'
@@ -44,7 +44,7 @@ export function useEdicaoProdutosDelivery({
   permanecerNoPainel = false,
   restaurarProdutos,
 }: UseEdicaoProdutosDeliveryParams) {
-  const useCase = useMemo(() => new AtualizarProdutosPedidoDeliveryUseCase(), [])
+  const useCase = atualizarProdutosPedidoDeliveryUseCase
   const [salvandoProdutos, setSalvandoProdutos] = useState(false)
 
   // Snapshot dos produtos como vieram do detalhe (base para o diff).

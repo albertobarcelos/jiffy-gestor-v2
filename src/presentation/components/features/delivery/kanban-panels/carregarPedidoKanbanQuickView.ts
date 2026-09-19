@@ -1,8 +1,8 @@
-import {
-  carregarPedidoKanbanQuickViewUseCase,
-  type PedidoKanbanQuickViewData,
-  type ProdutoKanbanQuickView,
+import type {
+  PedidoKanbanQuickViewData,
+  ProdutoKanbanQuickView,
 } from '@/src/application/use-cases/vendas/CarregarPedidoKanbanQuickViewUseCase'
+import { carregarPedidoKanbanQuickViewUseCase } from '@/src/infrastructure/composition/pedidoUseCases'
 import { invalidarPedidoDeliveryDetalheCache } from '@/src/infrastructure/api/pedidoDeliveryDetalheCache'
 
 export type { PedidoKanbanQuickViewData, ProdutoKanbanQuickView }

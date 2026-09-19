@@ -1,5 +1,7 @@
-import { emitirNotaPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/EmitirNotaPedidoDeliveryUseCase'
-import { reemitirNotaPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/ReemitirNotaPedidoDeliveryUseCase'
+import {
+  emitirNotaPedidoDeliveryUseCase,
+  reemitirNotaPedidoDeliveryUseCase,
+} from '@/src/infrastructure/composition/pedidoUseCases'
 import {
   deveUsarModuloDeliveryParaEmissaoFiscal,
   montarBodyReemitirNota,

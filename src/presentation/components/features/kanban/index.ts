@@ -17,11 +17,10 @@ export type {
 } from './types'
 export {
   useVendasUnificadasInfinite,
-  useVendasUnificadas,
   flattenVendasUnificadasInfinite,
   vendasUnificadasInfiniteQueryKey,
   resolveModeloParaEmitirNota,
-  VENDAS_UNIFICADAS_PAGE_SIZE,
+  VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE,
   type VendaUnificadaDTO,
   type VendasUnificadasQueryParams,
   type VendasUnificadasResponse,

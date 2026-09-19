@@ -16,7 +16,7 @@ import type {
   MoradaTelefone,
 } from '@/src/domain/types/moradaEntrega'
 import { mensagemErroRespostaGestor } from '@/src/infrastructure/api/mensagemErroRespostaGestor'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { fetchGestorApi } from '@/src/infrastructure/api/fetchGestorApi'
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import { lerEnderecoLocalizacaoDoPayloadEmpresa } from '@/src/shared/utils/geolocalizacaoEmpresa'
 import {

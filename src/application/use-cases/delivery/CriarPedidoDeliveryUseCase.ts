@@ -6,9 +6,8 @@ import type {
 import type { CriarPedidoDeliveryApiRequest } from '@/src/application/dto/api/pedidoDeliveryApi'
 import { buildCriarPedidoDeliveryPayload } from '@/src/application/mappers/CriarPedidoDeliveryPayloadMapper'
 import { parsePedidoDeliveryApiResponse } from '@/src/application/mappers/PedidoDeliveryApiNormalizer'
-import { atualizarCobrancasPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/AtualizarCobrancasPedidoDeliveryUseCase'
+import type { AtualizarCobrancasPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/AtualizarCobrancasPedidoDeliveryUseCase'
 import type { INovoPedidoReadRepository } from '@/src/domain/repositories/INovoPedidoReadRepository'
-import { novoPedidoReadRepository } from '@/src/infrastructure/api/repositories/NovoPedidoReadRepository'
 import { pagamentoPendenteNaEntrega } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import type { FluxoPagamentoEntrega } from '@/src/domain/types/vendaDetalhe'
 
@@ -34,8 +33,8 @@ function mensagemErro(error: unknown): string {
 
 export class CriarPedidoDeliveryUseCase {
   constructor(
-    private readonly cobrancasUseCase = atualizarCobrancasPedidoDeliveryUseCase,
-    private readonly repo: INovoPedidoReadRepository = novoPedidoReadRepository
+    private readonly cobrancasUseCase: Pick<AtualizarCobrancasPedidoDeliveryUseCase, 'execute'>,
+    private readonly repo: INovoPedidoReadRepository
   ) {}
 
   buildPayload(input: CriarPedidoDeliveryInputDTO): CriarPedidoDeliveryResultDTO {

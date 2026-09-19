@@ -1,4 +1,4 @@
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { fetchGestorApi } from '@/src/infrastructure/api/fetchGestorApi'
 import { DashboardVendas } from '@/src/domain/entities/DashboardVendas'
 
 interface PeriodoDates {

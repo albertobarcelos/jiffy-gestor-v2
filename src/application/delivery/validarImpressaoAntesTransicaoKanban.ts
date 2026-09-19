@@ -1,6 +1,6 @@
 import { carregarPayloadTicketsImpressaoDelivery } from '@/src/application/delivery/carregarPayloadTicketsImpressaoDelivery'
-import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
-import type { EmpresaMeResumo } from '@/src/presentation/hooks/useEmpresaMe'
+import type { AcaoTransicaoGestor } from '@/src/application/dto/TransicaoKanbanDTO'
+import type { EmpresaMeResumo } from '@/src/application/dto/EmpresaMeDTO'
 import type { ModoImpressaoDelivery, PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
 import type {
   VendaGestorTicket,

@@ -15,7 +15,7 @@ import {
 } from '@/src/infrastructure/api/meiosPagamentoNomeCache'
 import type { PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
 import type { VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
-import type { EmpresaMeResumo } from '@/src/presentation/hooks/useEmpresaMe'
+import type { EmpresaMeResumo } from '@/src/application/dto/EmpresaMeDTO'
 import { vendaDetalheReadRepository } from '@/src/infrastructure/api/repositories/VendaDetalheReadRepository'
 import { logImpressao, erroImpressao } from '@/src/shared/utils/logImpressaoDelivery'
 

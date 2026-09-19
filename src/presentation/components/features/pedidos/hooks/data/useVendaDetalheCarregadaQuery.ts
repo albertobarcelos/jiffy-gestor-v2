@@ -2,7 +2,7 @@
 
 import { useQuery, type QueryClient } from '@tanstack/react-query'
 import type { VendaDetalheCarregadaDTO } from '@/src/application/dto/VendaDetalheCarregadaDTO'
-import { CarregarVendaDetalheUseCase } from '@/src/application/use-cases/vendas/CarregarVendaDetalheUseCase'
+import { carregarVendaDetalheUseCase } from '@/src/infrastructure/composition/pedidoUseCases'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 
 const STALE_TIME_MS = 1000 * 60 * 5
@@ -164,7 +164,7 @@ export function patchVendaDetalheResumoFiscalCache(
   })
 }
 
-const useCase = new CarregarVendaDetalheUseCase()
+const useCase = carregarVendaDetalheUseCase
 
 export function useVendaDetalheCarregadaQuery({
   vendaId,

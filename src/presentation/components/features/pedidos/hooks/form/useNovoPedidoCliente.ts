@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { buscarClienteParaEntregaUseCase } from '@/src/application/use-cases/clientes/BuscarClienteParaEntregaUseCase'
+import { buscarClienteParaEntregaUseCase } from '@/src/infrastructure/composition/pedidoUseCases'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import type { MoradaTelefone } from '@/src/domain/types/moradaEntrega'
 import type { ClientesTabsModalState } from '@/src/presentation/components/features/clientes/ClientesTabsModal'

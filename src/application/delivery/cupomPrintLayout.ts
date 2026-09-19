@@ -1,7 +1,7 @@
 import type { DeliveryCupomTemplateConfig } from '@/src/shared/types/deliveryCupomTemplate'
 import { DEFAULT_DELIVERY_CUPOM_TEMPLATE } from '@/src/shared/types/deliveryCupomTemplate'
 import type { TicketTipoCupomApi } from '@/src/shared/types/vendaGestorTickets'
-import type { PrintSize } from '@/src/infrastructure/printing/agent/printJobTypes'
+import type { PrintSize } from '@/src/application/ports/printDocument'
 
 export function mergeCupomTemplate(
   template?: DeliveryCupomTemplateConfig

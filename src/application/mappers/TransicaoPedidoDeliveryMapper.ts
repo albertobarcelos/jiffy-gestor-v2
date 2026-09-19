@@ -8,7 +8,8 @@ import type {
   AcaoTransicaoKanbanEntrega,
   KanbanVendaCachePatch,
 } from '@/src/application/dto/TransicaoKanbanDTO'
-import type { VendaUnificadaDTO } from '@/features/kanban/hooks/useVendasUnificadas'
+import { etapaAposAcaoTransicao } from '@/src/domain/types/acaoTransicaoOperacionalDelivery'
+import type { VendaUnificadaDTO } from '@/src/application/dto/VendaUnificadaDTO'
 
 function extrairObservacoesPatchDeRegistro(registro: Record<string, unknown>): string[] | undefined {
   const raw = registro.observacoes ?? registro.observacao
@@ -117,20 +118,7 @@ export function extrairPatchOperacionalKanbanDeStatusDelivery(raw: unknown): Kan
 export function mapAcaoTransicaoGestorToStatusDelivery(
   acao: AcaoTransicaoKanbanEntrega
 ): StatusDeliveryApi {
-  switch (acao) {
-    case 'iniciar_preparo':
-      return 'EM_PREPARO'
-    case 'marcar_pronto':
-      return 'PRONTO'
-    case 'despachar':
-      return 'EM_ROTA'
-    case 'finalizar':
-      return 'FINALIZADO'
-    case 'cancelar':
-      return 'CANCELADO'
-    default:
-      return 'PENDENTE'
-  }
+  return etapaAposAcaoTransicao(acao)
 }
 
 export function mapAcoesTransicaoGestorToStatusDelivery(

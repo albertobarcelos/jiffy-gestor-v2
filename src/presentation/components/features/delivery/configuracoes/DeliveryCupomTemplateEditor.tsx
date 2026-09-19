@@ -6,6 +6,7 @@ import { mapTicketToGraphicPrintDocument } from '@/src/application/delivery/mapT
 import { mapTicketToPrintDocument } from '@/src/application/delivery/mapTicketToPrintDocument'
 import { mapTicketToProducaoHibridoDocument } from '@/src/application/delivery/mapTicketToProducaoHibridoDocument'
 import { printDeliveryCupom } from '@/src/infrastructure/printing/printDeliveryCupom'
+import { desenharPilulaProducaoPng } from '@/src/infrastructure/printing/pilulaProducaoPng'
 import { showToast } from '@/src/shared/utils/toast'
 import { DeliveryConfigCollapsibleSection } from './DeliveryConfigCollapsibleSection'
 import { larguraCupomDeliveryPx, renderDeliveryCupomHtml } from '@/src/application/delivery/renderDeliveryCupomHtml'
@@ -454,7 +455,9 @@ export function DeliveryCupomTemplateEditor({
       const sample = sampleCupom(modeloSelecionado === 'producao' ? 'producao' : 'expedicao')
       const document =
         modeloSelecionado === 'producao'
-          ? mapTicketToProducaoHibridoDocument(sample.root, sample.ticket)
+          ? mapTicketToProducaoHibridoDocument(sample.root, sample.ticket, {
+              desenharPilula: desenharPilulaProducaoPng,
+            })
           : value.modoPapel === 'grafico'
             ? await mapTicketToGraphicPrintDocument(sample.root, sample.ticket, {
                 nomeEmpresa: 'Espeto do Joaquim',
@@ -463,6 +466,7 @@ export function DeliveryCupomTemplateEditor({
             : mapTicketToPrintDocument(sample.root, sample.ticket, {
                 nomeEmpresa: 'Espeto do Joaquim',
                 template: value,
+                desenharPilula: desenharPilulaProducaoPng,
               })
       const result = await printDeliveryCupom({
         jobId: `teste-cupom-${modeloSelecionado}-${Date.now()}`,

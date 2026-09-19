@@ -7,7 +7,7 @@ import { resolverTrocoLevarPedidoEntrega } from '@/src/application/mappers/resol
 import {
   mapItemJsonParaVendaUnificadaDTO,
   type VendaUnificadaDTO,
-} from '@/features/kanban/hooks/useVendasUnificadas'
+} from '@/src/application/dto/VendaUnificadaDTO'
 
 /** Origem comercial no card Kanban (`VendaUnificadaDTO.origem`). */
 export function mapOrigemApiDeliveryParaVendaUnificada(

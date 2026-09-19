@@ -17,27 +17,9 @@ import { parseDeliveryCupomTemplate } from '@/src/shared/utils/parseDeliveryCupo
 import { getDeliveryCupomTemplateLocal } from '@/src/infrastructure/printing/deliveryCupomTemplateStorage'
 import { lerMenuIdDeParametroEmpresa } from '@/src/shared/utils/parametroEmpresaMenus'
 import { lerEnderecoLocalizacaoDoPayloadEmpresa } from '@/src/shared/utils/geolocalizacaoEmpresa'
+import type { EnderecoEmpresaMe, EmpresaMeResumo } from '@/src/application/dto/EmpresaMeDTO'
 
-/** Endereço da empresa (GET `/api/empresas/me`) — usado em mensagens de retirada. */
-export interface EnderecoEmpresaMe {
-  rua?: string | null
-  numero?: string | null
-  bairro?: string | null
-  cidade?: string | null
-  estado?: string | null
-  cep?: string | null
-  complemento?: string | null
-}
-
-/** Resumo da empresa da sessão (mesma rota usada em configurações / painel contador) */
-export interface EmpresaMeResumo {
-  id: string
-  nomeExibicao: string
-  cnpj?: string
-  cidade?: string
-  estado?: string
-  endereco?: EnderecoEmpresaMe | null
-}
+export type { EnderecoEmpresaMe, EmpresaMeResumo } from '@/src/application/dto/EmpresaMeDTO'
 
 export interface EmpresaMeQueryData {
   empresa: EmpresaMeResumo

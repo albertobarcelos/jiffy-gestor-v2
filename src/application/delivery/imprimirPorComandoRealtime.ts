@@ -2,8 +2,8 @@ import { decidirTipoCupomComandoImpressaoRealtime } from '@/src/application/deli
 import { filtrarTicketsPorTipoDecidido } from '@/src/application/delivery/filtrarTicketsPorTipoDecidido'
 import { filtrarWarningsTicketsParaImpressao } from '@/src/application/delivery/filtrarWarningsTicketsParaImpressao'
 import {
-  imprimirTicketsApiGestor,
   notificarWarningsTickets,
+  type ImprimirTicketsApiGestor,
 } from '@/src/application/delivery/imprimirTicketsApiGestor'
 import {
   jaImprimiuDeliveryRecentemente,
@@ -12,7 +12,7 @@ import {
 import { fetchVendaGestorTickets } from '@/src/infrastructure/api/fetchVendaGestorTickets'
 import type { DeliveryCupomTemplateConfig } from '@/src/shared/types/deliveryCupomTemplate'
 import type { PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
-import type { EmpresaMeResumo } from '@/src/presentation/hooks/useEmpresaMe'
+import type { EmpresaMeResumo } from '@/src/application/dto/EmpresaMeDTO'
 import { erroImpressao, logImpressao, warnImpressao } from '@/src/shared/utils/logImpressaoDelivery'
 
 export type ImprimirPorComandoRealtimeResult =
@@ -31,6 +31,7 @@ export type ImprimirPorComandoRealtimeParams = {
   onMensagem?: (mensagem: string) => void
   onErro?: (mensagem: string) => void
   onAviso?: (mensagem: string) => void
+  imprimirTickets: ImprimirTicketsApiGestor
 }
 
 /**
@@ -88,7 +89,7 @@ export async function imprimirPorComandoRealtime(
     warningsProdutoSemImpressora: ticketsFetch.data.warnings,
   })
 
-  await imprimirTicketsApiGestor({
+  await params.imprimirTickets({
     response: ticketsFetch.data,
     ticketsAImprimir: filtrados,
     nomeEmpresa: params.empresa?.nomeExibicao,

@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { useImpressaoDelivery } from '../../delivery/hooks/useImpressaoDelivery'
-import { confirmarCobrancaPendentePedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/ConfirmarCobrancaPendentePedidoDeliveryUseCase'
+import { confirmarCobrancaPendentePedidoDeliveryUseCase } from '@/src/infrastructure/composition/pedidoUseCases'
 import { invalidarPedidoKanbanQuickViewCache } from '../../delivery/kanban-panels/carregarPedidoKanbanQuickView'
 import { validarImpressaoAntesTransicaoKanban } from '@/src/application/delivery/validarImpressaoAntesTransicaoKanban'
 import {

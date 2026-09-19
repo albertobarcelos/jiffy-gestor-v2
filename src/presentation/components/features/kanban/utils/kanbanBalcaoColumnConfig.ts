@@ -82,8 +82,7 @@ export function buildVendasUnificadasParamsForKanbanColumn(
 }
 
 /**
- * Filtra itens da listagem balcão para a coluna visual (etapa Kanban).
- * Prefere `etapaKanbanBalcao` do backend quando disponível via getEtapaKanban.
+ * Filtra itens da listagem balcão para a coluna visual (máquina fiscal).
  */
 export function vendaPertenceColunaBalcaoKanban(
   venda: VendaUnificadaDTO,

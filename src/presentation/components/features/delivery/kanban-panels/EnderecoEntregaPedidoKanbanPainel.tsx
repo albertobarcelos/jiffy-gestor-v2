@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { MdLocationOn } from 'react-icons/md'
-import { atualizarEnderecoEntregaPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/AtualizarEnderecoEntregaPedidoDeliveryUseCase'
-import { alterarTipoEntregaPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/AlterarTipoEntregaPedidoDeliveryUseCase'
+import {
+  atualizarEnderecoEntregaPedidoDeliveryUseCase,
+  alterarTipoEntregaPedidoDeliveryUseCase,
+} from '@/src/infrastructure/composition/pedidoUseCases'
 import type { TipoEntregaDeliveryApi } from '@/src/application/dto/api/pedidoDeliveryApi'
 import { formatarEnderecoEntregaMultilinha } from '@/src/application/mappers/PedidoDisplayMapper'
 import {

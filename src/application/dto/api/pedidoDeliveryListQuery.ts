@@ -262,38 +262,3 @@ export function extrairPedidosDeliveryQueryParamsDeSearchParams(
   return params
 }
 
-const CHAVES_QUERY_JIFFY = [
-  'offset',
-  'limit',
-  'q',
-  'statusDelivery',
-  'tipoEntrega',
-  'origem',
-  'solicitarEmissaoFiscal',
-  'cancelado',
-  'dataCriacaoInicial',
-  'dataCriacaoFinal',
-  'dataFinalizacaoInicial',
-  'dataFinalizacaoFinal',
-  'dataFinalizacaoInicio',
-  'dataFinalizacaoFim',
-  'dataUltimaModificacaoInicial',
-] as const
-
-/** Indica se a requisição deve usar o módulo delivery Jiffy (vs integrador legado). */
-export function isRequisicaoListagemPedidosJiffy(searchParams: URLSearchParams): boolean {
-  if (CHAVES_QUERY_JIFFY.some(chave => searchParams.has(chave))) return true
-  return false
-}
-
-/** Integrador legado: `status`/`data_atualizacao` ou header `Bearer` customizado (não Authorization). */
-export function isRequisicaoListagemPedidosIntegradorLegada(
-  searchParams: URLSearchParams,
-  headers: { bearerHeaderCustom?: string | null; integradorToken?: string | null }
-): boolean {
-  if (isRequisicaoListagemPedidosJiffy(searchParams)) return false
-  if (searchParams.has('status') || searchParams.has('data_atualizacao')) return true
-  if (headers.bearerHeaderCustom?.trim()) return true
-  if (headers.integradorToken?.trim()) return true
-  return false
-}

@@ -23,7 +23,6 @@ import type {
   TabelaOrigemVenda,
 } from '@/src/domain/types/vendaDetalhe'
 import { deveUsarModuloDeliveryParaDetalhe } from '@/src/application/mappers/PedidoDeliveryDetalheAdapter'
-import { vendaDetalheReadRepository } from '@/src/infrastructure/api/repositories/VendaDetalheReadRepository'
 import {
   textoFromObservacoesApi,
   textoObservacaoProdutoApi,
@@ -173,7 +172,7 @@ async function resolverNomesMeiosPagamentoQuickView(args: {
 
 export class CarregarPedidoKanbanQuickViewUseCase {
   constructor(
-    private readonly repo: IVendaDetalheReadRepository = vendaDetalheReadRepository
+    private readonly repo: IVendaDetalheReadRepository
   ) {}
 
   async execute(params: {
@@ -345,5 +344,3 @@ export class CarregarPedidoKanbanQuickViewUseCase {
     }
   }
 }
-
-export const carregarPedidoKanbanQuickViewUseCase = new CarregarPedidoKanbanQuickViewUseCase()

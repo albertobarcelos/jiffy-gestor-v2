@@ -1,5 +1,5 @@
-import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
-import type { ColunaKanbanId } from '@/src/presentation/components/features/kanban/types'
+import type { AcaoTransicaoGestor } from '@/src/application/dto/TransicaoKanbanDTO'
+import type { ColunaKanbanId } from '@/src/domain/types/kanbanPedido'
 import type { ModoImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
 
 export const TOAST_IMPRESSORA_EXPEDICAO_NECESSARIA =

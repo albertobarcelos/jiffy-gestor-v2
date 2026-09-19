@@ -3,8 +3,10 @@
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { atualizarCobrancasPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/AtualizarCobrancasPedidoDeliveryUseCase'
-import { atualizarPagamentoEntregaGestorUseCase } from '@/src/application/use-cases/vendas/AtualizarPagamentoEntregaGestorUseCase'
+import {
+  atualizarCobrancasPedidoDeliveryUseCase,
+  atualizarPagamentoEntregaGestorUseCase,
+} from '@/src/infrastructure/composition/pedidoUseCases'
 import { pagamentoEstaCancelado, divergenciaPagamentoVsTotalPedido } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import { pagamentosAtivosParaPatchDelivery } from '@/src/application/mappers/CobrancaPedidoDeliveryPayloadMapper'
 import { Produto } from '@/src/domain/entities/Produto'

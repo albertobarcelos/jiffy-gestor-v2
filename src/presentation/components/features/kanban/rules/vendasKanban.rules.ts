@@ -1,4 +1,5 @@
 import { fiscalPendentePodeReemitirAposCooldown } from '@/src/domain/services/pedido/RegrasFiscaisVenda'
+import { StatusFiscalVenda } from '@/src/domain/value-objects/StatusFiscalVenda'
 import { ehPedidoModuloDelivery } from '@/src/domain/services/pedido/PedidoModuloDelivery'
 import { vendaKanbanPermiteEmissaoFiscalDelivery } from './emissaoFiscalDelivery.kanban'
 import {
@@ -44,12 +45,9 @@ export type AcaoAvancoEntrega = Extract<
   'iniciar_preparo' | 'marcar_pronto' | 'despachar'
 >
 
-export const STATUS_FISCAL_AGUARDANDO_SEFAZ = new Set([
-  'PENDENTE',
-  'PENDENTE_AUTORIZACAO',
-  'EMITINDO',
-  'CONTINGENCIA',
-])
+export function statusFiscalTextoAguardandoSefaz(raw?: string | null): boolean {
+  return StatusFiscalVenda.tryParse(raw)?.aguardandoSefaz() ?? false
+}
 
 /** Exibido quando o nome do cliente está vazio (Kanban e arraste). */
 export const LABEL_SEM_CLIENTE = 'SEM CLIENTE'
@@ -191,10 +189,7 @@ export function fiscalKanbanPodeReemitirAposCooldown(v: VendaUnificadaDTO): bool
 
 export function statusFiscalAguardandoSefaz(v: VendaUnificadaDTO): boolean {
   if (fiscalKanbanPodeReemitirAposCooldown(v)) return false
-  const sf = String(v.statusFiscal ?? '')
-    .trim()
-    .toUpperCase()
-  return STATUS_FISCAL_AGUARDANDO_SEFAZ.has(sf)
+  return statusFiscalTextoAguardandoSefaz(v.statusFiscal)
 }
 
 /** Faixa esquerda da etapa — a mesma dos cards do quadro. */
@@ -621,7 +616,6 @@ const ORIGENS_CUPOM_PUBLICO_NFCE = new Set([
   'PDV',
   'GESTOR',
   'JIFFY_DELIVERY',
-  'DELIVERY',
 ])
 
 export function kanbanVendaUsaCupomPublicoNfce(

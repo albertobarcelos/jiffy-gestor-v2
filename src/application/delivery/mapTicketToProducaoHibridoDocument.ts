@@ -9,16 +9,18 @@ import {
   origemModeloProducaoDeTicket,
   type OrigemModeloProducaoDeTicketOptions,
 } from '@/src/application/delivery/origemModeloProducao'
-import { desenharPilulaProducaoPng } from '@/src/infrastructure/printing/pilulaProducaoPng'
+import type { DesenharPilulaProducao } from '@/src/application/ports/IDesenharPilulaProducao'
 import type {
   PrintAlign,
   PrintContentBlock,
   PrintDocument,
   PrintSize,
-} from '@/src/infrastructure/printing/agent/printJobTypes'
+} from '@/src/application/ports/printDocument'
 import type { VendaGestorTicket, VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
 
-export type MapTicketToProducaoHibridoOptions = OrigemModeloProducaoDeTicketOptions
+export type MapTicketToProducaoHibridoOptions = OrigemModeloProducaoDeTicketOptions & {
+  desenharPilula?: DesenharPilulaProducao
+}
 
 const SIZE_COMPLEMENTO: PrintSize = 'double-b'
 
@@ -40,9 +42,10 @@ function pushTexto(
 function pushPilula(
   content: PrintContentBlock[],
   texto: string,
-  variante: 'senha' | 'identidade' | 'codigo'
+  variante: 'senha' | 'identidade' | 'codigo',
+  desenharPilula?: DesenharPilulaProducao
 ): void {
-  const png = desenharPilulaProducaoPng(texto, variante)
+  const png = desenharPilula?.(texto, variante)
   if (png) {
     content.push({ type: 'image', data: png, align: 'center' })
     return
@@ -50,24 +53,30 @@ function pushPilula(
   pushTexto(content, texto, { align: 'center', bold: true, size: 'double' })
 }
 
-export function modeloToProducaoHibridoContent(modelo: ModeloProducao80mm): PrintContentBlock[] {
+export function modeloToProducaoHibridoContent(
+  modelo: ModeloProducao80mm,
+  desenharPilula?: DesenharPilulaProducao
+): PrintContentBlock[] {
   const content: PrintContentBlock[] = []
   if (modelo.reimpressao) {
     pushTexto(content, '** REIMPRESSAO **', { align: 'center', bold: true, size: 'normal' })
   }
-  if (modelo.senha) pushPilula(content, modelo.senha, 'senha')
+  if (modelo.senha) pushPilula(content, modelo.senha, 'senha', desenharPilula)
   if (modelo.conferencia) {
     pushTexto(content, '*** VIA DE CONFERENCIA ***', { align: 'center', bold: true, size: 'normal' })
   }
-  if (modelo.unidade) pushPilula(content, modelo.unidade, 'codigo')
+  if (modelo.unidade) pushPilula(content, modelo.unidade, 'codigo', desenharPilula)
   if (modelo.identidade.primaria) {
     pushPilula(
       content,
       modelo.identidade.primaria,
-      identidadePrimariaEhTipoAvulso(modelo.identidade.primaria) ? 'identidade' : 'codigo'
+      identidadePrimariaEhTipoAvulso(modelo.identidade.primaria) ? 'identidade' : 'codigo',
+      desenharPilula
     )
   }
-  if (modelo.identidade.secundaria) pushPilula(content, modelo.identidade.secundaria, 'identidade')
+  if (modelo.identidade.secundaria) {
+    pushPilula(content, modelo.identidade.secundaria, 'identidade', desenharPilula)
+  }
   content.push({ type: 'divider' })
   for (const item of modelo.itens) {
     pushTexto(content, item.produto, { align: 'left', bold: true, size: 'double' })
@@ -108,6 +117,6 @@ export function mapTicketToProducaoHibridoDocument(
   return {
     type: 'ORDER',
     columns: PRODUCAO_80MM.colunasFonteA,
-    content: modeloToProducaoHibridoContent(modelo),
+    content: modeloToProducaoHibridoContent(modelo, options?.desenharPilula),
   }
 }

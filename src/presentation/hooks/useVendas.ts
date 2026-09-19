@@ -14,8 +14,10 @@ import {
   mapAcaoTransicaoGestorToStatusDelivery,
   mapAcoesTransicaoGestorToStatusDelivery,
 } from '@/src/application/mappers/TransicaoPedidoDeliveryMapper'
-import { emitirNotaPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/EmitirNotaPedidoDeliveryUseCase'
-import { reemitirNotaPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/ReemitirNotaPedidoDeliveryUseCase'
+import {
+  emitirNotaPedidoDeliveryUseCase,
+  reemitirNotaPedidoDeliveryUseCase,
+} from '@/src/infrastructure/composition/pedidoUseCases'
 import { ehPedidoModuloDelivery } from '@/src/domain/services/pedido/PedidoModuloDelivery'
 import { anexarInformacoesAdicionaisEmitirNota } from '@/src/shared/helpers/informacoesAdicionaisNota'
 

@@ -10,7 +10,7 @@ import type {
   PrintContentBlock,
   PrintDocument,
   PrintSize,
-} from '@/src/infrastructure/printing/agent/printJobTypes'
+} from '@/src/application/ports/printDocument'
 import {
   avisoCobrancaEntregadorCupom,
   deveCobrarNaEntregaCupom,
@@ -26,11 +26,12 @@ import {
   telefoneWhatsappE164,
 } from '@/src/application/delivery/cupomPrintLayout'
 import { detalheLinhasItemPedido } from '@/src/application/delivery/layoutProducao80mm'
-import { desenharPilulaProducaoPng } from '@/src/infrastructure/printing/pilulaProducaoPng'
+import type { DesenharPilulaProducao } from '@/src/application/ports/IDesenharPilulaProducao'
 
 export interface MapTicketToPrintDocumentOptions {
   nomeEmpresa?: string
   template?: DeliveryCupomTemplateConfig
+  desenharPilula?: DesenharPilulaProducao
 }
 
 function numeroFinito(v: unknown): number | null {
@@ -317,7 +318,7 @@ export function mapTicketToPrintDocument(
   }
   pushText(content, titulo, { align: 'center', bold: negrito.cabecalho, size: fontes.cabecalho })
   if (codigo) {
-    const pilula = desenharPilulaProducaoPng(codigo, 'identidade')
+    const pilula = options?.desenharPilula?.(codigo, 'identidade')
     if (pilula) {
       content.push({ type: 'image', data: pilula, align: 'center' })
     } else {

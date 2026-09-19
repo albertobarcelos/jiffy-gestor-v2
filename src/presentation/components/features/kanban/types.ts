@@ -16,15 +16,7 @@ export interface KanbanColumn {
 
 export type Venda = VendaUnificadaDTO
 
-export type ColunaKanbanId =
-  | 'NOVOS_PEDIDOS'
-  | 'EM_PREPARO'
-  | 'PRONTO_ENTREGA'
-  | 'EM_ROTA'
-  | 'FINALIZADAS'
-  | 'PENDENTE_EMISSAO'
-  | 'COM_FISCAL'
-  | 'REJEITADAS'
+export type { ColunaKanbanId } from '@/src/domain/types/kanbanPedido'
 
 export type CriterioOrdenacaoKanban = 'data' | 'numero'
 export type DirecaoOrdenacaoKanban = 'asc' | 'desc'

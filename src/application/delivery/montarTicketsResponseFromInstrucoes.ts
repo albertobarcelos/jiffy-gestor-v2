@@ -19,7 +19,7 @@ import type {
   VendaGestorTicketsPagamentoMeio,
   VendaGestorTicketsResponse,
 } from '@/src/shared/types/vendaGestorTickets'
-import type { EmpresaMeResumo } from '@/src/presentation/hooks/useEmpresaMe'
+import type { EmpresaMeResumo } from '@/src/application/dto/EmpresaMeDTO'
 import {
   modoImpressaoDeMapeamentoOpcional,
   type ModoImpressaoImpressora,

@@ -1,6 +1,6 @@
 import { Cliente } from '@/src/domain/entities/Cliente'
 import type { IClienteEntregaRepository } from '@/src/domain/repositories/IClienteEntregaRepository'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { fetchGestorApi } from '@/src/infrastructure/api/fetchGestorApi'
 import { mensagemErroRespostaGestor } from '@/src/infrastructure/api/mensagemErroRespostaGestor'
 
 export class ClienteEntregaRepository implements IClienteEntregaRepository {

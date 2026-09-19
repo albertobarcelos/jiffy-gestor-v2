@@ -1,32 +1,7 @@
 import type { ColunaKanbanId } from '@/src/presentation/components/features/kanban/types'
 import type { VendaDetalheCarregadaDTO } from '@/src/application/dto/VendaDetalheCarregadaDTO'
 import type { DetalhesEntregaPedido } from '@/src/domain/types/vendaDetalhe'
-
-const MAPA_ETAPA: Record<string, ColunaKanbanId> = {
-  NOVOS_PEDIDOS: 'NOVOS_PEDIDOS',
-  NOVO: 'NOVOS_PEDIDOS',
-  RECEBIDO: 'NOVOS_PEDIDOS',
-  PENDENTE_TRIAGEM: 'NOVOS_PEDIDOS',
-  PENDENTE: 'NOVOS_PEDIDOS',
-  EM_PREPARO: 'EM_PREPARO',
-  PREPARO: 'EM_PREPARO',
-  COZINHA: 'EM_PREPARO',
-  PRONTO_ENTREGA: 'PRONTO_ENTREGA',
-  PRONTO: 'PRONTO_ENTREGA',
-  EM_ROTA: 'EM_ROTA',
-  ROTA: 'EM_ROTA',
-  DESPACHADO: 'EM_ROTA',
-  SAIU_PARA_ENTREGA: 'EM_ROTA',
-  SAIU_ENTREGA: 'EM_ROTA',
-  FINALIZADAS: 'FINALIZADAS',
-}
-
-const ETAPAS_CONCLUIDAS = new Set([
-  'ENTREGUE',
-  'CONCLUIDO',
-  'FINALIZADO',
-  'FINALIZADA',
-])
+import { colunaKanbanDeStatusEtapa as colunaKanbanDeStatusEtapaDominio } from '@/src/domain/value-objects/EtapaOperacionalDelivery'
 
 const ORDEM_COLUNA_DETALHE: ColunaKanbanId[] = [
   'NOVOS_PEDIDOS',
@@ -43,10 +18,8 @@ function indiceColunaDetalhe(coluna: ColunaKanbanId): number {
 
 export function colunaKanbanDeStatusEtapa(
   statusEtapaOperacional?: string | null
-): ColunaKanbanId {
-  const raw = String(statusEtapaOperacional ?? '').trim().toUpperCase()
-  if (ETAPAS_CONCLUIDAS.has(raw)) return 'FINALIZADAS'
-  return MAPA_ETAPA[raw] ?? 'NOVOS_PEDIDOS'
+): ColunaKanbanId | null {
+  return colunaKanbanDeStatusEtapaDominio(statusEtapaOperacional)
 }
 
 export function colunaKanbanDeTimestampsEntrega(

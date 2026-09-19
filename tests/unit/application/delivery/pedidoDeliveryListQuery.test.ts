@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   extrairPedidosDeliveryQueryParamsDeSearchParams,
-  isRequisicaoListagemPedidosIntegradorLegada,
-  isRequisicaoListagemPedidosJiffy,
   mapOrigemApiParaFiltroKanban,
   mapOrigemFiltroKanbanParaApi,
   montarPedidosDeliveryQueryParams,
@@ -24,8 +22,9 @@ describe('pedidoDeliveryListQuery — origem toolbar ↔ API', () => {
 
   it('inverte origem da API para filtro do Kanban', () => {
     expect(mapOrigemApiParaFiltroKanban('GESTOR')).toBe('GESTOR')
-    expect(mapOrigemApiParaFiltroKanban('JIFFY_DELIVERY')).toBe('DELIVERY')
-    expect(mapOrigemApiParaFiltroKanban('PDV')).toBeUndefined()
+    expect(mapOrigemApiParaFiltroKanban('JIFFY_DELIVERY')).toBe('JIFFY_DELIVERY')
+    expect(mapOrigemApiParaFiltroKanban('PDV')).toBe('PDV')
+    expect(mapOrigemApiParaFiltroKanban('IFOOD')).toBeUndefined()
   })
 })
 
@@ -68,31 +67,13 @@ describe('pedidoDeliveryListQuery — serialização', () => {
       limit: 25,
     })
 
-    expect(qs.get('statusDelivery')).toBe('PENDENTE,EM_PREPARO')
-    expect(qs.get('origem')).toBe('GESTOR,JIFFY_DELIVERY')
+    expect(qs.getAll('statusDelivery')).toEqual(['PENDENTE', 'EM_PREPARO'])
+    expect(qs.getAll('origem')).toEqual(['GESTOR', 'JIFFY_DELIVERY'])
     expect(qs.get('limit')).toBe('25')
   })
 })
 
 describe('pedidoDeliveryListQuery — roteamento BFF', () => {
-  it('detecta query Jiffy vs integrador legado', () => {
-    const jiffy = new URLSearchParams('offset=0&limit=50&cancelado=false')
-    expect(isRequisicaoListagemPedidosJiffy(jiffy)).toBe(true)
-    expect(
-      isRequisicaoListagemPedidosIntegradorLegada(jiffy, { bearerHeaderCustom: 'token' })
-    ).toBe(false)
-
-    const legado = new URLSearchParams('status=1')
-    expect(isRequisicaoListagemPedidosIntegradorLegada(legado, {})).toBe(true)
-
-    const bearerOnly = new URLSearchParams('')
-    expect(
-      isRequisicaoListagemPedidosIntegradorLegada(bearerOnly, {
-        bearerHeaderCustom: 'integrador-token',
-      })
-    ).toBe(true)
-  })
-
   it('extrai params da URL do BFF com alias de datas do Kanban', () => {
     const params = extrairPedidosDeliveryQueryParamsDeSearchParams(
       new URLSearchParams(

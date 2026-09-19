@@ -4,7 +4,6 @@ import {
   type EnderecoManualAlterarTipoEntregaInput,
 } from '@/src/application/mappers/TipoEntregaPedidoDeliveryPayloadMapper'
 import type { INovoPedidoReadRepository } from '@/src/domain/repositories/INovoPedidoReadRepository'
-import { novoPedidoReadRepository } from '@/src/infrastructure/api/repositories/NovoPedidoReadRepository'
 
 export type AlterarTipoEntregaPedidoDeliveryInput = {
   pedidoId: string
@@ -20,7 +19,7 @@ export type AlterarTipoEntregaPedidoDeliveryInput = {
  * Em retirada→entrega exige endereço; em entrega→retirada remove taxa ativa quando permitido.
  */
 export class AlterarTipoEntregaPedidoDeliveryUseCase {
-  constructor(private readonly repo: INovoPedidoReadRepository = novoPedidoReadRepository) {}
+  constructor(private readonly repo: INovoPedidoReadRepository) {}
 
   async execute(input: AlterarTipoEntregaPedidoDeliveryInput): Promise<Record<string, unknown>> {
     if (input.tipoAtual === input.tipoSelecionado) {
@@ -44,5 +43,3 @@ export class AlterarTipoEntregaPedidoDeliveryUseCase {
     return this.repo.buscarPedidoDelivery(input.pedidoId, input.token)
   }
 }
-
-export const alterarTipoEntregaPedidoDeliveryUseCase = new AlterarTipoEntregaPedidoDeliveryUseCase()

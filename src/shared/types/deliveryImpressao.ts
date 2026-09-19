@@ -1,3 +1,5 @@
+import type { ColunaKanbanOperacionalId } from '@/src/domain/types/kanbanPedido'
+
 /** Modo configurado na empresa (`parametroEmpresa.modoImpressaoDelivery`). Canônicos: `unificado` | `separado`. */
 export type ModoImpressaoDelivery = 'unificado' | 'separado'
 
@@ -40,7 +42,7 @@ export type DecidirImpressaoResultado = {
 /** Usado pelo hook de reimpressão manual (inferência pela coluna atual). */
 export function tipoCupomParaReimpressao(
   modo: ModoImpressaoDelivery,
-  colunaOperacional: 'NOVOS_PEDIDOS' | 'EM_PREPARO' | 'PRONTO_ENTREGA' | 'EM_ROTA'
+  colunaOperacional: ColunaKanbanOperacionalId
 ): TipoCupomDelivery {
   if (modo === 'unificado') {
     return 'producao_completa'

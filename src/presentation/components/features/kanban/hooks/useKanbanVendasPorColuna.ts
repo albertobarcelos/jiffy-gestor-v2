@@ -231,8 +231,7 @@ export function useKanbanVendasPorColuna({
     for (const columnId of colunasBalcao) {
       const state = balcaoKanban.columnStates[columnId]
       const { items } = flattenVendasUnificadasInfinite(state?.data)
-      // Paliativo: a API pode devolver a mesma venda em mais de uma coluna.
-      // Reclassifica no client com getEtapaKanban (prefere etapaKanbanBalcao).
+      // A API pode devolver a mesma venda em mais de uma coluna; classifica pela máquina fiscal.
       let vendas = items.filter(v => {
         if (isPedidoTipoDeliveryKanban(v)) return false
         const etapaLocal = etapaLocalPorVendaId[v.id]

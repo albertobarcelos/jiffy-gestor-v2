@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   COOLDOWN_REEMISSAO_FISCAL_PENDENTE_MS,
   fiscalPendentePodeReemitirAposCooldown,
-  fiscalPendenteTravadoLimiteTentativas,
   fiscalPendenteTravadoParaReemissao,
   isRetornoSefazLimiteTentativasExcedido,
 } from '@/src/domain/services/pedido/RegrasFiscaisVenda'
@@ -214,7 +213,7 @@ describe('kanbanVendaUsaCupomPublicoNfce', () => {
     ).toBe(false)
     expect(
       kanbanVendaUsaCupomPublicoNfce(
-        criarVendaKanban({ origem: 'DELIVERY_IFOOD', tipoDocFiscal: 'NFCE' })
+        criarVendaKanban({ origem: 'AIQFOME', tipoDocFiscal: 'NFCE' })
       )
     ).toBe(false)
   })

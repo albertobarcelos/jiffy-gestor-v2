@@ -80,7 +80,7 @@ describe('VendaUnificadaDTO.getEtapaKanban — backend source of truth', () => {
   })
 })
 
-describe('VendaUnificadaDTO.getEtapaKanban — fallback client-side (etapaKanbanBalcao null)', () => {
+describe('VendaUnificadaDTO.getEtapaKanban — balcão fiscal (POS + Gestor, etapaKanbanBalcao null)', () => {
   it('REJEITADA → REJEITADAS', () => {
     const venda = makeVenda({ statusFiscal: 'REJEITADA', dataFinalizacao: null })
     expect(venda.getEtapaKanban()).toBe('REJEITADAS')
@@ -179,6 +179,42 @@ describe('VendaUnificadaDTO.getEtapaKanban — delivery operacional (prioridade 
       statusEtapaOperacional: null,
       statusFiscal: 'EMITIDA',
       dataFinalizacao: '2026-07-01T11:00:00.000Z',
+      etapaKanbanBalcao: null,
+    })
+    expect(venda.getEtapaKanban()).toBe('COM_FISCAL')
+  })
+
+  it('delivery sem etapa operacional não inventa NOVOS_PEDIDOS', () => {
+    const venda = makeVenda({
+      tipoVenda: 'entrega',
+      tabelaOrigem: 'venda_gestor',
+      statusEtapaOperacional: null,
+      statusFiscal: null,
+      dataFinalizacao: null,
+      etapaKanbanBalcao: null,
+    })
+    expect(venda.getEtapaKanban()).toBe('FINALIZADAS')
+  })
+})
+
+describe('VendaUnificadaDTO.getEtapaKanban — não mistura POS/balcão com delivery', () => {
+  it('venda POS usa coluna fiscal mesmo com statusDelivery operacional', () => {
+    const venda = makeVenda({
+      tipoVenda: 'balcao',
+      tabelaOrigem: 'venda',
+      statusEtapaOperacional: 'EM_PREPARO',
+      statusFiscal: 'EMITIDA',
+      etapaKanbanBalcao: null,
+    })
+    expect(venda.getEtapaKanban()).toBe('COM_FISCAL')
+  })
+
+  it('venda gestor balcão usa coluna fiscal, não logística', () => {
+    const venda = makeVenda({
+      tipoVenda: 'balcao',
+      tabelaOrigem: 'venda_gestor',
+      statusEtapaOperacional: 'EM_PREPARO',
+      statusFiscal: 'EMITIDA',
       etapaKanbanBalcao: null,
     })
     expect(venda.getEtapaKanban()).toBe('COM_FISCAL')

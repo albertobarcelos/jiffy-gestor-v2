@@ -1,6 +1,5 @@
 import { buildUpdateEnderecoEntregaPedidoPayload } from '@/src/application/mappers/ContextoEntregaDeliveryMapper'
 import type { INovoPedidoReadRepository } from '@/src/domain/repositories/INovoPedidoReadRepository'
-import { novoPedidoReadRepository } from '@/src/infrastructure/api/repositories/NovoPedidoReadRepository'
 
 export type AtualizarEnderecoEntregaPedidoInput = {
   pedidoId: string
@@ -25,7 +24,7 @@ export type AtualizarEnderecoEntregaPedidoInput = {
  * Use `enderecoDeliveryId` para trocar por morada salva ou `enderecoManual` para correção pontual.
  */
 export class AtualizarEnderecoEntregaPedidoDeliveryUseCase {
-  constructor(private readonly repo: INovoPedidoReadRepository = novoPedidoReadRepository) {}
+  constructor(private readonly repo: INovoPedidoReadRepository) {}
 
   async execute(input: AtualizarEnderecoEntregaPedidoInput): Promise<void> {
     const body = buildUpdateEnderecoEntregaPedidoPayload({
@@ -36,6 +35,3 @@ export class AtualizarEnderecoEntregaPedidoDeliveryUseCase {
     await this.repo.patchPedidoDelivery(input.pedidoId, input.token, body)
   }
 }
-
-export const atualizarEnderecoEntregaPedidoDeliveryUseCase =
-  new AtualizarEnderecoEntregaPedidoDeliveryUseCase()
