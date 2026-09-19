@@ -23,9 +23,12 @@ describe('RegrasEmissaoFiscalDelivery', () => {
   it('reconhece etapa finalizada e operacional', () => {
     expect(statusEtapaDeliveryEstaFinalizado('FINALIZADO')).toBe(true)
     expect(statusEtapaDeliveryEstaFinalizado('entregue')).toBe(true)
+    expect(statusEtapaDeliveryEstaFinalizado('NOVOS_PEDIDOS')).toBe(false)
     expect(statusEtapaDeliveryEstaFinalizado('EM_PREPARO')).toBe(false)
     expect(statusEtapaDeliveryAindaOperacional('EM_ROTA')).toBe(true)
+    expect(statusEtapaDeliveryAindaOperacional('PRONTO_ENTREGA')).toBe(true)
     expect(statusEtapaDeliveryAindaOperacional('FINALIZADO')).toBe(false)
+    expect(statusEtapaDeliveryAindaOperacional('COZINHA')).toBe(false)
   })
 
   it('não restringe venda que não é delivery gestor', () => {
@@ -80,6 +83,23 @@ describe('RegrasEmissaoFiscalDelivery', () => {
         statusEtapaOperacional: null,
       })
     ).toBe('indeterminado')
+    expect(
+      avaliarEmissaoFiscalDelivery({
+        tabelaOrigem: 'venda_gestor',
+        tipoVenda: 'entrega',
+        statusEtapaOperacional: 'COZINHA',
+      })
+    ).toBe('indeterminado')
+  })
+
+  it('bloqueia coluna operacional do Kanban após normalizar para a etapa canônica', () => {
+    expect(
+      avaliarEmissaoFiscalDelivery({
+        tabelaOrigem: 'venda_gestor',
+        tipoVenda: 'entrega',
+        statusEtapaOperacional: 'NOVOS_PEDIDOS',
+      })
+    ).toBe('bloqueado')
   })
 
   it('bloqueia pedido delivery cancelado', () => {

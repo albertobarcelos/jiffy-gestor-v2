@@ -1,26 +1,5 @@
 import { ehPedidoModuloDelivery } from '@/src/domain/services/pedido/PedidoModuloDelivery'
-
-const STATUS_DELIVERY_FINALIZADO = new Set([
-  'FINALIZADO',
-  'FINALIZADA',
-  'ENTREGUE',
-  'CONCLUIDO',
-])
-
-const STATUS_DELIVERY_OPERACIONAL = new Set([
-  'NOVOS_PEDIDOS',
-  'NOVO',
-  'RECEBIDO',
-  'PENDENTE_TRIAGEM',
-  'PENDENTE',
-  'EM_PREPARO',
-  'PREPARO',
-  'COZINHA',
-  'PRONTO_ENTREGA',
-  'PRONTO',
-  'EM_ROTA',
-  'ROTA',
-])
+import { EtapaOperacionalDelivery } from '@/src/domain/value-objects/EtapaOperacionalDelivery'
 
 export const MENSAGEM_EMISSAO_DELIVERY_SO_FINALIZADO =
   'A nota fiscal do delivery só pode ser emitida depois que o pedido for finalizado.'
@@ -37,19 +16,13 @@ export type ContextoEmissaoFiscalDelivery = {
 export function statusEtapaDeliveryEstaFinalizado(
   statusEtapaOperacional?: string | null
 ): boolean {
-  const status = String(statusEtapaOperacional ?? '')
-    .trim()
-    .toUpperCase()
-  return STATUS_DELIVERY_FINALIZADO.has(status)
+  return EtapaOperacionalDelivery.tryParse(statusEtapaOperacional)?.isFinalizado() ?? false
 }
 
 export function statusEtapaDeliveryAindaOperacional(
   statusEtapaOperacional?: string | null
 ): boolean {
-  const status = String(statusEtapaOperacional ?? '')
-    .trim()
-    .toUpperCase()
-  return STATUS_DELIVERY_OPERACIONAL.has(status)
+  return EtapaOperacionalDelivery.tryParse(statusEtapaOperacional)?.aindaOperacional() ?? false
 }
 
 /**

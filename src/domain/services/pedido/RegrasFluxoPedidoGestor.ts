@@ -3,6 +3,7 @@ import {
   statusFiscalPermiteCancelarNota,
 } from '@/src/domain/services/pedido/RegrasFiscaisVenda'
 import type { OrigemVenda, TabelaOrigemVenda } from '@/src/domain/types/vendaDetalhe'
+import { EtapaOperacionalDelivery } from '@/src/domain/value-objects/EtapaOperacionalDelivery'
 
 export function resolverStatusFiscalExibicao(
   statusFiscalUnificado: string | null | undefined,
@@ -58,21 +59,13 @@ export function podeExibirCancelarNotaFiscalDetalhe(params: {
   return statusFiscalPermiteCancelarNota(resumoFiscalStatus, statusFiscal, null)
 }
 
-/** Status operacionais terminais — pedido não pode mais ser cancelado. */
-const STATUS_ETAPA_PEDIDO_DELIVERY_ENCERRADO = new Set([
-  'FINALIZADO',
-  'FINALIZADA',
-  'CANCELADO',
-  'CANCELADA',
-])
-
 /** Pedido delivery pode ser cancelado em qualquer etapa operacional, exceto finalizado ou já cancelado. */
 export function statusEtapaPermiteCancelarPedidoDelivery(
   statusEtapaOperacional: string | null | undefined
 ): boolean {
-  const status = String(statusEtapaOperacional ?? '').trim().toUpperCase()
-  if (!status) return true
-  return !STATUS_ETAPA_PEDIDO_DELIVERY_ENCERRADO.has(status)
+  const etapa = EtapaOperacionalDelivery.tryParse(statusEtapaOperacional)
+  if (!etapa) return true
+  return etapa.permiteCancelarPedido()
 }
 
 export function podeExibirCancelarPedidoDeliveryOperacional(params: {
@@ -99,23 +92,12 @@ export function podeExibirCancelarPedidoDeliveryOperacional(params: {
   return statusEtapaPermiteCancelarPedidoDelivery(params.statusEtapaOperacional)
 }
 
-/** Status em que o backend ainda aceita `produtos.add` / `produtos.remove`. */
-const STATUS_ETAPA_PERMITE_EDITAR_ITENS_DELIVERY = new Set([
-  'PENDENTE',
-  'EM_PREPARO',
-  'PRONTO',
-  'NOVOS_PEDIDOS',
-  'PRONTO_ENTREGA',
-])
-
 const ORIGENS_JIFFY_PERMITEM_EDITAR_ITENS = new Set(['GESTOR', 'DELIVERY', 'JIFFY_DELIVERY'])
 
 export function statusEtapaPermiteEditarItensPedidoDelivery(
   statusEtapaOperacional: string | null | undefined
 ): boolean {
-  const status = String(statusEtapaOperacional ?? '').trim().toUpperCase()
-  if (!status) return false
-  return STATUS_ETAPA_PERMITE_EDITAR_ITENS_DELIVERY.has(status)
+  return EtapaOperacionalDelivery.tryParse(statusEtapaOperacional)?.permiteEditarItens() ?? false
 }
 
 /**

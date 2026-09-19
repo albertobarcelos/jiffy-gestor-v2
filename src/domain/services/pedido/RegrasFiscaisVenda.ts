@@ -1,3 +1,5 @@
+import { StatusFiscalVenda } from '@/src/domain/value-objects/StatusFiscalVenda'
+
 /** Tempo mínimo após a última atualização fiscal para liberar nova tentativa no Kanban. */
 export const COOLDOWN_REEMISSAO_FISCAL_PENDENTE_MS = 10 * 60 * 1000
 
@@ -28,10 +30,7 @@ export function fiscalPendenteTravadoParaReemissao(input: {
   dataEmissaoFiscal?: string | null
   numeroFiscal?: number | null
 }): boolean {
-  const status = String(input.statusFiscal ?? '')
-    .trim()
-    .toUpperCase()
-  if (status !== 'PENDENTE' && status !== 'PENDENTE_AUTORIZACAO') return false
+  if (!StatusFiscalVenda.tryParse(input.statusFiscal)?.isPendenteAutorizacao()) return false
   if (isRetornoSefazLimiteTentativasExcedido(input.retornoSefaz)) return true
 
   const temDocumento =
@@ -39,14 +38,6 @@ export function fiscalPendenteTravadoParaReemissao(input: {
     (input.numeroFiscal != null && Number.isFinite(Number(input.numeroFiscal)))
   const semDataEmissao = !String(input.dataEmissaoFiscal ?? '').trim()
   return temDocumento && semDataEmissao
-}
-
-/** @deprecated Preferir `fiscalPendenteTravadoParaReemissao` */
-export function fiscalPendenteTravadoLimiteTentativas(input: {
-  statusFiscal?: string | null
-  retornoSefaz?: string | null
-}): boolean {
-  return fiscalPendenteTravadoParaReemissao(input)
 }
 
 function obterMsReferenciaCooldownFiscal(input: {
@@ -91,20 +82,21 @@ export function fiscalPendentePodeReemitirAposCooldown(
   return agoraMs - referenciaMs >= COOLDOWN_REEMISSAO_FISCAL_PENDENTE_MS
 }
 
+function primeiroStatusFiscal(
+  ...candidatos: Array<string | null | undefined>
+): StatusFiscalVenda | null {
+  for (const c of candidatos) {
+    const parsed = StatusFiscalVenda.tryParse(c)
+    if (parsed) return parsed
+  }
+  return null
+}
+
 /**
  * Status em que a aba Nota Fiscal e o resumo fazem sentido (incl. aguardando SEFAZ).
- * Alinhado ao Kanban e ao `StatusFiscalBadge` ("Aguardando SEFAZ..." para PENDENTE / PENDENTE_AUTORIZACAO).
  */
-const STATUS_FISCAL_ABA_NOTA_FISCAL = new Set([
-  'EMITIDA',
-  'REJEITADA',
-  'PENDENTE',
-  'PENDENTE_AUTORIZACAO',
-])
-
 export function statusFiscalPermiteAbaNotaFiscal(s: string | null | undefined): boolean {
-  if (s == null || String(s).trim() === '') return false
-  return STATUS_FISCAL_ABA_NOTA_FISCAL.has(String(s).trim().toUpperCase())
+  return StatusFiscalVenda.tryParse(s)?.permiteAbaNotaFiscal() ?? false
 }
 
 /** PDF DANFE/DANFCE só existe após autorização — mesmo critério do Kanban */
@@ -112,10 +104,7 @@ export function statusFiscalEhEmitida(
   resumoStatus: string | null | undefined,
   statusUnificado: string | null | undefined
 ): boolean {
-  const r = resumoStatus != null ? String(resumoStatus).trim() : ''
-  const u = statusUnificado != null ? String(statusUnificado).trim() : ''
-  const s = (r !== '' ? r : u).toUpperCase()
-  return s === 'EMITIDA'
+  return primeiroStatusFiscal(resumoStatus, statusUnificado)?.isEmitida() ?? false
 }
 
 export function statusFiscalPermiteCancelarNota(
@@ -123,9 +112,5 @@ export function statusFiscalPermiteCancelarNota(
   statusUnificado: string | null | undefined,
   statusDetalhe: string | null | undefined
 ): boolean {
-  const r = resumoStatus != null ? String(resumoStatus).trim() : ''
-  const u = statusUnificado != null ? String(statusUnificado).trim() : ''
-  const d = statusDetalhe != null ? String(statusDetalhe).trim() : ''
-  const s = (r !== '' ? r : u !== '' ? u : d).toUpperCase()
-  return s === 'EMITIDA'
+  return primeiroStatusFiscal(resumoStatus, statusUnificado, statusDetalhe)?.permiteCancelarNota() ?? false
 }

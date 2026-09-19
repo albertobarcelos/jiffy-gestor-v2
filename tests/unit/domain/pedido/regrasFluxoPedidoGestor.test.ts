@@ -20,6 +20,12 @@ describe('podeEditarItensPedidoDeliveryDetalhe', () => {
     expect(
       podeEditarItensPedidoDeliveryDetalhe({ ...BASE, statusEtapaOperacional: 'PRONTO' })
     ).toBe(true)
+    expect(
+      podeEditarItensPedidoDeliveryDetalhe({ ...BASE, statusEtapaOperacional: 'NOVOS_PEDIDOS' })
+    ).toBe(true)
+    expect(
+      podeEditarItensPedidoDeliveryDetalhe({ ...BASE, statusEtapaOperacional: 'PRONTO_ENTREGA' })
+    ).toBe(true)
   })
 
   it('bloqueia a partir de EM_ROTA e pedidos cancelados', () => {
