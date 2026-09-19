@@ -103,7 +103,7 @@ export interface NovoPedidoCatalogoSlice {
   isFetchingNextProdutosCatalogo: boolean
   carregarProximaPaginaProdutosCatalogo: () => void
   menuCatalogoIndisponivel: boolean
-  tipoInicioPedido: 'balcao' | 'entrega'
+  tipoInicioPedido: 'balcao' | 'delivery'
 }
 
 /** Edição/lançamento de linha de produto (painel e modal de edição). */
@@ -268,7 +268,7 @@ export interface NovoPedidoUISlice {
 export interface NovoPedidoDetalheSlice {
   modoVisualizacao?: boolean
   tabelaOrigemVenda: 'venda' | 'venda_gestor'
-  tipoInicioPedido: 'balcao' | 'entrega'
+  tipoInicioPedido: 'balcao' | 'delivery'
   statusFiscalUnificado: string | null
   isLoadingVenda: boolean
   abaDetalhesPedido: AbaDetalhesPedido

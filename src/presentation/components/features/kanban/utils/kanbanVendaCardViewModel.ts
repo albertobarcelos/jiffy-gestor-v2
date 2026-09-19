@@ -26,7 +26,7 @@ export function derivarTipoVendaCardKanban(venda: Venda): KanbanVendaCardTipoVen
   const tipoVendaExibicao: TipoVendaExibicaoCard =
     venda.tabelaOrigem === 'venda_gestor'
       ? isDeliveryOuRetirada
-        ? tipoEntrega ?? 'entrega'
+        ? tipoEntrega ?? 'delivery'
         : 'gestor'
       : (venda.tipoVenda ?? '')
 
@@ -34,7 +34,9 @@ export function derivarTipoVendaCardKanban(venda: Venda): KanbanVendaCardTipoVen
     venda.tabelaOrigem === 'venda_gestor' && isDeliveryOuRetirada
       ? tipoEntrega === 'retirada'
         ? 'Retirada'
-        : 'Entrega'
+        : tipoEntrega === 'entrega'
+          ? 'Entrega'
+          : 'Delivery'
       : isPedidoBalcaoGestor
         ? 'Balcão'
         : (venda.origem ?? '')
@@ -45,7 +47,8 @@ export function derivarTipoVendaCardKanban(venda: Venda): KanbanVendaCardTipoVen
         tipoVendaExibicao === 'mesa' ||
         tipoVendaExibicao === 'gestor' ||
         tipoVendaExibicao === 'entrega' ||
-        tipoVendaExibicao === 'retirada')
+        tipoVendaExibicao === 'retirada' ||
+        tipoVendaExibicao === 'delivery')
   )
 
   return {

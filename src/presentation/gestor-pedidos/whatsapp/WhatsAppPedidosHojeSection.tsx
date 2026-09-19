@@ -281,7 +281,7 @@ export function WhatsAppPedidosHojeSection({ telefone, clienteNome, onOverlayAbe
           tabelaOrigemVenda={modais.pedidoVisualizacaoContext.tabelaOrigem}
           statusFiscalUnificado={modais.pedidoVisualizacaoContext.statusFiscal}
           tipoVendaGestor={modais.pedidoVisualizacaoContext.tipoVenda}
-          tipoInicioPedido="entrega"
+          tipoInicioPedido="delivery"
           abaDetalhesInicial={modais.pedidoVisualizacaoContext.abaDetalhesInicial}
           modoVisualizacao
           statusEtapaOperacionalHint={modais.pedidoVisualizacaoContext.statusEtapaOperacional}
@@ -302,7 +302,7 @@ export function WhatsAppPedidosHojeSection({ telefone, clienteNome, onOverlayAbe
           tabelaOrigemVenda={modais.pedidoEdicaoProdutosContext.tabelaOrigem}
           statusFiscalUnificado={modais.pedidoEdicaoProdutosContext.statusFiscal}
           tipoVendaGestor={modais.pedidoEdicaoProdutosContext.tipoVenda}
-          tipoInicioPedido="entrega"
+          tipoInicioPedido="delivery"
           modoEdicaoProdutos
         />
       ) : null}

@@ -131,7 +131,7 @@ describe('rotuloTipoAtendimento', () => {
 
 describe('deveUsarVisaoUnicaDetalhePedido', () => {
   it('usa o resumo de delivery só com tipoVenda delivery', () => {
-    expect(deveUsarVisaoUnicaDetalhePedido({ tipoInicioPedido: 'entrega' })).toBe(true)
+    expect(deveUsarVisaoUnicaDetalhePedido({ tipoInicioPedido: 'delivery' })).toBe(true)
     expect(deveUsarVisaoUnicaDetalhePedido({ tipoInicioPedido: 'balcao' })).toBe(false)
     expect(
       deveUsarVisaoUnicaDetalhePedido({ tipoInicioPedido: 'balcao', tipoVenda: 'delivery' })

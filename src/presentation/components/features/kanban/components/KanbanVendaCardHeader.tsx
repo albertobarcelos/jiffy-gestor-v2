@@ -45,7 +45,9 @@ function TipoVendaIconCard({
 
   const icon = (
     <TipoVendaIcon
-      tipoVenda={tipoVendaExibicao as 'balcao' | 'mesa' | 'gestor' | 'entrega' | 'retirada'}
+      tipoVenda={
+        tipoVendaExibicao as 'balcao' | 'mesa' | 'gestor' | 'entrega' | 'retirada' | 'delivery'
+      }
       numeroMesa={tipoVendaExibicao === 'mesa' ? venda.numeroMesa : undefined}
       size={56}
       containerScale={0.9}

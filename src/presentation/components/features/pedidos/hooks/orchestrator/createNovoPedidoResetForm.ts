@@ -3,7 +3,7 @@ import { statusPadraoNovoPedido } from '@/src/domain/services/pedido/RegrasStatu
 import type { NovoPedidoFormState } from './useNovoPedidoFormState'
 
 export type CreateNovoPedidoResetFormParams = {
-  tipoInicioPedido: 'balcao' | 'entrega'
+  tipoInicioPedido: 'balcao' | 'delivery'
   form: NovoPedidoFormState
   limparLongPressTimeouts: () => void
   resetEdicaoLinha: () => void

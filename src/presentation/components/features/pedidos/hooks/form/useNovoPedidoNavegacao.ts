@@ -16,7 +16,7 @@ export interface UseNovoPedidoNavegacaoParams {
   onClose: () => void
   vendaId?: string
   modoVisualizacao?: boolean
-  tipoInicioPedido: 'balcao' | 'entrega'
+  tipoInicioPedido: 'balcao' | 'delivery'
   produtos: ProdutoSelecionado[]
   pagamentos: PagamentoSelecionado[]
   clienteId: string
@@ -156,7 +156,7 @@ export function useNovoPedidoNavegacao({
   }, [produtos.length])
 
   const canGoToStep3 = useCallback(() => {
-    if (tipoInicioPedido === 'entrega') return validarInformacoesPedido(false)
+    if (tipoInicioPedido === 'delivery') return validarInformacoesPedido(false)
     return produtos.length > 0
   }, [tipoInicioPedido, validarInformacoesPedido, produtos.length])
 
@@ -165,13 +165,13 @@ export function useNovoPedidoNavegacao({
     if (modoEdicaoProdutos) return
 
     if (currentStep === 1 && canGoToStep2()) {
-      setCurrentStep(tipoInicioPedido === 'entrega' ? 2 : 3)
+      setCurrentStep(tipoInicioPedido === 'delivery' ? 2 : 3)
     } else if (currentStep === 1 && !canGoToStep2()) {
       showToast.error('Adicione pelo menos um produto antes de continuar')
     } else if (currentStep === 2 && canGoToStep3()) {
       setCurrentStep(3)
     } else if (currentStep === 2 && !canGoToStep3()) {
-      if (tipoInicioPedido === 'entrega') {
+      if (tipoInicioPedido === 'delivery') {
         validarInformacoesPedido(true)
       } else {
         showToast.error('Adicione pelo menos um produto antes de continuar')
@@ -196,7 +196,7 @@ export function useNovoPedidoNavegacao({
     if (currentStep === 2) {
       setCurrentStep(1)
     } else if (currentStep === 3) {
-      setCurrentStep(tipoInicioPedido === 'entrega' ? 2 : 1)
+      setCurrentStep(tipoInicioPedido === 'delivery' ? 2 : 1)
     }
   }, [vendaId, modoVisualizacao, currentStep, tipoInicioPedido, setCurrentStep, modoEdicaoProdutos])
 

@@ -186,7 +186,7 @@ export function useNovoPedidoSubmit({
       return
     }
 
-    if (tipoInicioPedido === 'entrega' && !createPedidoDelivery) {
+    if (tipoInicioPedido === 'delivery' && !createPedidoDelivery) {
       showToast.error('Criação de pedido delivery não disponível.')
       return
     }
@@ -194,7 +194,7 @@ export function useNovoPedidoSubmit({
     if (!iniciarSubmit()) return
 
     try {
-      const isPedidoDelivery = tipoInicioPedido === 'entrega'
+      const isPedidoDelivery = tipoInicioPedido === 'delivery'
 
       const resultado = isPedidoDelivery
         ? await criarPedidoDeliveryUseCase.execute(
@@ -231,7 +231,7 @@ export function useNovoPedidoSubmit({
 
       if (
         idCriado &&
-        tipoInicioPedido === 'entrega' &&
+        tipoInicioPedido === 'delivery' &&
         status === 'ABERTA' &&
         preferenciasAutoIniciarPreparo
       ) {

@@ -257,7 +257,8 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
           vendaId={venda.id}
           tabelaOrigem={tabelaOrigemQuickView}
           colunaAtual={colunaAtual}
-          tipoVenda={tipoEntregaQuickView}
+          tipoVenda={venda.tipoVenda}
+          tipoEntrega={tipoEntregaQuickView}
           observacaoPedidoHint={observacaoPedidoTexto || null}
           anchorEl={cardState.entregaQuickViewAnchor}
           open={Boolean(cardState.entregaQuickViewAnchor)}

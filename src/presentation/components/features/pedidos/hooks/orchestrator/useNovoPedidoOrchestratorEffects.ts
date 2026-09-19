@@ -11,7 +11,7 @@ export type UseNovoPedidoOrchestratorEffectsParams = {
   modoVisualizacao: boolean | undefined
   editandoItensNoDetalhe?: boolean
   ajustandoPagamentoAposEdicaoItens?: boolean
-  tipoInicioPedido: 'balcao' | 'entrega'
+  tipoInicioPedido: 'balcao' | 'delivery'
   abaDetalhesInicial?: AbaDetalhesPedido
   vendaDataUpdatedAt?: number
   currentStep: 1 | 2 | 3 | 4

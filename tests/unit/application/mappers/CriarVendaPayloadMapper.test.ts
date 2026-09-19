@@ -105,4 +105,11 @@ describe('CriarVendaPayloadMapper (contrato PR #115)', () => {
     expect(payload.totalAcrescimo).toBeUndefined()
     expect(payload.produtosLancados).toHaveLength(1)
   })
+
+  it('envia tipoVenda delivery no create do canal delivery', () => {
+    const payload = buildCriarVendaGestorPayload(
+      baseInput({ tipoInicioPedido: 'delivery', status: 'ABERTA' })
+    )
+    expect(payload.tipoVenda).toBe('delivery')
+  })
 })

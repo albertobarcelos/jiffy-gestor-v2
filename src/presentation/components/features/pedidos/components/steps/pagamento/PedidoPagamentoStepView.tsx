@@ -63,7 +63,7 @@ export function PedidoPagamentoStepView() {
   } = useNovoPedidoFormContext()
 
   const nomeClienteResumo =
-    tipoInicioPedido === 'entrega' ? (clienteEntregaVinculado?.nome ?? '') : clienteNome
+    tipoInicioPedido === 'delivery' ? (clienteEntregaVinculado?.nome ?? '') : clienteNome
   const temCliente = Boolean(nomeClienteResumo.trim())
   const restanteALancarExibicao = pedidoEntregaAceitaPagamentoPendente
     ? valorAPagarLancamento
@@ -151,7 +151,7 @@ export function PedidoPagamentoStepView() {
                 >
                   <MdEdit size={18} />
                 </button>
-                {tipoInicioPedido !== 'entrega' && (
+                {tipoInicioPedido !== 'delivery' && (
                   <button
                     type="button"
                     onClick={handleRemoveCliente}
@@ -368,7 +368,7 @@ export function PedidoPagamentoStepView() {
             <div className="space-y-0 border-t pt-1 text-sm leading-snug">
               <div className="flex items-center justify-between px-1 py-0">
                 <span className="font-semibold text-gray-700">
-                  Total Recebido{tipoInicioPedido === 'entrega' ? ' (Efetivo)' : ''}:
+                  Total Recebido{tipoInicioPedido === 'delivery' ? ' (Efetivo)' : ''}:
                 </span>
                 <span className="font-semibold text-green-700">
                   {transformarParaReal(totalPagamentos)}

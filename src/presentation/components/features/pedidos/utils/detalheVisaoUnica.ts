@@ -82,10 +82,10 @@ export function rotuloTipoAtendimento(tipo?: string | null): string {
 
 /** Resumo estilo delivery (trilha Preparo/Rota) só para `tipoVenda=delivery`. */
 export function deveUsarVisaoUnicaDetalhePedido(params: {
-  tipoInicioPedido?: 'balcao' | 'entrega' | null
+  tipoInicioPedido?: 'balcao' | 'delivery' | null
   tipoVenda?: string | null
 }): boolean {
-  if (params.tipoInicioPedido === 'entrega') return true
+  if (params.tipoInicioPedido === 'delivery') return true
   if (params.tipoInicioPedido === 'balcao') return false
   return String(params.tipoVenda ?? '').trim().toLowerCase() === 'delivery'
 }

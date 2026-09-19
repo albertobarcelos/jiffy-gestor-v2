@@ -40,7 +40,7 @@ export type UseNovoPedidoOrchestratorFlagsParams = {
   resumoFiscal: ResumoFiscalVenda | null
   origem: OrigemVenda | null
   detalhesPedidoMeta: DetalhesPedidoMeta | null
-  tipoInicioPedido: 'balcao' | 'entrega'
+  tipoInicioPedido: 'balcao' | 'delivery'
   status: StatusVenda
   fluxoPagamentoEntrega: FluxoPagamentoEntrega
   currentStep: 1 | 2 | 3 | 4
@@ -129,7 +129,7 @@ export function useNovoPedidoOrchestratorFlags({
   ]
 
   const rotuloStatusResumoModal = useMemo(() => {
-    if (tipoInicioPedido === 'entrega' && status === 'ABERTA') {
+    if (tipoInicioPedido === 'delivery' && status === 'ABERTA') {
       return 'Pendente (novos pedidos)'
     }
     return statusDisponiveis.find(s => s.value === status)?.label ?? String(status)
@@ -138,9 +138,9 @@ export function useNovoPedidoOrchestratorFlags({
   const pedidoGestorComPagamentoNoPasso3 =
     status === 'FINALIZADA' ||
     status === 'PENDENTE_EMISSAO' ||
-    (tipoInicioPedido === 'entrega' && status === 'ABERTA')
+    (tipoInicioPedido === 'delivery' && status === 'ABERTA')
 
-  const pedidoEntregaAceitaPagamentoPendente = tipoInicioPedido === 'entrega' && status === 'ABERTA'
+  const pedidoEntregaAceitaPagamentoPendente = tipoInicioPedido === 'delivery' && status === 'ABERTA'
 
   const entregaComCobrancaPeloEntregador =
     pedidoEntregaAceitaPagamentoPendente && fluxoPagamentoEntrega === 'cobrar_entregador'

@@ -17,7 +17,7 @@ interface NovoPedidoHeaderProps {
   bloquearAbasDetalhe?: boolean
   podeExibirAbaNotaFiscal: boolean
   podeExibirAbaDadosEntrega: boolean
-  tipoInicioPedido: 'balcao' | 'entrega'
+  tipoInicioPedido: 'balcao' | 'delivery'
 }
 
 export function NovoPedidoHeader({

@@ -263,9 +263,9 @@ export function useNovoPedidoOrchestrator({
     tabelaOrigemVenda,
     tipoVendaHint,
   })
-  const pedidoBalcao = tipoInicioPedido !== 'entrega'
+  const pedidoBalcao = tipoInicioPedido !== 'delivery'
   const canalVendaNovoPedido: CanalVendaNovoPedido =
-    tipoInicioPedido === 'entrega' ? 'entrega' : 'balcao'
+    tipoInicioPedido === 'delivery' ? 'entrega' : 'balcao'
   const menuCatalogoId = resolverMenuCatalogoNovoPedido(
     canalVendaNovoPedido,
     menuDeliveryId,
@@ -417,7 +417,7 @@ export function useNovoPedidoOrchestrator({
 
   useEffect(() => {
     if (!open || vendaId || modoVisualizacao) return
-    if (tipoInicioPedido !== 'entrega') return
+    if (tipoInicioPedido !== 'delivery') return
 
     const telCampo = telefoneWhatsAppParaCampoPedido(telefoneInicial)
     const digitos = digitosTelefonePedidoWhatsApp(telefoneInicial)
@@ -623,7 +623,7 @@ export function useNovoPedidoOrchestrator({
 
   const tipoVendaParaDetalhe =
     tipoVendaGestor ??
-    (tipoInicioPedido === 'entrega' ? 'entrega' : null)
+    (tipoInicioPedido === 'delivery' ? 'delivery' : null)
 
   const { carregarVendaExistente, isLoadingVenda, setIsLoadingVenda, vendaDataUpdatedAt } =
     useCarregarVenda({

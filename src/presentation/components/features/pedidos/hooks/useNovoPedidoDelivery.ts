@@ -5,10 +5,10 @@ import { deveUsarModuloDeliveryParaDetalhe } from '@/src/application/mappers/Ped
 import type { TipoAtendimentoDelivery } from '../types'
 
 interface UseNovoPedidoDeliveryParams {
-  tipoInicioPedido: 'balcao' | 'entrega'
+  tipoInicioPedido: 'balcao' | 'delivery'
   tipoAtendimentoDelivery: TipoAtendimentoDelivery
   tabelaOrigemVenda?: 'venda' | 'venda_gestor'
-  /** Hint do Kanban ou meta carregada (`entrega`, `retirada`, `balcao`). */
+  /** Hint do Kanban (`delivery` vs balcão). */
   tipoVendaHint?: string | null
 }
 
@@ -22,17 +22,13 @@ export function useNovoPedidoDelivery({
     const tipoVendaNormalizado = String(tipoVendaHint ?? '').trim().toLowerCase()
     /** Cliente/endereço obrigatórios só no fluxo de entrega; balcão novo não usa hint vazio como delivery. */
     const pedidoDeliveryGestor =
-      tipoInicioPedido === 'entrega' ||
+      tipoInicioPedido === 'delivery' ||
       (tipoInicioPedido === 'balcao' &&
         Boolean(tipoVendaNormalizado) &&
         deveUsarModuloDeliveryParaDetalhe(tabelaOrigemVenda, tipoVendaHint))
 
-    const pedidoComEntrega =
-      pedidoDeliveryGestor &&
-      (tipoAtendimentoDelivery === 'entrega' || tipoVendaNormalizado === 'entrega')
-    const pedidoComRetirada =
-      pedidoDeliveryGestor &&
-      (tipoAtendimentoDelivery === 'retirada' || tipoVendaNormalizado === 'retirada')
+    const pedidoComEntrega = pedidoDeliveryGestor && tipoAtendimentoDelivery === 'entrega'
+    const pedidoComRetirada = pedidoDeliveryGestor && tipoAtendimentoDelivery === 'retirada'
 
     return {
       pedidoDeliveryGestor,

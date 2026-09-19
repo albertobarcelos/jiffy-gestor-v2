@@ -185,7 +185,7 @@ export function PedidoDetalhesVisaoUnica() {
     const mensagem = montarMensagemWhatsappClienteKanban({
       clienteNome: dadosWhatsapp.clienteNome,
       colunaAtual: coluna,
-      tipoVenda: tipoWhatsapp,
+      tipoEntrega: tipoWhatsapp,
       dados: dadosWhatsapp,
       enderecoEmpresa: empresa?.endereco,
       nomeEmpresa: empresa?.nomeExibicao ?? '',

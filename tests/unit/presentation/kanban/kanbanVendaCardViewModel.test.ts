@@ -32,6 +32,12 @@ describe('derivarTipoVendaCardKanban', () => {
     expect(view.prefixoLinhaOrigemCard).toBe('Retirada')
   })
 
+  it('não inventa Entrega quando tipoEntrega não veio', () => {
+    const view = derivarTipoVendaCardKanban(vendaGestor('delivery', null))
+    expect(view.tipoVendaExibicao).toBe('delivery')
+    expect(view.prefixoLinhaOrigemCard).toBe('Delivery')
+  })
+
   it('mostra Balcão só para venda gestor que não é delivery', () => {
     const view = derivarTipoVendaCardKanban(vendaGestor('balcao'))
     expect(view.isDeliveryOuRetirada).toBe(false)

@@ -109,7 +109,7 @@ export interface ResumoFiscalVenda {
 
 export type TabelaOrigemVenda = 'venda' | 'venda_gestor'
 
-export type CanalAberturaPedido = 'balcao' | 'entrega'
+export type CanalAberturaPedido = 'balcao' | 'delivery'
 
 /** Morada de entrega selecionada no formulário (independente do hook de UI). */
 export interface MoradaEntregaSelecionada {

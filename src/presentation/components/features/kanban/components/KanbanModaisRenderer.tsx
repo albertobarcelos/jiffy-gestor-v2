@@ -205,7 +205,7 @@ export function KanbanModaisRenderer({
           tabelaOrigemVenda={pedidoEdicaoProdutosContext.tabelaOrigem}
           statusFiscalUnificado={pedidoEdicaoProdutosContext.statusFiscal}
           tipoVendaGestor={pedidoEdicaoProdutosContext.tipoVenda}
-          tipoInicioPedido="entrega"
+          tipoInicioPedido="delivery"
           modoEdicaoProdutos={true}
         />
       )}
@@ -223,7 +223,7 @@ export function KanbanModaisRenderer({
           tipoInicioPedido={
             modoKanbanVendas === 'delivery' ||
             pedidoVisualizacaoContext.tipoVenda === 'delivery'
-              ? 'entrega'
+              ? 'delivery'
               : 'balcao'
           }
           abaDetalhesInicial={pedidoVisualizacaoContext.abaDetalhesInicial}

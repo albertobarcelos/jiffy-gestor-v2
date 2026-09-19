@@ -7,7 +7,7 @@ function baseInput(
   overrides: Partial<CriarPedidoDeliveryInputDTO> = {}
 ): CriarPedidoDeliveryInputDTO {
   return {
-    tipoInicioPedido: 'entrega',
+    tipoInicioPedido: 'delivery',
     origem: 'GESTOR',
     status: 'ABERTA',
     produtos: [
