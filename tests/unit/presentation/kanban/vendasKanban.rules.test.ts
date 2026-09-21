@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   classeBordaEsquerdaColunaKanban,
+  getCardBorderEFundoKanban,
   vendaElegivelParaReemissaoAutomaticaLote,
   fiscalKanbanPodeReemitirAposCooldown,
   rotuloBotaoAvancarEtapaKanban,
@@ -197,6 +198,24 @@ describe('classeBordaEsquerdaColunaKanban', () => {
     expect(classeBordaEsquerdaColunaKanban('PRONTO_ENTREGA')).toBe('border-l-sky-500')
     expect(classeBordaEsquerdaColunaKanban('EM_ROTA')).toBe('border-l-indigo-500')
     expect(classeBordaEsquerdaColunaKanban('FINALIZADAS')).toBe('border-l-primary')
-    expect(classeBordaEsquerdaColunaKanban('FINALIZADAS', 'delivery')).toBe('border-l-emerald-500')
+    expect(classeBordaEsquerdaColunaKanban('FINALIZADAS', 'delivery')).toBe('border-l-primary')
+  })
+})
+
+describe('getCardBorderEFundoKanban', () => {
+  it('card entregue sem nota usa a faixa do Finalizadas do balcão', () => {
+    const venda = makeVenda({ statusFiscal: null })
+    expect(
+      getCardBorderEFundoKanban('FINALIZADAS', venda, SEM_ACAO_EM_ANDAMENTO, 'delivery')
+        .borderClass
+    ).toBe('border-l-primary')
+  })
+
+  it('card com NF emitida mantém a faixa verde fiscal', () => {
+    const venda = makeVenda({ statusFiscal: 'EMITIDA' })
+    expect(
+      getCardBorderEFundoKanban('COM_FISCAL', venda, SEM_ACAO_EM_ANDAMENTO, 'delivery')
+        .borderClass
+    ).toBe('border-l-green-500')
   })
 })

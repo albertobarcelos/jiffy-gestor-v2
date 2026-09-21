@@ -195,10 +195,10 @@ export function statusFiscalAguardandoSefaz(v: VendaUnificadaDTO): boolean {
 /** Faixa esquerda da etapa — a mesma dos cards do quadro. */
 export function classeBordaEsquerdaColunaKanban(
   columnId: ColunaKanbanId,
-  modoKanbanVendas?: ModoKanbanVendas
+  _modoKanbanVendas?: ModoKanbanVendas
 ): string {
   if (columnId === 'FINALIZADAS') {
-    return modoKanbanVendas === 'delivery' ? 'border-l-emerald-500' : 'border-l-primary'
+    return 'border-l-primary'
   }
   if (columnId === 'NOVOS_PEDIDOS') return 'border-l-slate-500'
   if (columnId === 'EM_PREPARO') return 'border-l-amber-500'
@@ -212,7 +212,8 @@ export function classeBordaEsquerdaColunaKanban(
 
 /**
  * Borda esquerda e fundo do card conforme coluna e statusFiscal.
- * Finalizadas: primary. Pendente/Com nota: fiscal (emitida/cancelada/rejeitada), sem status na pendente → amarelo,
+ * Finalizadas (sem nota): primary — no delivery evita confundir com NF emitida.
+ * Pendente/Com nota: fiscal (emitida/cancelada/rejeitada), sem status na pendente → amarelo,
  * reemitindo, emitindo (emitir-nota direto) ou aguardando SEFAZ → custom-2.
  */
 export function getCardBorderEFundoKanban(
