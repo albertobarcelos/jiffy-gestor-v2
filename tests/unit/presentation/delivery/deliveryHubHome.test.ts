@@ -157,7 +157,6 @@ describe('DELIVERY_HUB_ETAPAS', () => {
     expect(getDeliveryEtapaById('delivery-loja')?.label).toBe('Delivery')
     expect(DELIVERY_HUB_ETAPAS.some(e => e.id === 'delivery-loja')).toBe(false)
     expect(DELIVERY_LOJA_CARD_IDS).toEqual([
-      'delivery-nome-cardapio',
       'delivery-cobertura',
       'delivery-agenda',
       'delivery-design',
@@ -185,21 +184,19 @@ describe('DELIVERY_HUB_ETAPAS', () => {
 })
 
 describe('montarPassosLojaHub e operação', () => {
-  it('monta os 5 itens do grupo Loja na ordem do menu', () => {
+  it('monta os itens do grupo Loja na ordem do menu', () => {
     const cards = montarPassosLojaHub(calcularDeliveryHubProgresso([], true), {
       empresaDeliveryConfigurada: true,
       agendaConfigurada: true,
     })
     expect(cards.map(c => c.id)).toEqual([...DELIVERY_LOJA_CARD_IDS])
     expect(cards.map(c => c.titulo)).toEqual([
-      'Nome da Loja',
       'Áreas de entrega',
       'Agenda e funcionamento',
       'Personalizar Loja',
       'Notificações WhatsApp',
     ])
     expect(cards.filter(c => c.obrigatoria).map(c => c.id)).toEqual([
-      'delivery-nome-cardapio',
       'delivery-cobertura',
       'delivery-agenda',
     ])

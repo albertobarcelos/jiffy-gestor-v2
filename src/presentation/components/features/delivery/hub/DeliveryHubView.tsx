@@ -14,6 +14,7 @@ import {
   getDeliveryEtapaById,
   type DeliveryEtapaId,
 } from './deliveryHubEtapas'
+import { deliveryHubDesignSectionPath } from '@/src/presentation/components/features/delivery-publico/shared/constants/designTabs'
 import { calcularDeliveryHubProgresso } from './deliveryHubProgresso'
 import { DeliveryHubHome } from './DeliveryHubHome'
 
@@ -67,6 +68,9 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
     if (etapaId === 'delivery-loja') {
       router.replace(toGestao(DELIVERY_HUB_PATH))
     }
+    if (etapaId === 'delivery-nome-cardapio') {
+      router.replace(toGestao(deliveryHubDesignSectionPath('cardapio')))
+    }
   }, [etapaId, router, toGestao])
 
   useEffect(() => {
@@ -102,7 +106,7 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
     [activeEtapaId, pedirSaida, router, toGestao]
   )
 
-  if (etapaId === 'delivery-loja') {
+  if (etapaId === 'delivery-loja' || etapaId === 'delivery-nome-cardapio') {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
         <JiffyLoading />

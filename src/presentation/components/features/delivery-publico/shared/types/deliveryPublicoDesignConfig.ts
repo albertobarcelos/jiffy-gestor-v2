@@ -28,6 +28,7 @@ export type TypographyPresetId = 'urbana' | 'moderna' | 'classica' | 'elegante'
 export type GrupoTituloFundoMode = 'cor' | 'imagem'
 
 export type DesignTabId =
+  | 'cardapio'
   | 'cabecalho'
   | 'modelos'
   | 'cores'

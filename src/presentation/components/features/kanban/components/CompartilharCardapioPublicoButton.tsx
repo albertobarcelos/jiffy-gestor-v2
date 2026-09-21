@@ -8,7 +8,7 @@ import { MdCheck, MdContentCopy, MdShare } from 'react-icons/md'
 import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
-import { deliveryHubEtapaPath } from '@/src/shared/constants/configuracoesRoutes'
+import { deliveryHubDesignSectionPath } from '@/src/presentation/components/features/delivery-publico/shared/constants/designTabs'
 import { showToast } from '@/src/shared/utils/toast'
 import {
   textoWhatsappCardapioPublico,
@@ -104,7 +104,7 @@ export function CompartilharCardapioPublicoButton() {
             <p className="text-xs text-secondary-text">
               Defina o nome da loja no Delivery para gerar o link.{' '}
               <Link
-                href={toGestao(deliveryHubEtapaPath('delivery-nome-cardapio'))}
+                href={toGestao(deliveryHubDesignSectionPath('cardapio'))}
                 onClick={fechar}
                 className="font-semibold text-primary hover:underline"
               >

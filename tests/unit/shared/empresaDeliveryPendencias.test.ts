@@ -90,7 +90,7 @@ describe('empresaDeliveryPendencias', () => {
       resolverAcaoPendencia(EMPRESA_DELIVERY_PENDENCIA_TYPES.CARDAPIO_DELIVERY_NAO_CONFIGURADO)
     ).toEqual({
       label: 'Selecionar cardápio',
-      href: '/config/delivery/nome-cardapio',
+      href: '/config/delivery/design?secao=cardapio',
     })
     expect(resolverAcaoPendencia('TIPO_DESCONHECIDO')).toBeNull()
   })

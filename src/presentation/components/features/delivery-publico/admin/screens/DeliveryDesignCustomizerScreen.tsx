@@ -31,6 +31,7 @@ import { DesignModelosTab } from '../components/tabs/DesignModelosTab'
 import { DesignCoresTab } from '../components/tabs/DesignCoresTab'
 import { DesignTipografiasTab } from '../components/tabs/DesignTipografiasTab'
 import { DesignCategoriasTab } from '../components/tabs/DesignCategoriasTab'
+import { DeliveryNomeCardapioView } from '@/src/presentation/components/features/delivery/hub/DeliveryNomeCardapioView'
 import { DELIVERY_HUB_PATH } from '@/src/presentation/components/features/delivery/hub/deliveryHubEtapas'
 
 function DesignSectionForm({
@@ -58,6 +59,9 @@ function DesignSectionForm({
   categoriasGruposLoading: boolean
   categoriasGruposError: boolean
 }) {
+  if (activeSection === 'cardapio') {
+    return <DeliveryNomeCardapioView embedded />
+  }
   if (activeSection === 'cabecalho') {
     return (
       <DesignCabecalhoTab
@@ -178,7 +182,11 @@ export function DeliveryDesignCustomizerScreen() {
               title={
                 getPublishDisabledReason(draft) ?? 'Salva e aplica no cardápio público'
               }
-              className="inline-flex h-9 items-center rounded-lg bg-secondary px-5 text-sm font-semibold text-white transition-colors hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              className={
+                activeSection === 'cardapio'
+                  ? 'hidden'
+                  : 'inline-flex h-9 items-center rounded-lg bg-secondary px-5 text-sm font-semibold text-white transition-colors hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-50'
+              }
             >
               Salvar
             </button>

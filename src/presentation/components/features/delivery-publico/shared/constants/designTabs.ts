@@ -2,6 +2,7 @@ import type { IconType } from 'react-icons'
 import {
   MdCategory,
   MdImage,
+  MdLink,
   MdPalette,
   MdTextFields,
   MdViewModule,
@@ -21,6 +22,7 @@ export type DesignTabDefinition = {
 export const DESIGN_SECTION_QUERY_KEY = 'secao'
 
 export type DeliveryDesignSectionTabId =
+  | 'delivery-design-cardapio'
   | 'delivery-design-cabecalho'
   | 'delivery-design-modelos'
   | 'delivery-design-cores'
@@ -28,6 +30,13 @@ export type DeliveryDesignSectionTabId =
   | 'delivery-design-categorias'
 
 export const DESIGN_TABS: DesignTabDefinition[] = [
+  {
+    id: 'cardapio',
+    label: 'Cardápio',
+    descricao: 'Cardápio publicado e link público da loja.',
+    icon: MdLink,
+    cta: 'Abrir',
+  },
   {
     id: 'cabecalho',
     label: 'Cabeçalho',
@@ -68,6 +77,7 @@ export const DESIGN_TABS: DesignTabDefinition[] = [
 const DESIGN_TAB_IDS: ReadonlySet<string> = new Set(DESIGN_TABS.map(tab => tab.id))
 
 const SECTION_TO_TAB_ID: Record<DesignTabId, DeliveryDesignSectionTabId> = {
+  cardapio: 'delivery-design-cardapio',
   cabecalho: 'delivery-design-cabecalho',
   modelos: 'delivery-design-modelos',
   cores: 'delivery-design-cores',

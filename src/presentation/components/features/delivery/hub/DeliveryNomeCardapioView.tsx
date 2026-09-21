@@ -25,7 +25,7 @@ import {
 } from '@/src/shared/constants/empresaDeliveryPendencias'
 import { getCardapioSlugInputPrefix } from '@/src/shared/utils/cardapioPublicUrl'
 
-export function DeliveryNomeCardapioView() {
+export function DeliveryNomeCardapioView({ embedded = false }: { embedded?: boolean }) {
   const slugInputPrefix = getCardapioSlugInputPrefix()
   const { empresa } = useEmpresaMe()
   const { menuDeliveryId: menuDeliveryIdSalvo } = useMenuDeliveryId()
@@ -159,19 +159,25 @@ export function DeliveryNomeCardapioView() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-      <div className="mx-auto w-full max-w-[720px] space-y-6 p-4 md:p-6">
-        <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-secondary/10 text-secondary">
-            <MdStorefront className="h-6 w-6" aria-hidden />
+    <div className={embedded ? 'mx-auto w-full max-w-[720px] space-y-6' : 'flex min-h-0 flex-1 flex-col overflow-y-auto'}>
+      <div className={embedded ? 'space-y-6' : 'mx-auto w-full max-w-[720px] space-y-6 p-4 md:p-6'}>
+        {embedded ? (
+          <p className="text-sm text-secondary-text">
+            Defina o slug do link público e o cardápio (menu) publicado na loja online.
+          </p>
+        ) : (
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-secondary/10 text-secondary">
+              <MdStorefront className="h-6 w-6" aria-hidden />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-primary-text">Nome da loja e cardápio</h1>
+              <p className="mt-1 text-sm text-secondary-text">
+                Defina o slug do link público e o cardápio (menu) publicado na loja online.
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-primary-text">Nome da loja e cardápio</h1>
-            <p className="mt-1 text-sm text-secondary-text">
-              Defina o slug do link público e o cardápio (menu) publicado na loja online.
-            </p>
-          </div>
-        </div>
+        )}
 
         {configurado &&
         !lojaDeliveryDisponivel(empresaDelivery ?? undefined) &&

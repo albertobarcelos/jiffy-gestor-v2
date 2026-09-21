@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   DESIGN_SECTION_QUERY_KEY,
+  DESIGN_TABS,
   designSectionFromTabId,
   designSectionTabId,
   deliveryHubDesignPath,
@@ -15,6 +16,8 @@ import {
 
 describe('designTabs — seções no TabBar', () => {
   it('mapeia seção ↔ tab id e path com query secao', () => {
+    expect(DESIGN_TABS[0]?.id).toBe('cardapio')
+    expect(designSectionTabId('cardapio')).toBe('delivery-design-cardapio')
     expect(designSectionTabId('cabecalho')).toBe('delivery-design-cabecalho')
     expect(designSectionFromTabId('delivery-design-cores')).toBe('cores')
     expect(isDesignTabId('tipografias')).toBe(true)

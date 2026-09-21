@@ -4,7 +4,7 @@ import { MdClose } from 'react-icons/md'
 import { useRouter } from 'next/navigation'
 import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
-import { deliveryHubEtapaPath } from '@/src/shared/constants/configuracoesRoutes'
+import { deliveryHubDesignSectionPath } from '@/src/presentation/components/features/delivery-publico/shared/constants/designTabs'
 
 type EmpresaDeliveryPendenteGestorModalProps = {
   open: boolean
@@ -26,7 +26,7 @@ export function EmpresaDeliveryPendenteGestorModal({
 
   const handleConfigurar = () => {
     onClose()
-    router.push(toGestao(deliveryHubEtapaPath('delivery-nome-cardapio')))
+    router.push(toGestao(deliveryHubDesignSectionPath('cardapio')))
   }
 
   return (
