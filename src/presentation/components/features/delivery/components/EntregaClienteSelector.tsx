@@ -12,6 +12,7 @@ import {
   formatarCepMascara,
   normalizarDigitosCep,
 } from '@/src/shared/utils/consultaCep'
+import { capitalizarPrimeiraLetra } from '@/src/shared/utils/capitalizarPrimeiraLetra'
 import { maiusculasEnderecoInput } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { JiffyConfirmDialog } from '@/src/presentation/components/ui/jiffy-confirm-dialog'
@@ -340,6 +341,8 @@ export function EntregaClienteSelector({
   const [clienteNaoEncontrado, setClienteNaoEncontrado] = useState(false)
   /** Painel lateral de cadastro rápido de cliente. */
   const [painelClienteAberto, setPainelClienteAberto] = useState(false)
+  /** Cadastro de cliente + endereço no mesmo painel (entrega sem ficha nesta empresa). */
+  const [cadastroUnificado, setCadastroUnificado] = useState(false)
   /** Nome no formulário de cadastro rápido (separado do campo de busca). */
   const [nomeNovoCliente, setNomeNovoCliente] = useState('')
   /** `null` = modo criar; definido = modo editar */
@@ -827,6 +830,123 @@ export function EntregaClienteSelector({
     }))
   }, [])
 
+  const persistirMoradaDoFormulario = useCallback(
+    async (digitos: string): Promise<MoradaTelefone | null> => {
+      const nomeMoradaTrim = formNova.nomeMorada.trim()
+      if (!digitos || !nomeMoradaTrim || !formNova.rua || !formNova.numero || !formNova.cidade || !formNova.estado) {
+        if (digitos && !nomeMoradaTrim) {
+          showToast.warning('Informe o nome da morada.')
+        }
+        return null
+      }
+
+      const cepDigits = normalizarDigitosCep(formNova.cep)
+      if (cepDigits.length > 0 && cepDigits.length !== 8) {
+        showToast.warning('Informe um CEP válido com 8 dígitos ou deixe o campo em branco.')
+        return null
+      }
+
+      const uf = formNova.estado.trim().toUpperCase().slice(0, 2)
+      if (uf.length !== 2) {
+        showToast.warning('Informe a UF com 2 letras.')
+        return null
+      }
+
+      const enderecoBase: EnderecoMorada = {
+        cep: cepDigits,
+        rua: paraMaiusculaEndereco(formNova.rua.trim()),
+        numero: paraMaiusculaEndereco(formNova.numero.trim()),
+        bairro: paraMaiusculaEndereco(formNova.bairro.trim()),
+        cidade: paraMaiusculaEndereco(formNova.cidade.trim()),
+        estado: uf,
+        complemento: formNova.complemento.trim()
+          ? paraMaiusculaEndereco(formNova.complemento.trim())
+          : undefined,
+        referencia: formNova.referencia.trim()
+          ? paraMaiusculaEndereco(formNova.referencia.trim())
+          : undefined,
+      }
+
+      let geoParaSalvar: {
+        enderecoLocalizacao: GeoJsonPoint
+        providerEnderecoId?: string | null
+      } | null = null
+
+      if (usarModuloDeliveryClientes) {
+        try {
+          const resolvida = await resolverGeoMoradaDeliveryGestor({
+            endereco: enderecoBase,
+            fallbackEmpresaGeo,
+          })
+          geoParaSalvar = {
+            enderecoLocalizacao: resolvida.enderecoLocalizacao,
+            providerEnderecoId: resolvida.providerEnderecoId ?? null,
+          }
+          if (resolvida.origem === 'empresa') {
+            showToast.warning(
+              'Google não localizou o endereço. Usamos a localização da empresa como aproximação.'
+            )
+          }
+        } catch (error) {
+          if (
+            moradaEditando?.endereco &&
+            enderecoTemGeolocalizacao(moradaEditando.endereco)
+          ) {
+            geoParaSalvar = {
+              enderecoLocalizacao: moradaEditando.endereco.enderecoLocalizacao!,
+              providerEnderecoId: moradaEditando.endereco.providerEnderecoId ?? null,
+            }
+          } else {
+            showToast.error(
+              error instanceof Error
+                ? error.message
+                : 'Não foi possível obter a localização do endereço'
+            )
+            return null
+          }
+        }
+      } else if (moradaGeo) {
+        geoParaSalvar = moradaGeo
+      }
+
+      const endereco: EnderecoMorada = {
+        ...enderecoBase,
+        ...(geoParaSalvar
+          ? {
+              enderecoLocalizacao: geoParaSalvar.enderecoLocalizacao,
+              providerEnderecoId: geoParaSalvar.providerEnderecoId ?? null,
+              preferenciaEntrega: null,
+            }
+          : {}),
+      }
+
+      const dto = {
+        telefone: digitos,
+        tipoEtiqueta: formNova.tipoEtiqueta.toLowerCase(),
+        nomeMorada: nomeMoradaTrim,
+        endereco,
+      }
+
+      if (moradaEditando) {
+        return atualizarMorada.mutateAsync({
+          id: moradaEditando.id,
+          dto,
+        })
+      }
+
+      return criarMorada.mutateAsync(dto)
+    },
+    [
+      formNova,
+      moradaEditando,
+      criarMorada,
+      atualizarMorada,
+      moradaGeo,
+      usarModuloDeliveryClientes,
+      fallbackEmpresaGeo,
+    ]
+  )
+
   const handleSalvarMorada = useCallback(async () => {
     if (!podeGerenciarEnderecos) {
       showToast.warning('Cadastre o cliente antes de salvar o endereço.')
@@ -834,141 +954,30 @@ export function EntregaClienteSelector({
     }
 
     const digitos = extrairDigitosTelefone(telefoneInput)
-    const nomeMoradaTrim = formNova.nomeMorada.trim()
-    if (!digitos || !nomeMoradaTrim || !formNova.rua || !formNova.numero || !formNova.cidade || !formNova.estado) {
-      if (digitos && !nomeMoradaTrim) {
-        showToast.warning('Informe o nome da morada.')
-      }
-      return
-    }
-
-    const cepDigits = normalizarDigitosCep(formNova.cep)
-    if (cepDigits.length > 0 && cepDigits.length !== 8) {
-      showToast.warning('Informe um CEP válido com 8 dígitos ou deixe o campo em branco.')
-      return
-    }
-
-    const uf = formNova.estado.trim().toUpperCase().slice(0, 2)
-    if (uf.length !== 2) {
-      showToast.warning('Informe a UF com 2 letras.')
-      return
-    }
-
-    const enderecoBase: EnderecoMorada = {
-      cep: cepDigits,
-      rua: paraMaiusculaEndereco(formNova.rua.trim()),
-      numero: paraMaiusculaEndereco(formNova.numero.trim()),
-      bairro: paraMaiusculaEndereco(formNova.bairro.trim()),
-      cidade: paraMaiusculaEndereco(formNova.cidade.trim()),
-      estado: uf,
-      complemento: formNova.complemento.trim()
-        ? paraMaiusculaEndereco(formNova.complemento.trim())
-        : undefined,
-      referencia: formNova.referencia.trim()
-        ? paraMaiusculaEndereco(formNova.referencia.trim())
-        : undefined,
-    }
-
-    let geoParaSalvar: {
-      enderecoLocalizacao: GeoJsonPoint
-      providerEnderecoId?: string | null
-    } | null = null
-
-    if (usarModuloDeliveryClientes) {
-      try {
-        const resolvida = await resolverGeoMoradaDeliveryGestor({
-          endereco: enderecoBase,
-          fallbackEmpresaGeo,
-        })
-        geoParaSalvar = {
-          enderecoLocalizacao: resolvida.enderecoLocalizacao,
-          providerEnderecoId: resolvida.providerEnderecoId ?? null,
-        }
-        if (resolvida.origem === 'empresa') {
-          showToast.warning(
-            'Google não localizou o endereço. Usamos a localização da empresa como aproximação.'
-          )
-        }
-      } catch (error) {
-        if (
-          moradaEditando?.endereco &&
-          enderecoTemGeolocalizacao(moradaEditando.endereco)
-        ) {
-          geoParaSalvar = {
-            enderecoLocalizacao: moradaEditando.endereco.enderecoLocalizacao!,
-            providerEnderecoId: moradaEditando.endereco.providerEnderecoId ?? null,
-          }
-        } else {
-          showToast.error(
-            error instanceof Error
-              ? error.message
-              : 'Não foi possível obter a localização do endereço'
-          )
-          return
-        }
-      }
-    } else if (moradaGeo) {
-      geoParaSalvar = moradaGeo
-    }
-
-    const endereco: EnderecoMorada = {
-      ...enderecoBase,
-      ...(geoParaSalvar
-        ? {
-            enderecoLocalizacao: geoParaSalvar.enderecoLocalizacao,
-            providerEnderecoId: geoParaSalvar.providerEnderecoId ?? null,
-            preferenciaEntrega: null,
-          }
-        : {}),
-    }
-
-    const dto = {
-      telefone: digitos,
-      tipoEtiqueta: formNova.tipoEtiqueta.toLowerCase(),
-      nomeMorada: nomeMoradaTrim,
-      endereco,
-    }
-
-    if (moradaEditando) {
-      const atualizada = await atualizarMorada.mutateAsync({
-        id: moradaEditando.id,
-        dto,
-      })
-      fecharPainelMorada()
-      setTelefoneBuscado(digitos)
-      definirMoradaSelecionada(atualizada, digitos)
-      return
-    }
-
-    const nova = await criarMorada.mutateAsync(dto)
+    const salva = await persistirMoradaDoFormulario(digitos)
+    if (!salva) return
     fecharPainelMorada()
     setTelefoneBuscado(digitos)
-    definirMoradaSelecionada(nova, digitos)
+    definirMoradaSelecionada(salva, digitos)
   }, [
     podeGerenciarEnderecos,
     telefoneInput,
-    formNova,
-    moradaEditando,
-    criarMorada,
-    atualizarMorada,
+    persistirMoradaDoFormulario,
     fecharPainelMorada,
     definirMoradaSelecionada,
     setTelefoneBuscado,
-    moradaGeo,
-    usarModuloDeliveryClientes,
-    fallbackEmpresaGeo,
   ])
 
   const handleSalvarClienteRapido = useCallback(async () => {
-    const nome = nomeNovoCliente.trim()
+    const nome = capitalizarPrimeiraLetra(nomeNovoCliente.trim())
     if (!nome) {
       showToast.warning('Informe o nome do cliente.')
-      return
+      return null
     }
     const digitos = extrairDigitosTelefone(telefoneInput)
     if (usarModuloDeliveryClientes && !telefoneCelularBrCompleto(digitos)) {
       showToast.warning('Informe o celular completo com DDD (11 dígitos).')
-      return
+      return null
     }
     try {
       const novo = await criarCliente.mutateAsync({ nome, telefone: digitos })
@@ -982,11 +991,9 @@ export function EntregaClienteSelector({
       }
       onClienteVinculado({ id: novo.getId(), nome: novo.getNome() })
       setClienteNaoEncontrado(false)
-      setPainelClienteAberto(false)
-      setNomeNovoCliente('')
-      showToast.success('Cliente cadastrado com sucesso!')
+      return { id: novo.getId(), nome: novo.getNome(), digitos }
     } catch {
-      /* erro exibido pelo hook */
+      return null
     }
   }, [
     nomeNovoCliente,
@@ -998,11 +1005,64 @@ export function EntregaClienteSelector({
     setTelefoneBuscado,
   ])
 
+  const handleSalvarClienteEEndereco = useCallback(async () => {
+    if (cadastroUnificado) {
+      if (!formNova.rua || !formNova.numero || !formNova.cidade || !formNova.estado) {
+        showToast.warning('Preencha o endereço de entrega (rua, número, cidade e UF).')
+        return
+      }
+    }
+    const criado = await handleSalvarClienteRapido()
+    if (!criado) return
+
+    if (!cadastroUnificado) {
+      setPainelClienteAberto(false)
+      setCadastroUnificado(false)
+      setNomeNovoCliente('')
+      showToast.success('Cliente cadastrado com sucesso!')
+      return
+    }
+
+    const morada = await persistirMoradaDoFormulario(criado.digitos)
+    if (!morada) {
+      setPainelClienteAberto(false)
+      setCadastroUnificado(false)
+      setNomeNovoCliente('')
+      showToast.warning('Cliente cadastrado. Complete o endereço para continuar.')
+      setPainelMoradaAberto(true)
+      return
+    }
+
+    setPainelClienteAberto(false)
+    setCadastroUnificado(false)
+    setNomeNovoCliente('')
+    setTelefoneBuscado(criado.digitos)
+    definirMoradaSelecionada(morada, criado.digitos)
+    showToast.success('Cliente e endereço cadastrados.')
+  }, [
+    cadastroUnificado,
+    formNova.rua,
+    formNova.numero,
+    formNova.cidade,
+    formNova.estado,
+    handleSalvarClienteRapido,
+    persistirMoradaDoFormulario,
+    definirMoradaSelecionada,
+    setTelefoneBuscado,
+  ])
+
   const handleAbrirPainelCliente = useCallback(() => {
-    setNomeNovoCliente(nomeDigitado.trim())
+    setNomeNovoCliente(capitalizarPrimeiraLetra(nomeDigitado.trim()))
     focarTelefoneNoPainelRef.current = extrairDigitosTelefone(telefoneInput).length === 0
+    const unificado = Boolean(mostrarEnderecos)
+    setCadastroUnificado(unificado)
+    if (unificado) {
+      setMoradaEditando(null)
+      setFormNova(formInicialComEnderecoPadrao(enderecoPadrao))
+      resetGeoPainelState()
+    }
     setPainelClienteAberto(true)
-  }, [nomeDigitado, telefoneInput])
+  }, [nomeDigitado, telefoneInput, mostrarEnderecos, enderecoPadrao, resetGeoPainelState])
 
   useEffect(() => {
     if (!painelClienteAberto) return
@@ -1020,11 +1080,22 @@ export function EntregaClienteSelector({
   useEffect(() => {
     if (!abrirCadastroRapidoPedido) return
     const id = window.setTimeout(() => {
-      handleAbrirPainelCliente()
+      if (clienteVinculado?.id?.trim() && mostrarEnderecos) {
+        abrirPainelNovo()
+      } else {
+        handleAbrirPainelCliente()
+      }
       onCadastroRapidoPedidoConsumido?.()
     }, 80)
     return () => window.clearTimeout(id)
-  }, [abrirCadastroRapidoPedido, handleAbrirPainelCliente, onCadastroRapidoPedidoConsumido])
+  }, [
+    abrirCadastroRapidoPedido,
+    clienteVinculado?.id,
+    mostrarEnderecos,
+    abrirPainelNovo,
+    handleAbrirPainelCliente,
+    onCadastroRapidoPedidoConsumido,
+  ])
 
   const moradasEncontradas = moradas ?? []
   const buscaRealizada = telefoneBuscado !== null || clienteVinculado !== null
@@ -1085,14 +1156,14 @@ export function EntregaClienteSelector({
                 }
                 onChange={e => {
                   if (editandoNome) {
-                    setNomeEmEdicao(e.target.value)
+                    setNomeEmEdicao(capitalizarPrimeiraLetra(e.target.value))
                     return
                   }
                   if (clienteVinculado) {
                     onClienteVinculado(null)
                     setClienteNaoEncontrado(false)
                   }
-                  setNomeDigitado(e.target.value)
+                  setNomeDigitado(capitalizarPrimeiraLetra(e.target.value))
                 }}
                 readOnly={!!clienteVinculado && !editandoNome}
                 disabled={salvandoNome}
@@ -1312,31 +1383,42 @@ export function EntregaClienteSelector({
         </div>
       )}
 
-      {/* Painel lateral: cadastro rápido de cliente */}
+      {/* Painel lateral: cadastro rápido de cliente (+ endereço na entrega) */}
       <JiffySidePanelModal
         open={painelClienteAberto}
         onClose={() => {
           setPainelClienteAberto(false)
+          setCadastroUnificado(false)
           setNomeNovoCliente('')
         }}
-        title="Cadastrar cliente"
+        title={cadastroUnificado ? 'Cadastrar cliente e endereço' : 'Cadastrar cliente'}
         zIndex={1600}
-        panelClassName="w-[min(36rem,94vw)] sm:w-[min(38rem,90vw)]"
+        panelClassName={
+          cadastroUnificado
+            ? 'w-[min(40rem,94vw)] sm:w-[min(42rem,90vw)]'
+            : 'w-[min(36rem,94vw)] sm:w-[min(38rem,90vw)]'
+        }
         footerVariant="bar"
         footerActions={{
           showSave: true,
-          saveLabel: 'Salvar cliente',
-          saveLoading: criarCliente.isPending,
+          saveLabel: cadastroUnificado ? 'Salvar e continuar' : 'Salvar cliente',
+          saveLoading:
+            criarCliente.isPending ||
+            (cadastroUnificado && (criarMorada.isPending || atualizarMorada.isPending)),
           saveDisabled:
             criarCliente.isPending ||
+            criarMorada.isPending ||
             !nomeNovoCliente.trim() ||
             (usarModuloDeliveryClientes &&
-              !telefoneCelularBrCompleto(extrairDigitosTelefone(telefoneInput))),
-          onSave: handleSalvarClienteRapido,
+              !telefoneCelularBrCompleto(extrairDigitosTelefone(telefoneInput))) ||
+            (cadastroUnificado &&
+              (!formNova.rua || !formNova.numero || !formNova.cidade || !formNova.estado)),
+          onSave: () => void handleSalvarClienteEEndereco(),
           showCancel: true,
           cancelLabel: 'Cancelar',
           onCancel: () => {
             setPainelClienteAberto(false)
+            setCadastroUnificado(false)
             setNomeNovoCliente('')
           },
         }}
@@ -1349,7 +1431,7 @@ export function EntregaClienteSelector({
             <input
               ref={nomeNovoClienteInputRef}
               value={nomeNovoCliente}
-              onChange={e => setNomeNovoCliente(e.target.value)}
+              onChange={e => setNomeNovoCliente(capitalizarPrimeiraLetra(e.target.value))}
               placeholder="Ex.: João Silva"
               className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
@@ -1380,6 +1462,126 @@ export function EntregaClienteSelector({
                 : 'Celular com DDD. Altere se precisar.'}
             </p>
           </div>
+
+          {cadastroUnificado ? (
+            <div className="space-y-4 border-t border-gray-100 pt-4">
+              <p className="text-sm font-semibold text-gray-800">Endereço de entrega</p>
+              <div>
+                <Label className="mb-1 block text-xs font-medium text-gray-600">
+                  Tipo <span className="text-red-500">*</span>
+                </Label>
+                <select
+                  value={formNova.tipoEtiqueta}
+                  onChange={e => handleTipoEtiquetaChange(e.target.value)}
+                  className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                >
+                  {ETIQUETAS_MORADA_ENTREGA.map(etiqueta => (
+                    <option key={etiqueta} value={etiqueta}>
+                      {etiqueta}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <div className="mb-1 flex items-baseline justify-between gap-2">
+                  <Label className="text-xs font-medium text-gray-600">CEP</Label>
+                  <span className="text-[11px] text-gray-400">Se não tiver, pode deixar em branco</span>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    value={formNova.cep}
+                    onChange={e => handleFormChange('cep', formatarCepMascara(e.target.value))}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        void handleBuscarCep()
+                      }
+                    }}
+                    placeholder="00000-000"
+                    inputMode="numeric"
+                    autoComplete="postal-code"
+                    className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleBuscarCep()}
+                    disabled={buscandoCep || normalizarDigitosCep(formNova.cep).length !== 8}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <MdSearch className="h-4 w-4" />
+                    {buscandoCep ? 'Buscando…' : 'Buscar'}
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <Label className="mb-1 block text-xs font-medium text-gray-600">
+                    Rua / Logradouro <span className="text-red-500">*</span>
+                  </Label>
+                  <input
+                    value={formNova.rua}
+                    onChange={e => handleFormChange('rua', e.target.value)}
+                    placeholder="RUA DAS FLORES"
+                    className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  />
+                </div>
+                <div>
+                  <Label className="mb-1 block text-xs font-medium text-gray-600">
+                    Nº <span className="text-red-500">*</span>
+                  </Label>
+                  <input
+                    value={formNova.numero}
+                    onChange={e => handleFormChange('numero', e.target.value)}
+                    placeholder="100"
+                    className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="mb-1 block text-xs font-medium text-gray-600">Bairro</Label>
+                <input
+                  value={formNova.bairro}
+                  onChange={e => handleFormChange('bairro', e.target.value)}
+                  placeholder="CENTRO"
+                  className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <Label className="mb-1 block text-xs font-medium text-gray-600">
+                    Cidade <span className="text-red-500">*</span>
+                  </Label>
+                  <input
+                    value={formNova.cidade}
+                    onChange={e => handleFormChange('cidade', e.target.value)}
+                    placeholder="SÃO PAULO"
+                    className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  />
+                </div>
+                <div>
+                  <Label className="mb-1 block text-xs font-medium text-gray-600">
+                    UF <span className="text-red-500">*</span>
+                  </Label>
+                  <input
+                    value={formNova.estado}
+                    onChange={e => handleFormChange('estado', e.target.value)}
+                    placeholder="SP"
+                    maxLength={2}
+                    className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="mb-1 block text-xs font-medium text-gray-600">Complemento</Label>
+                <input
+                  value={formNova.complemento}
+                  onChange={e => handleFormChange('complemento', e.target.value)}
+                  placeholder="APTO 2, BLOCO B..."
+                  className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
       </JiffySidePanelModal>
 
@@ -1433,7 +1635,10 @@ export function EntregaClienteSelector({
           </div>
 
           <div>
-            <Label className="mb-1 block text-xs font-medium text-gray-600">CEP</Label>
+            <div className="mb-1 flex items-baseline justify-between gap-2">
+              <Label className="text-xs font-medium text-gray-600">CEP</Label>
+              <span className="text-[11px] text-gray-400">Se não tiver, pode deixar em branco</span>
+            </div>
             <div className="flex gap-2">
               <input
                 value={formNova.cep}

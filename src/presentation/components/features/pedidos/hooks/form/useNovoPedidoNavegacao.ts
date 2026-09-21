@@ -9,6 +9,12 @@ import {
 import {
   validarInformacoesPedido as validarInformacoesPedidoEntrega,
 } from '../useNovoPedidoSubmit'
+import {
+  clienteCadastradoNestaEmpresa,
+  deveAbrirCadastroClienteNoAvancar,
+  telefoneMinimoDigitosBuscaEntrega,
+} from '@/src/domain/policies/pedido/ClienteEntregaPolicy'
+import { extrairDigitosTelefone } from '@/src/shared/utils/telefoneBr'
 import type { PagamentoSelecionado, ProdutoSelecionado } from '../../types'
 
 export interface UseNovoPedidoNavegacaoParams {
@@ -43,6 +49,8 @@ export interface UseNovoPedidoNavegacaoParams {
    * O rascunho volta ao reabrir o pedido da mesma conversa.
    */
   preservarRascunhoAoFechar?: boolean
+  /** Abre o painel de cadastro rápido (cliente+endereço ou só endereço). */
+  onAbrirCadastroRapidoCliente?: () => void
 }
 
 export function useNovoPedidoNavegacao({
@@ -69,6 +77,7 @@ export function useNovoPedidoNavegacao({
   edicaoProdutosPermaneceNoPainel = false,
   ajustandoPagamentoAposEdicaoItens = false,
   preservarRascunhoAoFechar = false,
+  onAbrirCadastroRapidoCliente,
 }: UseNovoPedidoNavegacaoParams) {
   const hrefCoberturaEntrega = useHrefCoberturaEntregaPedido()
   const [modalConfirmacaoSaidaOpen, setModalConfirmacaoSaidaOpen] = useState(false)
@@ -172,6 +181,26 @@ export function useNovoPedidoNavegacao({
       setCurrentStep(3)
     } else if (currentStep === 2 && !canGoToStep3()) {
       if (tipoInicioPedido === 'delivery') {
+        const telefoneCompleto =
+          extrairDigitosTelefone(telefoneClienteDelivery ?? '').length >=
+          telefoneMinimoDigitosBuscaEntrega(pedidoDeliveryGestor)
+        if (
+          deveAbrirCadastroClienteNoAvancar({
+            clienteId: clienteEntregaVinculadoId,
+            telefoneCompleto,
+          })
+        ) {
+          onAbrirCadastroRapidoCliente?.()
+          return
+        }
+        if (
+          clienteCadastradoNestaEmpresa(clienteEntregaVinculadoId) &&
+          pedidoComEntrega &&
+          !temEnderecoEntrega
+        ) {
+          onAbrirCadastroRapidoCliente?.()
+          return
+        }
         validarInformacoesPedido(true)
       } else {
         showToast.error('Adicione pelo menos um produto antes de continuar')
@@ -187,6 +216,12 @@ export function useNovoPedidoNavegacao({
     setCurrentStep,
     validarInformacoesPedido,
     modoEdicaoProdutos,
+    pedidoDeliveryGestor,
+    clienteEntregaVinculadoId,
+    telefoneClienteDelivery,
+    pedidoComEntrega,
+    temEnderecoEntrega,
+    onAbrirCadastroRapidoCliente,
   ])
 
   const handlePreviousStep = useCallback(() => {

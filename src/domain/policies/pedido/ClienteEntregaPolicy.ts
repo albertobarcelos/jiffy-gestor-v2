@@ -22,6 +22,14 @@ export function podeExibirEnderecosClienteEntrega(input: {
   return input.mostrarEnderecos && clienteCadastradoNestaEmpresa(input.clienteId)
 }
 
+/** Próximo: telefone completo e sem cadastro nesta empresa → abre o painel unificado. */
+export function deveAbrirCadastroClienteNoAvancar(input: {
+  clienteId?: string | null
+  telefoneCompleto: boolean
+}): boolean {
+  return input.telefoneCompleto && !clienteCadastradoNestaEmpresa(input.clienteId)
+}
+
 export function normalizarTipoEtiquetaMorada(
   valor: string | undefined | null
 ): TipoEtiquetaMoradaEntrega {

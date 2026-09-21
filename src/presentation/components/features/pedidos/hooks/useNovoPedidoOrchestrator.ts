@@ -731,7 +731,7 @@ export function useNovoPedidoOrchestrator({
     setCurrentStep,
     pedidoDeliveryGestor,
     clienteEntregaVinculadoId: clienteEntregaVinculado?.id,
-    telefoneClienteDelivery: telefoneBuscadoEntrega,
+    telefoneClienteDelivery: telefoneBuscadoEntrega || telefoneBuscaEntrega,
     pedidoComEntrega,
     temEnderecoEntrega: Boolean(moradaEntregaSelecionada?.endereco),
     enderecoEntregaTemGeo: Boolean(
@@ -745,6 +745,7 @@ export function useNovoPedidoOrchestrator({
     edicaoProdutosPermaneceNoPainel: editandoItensNoDetalhe,
     ajustandoPagamentoAposEdicaoItens,
     preservarRascunhoAoFechar,
+    onAbrirCadastroRapidoCliente: () => setAbrirCadastroRapidoEntregaPedido(n => n + 1),
   })
 
   const handleConfirmarSaidaDescartando = useCallback(() => {
