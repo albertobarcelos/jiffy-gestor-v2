@@ -5,6 +5,7 @@ export interface BuscarMeiosPagamentosParams {
   offset: number
   q?: string
   ativo?: boolean | null
+  ativoDelivery?: boolean | null
 }
 
 export type TipoParcelamento = 'jurosVendedor' | 'jurosCliente'
@@ -12,7 +13,7 @@ export type TipoParcelamento = 'jurosVendedor' | 'jurosCliente'
 export interface CriarMeioPagamentoDTO {
   nome: string
   tefAtivo?: boolean
-  isDelivery?: boolean
+  ativoDelivery?: boolean
   formaPagamentoFiscal?: string
   ativo?: boolean
   isParcelavel?: boolean
@@ -22,7 +23,7 @@ export interface CriarMeioPagamentoDTO {
 export interface AtualizarMeioPagamentoDTO {
   nome?: string
   tefAtivo?: boolean
-  isDelivery?: boolean
+  ativoDelivery?: boolean
   formaPagamentoFiscal?: string
   ativo?: boolean
   isParcelavel?: boolean

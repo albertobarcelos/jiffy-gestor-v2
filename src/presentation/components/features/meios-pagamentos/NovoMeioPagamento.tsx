@@ -263,7 +263,7 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
       const body: Record<string, unknown> = {
         nome,
         tefAtivo,
-        isDelivery,
+        ativoDelivery: isDelivery,
         // Garantir que o valor está em lowercase antes de enviar
         formaPagamentoFiscal: formaPagamentoFiscal.toLowerCase(),
         isParcelavel: parcelavelDisponivel ? isParcelavel : false,

@@ -454,6 +454,7 @@ export function useNovoPedidoOrchestrator({
   } = useMeiosPagamentoInfinite({
     limit: 100,
     ativo: true,
+    ...(pedidoDeliveryGestor ? { ativoDelivery: true } : {}),
     // Step 3 usa meios de pagamento; em visualizacao/edicao pode ser usado para resolver nomes.
     enabled: open && (currentStep >= 3 || modoVisualizacao || !!vendaId),
     refetchOnWindowFocus: false,

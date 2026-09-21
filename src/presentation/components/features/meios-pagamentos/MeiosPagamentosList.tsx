@@ -78,7 +78,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
   const [meiosPagamento, setMeiosPagamento] = useState<MeioPagamento[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searchText, setSearchText] = useState('')
-  const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
+  const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Todos')
   const [totalMeiosPagamento, setTotalMeiosPagamento] = useState(0)
   const [updatingTefAtivo, setUpdatingTefAtivo] = useState<Record<string, boolean>>({})
   const [updatingIsDelivery, setUpdatingIsDelivery] = useState<Record<string, boolean>>({})
@@ -105,7 +105,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
   // Refs para evitar dependências desnecessárias no useCallback
   const isLoadingRef = useRef(false)
   const searchTextRef = useRef('')
-  const filterStatusRef = useRef<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
+  const filterStatusRef = useRef<'Todos' | 'Ativo' | 'Desativado'>('Todos')
 
   // Atualiza refs quando os valores mudam
   useEffect(() => {
@@ -432,7 +432,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ isDelivery: novoStatus }),
+          body: JSON.stringify({ ativoDelivery: novoStatus }),
         })
 
         if (!response.ok) {
@@ -739,7 +739,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
             Tipo parcelamento
           </div>
           <div className="md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text">
-            Status
+            POS Ativo
           </div>
           <div className="md:flex-[2] flex-[1] text-right font-semibold md:text-sm text-xs text-primary-text">
             Ações
