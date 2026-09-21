@@ -66,11 +66,11 @@ export function mapMenuGruposComplementosToProduto(
   grupos: MenuProdutoComplementoResumo[] | undefined
 ): ProdutoGrupoComplementoCatalogo[] {
   if (!Array.isArray(grupos)) return []
-  return grupos
-    .map(grupo => {
-      const id = grupo?.id != null ? String(grupo.id).trim() : ''
-      if (!id) return null
-      return {
+  return grupos.flatMap(grupo => {
+    const id = grupo?.id != null ? String(grupo.id).trim() : ''
+    if (!id) return []
+    return [
+      {
         id,
         nome: grupo.nome?.trim() || 'Grupo',
         qtdMinima: parseQuantidadeLimiteGrupo(grupo.qtdMinima),
@@ -81,9 +81,9 @@ export function mapMenuGruposComplementosToProduto(
               .map(mapComplementoResumo)
               .filter((item): item is MenuProdutoComplementoItemResumo => item != null)
           : [],
-      }
-    })
-    .filter((grupo): grupo is ProdutoGrupoComplementoCatalogo => grupo != null)
+      },
+    ]
+  })
 }
 
 export function gruposComplementosPrecisamHidratacao(
