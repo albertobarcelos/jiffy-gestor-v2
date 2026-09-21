@@ -1,4 +1,4 @@
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { fetchGestorApi } from '@/src/infrastructure/api/fetchGestorApi'
 import { MIN_CARACTERES_BUSCA_CATALOGO_VENDA } from '@/src/domain/policies/pedido/CatalogoVendaPolicy'
 import { Produto } from '@/src/domain/entities/Produto'
 import type { INovoPedidoReadRepository } from '@/src/domain/repositories/INovoPedidoReadRepository'
@@ -20,6 +20,7 @@ import {
 } from '@/src/infrastructure/api/repositories/menuCatalogFetch'
 import { salvarPedidoDeliveryDetalheCache } from '@/src/infrastructure/api/pedidoDeliveryDetalheCache'
 import { anexarInformacoesAdicionaisEmitirNota } from '@/src/shared/helpers/informacoesAdicionaisNota'
+import { montarBodyReemitirNotaDelivery } from '@/src/domain/services/pedido/RegrasEmissaoFiscalDelivery'
 
 async function fetchJson<T>(url: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetchGestorApi(url, {
@@ -329,6 +330,26 @@ export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
       {
         method: 'POST',
         body: JSON.stringify(anexarInformacoesAdicionaisEmitirNota({ modelo }, pedidoId)),
+      }
+    )
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      return raw as Record<string, unknown>
+    }
+    return {}
+  }
+
+  async reemitirNotaPedidoDelivery(
+    pedidoId: string,
+    token: string,
+    numero?: number
+  ): Promise<Record<string, unknown>> {
+    const body = montarBodyReemitirNotaDelivery({ numero })
+    const raw = await fetchJson<unknown>(
+      `/api/delivery/pedidos/${encodeURIComponent(pedidoId)}/reemitir-nota`,
+      token,
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
       }
     )
     if (raw && typeof raw === 'object' && !Array.isArray(raw)) {

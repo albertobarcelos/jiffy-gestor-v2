@@ -24,6 +24,8 @@ import {
   resolverEnderecoIdEntregaSeJaGarantido,
 } from '@/src/application/use-cases/delivery-publico/GarantirEnderecoEntregaPublicoUseCase'
 
+export type EtapaEnvioPedidoPublico = 'salvando_endereco' | 'enviando_pedido'
+
 export type EnviarPedidoPublicoInput = {
   slug: string
   telefoneApi: string
@@ -33,6 +35,7 @@ export type EnviarPedidoPublicoInput = {
   form: CheckoutFormData
   clienteLookup: ClienteDeliveryPublicoDTO | null
   tokenCotacao: string
+  onEtapa?: (etapa: EtapaEnvioPedidoPublico) => void
 }
 
 export type EnviarPedidoPublicoResult =
@@ -89,6 +92,7 @@ export class EnviarPedidoPublicoUseCase {
         if (jaGarantido) {
           enderecoIdEntrega = jaGarantido
         } else {
+          input.onEtapa?.('salvando_endereco')
           const garantido = await this.garantirEndereco.execute({
             telefone: tel,
             nome: input.nomeEfetivo,
@@ -150,6 +154,7 @@ export class EnviarPedidoPublicoUseCase {
     }
 
     try {
+      input.onEtapa?.('enviando_pedido')
       const pedido = await this.pedidoPort.criar(payload)
       return { ok: true, clienteAtualizado, pedido }
     } catch (error) {

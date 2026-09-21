@@ -2,10 +2,8 @@
 
 import { useCallback, useMemo, useRef } from 'react'
 import type { CriarVendaGestorInputDTO } from '@/src/application/dto/CriarVendaGestorDTO'
-import {
-  CriarPedidoDeliveryUseCase,
-  extrairIdPedidoDeliveryCriado,
-} from '@/src/application/use-cases/delivery/CriarPedidoDeliveryUseCase'
+import { extrairIdPedidoDeliveryCriado } from '@/src/application/use-cases/delivery/CriarPedidoDeliveryUseCase'
+import { criarPedidoDeliveryUseCase } from '@/src/infrastructure/composition/pedidoUseCases'
 import {
   CriarVendaGestorUseCase,
   extrairIdVendaCriada,
@@ -123,7 +121,6 @@ export function useNovoPedidoSubmit({
 }: UseNovoPedidoSubmitParams) {
   const hrefCoberturaEntrega = useHrefCoberturaEntregaPedido()
   const criarVendaGestorUseCase = useMemo(() => new CriarVendaGestorUseCase(), [])
-  const criarPedidoDeliveryUseCase = useMemo(() => new CriarPedidoDeliveryUseCase(), [])
 
   const handleSubmit = useCallback(async () => {
     if (isPending) return

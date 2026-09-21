@@ -1,4 +1,4 @@
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { fetchGestorApi } from '@/src/infrastructure/api/fetchGestorApi'
 import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
 import { resolverTrocoLevarPedidoEntrega } from '@/src/application/mappers/resolverTrocoLevarPedidoEntrega'
 import {
@@ -160,7 +160,7 @@ export async function resolverEnderecoEntregaDetalhePedido(args: {
   const { vendaData, detalhesEntrega, clienteApi, preferirModuloDelivery, fetchClienteDelivery } =
     args
 
-  const tipo = String(vendaData.tipoEntrega ?? vendaData.tipoVenda ?? '')
+  const tipo = String(vendaData.tipoEntrega ?? '')
     .trim()
     .toLowerCase()
   if (tipo === 'retirada') {

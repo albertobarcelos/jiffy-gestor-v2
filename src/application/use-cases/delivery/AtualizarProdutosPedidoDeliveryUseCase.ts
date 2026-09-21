@@ -1,6 +1,5 @@
 import type { ProdutoAddPedidoDelivery } from '@/src/application/delivery/montarDiffProdutosPedidoDelivery'
 import type { INovoPedidoReadRepository } from '@/src/domain/repositories/INovoPedidoReadRepository'
-import { novoPedidoReadRepository } from '@/src/infrastructure/api/repositories/NovoPedidoReadRepository'
 
 export type AtualizarProdutosPedidoDeliveryInput = {
   pedidoId: string
@@ -19,7 +18,7 @@ export type AtualizarProdutosPedidoDeliveryInput = {
  * após cada rebuild — zerar os itens no remove impede o add de rodar.
  */
 export class AtualizarProdutosPedidoDeliveryUseCase {
-  constructor(private readonly repo: INovoPedidoReadRepository = novoPedidoReadRepository) {}
+  constructor(private readonly repo: INovoPedidoReadRepository) {}
 
   async execute(input: AtualizarProdutosPedidoDeliveryInput): Promise<void> {
     const temAdd = input.add.length > 0
@@ -44,6 +43,3 @@ export class AtualizarProdutosPedidoDeliveryUseCase {
     await this.repo.patchPedidoDelivery(input.pedidoId, input.token, { produtos })
   }
 }
-
-export const atualizarProdutosPedidoDeliveryUseCase =
-  new AtualizarProdutosPedidoDeliveryUseCase()

@@ -7,7 +7,7 @@ import { resolverTrocoLevarPedidoEntrega } from '@/src/application/mappers/resol
 import {
   mapItemJsonParaVendaUnificadaDTO,
   type VendaUnificadaDTO,
-} from '@/features/kanban/hooks/useVendasUnificadas'
+} from '@/src/application/dto/VendaUnificadaDTO'
 
 /** Origem comercial no card Kanban (`VendaUnificadaDTO.origem`). */
 export function mapOrigemApiDeliveryParaVendaUnificada(
@@ -17,10 +17,10 @@ export function mapOrigemApiDeliveryParaVendaUnificada(
     .trim()
     .toUpperCase()
   if (o === 'GESTOR') return 'GESTOR'
-  if (o === 'JIFFY_DELIVERY' || o === 'DELIVERY') return 'JIFFY_DELIVERY'
+  if (o === 'JIFFY_DELIVERY') return 'JIFFY_DELIVERY'
   if (o === 'AIQFOME') return 'AIQFOME'
   if (o === 'PDV') return 'PDV'
-  return 'GESTOR'
+  return null
 }
 
 /** Deriva status financeiro a partir do summary delivery (Kanban / badge pagamento). */
@@ -48,7 +48,7 @@ function resolverTipoDocFiscal(modelo: number | null | undefined): 'NFE' | 'NFCE
 
 /**
  * Monta record compatível com `mapItemJsonParaVendaUnificadaDTO` (GET unificado).
- * `tipoEntrega` vira `tipoVenda`; ignora `tipoVenda: "delivery"` do backend.
+ * Mantém `tipoVenda` e `tipoEntrega` como o backend envia.
  */
 export function pedidoDeliverySummaryParaUnifiedRecord(
   summary: PedidoDeliverySummaryApi
@@ -59,7 +59,8 @@ export function pedidoDeliverySummaryParaUnifiedRecord(
     id: summary.id,
     numeroVenda: summary.numeroVenda,
     codigoVenda: summary.codigoVenda,
-    tipoVenda: summary.tipoEntrega,
+    tipoVenda: summary.tipoVenda,
+    tipoEntrega: summary.tipoEntrega,
     origem: mapOrigemApiDeliveryParaVendaUnificada(summary.origem),
     tabelaOrigem: 'venda_gestor',
     valorFinal: summary.valorFinal,
@@ -79,7 +80,7 @@ export function pedidoDeliverySummaryParaUnifiedRecord(
         }
       : null,
     solicitarEmissaoFiscal: summary.solicitarEmissaoFiscal,
-    statusFiscal: resumoFiscal?.status ?? null,
+    statusFiscal: resumoFiscal?.status ?? (summary as { statusFiscal?: string }).statusFiscal ?? null,
     resumoFiscal,
     documentoFiscalId: resumoFiscal?.documentoFiscalId ?? null,
     abertoPor: { id: '', nome: '—' },

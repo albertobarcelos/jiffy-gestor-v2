@@ -52,6 +52,7 @@ function clonarMeioPagamento(
   item: MeioPagamento,
   patch: {
     tefAtivo?: boolean
+    isDelivery?: boolean
     ativo?: boolean
     parcelavel?: boolean
     tipoParcelamento?: TipoParcelamento | null
@@ -64,7 +65,8 @@ function clonarMeioPagamento(
     item.getFormaPagamentoFiscal(),
     patch.ativo ?? item.isAtivo(),
     patch.parcelavel ?? item.isParcelavel(),
-    patch.tipoParcelamento !== undefined ? patch.tipoParcelamento : item.getTipoParcelamento()
+    patch.tipoParcelamento !== undefined ? patch.tipoParcelamento : item.getTipoParcelamento(),
+    patch.isDelivery ?? item.isDelivery()
   )
 }
 
@@ -79,6 +81,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
   const [totalMeiosPagamento, setTotalMeiosPagamento] = useState(0)
   const [updatingTefAtivo, setUpdatingTefAtivo] = useState<Record<string, boolean>>({})
+  const [updatingIsDelivery, setUpdatingIsDelivery] = useState<Record<string, boolean>>({})
   const [updatingParcelavel, setUpdatingParcelavel] = useState<Record<string, boolean>>({})
   const [updatingTipoParcelamento, setUpdatingTipoParcelamento] = useState<Record<string, boolean>>({})
   const [updatingAtivo, setUpdatingAtivo] = useState<Record<string, boolean>>({})
@@ -402,6 +405,64 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
     [ loadMeiosPagamento, onReload]
   )
 
+  const handleToggleIsDelivery = useCallback(
+    async (meioPagamento: MeioPagamento, novoStatus: boolean) => {
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!token) {
+        return
+      }
+
+      const meioPagamentoId = meioPagamento.getId()
+      const previousIsDelivery = meioPagamento.isDelivery()
+
+      setUpdatingIsDelivery((prev) => ({ ...prev, [meioPagamentoId]: true }))
+      setMeiosPagamento((prev) =>
+        prev.map((item) => {
+          if (item.getId() === meioPagamentoId) {
+            return clonarMeioPagamento(item, { isDelivery: novoStatus })
+          }
+          return item
+        })
+      )
+
+      try {
+        const response = await fetchGestorApi(`/api/meios-pagamentos/${meioPagamentoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ isDelivery: novoStatus }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || errorData.error || 'Erro ao atualizar Delivery')
+        }
+
+        await loadMeiosPagamento()
+        onReload?.()
+      } catch (error) {
+        console.error('Erro ao atualizar Delivery:', error)
+        showToast.error(error instanceof Error ? error.message : 'Erro ao atualizar Delivery')
+        setMeiosPagamento((prev) =>
+          prev.map((item) => {
+            if (item.getId() === meioPagamentoId) {
+              return clonarMeioPagamento(item, { isDelivery: previousIsDelivery })
+            }
+            return item
+          })
+        )
+      } finally {
+        setUpdatingIsDelivery((prev) => {
+          const { [meioPagamentoId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [loadMeiosPagamento, onReload]
+  )
+
   const handleToggleParcelavel = useCallback(
     async (meioPagamento: MeioPagamento, novoStatus: boolean) => {
       const token = useAuthStore.getState().tenantAuth?.getAccessToken()
@@ -669,6 +730,9 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
             TEF Ativo
           </div>
           <div className="md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text">
+            Delivery
+          </div>
+          <div className="md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text">
             Permite Parcela
           </div>
           <div className="md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text hidden md:flex">
@@ -735,6 +799,29 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
                   inputProps={{
                     'aria-label': `TEF — ${meioPagamento.getNome()}`,
                     title: meioPagamento.isTefAtivo() ? 'TEF Ativo' : 'TEF Inativo',
+                  }}
+                />
+              </div>
+              <div
+                className="md:flex-[2] flex-[1] flex justify-center"
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+              >
+                <JiffyIconSwitch
+                  checked={meioPagamento.isDelivery()}
+                  onChange={(e) => {
+                    e.stopPropagation()
+                    handleToggleIsDelivery(meioPagamento, e.target.checked)
+                  }}
+                  disabled={!!updatingIsDelivery[meioPagamento.getId()]}
+                  size="sm"
+                  className="justify-center gap-0 px-0 py-0"
+                  inputProps={{
+                    'aria-label': `Delivery — ${meioPagamento.getNome()}`,
+                    title: meioPagamento.isDelivery()
+                      ? 'Disponível no delivery'
+                      : 'Não disponível no delivery',
                   }}
                 />
               </div>

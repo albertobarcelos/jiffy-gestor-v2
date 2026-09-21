@@ -3,9 +3,11 @@
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { atualizarCobrancasPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/AtualizarCobrancasPedidoDeliveryUseCase'
-import { atualizarPagamentoEntregaGestorUseCase } from '@/src/application/use-cases/vendas/AtualizarPagamentoEntregaGestorUseCase'
-import { pagamentoEstaCancelado } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
+import {
+  atualizarCobrancasPedidoDeliveryUseCase,
+  atualizarPagamentoEntregaGestorUseCase,
+} from '@/src/infrastructure/composition/pedidoUseCases'
+import { pagamentoEstaCancelado, divergenciaPagamentoVsTotalPedido } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import { pagamentosAtivosParaPatchDelivery } from '@/src/application/mappers/CobrancaPedidoDeliveryPayloadMapper'
 import { Produto } from '@/src/domain/entities/Produto'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
@@ -62,6 +64,9 @@ export type UseNovoPedidoGestorActionsParams = {
   recarregarVendaExistente?: () => Promise<unknown>
   /** Aberto pelo Kanban para quitar pagamento antes de finalizar. */
   confirmarPagamentoParaFinalizar?: boolean
+  /** Após editar itens: o pagamento precisa conferir com o novo total. */
+  ajustandoPagamentoAposEdicaoItens?: boolean
+  onPagamentoEntregaSalvo?: () => void
 }
 
 export function useNovoPedidoGestorActions({
@@ -81,6 +86,8 @@ export function useNovoPedidoGestorActions({
   usarModuloDeliveryCobrancas = false,
   recarregarVendaExistente,
   confirmarPagamentoParaFinalizar = false,
+  ajustandoPagamentoAposEdicaoItens = false,
+  onPagamentoEntregaSalvo,
 }: UseNovoPedidoGestorActionsParams) {
   const queryClient = useQueryClient()
   const empresaId = useTenantEmpresaId()
@@ -115,10 +122,20 @@ export function useNovoPedidoGestorActions({
 
     const pagamentosPayload = pagamentosAtivosParaPatchDelivery(pagamentos)
     const totalLancadoAtivos = pagamentosAtivos.reduce((sum, p) => sum + p.valor, 0)
-    const diferencaPagamentoEntrega = totalProdutos - totalLancadoAtivos
-    const pagamentoEntregaQuitado = diferencaPagamentoEntrega <= 0.01
+    const { divergente, diferenca } = divergenciaPagamentoVsTotalPedido(
+      totalProdutos,
+      totalLancadoAtivos
+    )
+    const pagamentoEntregaQuitado = diferenca <= 0.01
     const pagamentoEntregaComTrocoValido =
       totalLancadoAtivos > totalProdutos && trocoLancamento > 0
+
+    if (ajustandoPagamentoAposEdicaoItens && divergente && diferenca < 0 && !pagamentoEntregaComTrocoValido) {
+      showToast.error(
+        `O pagamento está ${transformarParaReal(Math.abs(diferenca))} acima do novo total. Ajuste as formas de pagamento.`
+      )
+      return
+    }
 
     if (!pagamentoEntregaQuitado && !pagamentoEntregaComTrocoValido) {
       showToast.error(
@@ -139,6 +156,16 @@ export function useNovoPedidoGestorActions({
           fluxoParaPatch
         )
         if (!aplicado) {
+          if (ajustandoPagamentoAposEdicaoItens && !divergente) {
+            showToast.success('Cobrança conferida com o novo total.')
+            onPagamentoEntregaSalvo?.()
+            onSuccess()
+            return
+          }
+          if (ajustandoPagamentoAposEdicaoItens) {
+            showToast.error('Ajuste as formas de pagamento para o novo total antes de salvar.')
+            return
+          }
           showToast.info('Nenhuma alteração de cobrança para salvar.')
           return
         }
@@ -158,6 +185,7 @@ export function useNovoPedidoGestorActions({
       }
 
       showToast.success('Cobrança da entrega atualizada.')
+      onPagamentoEntregaSalvo?.()
       onSuccess()
     } catch (error) {
       console.error('Erro ao atualizar pagamento da entrega:', error)
@@ -178,6 +206,8 @@ export function useNovoPedidoGestorActions({
     empresaId,
     usarModuloDeliveryCobrancas,
     recarregarVendaExistente,
+    ajustandoPagamentoAposEdicaoItens,
+    onPagamentoEntregaSalvo,
   ])
 
   const handleAbrirEdicaoProdutoDetalhes = useCallback(

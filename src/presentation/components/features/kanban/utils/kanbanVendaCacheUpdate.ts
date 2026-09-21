@@ -44,7 +44,7 @@ function isoDeCampoApi(valor: unknown): string | null {
   return texto || null
 }
 
-/** Extrai campos operacionais da resposta de POST /vendas/gestor/:id/transicoes (legado). */
+/** Extrai campos operacionais da resposta de POST /vendas/gestor/:id/transicoes. */
 export function extrairPatchKanbanDeTransicaoGestor(data: unknown): KanbanVendaCachePatch {
   const registro =
     data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
@@ -119,7 +119,9 @@ export function cloneVendaUnificadaDTO(
     venda.totalDesconto,
     venda.totalAcrescimo,
     venda.dataCriacao,
-    patch.dataFinalizacao !== undefined ? patch.dataFinalizacao : venda.dataFinalizacao,
+    patch.dataFinalizacao != null && String(patch.dataFinalizacao).trim()
+      ? patch.dataFinalizacao
+      : venda.dataFinalizacao,
     venda.dataCancelamento,
     venda.cliente,
     patch.solicitarEmissaoFiscal !== undefined
@@ -143,7 +145,7 @@ export function cloneVendaUnificadaDTO(
       ? normalizarModeloFiscalPatch(patch.modelo, venda.modelo)
       : venda.modelo,
     patch.retornoSefaz !== undefined ? patch.retornoSefaz : venda.retornoSefaz,
-    patch.statusEtapaOperacional !== undefined
+    patch.statusEtapaOperacional != null && String(patch.statusEtapaOperacional).trim()
       ? patch.statusEtapaOperacional
       : venda.statusEtapaOperacional,
     patch.dataUltimaModificacao !== undefined
@@ -161,7 +163,8 @@ export function cloneVendaUnificadaDTO(
       ? normalizarEntregadorKanbanPatch(patch.entregador)
       : venda.entregador,
     venda.contextoEntrega,
-    patch.etapaKanbanBalcao !== undefined ? patch.etapaKanbanBalcao : venda.etapaKanbanBalcao
+    patch.etapaKanbanBalcao !== undefined ? patch.etapaKanbanBalcao : venda.etapaKanbanBalcao,
+    venda.tipoEntrega
   )
 }
 
@@ -553,11 +556,42 @@ export function extrairPatchFiscalKanban(data: unknown): KanbanVendaCachePatch {
       ? (root.resumoFiscal as Record<string, unknown>)
       : null
 
+  const statusOperacional = new Set([
+    'FINALIZADO',
+    'FINALIZADA',
+    'EM_PREPARO',
+    'PRONTO',
+    'EM_ROTA',
+    'PENDENTE',
+    'CANCELADO',
+    'ENTREGUE',
+    'CONCLUIDO',
+  ])
+  const statusFiscalUnico = new Set([
+    'EMITIDA',
+    'AUTORIZADA',
+    'AUTORIZADO',
+    'REJEITADA',
+    'DENEGADA',
+    'EMITINDO',
+    'PENDENTE_AUTORIZACAO',
+    'PENDENTE_EMISSAO',
+    'INUTILIZADA',
+    'CONTINGENCIA',
+    'CANCELADA',
+  ])
+  const statusRaizGenerico = isoOuNull(root.status)
+  const statusRaizFiscal =
+    statusRaizGenerico &&
+    statusFiscalUnico.has(statusRaizGenerico.toUpperCase()) &&
+    !statusOperacional.has(statusRaizGenerico.toUpperCase())
+      ? statusRaizGenerico
+      : null
   const statusRaw =
     isoOuNull(root.statusFiscal) ??
-    isoOuNull(root.status) ??
     isoOuNull(rf?.status) ??
-    isoOuNull(rf?.statusFiscal)
+    isoOuNull(rf?.statusFiscal) ??
+    statusRaizFiscal
 
   const modeloRaw = numeroOuNull(root.modelo) ?? numeroOuNull(rf?.modelo)
   const tipoDocRaw = isoOuNull(root.tipoDocFiscal) ?? isoOuNull(root.tipoDocumento)
@@ -648,16 +682,20 @@ export function aplicarPatchFiscalKanbanSemRefetch(
     atualizouListagem = patchKanbanVendasListagemCache(queryClient, vendaId, patch)
   } else {
     const atualizada = cloneVendaUnificadaDTO(venda, patch)
-    const etapa = atualizada.getEtapaKanban()
-    if ((COLUNAS_FISCAIS_BALCAO as string[]).includes(etapa)) {
-      atualizouListagem = moveVendaKanbanBalcaoEntreColunas(
-        queryClient,
-        vendaId,
-        etapa as EtapaKanbanBalcao,
-        patch
-      )
-    } else {
-      atualizouListagem = patchKanbanVendasListagemCache(queryClient, vendaId, patch)
+    const entregaKanban = atualizada.isPedidoEntregaGestor() || atualizada.isDelivery()
+    // Delivery: Entregues absorve COM_FISCAL. Não mover para coluna de balcão.
+    atualizouListagem = patchKanbanVendasListagemCache(queryClient, vendaId, patch)
+    if (!entregaKanban) {
+      const etapa = atualizada.getEtapaKanban()
+      if ((COLUNAS_FISCAIS_BALCAO as string[]).includes(etapa)) {
+        atualizouListagem =
+          moveVendaKanbanBalcaoEntreColunas(
+            queryClient,
+            vendaId,
+            etapa as EtapaKanbanBalcao,
+            patch
+          ) || atualizouListagem
+      }
     }
   }
 
@@ -677,7 +715,7 @@ export async function sincronizarStatusFiscalVendaKanban(
       .trim()
       .toLowerCase()
     const usarDelivery =
-      venda.tabelaOrigem === 'venda_gestor' && (tipo === 'entrega' || tipo === 'retirada')
+      venda.tabelaOrigem === 'venda_gestor' && tipo === 'delivery'
 
     const url = usarDelivery
       ? `/api/delivery/pedidos/${encodeURIComponent(venda.id)}`

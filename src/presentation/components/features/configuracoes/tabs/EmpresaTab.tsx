@@ -14,10 +14,17 @@ import { LogoImpressaoCropModal } from '../LogoImpressaoCropModal'
 import { EnderecoPlacesAutocomplete } from '@/src/presentation/components/shared/geolocalizacao/EnderecoPlacesAutocomplete'
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import {
+  assinaturaEnderecoEmpresaGeocode,
+  enderecoEmpresaGeocodeMinimo,
+  geocodificarEnderecoEmpresaViaGoogle,
   lerEnderecoLocalizacaoDoPayloadEmpresa,
   montarPatchEnderecoGeolocalizacao,
+  resolverPinAoSalvarEmpresa,
   type EnderecoEmpresaGeocodeInput,
 } from '@/src/shared/utils/geolocalizacaoEmpresa'
+import { escolherPinAposGeocode } from '@/src/shared/utils/ajustePinEmpresa'
+import { dispararEmpresaDeliveryAtualizada } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import {
   placeDetailsParaEnderecoGeocode,
   type PlaceDetailsResult,
@@ -176,6 +183,11 @@ export function EmpresaTab() {
   const [timezone, setTimezone] = useState('')
   /** Snapshot de `parametroEmpresa` para PATCH preservar tipos impressão/cobrança etc. */
   const [parametroEmpresaDraft, setParametroEmpresaDraft] = useState<Record<string, unknown>>({})
+  const invalidateQueries = useInvalidateTenantQueries()
+  /** Endereço persistido — usado para saber se o save precisa geocodificar de novo. */
+  const enderecoSalvoRef = useRef<EnderecoEmpresaGeocodeInput | null>(null)
+  /** True se o pin atual corresponde ao formulário (carregado da API ou escolhido no Places). */
+  const pinAlinhadoAoFormularioRef = useRef(true)
 
   const [logoDragActive, setLogoDragActive] = useState(false)
   /** Arquivo escolhido localmente; só é enviado ao API ao clicar em Salvar. */
@@ -223,10 +235,11 @@ export function EmpresaTab() {
     if (fields.cep) setCep(maiusculasPt(formatarCepMascara(fields.cep)))
     setEnderecoLocalizacao(place.enderecoLocalizacao)
     setProviderEnderecoId(place.providerEnderecoId)
+    pinAlinhadoAoFormularioRef.current = true
     setBuscaPlacesEmpresa(
       [fields.rua, fields.numero].filter(Boolean).join(', ') || place.enderecoFormatado || ''
     )
-    showToast.success('Endereço aplicado. Salve a empresa. O pin da loja é definido na cobertura.')
+    showToast.success('Endereço aplicado. Ao salvar, a localização da loja acompanha este endereço.')
   }, [])
 
   useEffect(() => {
@@ -399,14 +412,25 @@ export function EmpresaTab() {
           setTelefone(maiusculasPt(empresaData.getTelefone() || ''))
 
           const endereco = empresaData.getEndereco()
+          const camposEnderecoSalvo: EnderecoEmpresaGeocodeInput = {
+            rua: maiusculasPt(endereco?.rua || ''),
+            numero: maiusculasPt(endereco?.numero || ''),
+            bairro: maiusculasPt(endereco?.bairro || '') || undefined,
+            cidade: maiusculasPt(endereco?.cidade || '') || undefined,
+            estado: endereco?.estado || undefined,
+            cep: maiusculasPt(endereco?.cep || '') || undefined,
+            complemento: maiusculasPt(endereco?.complemento || '') || undefined,
+          }
+          enderecoSalvoRef.current = camposEnderecoSalvo
+          pinAlinhadoAoFormularioRef.current = true
           if (endereco) {
-            setCep(maiusculasPt(endereco.cep || ''))
-            setRua(maiusculasPt(endereco.rua || ''))
-            setNumero(maiusculasPt(endereco.numero || ''))
+            setCep(camposEnderecoSalvo.cep || '')
+            setRua(camposEnderecoSalvo.rua)
+            setNumero(camposEnderecoSalvo.numero)
             setComplemento(maiusculasPt(endereco.complemento || ''))
-            setBairro(maiusculasPt(endereco.bairro || ''))
-            setCidade(maiusculasPt(endereco.cidade || ''))
-            setEstado(endereco.estado || '')
+            setBairro(camposEnderecoSalvo.bairro || '')
+            setCidade(camposEnderecoSalvo.cidade || '')
+            setEstado(camposEnderecoSalvo.estado || '')
 
             // Carregar código IBGE se cidade e estado estiverem preenchidos
             if (endereco.cidade && endereco.estado) {
@@ -417,6 +441,8 @@ export function EmpresaTab() {
               setCodigoCidadeIbge(null)
               ultimaCidadeBuscada.current = ''
             }
+          } else {
+            enderecoSalvoRef.current = { rua: '', numero: '' }
           }
 
           const { enderecoLocalizacao: geoSalva, providerEnderecoId: providerSalvo } =
@@ -772,10 +798,71 @@ export function EmpresaTab() {
         if (estado) endereco.estado = estado
         if (codigoCidadeIbge) endereco.codigoCidadeIbge = codigoCidadeIbge
 
-        const geoPatch = montarPatchEnderecoGeolocalizacao(
-          enderecoLocalizacao,
-          providerEnderecoId
-        )
+        const enderecoAtual: EnderecoEmpresaGeocodeInput = {
+          rua,
+          numero,
+          bairro: bairro || undefined,
+          cidade: nomeCidadeParaSalvar || undefined,
+          estado: estado || undefined,
+          cep: cep || undefined,
+          complemento: complemento || undefined,
+        }
+        const resolucaoPin = resolverPinAoSalvarEmpresa({
+          enderecoAtual,
+          enderecoSalvo: enderecoSalvoRef.current,
+          pinAtual: enderecoLocalizacao,
+          providerEnderecoId,
+          pinAlinhadoAoFormulario: pinAlinhadoAoFormularioRef.current,
+        })
+        if (resolucaoPin.acao === 'bloquear') {
+          showToast.error(resolucaoPin.motivo)
+          return
+        }
+
+        let pinParaSalvar = enderecoLocalizacao
+        let providerParaSalvar = providerEnderecoId
+        let pinFoiAtualizado = false
+        if (resolucaoPin.acao === 'manter') {
+          pinParaSalvar = resolucaoPin.point
+          providerParaSalvar = resolucaoPin.providerEnderecoId
+        } else {
+          if (!enderecoEmpresaGeocodeMinimo(enderecoAtual)) {
+            showToast.error(
+              'Preencha rua, número, cidade e estado. Ao mudar o endereço, a localização da loja é atualizada automaticamente.'
+            )
+            return
+          }
+          try {
+            const geocode = await geocodificarEnderecoEmpresaViaGoogle(enderecoAtual)
+            const escolha = escolherPinAposGeocode(
+              enderecoLocalizacao,
+              geocode.enderecoLocalizacao
+            )
+            if (escolha === 'usar-geocode') {
+              pinParaSalvar = geocode.enderecoLocalizacao
+              providerParaSalvar = geocode.providerEnderecoId
+              pinFoiAtualizado = true
+              setEnderecoLocalizacao(geocode.enderecoLocalizacao)
+              setProviderEnderecoId(geocode.providerEnderecoId)
+              pinAlinhadoAoFormularioRef.current = true
+            }
+          } catch (error) {
+            const enderecoMudou =
+              !enderecoSalvoRef.current ||
+              assinaturaEnderecoEmpresaGeocode(enderecoAtual) !==
+                assinaturaEnderecoEmpresaGeocode(enderecoSalvoRef.current)
+            if (!enderecoLocalizacao || enderecoMudou) {
+              showToast.error(
+                error instanceof Error
+                  ? error.message
+                  : 'Não foi possível localizar o novo endereço. Corrija o endereço e tente de novo.'
+              )
+              return
+            }
+          }
+        }
+
+        const geoPatch = montarPatchEnderecoGeolocalizacao(pinParaSalvar, providerParaSalvar)
         if (geoPatch) {
           Object.assign(endereco, geoPatch)
         }
@@ -821,7 +908,14 @@ export function EmpresaTab() {
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new Event('jiffy:empresa-me-updated'))
         }
-        showToast.success('Empresa atualizada com sucesso!')
+        await invalidateQueries(['empresa', 'endereco-geo'])
+        await invalidateQueries(['empresas', 'me'])
+        dispararEmpresaDeliveryAtualizada()
+        showToast.success(
+          pinFoiAtualizado
+            ? 'Empresa atualizada. A localização da loja foi movida para o novo endereço.'
+            : 'Empresa atualizada com sucesso!'
+        )
       } catch (error) {
         console.error('Erro ao salvar empresa:', error)
         showToast.error('Erro ao salvar empresa')
@@ -1172,7 +1266,10 @@ export function EmpresaTab() {
                 <Input
                   label="CEP"
                   value={cep}
-                  onChange={e => setCep(maiusculasPt(e.target.value))}
+                  onChange={e => {
+                    pinAlinhadoAoFormularioRef.current = false
+                    setCep(maiusculasPt(e.target.value))
+                  }}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
@@ -1181,7 +1278,10 @@ export function EmpresaTab() {
                   <Input
                     label="Rua"
                     value={rua}
-                    onChange={e => setRua(maiusculasPt(e.target.value))}
+                    onChange={e => {
+                      pinAlinhadoAoFormularioRef.current = false
+                      setRua(maiusculasPt(e.target.value))
+                    }}
                     disabled={!isEditing}
                     size="small"
                     sx={sxEntradaEmpresa}
@@ -1194,7 +1294,10 @@ export function EmpresaTab() {
                 <Input
                   label="Número"
                   value={numero}
-                  onChange={e => setNumero(maiusculasPt(e.target.value))}
+                  onChange={e => {
+                    pinAlinhadoAoFormularioRef.current = false
+                    setNumero(maiusculasPt(e.target.value))
+                  }}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
@@ -1210,7 +1313,10 @@ export function EmpresaTab() {
                 <Input
                   label="Bairro"
                   value={bairro}
-                  onChange={e => setBairro(maiusculasPt(e.target.value))}
+                  onChange={e => {
+                    pinAlinhadoAoFormularioRef.current = false
+                    setBairro(maiusculasPt(e.target.value))
+                  }}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
@@ -1224,6 +1330,7 @@ export function EmpresaTab() {
                   label="Estado"
                   value={estado}
                   onChange={async e => {
+                    pinAlinhadoAoFormularioRef.current = false
                     const novoEstado = e.target.value
                     const cidadeAnterior = cidade
 
@@ -1264,6 +1371,7 @@ export function EmpresaTab() {
                 <CidadeAutocomplete
                   value={cidade}
                   onChange={novaCidade => {
+                    pinAlinhadoAoFormularioRef.current = false
                     setCidade(maiusculasPt(novaCidade))
                     if (!novaCidade) {
                       setCodigoCidadeIbge(null)
@@ -1278,6 +1386,7 @@ export function EmpresaTab() {
                   useNativeInput={false}
                   sx={sxEntradaEmpresa}
                   onCidadeSelecionada={(nomeCidade, codigoIbge) => {
+                    pinAlinhadoAoFormularioRef.current = false
                     setCodigoCidadeIbge(codigoIbge)
                     ultimaCidadeBuscada.current = nomeCidade
                     setCidadeValida(true)

@@ -17,15 +17,15 @@ export function getKanbanColumnsConfig(): KanbanColumn[] {
     {
       id: 'NOVOS_PEDIDOS',
       title: 'Novos Pedidos',
-      color: 'bg-sky-50',
-      borderColor: 'border-sky-300',
-      icon: <MdPostAdd className="h-4 w-4 text-sky-700" />,
+      color: 'bg-slate-200',
+      borderColor: 'border-slate-400',
+      icon: <MdPostAdd className="h-4 w-4 text-slate-700" />,
       placeholder: 'Pedidos recém-criados aguardando triagem',
     },
     {
       id: 'EM_PREPARO',
       title: 'Em Preparo',
-      color: 'bg-amber-50',
+      color: 'bg-amber-100',
       borderColor: 'border-amber-300',
       icon: <MdRestaurant className="h-4 w-4 text-amber-700" />,
       placeholder: 'Pedidos em preparação na cozinha ou separação',
@@ -33,15 +33,15 @@ export function getKanbanColumnsConfig(): KanbanColumn[] {
     {
       id: 'PRONTO_ENTREGA',
       title: 'Pronto para entrega',
-      color: 'bg-teal-50',
-      borderColor: 'border-teal-300',
-      icon: <MdLocalShipping className="h-4 w-4 text-teal-700" />,
+      color: 'bg-sky-100',
+      borderColor: 'border-sky-300',
+      icon: <MdLocalShipping className="h-4 w-4 text-sky-700" />,
       placeholder: 'Pedidos prontos para retirada ou envio',
     },
     {
       id: 'EM_ROTA',
       title: 'Em Rota / Retirada',
-      color: 'bg-indigo-50',
+      color: 'bg-indigo-100',
       borderColor: 'border-indigo-300',
       icon: <MdRoute className="h-4 w-4 text-indigo-700" />,
       placeholder: 'Pedidos a caminho do cliente ou prontos para retirada',
@@ -49,33 +49,33 @@ export function getKanbanColumnsConfig(): KanbanColumn[] {
     {
       id: 'FINALIZADAS',
       title: 'Finalizadas',
-      color: 'bg-primary/15',
-      borderColor: 'border-gray-400',
-      icon: <MdReceipt className="h-4 w-4 text-gray-600" />,
+      color: 'bg-primary/22',
+      borderColor: 'border-primary/35',
+      icon: <MdReceipt className="h-4 w-4 text-primary" />,
       placeholder: 'Vendas finalizadas aguardando ação',
     },
     {
       id: 'PENDENTE_EMISSAO',
       title: 'Pendente de Emissão',
-      color: 'bg-yellow-50',
+      color: 'bg-yellow-100',
       borderColor: 'border-yellow-400',
-      icon: <MdSchedule className="h-4 w-4 text-yellow-600" />,
+      icon: <MdSchedule className="h-4 w-4 text-yellow-700" />,
       placeholder: 'Vendas aguardando emissão de NFe',
     },
     {
       id: 'COM_FISCAL',
       title: 'Com NF Solicitada',
-      color: 'bg-green-50',
+      color: 'bg-green-100',
       borderColor: 'border-green-400',
-      icon: <MdCheckCircle className="h-4 w-4 text-green-600" />,
-      placeholder: 'Vendas com nota fiscal solicitada',
+      icon: <MdCheckCircle className="h-4 w-4 text-green-700" />,
+      placeholder: 'Vendas com nota emitida, pendente ou rejeitada',
     },
     {
       id: 'REJEITADAS',
       title: 'Rejeitadas',
-      color: 'bg-red-50',
+      color: 'bg-red-100',
       borderColor: 'border-red-400',
-      icon: <MdError className="h-4 w-4 text-red-600" />,
+      icon: <MdError className="h-4 w-4 text-red-700" />,
       placeholder: 'Vendas com nota rejeitada ou denegada',
     },
   ]
@@ -88,12 +88,25 @@ export function getVisibleKanbanColumns(
   const todasColunasKanban = getKanbanColumnsConfig()
 
   if (modoKanbanVendas === 'delivery') {
-    // Delivery: colunas operacionais + COM_FISCAL + FINALIZADAS (sem Pendente/Rejeitadas fixas).
-    return todasColunasKanban.filter(
-      c =>
-        c.id !== 'PENDENTE_EMISSAO' &&
-        c.id !== 'REJEITADAS'
-    )
+    return todasColunasKanban
+      .filter(
+        c =>
+          c.id !== 'PENDENTE_EMISSAO' &&
+          c.id !== 'REJEITADAS' &&
+          c.id !== 'COM_FISCAL'
+      )
+      .map(coluna =>
+        coluna.id === 'FINALIZADAS'
+          ? {
+              ...coluna,
+              title: 'Entregues',
+              placeholder: 'Pedidos entregues, com ou sem nota fiscal',
+              color: 'bg-emerald-100',
+              borderColor: 'border-emerald-300',
+              icon: <MdReceipt className="h-4 w-4 text-emerald-700" />,
+            }
+          : coluna
+      )
   }
 
   const idsAtivos = balcaoKanbanColunasAtivas(filtroExtraBalcao)

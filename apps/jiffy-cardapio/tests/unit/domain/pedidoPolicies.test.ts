@@ -3,7 +3,7 @@ import {
   clienteAtingiuMaxEnderecosDelivery,
   MAX_ENDERECOS_CLIENTE_DELIVERY,
 } from '@/src/domain/policies/LimiteEnderecosClienteDelivery'
-import { isTokenCotacaoExpirado } from '@/src/domain/policies/ValidadeTokenCotacao'
+import { isTokenCotacaoExpirado, tokenCotacaoPertoDeVencer, MARGEM_RENOVACAO_TOKEN_COTACAO_MS } from '@/src/domain/policies/ValidadeTokenCotacao'
 import {
   isErroCoberturaEntregaPublica,
   MSG_FORA_COBERTURA_ENTREGA_PUBLICA,
@@ -26,6 +26,15 @@ describe('ValidadeTokenCotacao', () => {
 
   it('considera inválido se expiresAt não parseia', () => {
     expect(isTokenCotacaoExpirado('nao-e-data')).toBe(true)
+  })
+
+  it('trata como perto de vencer dentro da margem e depois dela', () => {
+    const now = Date.parse('2026-01-01T12:00:00.000Z')
+    const dentro = new Date(now + MARGEM_RENOVACAO_TOKEN_COTACAO_MS - 1_000).toISOString()
+    const fora = new Date(now + MARGEM_RENOVACAO_TOKEN_COTACAO_MS + 60_000).toISOString()
+    expect(tokenCotacaoPertoDeVencer(dentro, now)).toBe(true)
+    expect(tokenCotacaoPertoDeVencer(fora, now)).toBe(false)
+    expect(tokenCotacaoPertoDeVencer('2026-01-01T11:00:00.000Z', now)).toBe(true)
   })
 })
 

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { CriarPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/CriarPedidoDeliveryUseCase'
 import type { CriarPedidoDeliveryInputDTO } from '@/src/application/dto/CriarPedidoDeliveryDTO'
-import { atualizarCobrancasPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/AtualizarCobrancasPedidoDeliveryUseCase'
+import { atualizarCobrancasPedidoDeliveryUseCase } from '@/src/infrastructure/composition/pedidoUseCases'
 import type { INovoPedidoReadRepository } from '@/src/domain/repositories/INovoPedidoReadRepository'
 import { TAXA_ENTREGA_SEM_TAXA_ID } from '@/src/shared/constants/taxaEntregaPedido'
 
@@ -64,6 +64,7 @@ function repoMock(overrides: Partial<INovoPedidoReadRepository> = {}): INovoPedi
     patchPedidoDelivery: vi.fn().mockResolvedValue(undefined),
     transicionarStatusPedidoDelivery: vi.fn().mockResolvedValue(undefined),
     emitirNotaPedidoDelivery: vi.fn(),
+    reemitirNotaPedidoDelivery: vi.fn(),
     buscarAuthMe: vi.fn(),
     buscarUsuarioGestor: vi.fn(),
     ...overrides,
@@ -77,7 +78,10 @@ describe('CriarPedidoDeliveryUseCase', () => {
       .mockResolvedValue(true)
 
     const mutate = vi.fn().mockResolvedValue({ id: 'pedido-abc' })
-    const useCase = new CriarPedidoDeliveryUseCase()
+    const useCase = new CriarPedidoDeliveryUseCase(
+      atualizarCobrancasPedidoDeliveryUseCase,
+      repoMock()
+    )
 
     await useCase.execute(baseInput(), mutate, 'token-test')
 

@@ -1,3 +1,4 @@
+import { atorUsuarioId, rotuloAtorPedido } from '@/src/application/mappers/atorPedidoDelivery'
 import type { PagamentoApiItem } from '@/src/application/dto/api/vendaGestorApi'
 import { mapearPagamentoDetalheVenda } from '@/src/application/mappers/VendaDetalhePagamentoMapper'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
@@ -9,13 +10,6 @@ function texto(value: unknown): string {
 function isoString(value: unknown): string | null {
   const s = texto(value)
   return s || null
-}
-
-function atorUsuarioId(ator: unknown): string | null {
-  if (!ator || typeof ator !== 'object') return null
-  const a = ator as Record<string, unknown>
-  const ref = texto(a.sourceReference ?? a.id)
-  return ref || null
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -79,6 +73,20 @@ export function mapCobrancaDeliveryToPagamento(raw: unknown): PagamentoApiItem |
   }
 
   const realizadoPorNested = asRecord(pagamentoEfetivado?.realizadoPor)
+  const atorPagamento =
+    realizadoPorNested ??
+    c.criadaPor ??
+    c.criadoPor ??
+    c.lancadaPor ??
+    c.abertaPor
+  const realizadoPorIdEfetivado = texto(pagamentoEfetivado?.realizadoPorId)
+  const realizadoPorId =
+    atorUsuarioId(atorPagamento) ||
+    texto(c.criadaPorId) ||
+    texto(c.criadoPorId) ||
+    realizadoPorIdEfetivado ||
+    null
+  const realizadoPorNome = rotuloAtorPedido(atorPagamento)
   const nomeMeio = extrairNomeMeioPagamentoDeCobranca(c)
 
   return {
@@ -91,15 +99,9 @@ export function mapCobrancaDeliveryToPagamento(raw: unknown): PagamentoApiItem |
     dataCancelamento: isoString(c.dataCancelamento),
     dataCriacao: isoString(c.dataCriacao),
     canceladoPorId: atorUsuarioId(c.canceladaPor),
-    realizadoPorId:
-      pagamentoEfetivado?.realizadoPorId != null
-        ? String(pagamentoEfetivado.realizadoPorId)
-        : realizadoPorNested
-          ? atorUsuarioId(realizadoPorNested)
-          : atorUsuarioId(c.criadaPor) ??
-            atorUsuarioId(c.criadoPor) ??
-            atorUsuarioId(c.lancadaPor) ??
-            atorUsuarioId(c.abertaPor),
+    realizadoPorId: realizadoPorId || undefined,
+    realizadoPorNome: realizadoPorNome || undefined,
+    realizadoPor: atorPagamento ?? undefined,
     isTefUsed,
     isTefConfirmed,
     tefIdentifier:

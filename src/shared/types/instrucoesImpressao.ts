@@ -10,6 +10,8 @@ export interface InstrucaoImpressaoMapeamento {
   impressoraNome: string | null
   nomeImpressoraWindows: string | null
   produtosLancadosIds: string[]
+  modoImpressao?: unknown
+  modoFicha?: unknown
 }
 
 export interface InstrucoesImpressaoResponse {

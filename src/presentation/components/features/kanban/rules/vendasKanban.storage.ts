@@ -102,21 +102,10 @@ export function sanitizarSnapshotFiltrosToolbarKanban(
     o.periodoDataModo === 'todos' || periodoPreset === 'todos' ? 'todos' : 'periodo'
   const presetComDatas = periodoPreset === 'por_data' || periodoPreset === 'ultimos_7'
 
-  let origemFilter: OrigemFiltro = isOrigemFiltro(o.origemFilter) ? o.origemFilter : ''
-  let tipoCanalFilter: TipoCanalFiltro = isTipoCanalFiltro(o.tipoCanalFilter)
+  const origemFilter: OrigemFiltro = isOrigemFiltro(o.origemFilter) ? o.origemFilter : ''
+  const tipoCanalFilter: TipoCanalFiltro = isTipoCanalFiltro(o.tipoCanalFilter)
     ? o.tipoCanalFilter
     : ''
-
-  // Snapshot antigo sem `tipoCanalFilter`: PDV/GESTOR/DELIVERY em `origemFilter` eram canal.
-  if (!('tipoCanalFilter' in o)) {
-    const legado = String(o.origemFilter ?? '')
-      .trim()
-      .toUpperCase()
-    if (legado === 'DELIVERY' || legado === 'PDV' || legado === 'GESTOR') {
-      tipoCanalFilter = legado as TipoCanalFiltro
-      origemFilter = ''
-    }
-  }
 
   return {
     searchInput: typeof o.searchInput === 'string' ? o.searchInput : '',

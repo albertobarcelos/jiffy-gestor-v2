@@ -1,32 +1,7 @@
 import type { ColunaKanbanId } from '@/src/presentation/components/features/kanban/types'
 import type { VendaDetalheCarregadaDTO } from '@/src/application/dto/VendaDetalheCarregadaDTO'
 import type { DetalhesEntregaPedido } from '@/src/domain/types/vendaDetalhe'
-
-const MAPA_ETAPA: Record<string, ColunaKanbanId> = {
-  NOVOS_PEDIDOS: 'NOVOS_PEDIDOS',
-  NOVO: 'NOVOS_PEDIDOS',
-  RECEBIDO: 'NOVOS_PEDIDOS',
-  PENDENTE_TRIAGEM: 'NOVOS_PEDIDOS',
-  PENDENTE: 'NOVOS_PEDIDOS',
-  EM_PREPARO: 'EM_PREPARO',
-  PREPARO: 'EM_PREPARO',
-  COZINHA: 'EM_PREPARO',
-  PRONTO_ENTREGA: 'PRONTO_ENTREGA',
-  PRONTO: 'PRONTO_ENTREGA',
-  EM_ROTA: 'EM_ROTA',
-  ROTA: 'EM_ROTA',
-  DESPACHADO: 'EM_ROTA',
-  SAIU_PARA_ENTREGA: 'EM_ROTA',
-  SAIU_ENTREGA: 'EM_ROTA',
-  FINALIZADAS: 'FINALIZADAS',
-}
-
-const ETAPAS_CONCLUIDAS = new Set([
-  'ENTREGUE',
-  'CONCLUIDO',
-  'FINALIZADO',
-  'FINALIZADA',
-])
+import { colunaKanbanDeStatusEtapa as colunaKanbanDeStatusEtapaDominio } from '@/src/domain/value-objects/EtapaOperacionalDelivery'
 
 const ORDEM_COLUNA_DETALHE: ColunaKanbanId[] = [
   'NOVOS_PEDIDOS',
@@ -43,10 +18,8 @@ function indiceColunaDetalhe(coluna: ColunaKanbanId): number {
 
 export function colunaKanbanDeStatusEtapa(
   statusEtapaOperacional?: string | null
-): ColunaKanbanId {
-  const raw = String(statusEtapaOperacional ?? '').trim().toUpperCase()
-  if (ETAPAS_CONCLUIDAS.has(raw)) return 'FINALIZADAS'
-  return MAPA_ETAPA[raw] ?? 'NOVOS_PEDIDOS'
+): ColunaKanbanId | null {
+  return colunaKanbanDeStatusEtapaDominio(statusEtapaOperacional)
 }
 
 export function colunaKanbanDeTimestampsEntrega(
@@ -87,9 +60,9 @@ export function resolverColunaDetalhePedido(args: {
 
 export function rotuloEtapaDetalhePedido(
   coluna: ColunaKanbanId,
-  tipoVenda?: string | null
+  tipoEntrega?: string | null
 ): string {
-  const retirada = String(tipoVenda ?? '').trim().toLowerCase() === 'retirada'
+  const retirada = String(tipoEntrega ?? '').trim().toLowerCase() === 'retirada'
   if (coluna === 'NOVOS_PEDIDOS') return 'Recebido'
   if (coluna === 'EM_PREPARO') return 'Em preparo'
   if (coluna === 'PRONTO_ENTREGA') return 'Pronto'
@@ -98,23 +71,23 @@ export function rotuloEtapaDetalhePedido(
   return 'Em andamento'
 }
 
-export function rotuloTipoAtendimento(tipoVenda?: string | null): string {
-  const tipo = String(tipoVenda ?? '').trim().toLowerCase()
-  if (tipo === 'retirada') return 'Retirada'
-  if (tipo === 'entrega' || tipo === 'delivery') return 'Entrega'
-  if (tipo === 'balcao' || tipo === 'mesa' || tipo === 'gestor') return 'Balcão'
-  return tipo ? tipo : '—'
+export function rotuloTipoAtendimento(tipo?: string | null): string {
+  const valor = String(tipo ?? '').trim().toLowerCase()
+  if (valor === 'retirada') return 'Retirada'
+  if (valor === 'entrega') return 'Entrega'
+  if (valor === 'delivery') return 'Delivery'
+  if (valor === 'balcao' || valor === 'mesa' || valor === 'gestor') return 'Balcão'
+  return valor ? valor : '—'
 }
 
-/** Resumo estilo delivery (trilha Preparo/Rota) só para entrega ou retirada. */
+/** Resumo estilo delivery (trilha Preparo/Rota) só para `tipoVenda=delivery`. */
 export function deveUsarVisaoUnicaDetalhePedido(params: {
   tipoInicioPedido?: 'balcao' | 'entrega' | null
   tipoVenda?: string | null
 }): boolean {
   if (params.tipoInicioPedido === 'entrega') return true
   if (params.tipoInicioPedido === 'balcao') return false
-  const tipo = String(params.tipoVenda ?? '').trim().toLowerCase()
-  return tipo === 'entrega' || tipo === 'retirada' || tipo === 'delivery'
+  return String(params.tipoVenda ?? '').trim().toLowerCase() === 'delivery'
 }
 
 export interface HintKanbanDetalhePedido {

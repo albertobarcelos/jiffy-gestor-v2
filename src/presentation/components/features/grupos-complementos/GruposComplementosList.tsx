@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { useGruposComplementosInfinite } from '@/src/presentation/hooks/useGruposComplementos'
+import { useCadastroListImagens } from '@/src/presentation/hooks/useCadastroListImagens'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import {
@@ -28,10 +29,8 @@ import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalida
 import { showToast } from '@/src/shared/utils/toast'
 import { DELIVERY_IMAGE_ACCEPT } from '@/src/shared/constants/deliveryImageUpload'
 import {
-  fetchGrupoComplementoImagemUrl,
-  fetchGruposComplementoImagemUrlsBatch,
+  grupoComplementoImagemMedia,
   mensagemLegivelDeliveryMediaError,
-  uploadGrupoComplementoImagem,
 } from '@/src/infrastructure/api/deliveryMediaApi'
 import { DELIVERY_GRUPO_COMPLEMENTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
 import { useEntityImageCropUpload } from '@/src/presentation/hooks/useEntityImageCropUpload'
@@ -43,6 +42,11 @@ import {
 interface GruposComplementosListProps {
   onReload?: () => void
 }
+
+const grupoListId = (g: GrupoComplemento) => g.getId()
+const grupoListUrl = (g: GrupoComplemento) => g.getImagemUrl()
+const grupoWithImagem = (g: GrupoComplemento, url: string | null) => g.withImagemUrl(url)
+const GRUPOS_COMPLEMENTOS_INFINITE_KEY = ['grupos-complementos', 'infinite'] as const
 
 function stopRowInteraction(e: React.SyntheticEvent) {
   e.stopPropagation()
@@ -385,60 +389,41 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
   }, [error])
 
   const [updatingQuantidadeId, setUpdatingQuantidadeId] = useState<string | null>(null)
-  const [imagensPorGrupoId, setImagensPorGrupoId] = useState<Record<string, string | null>>({})
-  const [uploadingImagemGrupoId, setUploadingImagemGrupoId] = useState<string | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const invalidate = useInvalidateTenantQueries()
-
-  useEffect(() => {
-    const idsFaltantes = grupos
-      .map(g => g.getId())
-      .filter(id => !(id in imagensPorGrupoId))
-
-    if (idsFaltantes.length === 0) return
-
-    let cancelled = false
-    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-    if (!token) return
-
-    void fetchGruposComplementoImagemUrlsBatch(idsFaltantes, token).then(resolved => {
-      if (cancelled) return
-      setImagensPorGrupoId(prev => ({ ...prev, ...resolved }))
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [grupos, imagensPorGrupoId])
+  const {
+    uploadingId: uploadingImagemGrupoId,
+    uploadFromList,
+    applyAfterSave,
+    refreshOne,
+    urlDaLista,
+  } = useCadastroListImagens({
+    media: grupoComplementoImagemMedia,
+    items: grupos,
+    getId: grupoListId,
+    getUrl: grupoListUrl,
+    withUrl: grupoWithImagem,
+    queryKeyBase: GRUPOS_COMPLEMENTOS_INFINITE_KEY,
+    pageItemsKey: 'grupos',
+  })
 
   const handleUploadImagem = useCallback(
     async (grupoId: string, file: File) => {
-      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-      if (!token) {
-        showToast.error('Token não encontrado')
-        return
-      }
-
-      setUploadingImagemGrupoId(grupoId)
       const toastId = showToast.loading('Enviando imagem...')
-
       try {
-        await uploadGrupoComplementoImagem(grupoId, file, token)
-        const persistedUrl = await fetchGrupoComplementoImagemUrl(grupoId, token)
-        setImagensPorGrupoId(prev => ({
-          ...prev,
-          [grupoId]: persistedUrl,
-        }))
+        await uploadFromList(grupoId, file)
         showToast.successLoading(toastId, 'Imagem salva com sucesso!')
       } catch (error) {
+        if (error instanceof Error && error.message === 'Token não encontrado') {
+          showToast.errorLoading(toastId, 'Token não encontrado')
+          return
+        }
         showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
-      } finally {
-        setUploadingImagemGrupoId(null)
       }
     },
-    []
+    [uploadFromList]
   )
 
   const { selectForEntity: selectGrupoComplementoImagem, cropModal: grupoComplementoCropModal } =
@@ -525,10 +510,11 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
     await invalidate(['grupos-complementos'])
   }, [router, searchParams, pathname, invalidate])
 
-  const handleTabsModalReload = useCallback(async () => {
-    setImagensPorGrupoId({})
+  const handleTabsModalReload = useCallback(async (savedId?: string, imagemUrl?: string | null) => {
+    await applyAfterSave(savedId, imagemUrl)
     await handleActionsReload()
-  }, [handleActionsReload])
+    await refreshOne(savedId)
+  }, [applyAfterSave, handleActionsReload, refreshOne])
 
   const handleTabsModalTabChange = useCallback((tab: 'grupo' | 'complementos') => {
     setTabsModalState((prev) => ({
@@ -719,7 +705,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
             onChangeQuantidade={handleChangeQuantidade}
             isChangingQuantidade={updatingQuantidadeId === grupo.getId()}
             rowIndex={index}
-            imagemUrl={imagensPorGrupoId[grupo.getId()] ?? null}
+            imagemUrl={urlDaLista(grupo.getId(), grupo.getImagemUrl())}
             isUploadingImagem={uploadingImagemGrupoId === grupo.getId()}
             onUploadImagem={selectGrupoComplementoImagem}
           />

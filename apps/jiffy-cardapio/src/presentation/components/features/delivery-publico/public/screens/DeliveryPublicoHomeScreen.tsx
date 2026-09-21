@@ -11,7 +11,7 @@ import {
   type RefObject,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import type {
   CatalogoPublicoProdutoDTO,
   EmpresaPublicaDTO,
@@ -60,6 +60,8 @@ import { DeliveryLojaInfoModal } from '../../shared/components/DeliveryLojaInfoM
 import { DeliveryWhatsAppFab } from '../../shared/components/DeliveryWhatsAppFab'
 import { DeliveryPublicoCarrinhoScreen } from './DeliveryPublicoCarrinhoScreen'
 import { useFlyToCart } from '../../shared/hooks/useFlyToCart'
+import type { FlySourceRect } from '../../shared/components/FlyingProduct'
+import { getProdutoImageSourceRect } from '../../shared/utils/getProdutoImageSourceRect'
 import { useDeliveryBodyScrollLock } from '../../shared/hooks/useDeliveryBodyScrollLock'
 import type { DeliveryCarrinhoThumb } from '../../shared/components/DeliveryPedidoFooter'
 import { buildCarrinhoThumbsFromItens } from '../../shared/utils/buildCarrinhoThumbsFromItens'
@@ -81,6 +83,7 @@ type ProdutoAdicionadoPayload = {
   produtoId: string
   nome: string
   imagemUrl: string | null
+  sourceRect?: FlySourceRect | null
   /** Se false, só anima o fly-to-cart (atalho "+"); padrão true abre o modal. */
   abrirDialogo?: boolean
 }
@@ -90,11 +93,10 @@ export function DeliveryPublicoHomeScreen({
   carrinhoInicialAberto = false,
 }: DeliveryPublicoHomeScreenProps) {
   const router = useRouter()
-  const pathname = usePathname()
   const searchParams = useSearchParams()
   const [termoBusca, setTermoBusca] = useState('')
-  /** Fecha o modal na hora, sem esperar o router.replace limpar ?produto= */
-  const [fechandoProduto, setFechandoProduto] = useState(false)
+  /** Modal de produto controlado por estado (URL limpa na navegação). */
+  const [produtoIdAberto, setProdutoIdAberto] = useState<string | null>(null)
   const [produtoAdicionadoNome, setProdutoAdicionadoNome] = useState<string | null>(null)
   const [pendingFly, setPendingFly] = useState<ProdutoAdicionadoPayload | null>(null)
   /** 1ª aparição: oculta a thumb até a imagem chegar no footer. */
@@ -165,28 +167,16 @@ export function DeliveryPublicoHomeScreen({
     return map
   }, [carrinhoItens])
 
-  const syncProdutoQuery = useCallback(
-    (produtoId: string | null) => {
-      const params = new URLSearchParams(searchParams.toString())
-      if (produtoId) {
-        params.set('produto', produtoId)
-      } else {
-        params.delete('produto')
-      }
-      const query = params.toString()
-      const homePath = deliveryPublicoHomePath(slug)
-      const nextUrl = query ? `${homePath}?${query}` : homePath
-      const currentQuery = searchParams.toString()
-      const currentPath =
-        typeof window !== 'undefined' && window.location.pathname.endsWith('/carrinho')
-          ? deliveryPublicoHomePath(slug)
-          : pathname.replace(/\/carrinho\/?$/, '') || homePath
-      const currentUrl = currentQuery ? `${currentPath}?${currentQuery}` : currentPath
-      if (nextUrl === currentUrl) return
-      router.replace(nextUrl, { scroll: false })
-    },
-    [pathname, router, searchParams, slug]
-  )
+  /** Remove `?produto=` da URL sem alterar o estado do modal (deep link / fechar). */
+  const limparProdutoQuery = useCallback(() => {
+    if (!searchParams.has('produto')) return
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete('produto')
+    const query = params.toString()
+    const homePath = deliveryPublicoHomePath(slug)
+    const nextUrl = query ? `${homePath}?${query}` : homePath
+    router.replace(nextUrl, { scroll: false })
+  }, [router, searchParams, slug])
 
   useEffect(() => {
     if (!isError || !error) return
@@ -200,14 +190,17 @@ export function DeliveryPublicoHomeScreen({
 
   const produtoIdQuery = searchParams.get('produto')
 
+  /** Deep link / compartilhamento: abre o modal e limpa a query da barra. */
   useEffect(() => {
-    if (!produtoIdQuery) setFechandoProduto(false)
-  }, [produtoIdQuery])
+    if (!produtoIdQuery) return
+    setProdutoIdAberto(produtoIdQuery)
+    limparProdutoQuery()
+  }, [produtoIdQuery, limparProdutoQuery])
 
   const produtoSelecionado = useMemo(() => {
-    if (fechandoProduto || !produtoIdQuery || grupos.length === 0) return null
-    return findCatalogoProdutoById(grupos, produtoIdQuery)
-  }, [fechandoProduto, grupos, produtoIdQuery])
+    if (!produtoIdAberto || grupos.length === 0) return null
+    return findCatalogoProdutoById(grupos, produtoIdAberto)
+  }, [grupos, produtoIdAberto])
 
   const handleBuscaChange = useCallback((termo: string) => {
     setTermoBusca(termo)
@@ -219,18 +212,14 @@ export function DeliveryPublicoHomeScreen({
       ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [])
 
-  const handleProdutoClick = useCallback(
-    (produtoId: string) => {
-      setFechandoProduto(false)
-      syncProdutoQuery(produtoId)
-    },
-    [syncProdutoQuery]
-  )
+  const handleProdutoClick = useCallback((produtoId: string) => {
+    setProdutoIdAberto(produtoId)
+  }, [])
 
   const handleCloseProduto = useCallback(() => {
-    setFechandoProduto(true)
-    syncProdutoQuery(null)
-  }, [syncProdutoQuery])
+    setProdutoIdAberto(null)
+    limparProdutoQuery()
+  }, [limparProdutoQuery])
 
   const handleProdutoAdicionado = useCallback((payload: ProdutoAdicionadoPayload) => {
     if (payload.imagemUrl?.trim()) {
@@ -267,6 +256,7 @@ export function DeliveryPublicoHomeScreen({
         produtoId: produto.id,
         nome: produto.nome,
         imagemUrl: produto.imagemUrl,
+        sourceRect: getProdutoImageSourceRect(produto.id),
         abrirDialogo: false,
       })
     },
@@ -289,7 +279,7 @@ export function DeliveryPublicoHomeScreen({
         return
       }
 
-      const { nome, imagemUrl, produtoId, abrirDialogo = true } = pendingFly
+      const { nome, imagemUrl, produtoId, abrirDialogo = true, sourceRect } = pendingFly
       setPendingFly(null)
 
       if (!imagemUrl?.trim() || !target) {
@@ -312,6 +302,7 @@ export function DeliveryPublicoHomeScreen({
       flyToCart({
         imageUrl: imagemUrl,
         targetElement: target,
+        sourceRect: sourceRect ?? getProdutoImageSourceRect(produtoId),
         onArrive: () => {
           setFlyingProdutoId(null)
           setThumbsCongeladas(null)

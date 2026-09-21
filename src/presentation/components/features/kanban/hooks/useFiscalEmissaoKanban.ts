@@ -6,7 +6,12 @@ import { deveUsarModuloDeliveryParaEmissaoFiscal } from '@/src/presentation/hook
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { fiscalPendentePodeReemitirAposCooldown } from '@/src/domain/services/pedido/RegrasFiscaisVenda'
-import { STATUS_FISCAL_AGUARDANDO_SEFAZ } from '../rules/vendasKanban.rules'
+import {
+  MENSAGEM_EMISSAO_DELIVERY_SO_FINALIZADO,
+  numeroOpcionalReemitirNotaDelivery,
+} from '@/src/domain/services/pedido/RegrasEmissaoFiscalDelivery'
+import { vendaKanbanPermiteEmissaoFiscalDelivery } from '../rules/emissaoFiscalDelivery.kanban'
+import { statusFiscalTextoAguardandoSefaz } from '../rules/vendasKanban.rules'
 import {
   aplicarPatchFiscalKanbanSemRefetch,
   extrairPatchFiscalKanban,
@@ -81,8 +86,7 @@ function normalizarStatusFiscal(status: string | null | undefined): string {
 }
 
 function statusFiscalAguardando(status: string | null | undefined): boolean {
-  const s = normalizarStatusFiscal(status)
-  return STATUS_FISCAL_AGUARDANDO_SEFAZ.has(s)
+  return statusFiscalTextoAguardandoSefaz(status)
 }
 
 /**
@@ -97,7 +101,7 @@ export function deveEncerrarPollComStatus(
 ): boolean {
   const s = normalizarStatusFiscal(status)
   if (!s) return false
-  if (s === 'EMITIDA' || s === 'CANCELADA' || s === 'INUTILIZADA') return true
+  if (s === 'EMITIDA' || s === 'AUTORIZADA' || s === 'AUTORIZADO' || s === 'CANCELADA' || s === 'INUTILIZADA') return true
   if ((s === 'REJEITADA' || s === 'DENEGADA') && viuAguardando) return true
   if ((s === 'REJEITADA' || s === 'DENEGADA') && s !== statusAnterior) return true
   return false
@@ -126,6 +130,7 @@ interface UseFiscalEmissaoKanbanParams {
     documentId: string
     numero?: number
   }) => Promise<unknown>
+  reemitirNfeDelivery: (payload: { id: string; numero?: number }) => Promise<unknown>
   emitirNotaPdv: (payload: { id: string; modelo: 55 | 65 }) => Promise<unknown>
   emitirNotaGestor: (payload: { id: string; modelo: 55 | 65 }) => Promise<unknown>
   emitirNotaDelivery: (payload: { id: string; modelo: 55 | 65 }) => Promise<unknown>
@@ -139,6 +144,7 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
   const {
     reemitirNfePdv,
     reemitirNfeGestor,
+    reemitirNfeDelivery,
     emitirNotaPdv,
     emitirNotaGestor,
     emitirNotaDelivery,
@@ -345,6 +351,18 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
       if (!iniciarAcaoFiscal(venda.id, 'emitindo')) return
       vendaIdEmissaoPreparandoRef.current = venda.id
 
+      if (!vendaKanbanPermiteEmissaoFiscalDelivery(venda)) {
+        showToast.error(MENSAGEM_EMISSAO_DELIVERY_SO_FINALIZADO)
+        encerrarAcaoFiscal(venda.id)
+        vendaIdEmissaoPreparandoRef.current = null
+        return
+      }
+
+      const usarDelivery = deveUsarModuloDeliveryParaEmissaoFiscal(
+        venda.tabelaOrigem,
+        venda.tipoVenda
+      )
+
       const podeReemitirInterativo =
         venda.statusFiscal === 'REJEITADA' ||
         venda.statusFiscal === 'DENEGADA' ||
@@ -361,7 +379,18 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
 
       if (podeReemitirInterativo) {
         const docId = venda.documentoFiscalId?.trim()
+        const numeroFiscal = numeroOpcionalReemitirNotaDelivery(venda.numeroFiscal)
         const executarAtalho = async () => {
+          if (usarDelivery) {
+            await executarAcaoFiscalComLock(
+              venda,
+              'reemitindo',
+              venda.statusFiscal,
+              () => reemitirNfeDelivery({ id: venda.id, numero: numeroFiscal }),
+              { jaTravado: true }
+            )
+            return
+          }
           if (docId) {
             const payload = {
               id: venda.id,
@@ -402,7 +431,7 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
           }
         }
 
-        if (docId || resolveModeloParaEmitirNota(venda) !== null) {
+        if (usarDelivery || docId || resolveModeloParaEmitirNota(venda) !== null) {
           try {
             const itens = await verificarCbenef.mutateAsync({
               vendaId: venda.id,
@@ -425,13 +454,17 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
         }
       }
 
-      setPrimeiroPorColuna(prev => ({ ...prev, COM_FISCAL: venda.id }))
+      setPrimeiroPorColuna(prev => ({
+        ...prev,
+        COM_FISCAL: venda.id,
+        FINALIZADAS: venda.id,
+      }))
       setVendaSelecionadaParaEmissao({
         id: venda.id,
         tabelaOrigem: venda.tabelaOrigem,
         numeroVenda: venda.numeroVenda,
         codigoVenda: venda.codigoVenda,
-        origemVenda: venda.origem,
+        origemVenda: venda.origem ?? undefined,
         clienteId: venda.cliente?.id ?? null,
         clienteNome: venda.cliente?.nome ?? null,
         tipoVenda: venda.tipoVenda,
@@ -441,11 +474,11 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
     },
     [
       emissaoFiscalLock,
-      emitirNotaDelivery,
       emitirNotaParaVenda,
       encerrarAcaoFiscal,
       executarAcaoFiscalComLock,
       iniciarAcaoFiscal,
+      reemitirNfeDelivery,
       reemitirNfeGestor,
       reemitirNfePdv,
       setEmitirNfeModalOpen,

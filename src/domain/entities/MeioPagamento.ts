@@ -1,5 +1,9 @@
 export type TipoParcelamento = 'jurosVendedor' | 'jurosCliente'
 
+function parseBooleanFlag(value: unknown): boolean {
+  return value === true || value === 'true' || value === 1 || value === '1'
+}
+
 /**
  * Entidade de domínio representando um Meio de Pagamento
  */
@@ -11,7 +15,8 @@ export class MeioPagamento {
     private readonly formaPagamentoFiscal: string,
     private readonly ativo: boolean,
     private readonly parcelavel: boolean,
-    private readonly tipoParcelamento: TipoParcelamento | null
+    private readonly tipoParcelamento: TipoParcelamento | null,
+    private readonly isDeliveryFlag: boolean
   ) {}
 
   static create(
@@ -21,7 +26,8 @@ export class MeioPagamento {
     formaPagamentoFiscal: string,
     ativo: boolean,
     isParcelavel: boolean,
-    tipoParcelamento: TipoParcelamento | null
+    tipoParcelamento: TipoParcelamento | null,
+    isDelivery = false
   ): MeioPagamento {
     if (!id || !nome) {
       throw new Error('ID e nome são obrigatórios')
@@ -34,7 +40,8 @@ export class MeioPagamento {
       formaPagamentoFiscal,
       ativo,
       isParcelavel,
-      tipoParcelamento
+      tipoParcelamento,
+      isDelivery
     )
   }
 
@@ -50,11 +57,12 @@ export class MeioPagamento {
     return MeioPagamento.create(
       data.id?.toString() || '',
       data.nome?.toString() || '',
-      data.tefAtivo === true || data.tefAtivo === 'true',
+      parseBooleanFlag(data.tefAtivo),
       data.formaPagamentoFiscal?.toString() || 'Dinheiro',
-      data.ativo === true || data.ativo === 'true',
-      data.isParcelavel === true || data.isParcelavel === 'true',
-      tipoParcelamento
+      parseBooleanFlag(data.ativo),
+      parseBooleanFlag(data.isParcelavel),
+      tipoParcelamento,
+      parseBooleanFlag(data.isDelivery)
     )
   }
 
@@ -68,6 +76,10 @@ export class MeioPagamento {
 
   isTefAtivo(): boolean {
     return this.tefAtivo
+  }
+
+  isDelivery(): boolean {
+    return this.isDeliveryFlag
   }
 
   getFormaPagamentoFiscal(): string {
@@ -91,6 +103,7 @@ export class MeioPagamento {
       id: this.id,
       nome: this.nome,
       tefAtivo: this.tefAtivo,
+      isDelivery: this.isDeliveryFlag,
       formaPagamentoFiscal: this.formaPagamentoFiscal,
       ativo: this.ativo,
       isParcelavel: this.parcelavel,
@@ -98,4 +111,3 @@ export class MeioPagamento {
     }
   }
 }
-

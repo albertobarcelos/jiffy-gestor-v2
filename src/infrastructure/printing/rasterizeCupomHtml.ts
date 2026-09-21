@@ -1,3 +1,4 @@
+import { toPng } from 'html-to-image'
 import html2canvas from 'html2canvas'
 
 function waitIframeLoad(iframe: HTMLIFrameElement): Promise<void> {
@@ -14,8 +15,7 @@ function waitIframeLoad(iframe: HTMLIFrameElement): Promise<void> {
   })
 }
 
-function canvasToPngBase64(canvas: HTMLCanvasElement): string {
-  const dataUrl = canvas.toDataURL('image/png')
+function dataUrlToBase64(dataUrl: string): string {
   const comma = dataUrl.indexOf(',')
   return comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl
 }
@@ -37,9 +37,57 @@ export function graphicRasterScale(larguraMm: 58 | 80): number {
   return larguraMm === 58 ? 384 / 220 : 576 / 300
 }
 
+async function fotografarComMotorDoNavegador(
+  receipt: HTMLElement,
+  width: number,
+  height: number,
+  scale: number
+): Promise<string> {
+  const dataUrl = await toPng(receipt, {
+    pixelRatio: scale,
+    backgroundColor: '#ffffff',
+    cacheBust: true,
+    skipFonts: false,
+    width,
+    height,
+    canvasWidth: Math.ceil(width * scale),
+    canvasHeight: Math.ceil(height * scale),
+    style: {
+      margin: '0',
+      transform: 'none',
+    },
+  })
+  const base64 = dataUrlToBase64(dataUrl)
+  if (!base64) throw new Error('Foto do cupom vazia.')
+  return base64
+}
+
+async function fotografarComHtml2Canvas(
+  receipt: HTMLElement,
+  width: number,
+  height: number,
+  scale: number
+): Promise<string> {
+  const canvas = await html2canvas(receipt, {
+    scale,
+    backgroundColor: '#ffffff',
+    useCORS: true,
+    allowTaint: false,
+    logging: false,
+    width,
+    height,
+    windowWidth: width,
+    windowHeight: height + 32,
+    foreignObjectRendering: true,
+  })
+  if (canvas.width < 8 || canvas.height < 8) {
+    throw new Error('Falha ao rasterizar o cupom.')
+  }
+  return dataUrlToBase64(canvas.toDataURL('image/png'))
+}
+
 /**
- * Fotografa o HTML já layoutado no iframe (html2canvas).
- * Não usa SVG+foreignObject: perde ::before, bordas e a fonte do preview.
+ * Fotografa o mesmo HTML do preview com o motor do navegador.
  */
 export async function rasterizeCupomHtmlToPngBase64(
   html: string,
@@ -71,49 +119,17 @@ export async function rasterizeCupomHtmlToPngBase64(
     if (doc.fonts?.ready) {
       await Promise.race([doc.fonts.ready, new Promise(resolve => window.setTimeout(resolve, 800))])
     }
+    if (doc.fonts?.load) {
+      await Promise.race([
+        doc.fonts.load('24px EscPosFontA'),
+        new Promise(resolve => window.setTimeout(resolve, 800)),
+      ])
+    }
     doc.documentElement.style.overflow = 'visible'
     doc.body.style.overflow = 'visible'
     doc.body.style.height = 'auto'
     const receipt = (doc.querySelector('.receipt') as HTMLElement | null) ?? doc.body
     receipt.style.overflow = 'visible'
-    receipt.style.paddingBottom = '6px'
-    const compact = receipt.dataset.densidade === 'compacto'
-    const sepExtra = compact ? '6px' : '10px'
-    for (const el of Array.from(doc.querySelectorAll('.separator'))) {
-      const node = el as HTMLElement
-      node.style.paddingTop = sepExtra
-      node.style.marginTop = sepExtra
-    }
-    const afterQr = doc.querySelector('.whatsapp-qr + .separator') as HTMLElement | null
-    if (afterQr) {
-      const half = compact ? '3px' : '5px'
-      afterQr.style.paddingTop = half
-      afterQr.style.marginTop = half
-    }
-    for (const el of Array.from(doc.querySelectorAll('.brand'))) {
-      const node = el as HTMLElement
-      node.style.transform = 'translateY(-5px)'
-    }
-    for (const el of Array.from(doc.querySelectorAll('.obs-box'))) {
-      const node = el as HTMLElement
-      node.style.paddingTop = '2px'
-      node.style.paddingBottom = '8px'
-    }
-    for (const el of Array.from(doc.querySelectorAll('.obs-title, .obs-text'))) {
-      const node = el as HTMLElement
-      node.style.transform = 'translateY(-3px)'
-    }
-    for (const el of Array.from(doc.querySelectorAll('.method'))) {
-      const node = el as HTMLElement
-      node.style.paddingTop = '1px'
-      node.style.paddingBottom = '10px'
-      node.style.lineHeight = '1'
-      const wrap = doc.createElement('span')
-      wrap.style.display = 'inline-block'
-      wrap.style.transform = 'translateY(-6px)'
-      while (node.firstChild) wrap.appendChild(node.firstChild)
-      node.appendChild(wrap)
-    }
     await nextPaint()
     let { width, height } = measureReceipt(receipt, options.widthPx)
     height += 8
@@ -126,21 +142,11 @@ export async function rasterizeCupomHtmlToPngBase64(
     iframe.style.height = `${height}px`
     iframe.style.width = `${width}px`
 
-    const canvas = await html2canvas(receipt, {
-      scale,
-      backgroundColor: '#ffffff',
-      useCORS: true,
-      allowTaint: false,
-      logging: false,
-      width,
-      height,
-      windowWidth: width,
-      windowHeight: height + 32,
-    })
-    if (canvas.width < 8 || canvas.height < 8) {
-      throw new Error('Falha ao rasterizar o cupom.')
+    try {
+      return await fotografarComMotorDoNavegador(receipt, width, height, scale)
+    } catch {
+      return await fotografarComHtml2Canvas(receipt, width, height, scale)
     }
-    return canvasToPngBase64(canvas)
   } finally {
     iframe.remove()
   }

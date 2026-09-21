@@ -1,3 +1,5 @@
+import { ehPedidoModuloDelivery } from '@/src/domain/services/pedido/PedidoModuloDelivery'
+import { atorUsuarioId } from '@/src/application/mappers/atorPedidoDelivery'
 import type {
   PagamentoApiItem,
   ProdutoLancadoApiItem,
@@ -15,13 +17,6 @@ function isoString(value: unknown): string | null {
   if (value == null) return null
   const s = String(value).trim()
   return s || null
-}
-
-function atorUsuarioId(ator: unknown): string | null {
-  if (!ator || typeof ator !== 'object') return null
-  const a = ator as Record<string, unknown>
-  const ref = String(a.sourceReference ?? a.id ?? '').trim()
-  return ref || null
 }
 
 /**
@@ -75,18 +70,32 @@ export function adaptPedidoDeliveryToVendaGestorApiResponse(
       ? (registro.entregador as Record<string, unknown>)
       : null
 
-  const tipoEntrega = String(registro.tipoEntrega ?? registro.tipoVenda ?? '')
+  const tipoVenda = String(registro.tipoVenda ?? 'delivery')
+    .trim()
+    .toLowerCase() || 'delivery'
+  const tipoEntregaRaw = String(registro.tipoEntrega ?? '')
     .trim()
     .toLowerCase()
+  const tipoEntrega =
+    tipoEntregaRaw === 'entrega' || tipoEntregaRaw === 'retirada' ? tipoEntregaRaw : null
 
   const cobrancas = Array.isArray(registro.cobrancas) ? registro.cobrancas : []
   const pagamentos = cobrancas
     .map(mapCobrancaDeliveryToPagamento)
     .filter((p): p is PagamentoApiItem => p != null)
 
-  const produtosLancados = Array.isArray(registro.produtosLancados)
+  const produtosLancados = (Array.isArray(registro.produtosLancados)
     ? (registro.produtosLancados as ProdutoLancadoApiItem[])
     : []
+  ).map(item => {
+    const lancadoPorId = atorUsuarioId(item.lancadoPor) ?? String(item.lancadoPorId ?? '').trim()
+    const removidoPorId = atorUsuarioId(item.removidoPor) ?? String(item.removidoPorId ?? '').trim()
+    return {
+      ...item,
+      ...(lancadoPorId ? { lancadoPorId } : {}),
+      ...(removidoPorId ? { removidoPorId } : {}),
+    }
+  })
 
   const dataFinalizacao = isoString(registro.dataFinalizacao)
   const statusDeliveryCandidatos = [
@@ -122,7 +131,8 @@ export function adaptPedidoDeliveryToVendaGestorApiResponse(
     enderecoEntrega: enderecoSnapshot ?? registro.enderecoEntrega,
     id: registro.id != null ? String(registro.id) : undefined,
     origem: registro.origem != null ? String(registro.origem) : 'GESTOR',
-    tipoVenda: tipoEntrega || String(registro.tipoVenda ?? ''),
+    tipoVenda,
+    tipoEntrega,
     statusVenda: dataFinalizacao || pedidoDeliveryFinalizado ? 'FINALIZADA' : 'ABERTA',
     statusEtapaOperacional: statusDelivery || undefined,
     statusOperacional: statusDelivery || undefined,
@@ -174,8 +184,5 @@ export function deveUsarModuloDeliveryParaDetalhe(
   tabelaOrigem: 'venda' | 'venda_gestor',
   tipoVenda?: string | null
 ): boolean {
-  if (tabelaOrigem !== 'venda_gestor') return false
-  const tipo = String(tipoVenda ?? '').trim().toLowerCase()
-  if (!tipo || tipo === 'balcao') return false
-  return tipo === 'entrega' || tipo === 'retirada'
+  return ehPedidoModuloDelivery(tabelaOrigem, tipoVenda)
 }

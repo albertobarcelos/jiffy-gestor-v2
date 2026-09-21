@@ -1,4 +1,4 @@
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { fetchGestorApi } from '@/src/infrastructure/api/fetchGestorApi'
 import { FiscalPainelMapper } from '@/src/application/mappers/FiscalPainelMapper'
 import { ConfiguracaoEmissao } from '@/src/domain/entities/painel-contador/ConfiguracaoEmissao'
 import type {

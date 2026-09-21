@@ -21,6 +21,7 @@ import type {
   TipoEntregaFiltro,
 } from '../types'
 import type { ModoVisualizacaoKanban } from '../utils/kanbanModoVisualizacao'
+import { CompartilharCardapioPublicoButton } from './CompartilharCardapioPublicoButton'
 import { KanbanColunasMenu } from './KanbanColunasMenu'
 import { KanbanModoVisualizacaoSelect } from './KanbanModoVisualizacaoSelect'
 import { LojaAbertaToggle } from '@/src/presentation/components/features/delivery/LojaAbertaToggle'
@@ -441,6 +442,7 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
           >
             <MdRefresh className={`h-5 w-5 ${refreshSpinning ? 'animate-spin' : ''}`} />
           </button>
+          <CompartilharCardapioPublicoButton />
           {noFredy ? <FredySomPedidosToggle /> : null}
           {noFredy ? (
             <KanbanModoVisualizacaoSelect

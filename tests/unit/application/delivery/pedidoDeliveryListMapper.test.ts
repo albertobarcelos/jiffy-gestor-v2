@@ -110,16 +110,18 @@ describe('PedidoDeliveryListMapper — origem e financeiro', () => {
 })
 
 describe('PedidoDeliveryListMapper — summary → VendaUnificadaDTO', () => {
-  it('usa tipoEntrega como tipoVenda (não o campo delivery da API)', () => {
+  it('mantém tipoVenda delivery e tipoEntrega separados', () => {
     const record = pedidoDeliverySummaryParaUnifiedRecord(
       criarSummary({ tipoVenda: 'delivery', tipoEntrega: 'retirada' })
     )
-    expect(record.tipoVenda).toBe('retirada')
+    expect(record.tipoVenda).toBe('delivery')
+    expect(record.tipoEntrega).toBe('retirada')
 
     const dto = mapPedidoDeliverySummaryParaVendaUnificadaDTO(
       criarSummary({ tipoEntrega: 'entrega' })
     )
-    expect(dto.tipoVenda).toBe('entrega')
+    expect(dto.tipoVenda).toBe('delivery')
+    expect(dto.tipoEntrega).toBe('entrega')
     expect(dto.tabelaOrigem).toBe('venda_gestor')
   })
 
@@ -333,7 +335,8 @@ describe('PedidoDeliveryListMapper — resposta paginada', () => {
     expect(normalizado.items[0]?.origem).toBe('JIFFY_DELIVERY')
 
     const mapeado = mapPedidosDeliveryListResponseParaVendaUnificadaDTO(normalizado)
-    expect(mapeado.items[0]?.tipoVenda).toBe('entrega')
+    expect(mapeado.items[0]?.tipoVenda).toBe('delivery')
+    expect(mapeado.items[0]?.tipoEntrega).toBe('entrega')
     expect(mapeado.items[0]?.getEtapaKanban()).toBe('PRONTO_ENTREGA')
     expect(mapeado.items[0]?.statusFinanceiro).toBe('pendente')
   })

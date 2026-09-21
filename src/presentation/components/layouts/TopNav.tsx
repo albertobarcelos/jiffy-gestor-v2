@@ -438,7 +438,7 @@ export function TopNav() {
           >
             <MdApps className="w-6 h-6" />
           </button>
-          {/* Logout no drawer: ações do usuário ficam na barra só a partir de `lg` */}
+          {/* Logout no drawer: no desktop (`lg+`) as ações ficam na barra */}
           <button
             type="button"
             onClick={() => void handleLogout()}
@@ -454,16 +454,15 @@ export function TopNav() {
 
   return (
     <nav className="relative z-40 h-16 shrink-0 bg-white border-b border-gray-200 shadow-sm">
-      <div className="h-full flex items-center justify-between xl:px-4">
-        {/* Logo */}
-        <div className="flex items-center">
+      <div className="flex h-full min-w-0 w-full flex-nowrap items-center gap-2 px-3 sm:px-4">
+        <div className="shrink-0">
           <Link href={toGestao('/dashboard')} className="flex items-center">
-            <div className="relative ml-6 md:ml-0 w-12 h-12 sm:w-20 sm:h-16">
+            <div className="relative h-10 w-10 sm:h-12 sm:w-12 2xl:h-14 2xl:w-16">
               <Image
                 src="/images/jiffy-100x100.gif"
                 alt="Jiffy"
                 fill
-                sizes="(max-width: 640px) 176px, 208px"
+                sizes="(max-width: 640px) 40px, (max-width: 1536px) 48px, 64px"
                 className="object-contain"
                 priority
               />
@@ -471,10 +470,9 @@ export function TopNav() {
           </Link>
         </div>
 
-        {/* Menu Items */}
         <div
           ref={menuRef}
-          className="hidden min-w-0 flex-1 items-center justify-start gap-1 pl-2 lg:flex"
+          className="hidden shrink-0 items-center gap-0.5 lg:flex xl:gap-1"
         >
           {menuItems
             .filter(item => item.name !== 'Configurações')
@@ -482,30 +480,32 @@ export function TopNav() {
             const isActive = isMenuActive(item)
             const isExpanded = expandedMenus.has(item.name)
             const renderedIcon = renderNavIcon(item, MENU_ICON_PARENT)
+            const itemClass = `flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-2 text-xs font-medium transition-all duration-200 xl:px-2 xl:text-sm 2xl:gap-1.5 2xl:px-3 ${
+              isActive
+                ? 'bg-gray-100 text-gray-900'
+                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+            }`
 
             if (item.children) {
               return (
-                <div key={item.name} className="relative group">
+                <div key={item.name} className="relative shrink-0">
                   <button
                     onClick={() => toggleMenu(item.name)}
-                    className={`flex items-center gap-1.5 xl:px-4 px-1 py-2 rounded-lg text-xs lg:text-sm font-medium transition-all duration-200 ${
-                      isActive
-                        ? 'bg-gray-100 text-gray-900'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    }`}
+                    className={itemClass}
+                    title={item.name}
+                    aria-label={item.name}
                   >
                     {renderedIcon}
-                    <span>{item.name}</span>
-                    <MdExpandMore 
-                      className={`w-4 h-4 transition-transform duration-200 ${
+                    <span className="whitespace-nowrap">{item.name}</span>
+                    <MdExpandMore
+                      className={`h-4 w-4 shrink-0 transition-transform duration-200 ${
                         isExpanded ? 'rotate-180' : ''
-                      }`} 
+                      }`}
                     />
                   </button>
 
-                  {/* Dropdown Menu */}
                   {isExpanded && (
-                    <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                    <div className="absolute top-full left-0 z-50 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-2 shadow-lg">
                       {item.children.map((child) => {
                         const renderedChildIcon = renderNavIcon(child, MENU_ICON_CHILD)
                         const childIsActive = isChildActive(child.path)
@@ -525,7 +525,7 @@ export function TopNav() {
                             {renderedChildIcon}
                             <span>{child.name}</span>
                             {childIsActive && (
-                              <MdChevronRight className="w-4 h-4 ml-auto text-gray-400" />
+                              <MdChevronRight className="ml-auto h-4 w-4 text-gray-400" />
                             )}
                           </Link>
                         )
@@ -544,147 +544,132 @@ export function TopNav() {
                 prefetch={true}
                 title={item.name}
                 aria-label={item.name}
-                className={`flex items-center gap-1.5 xl:px-4 px-1 py-2 rounded-lg text-xs lg:text-sm font-medium transition-all duration-200 ${
-                  isActive
-                    ? 'bg-gray-100 text-gray-900'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }`}
+                className={itemClass}
               >
                 {renderedIcon}
-                <span
-                  className={
-                    item.name === 'Portal do Contador'
-                      ? 'hidden text-xs xl:inline xl:text-sm'
-                      : 'text-xs lg:text-sm'
-                  }
-                >
-                  {item.name}
-                </span>
+                <span className="whitespace-nowrap">{item.name}</span>
               </Link>
             )
           })}
-
-          <EmpresaSwitcherTopNav variant="desktop" />
         </div>
 
-        {/* Mobile toggler */}
-        <button
-          type="button"
-          className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 lg:hidden"
-          onClick={() => setIsMobileMenuOpen(true)}
-        >
-          <MdMenu className="w-6 h-6" />
-        </button>
+        <div className="ml-auto flex min-w-0 items-center gap-1 sm:gap-1.5">
+          <EmpresaSwitcherTopNav variant="desktop" />
 
-        {/* User Actions */}
-        <div className="hidden items-center gap-2 lg:flex">
-          {/* Meu Jiffy */}
           <button
             type="button"
-            onClick={() => void handleVoltarPortal()}
-            className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
-            title="Meu Jiffy"
-            aria-label="Ir para Meu Jiffy"
+            className="rounded-lg p-2 text-gray-600 hover:bg-gray-100 lg:hidden"
+            onClick={() => setIsMobileMenuOpen(true)}
+            aria-label="Abrir menu"
           >
-            <MdApps className="h-5 w-5" aria-hidden />
+            <MdMenu className="h-6 w-6" />
           </button>
 
-          {/* Notifications */}
-          <div ref={notificationsRef} className="relative">
+          <div className="hidden shrink-0 items-center gap-0.5 lg:flex">
             <button
               type="button"
-              className="relative rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
-              aria-label="Notificações"
-              aria-expanded={notificationsOpen}
-              aria-haspopup="true"
-              onClick={() => setNotificationsOpen(open => !open)}
+              onClick={() => void handleVoltarPortal()}
+              className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
+              title="Meu Jiffy"
+              aria-label="Ir para Meu Jiffy"
             >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                />
-              </svg>
-              {deliveryGestorConfig.temPendencia ? (
-                <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary ring-2 ring-white" />
-              ) : null}
+              <MdApps className="h-5 w-5" aria-hidden />
             </button>
-            {notificationsOpen ? (
-              <div
-                role="menu"
-                className="absolute right-0 top-full z-50 mt-2 w-72 rounded-lg border border-gray-200 bg-white py-2 text-left shadow-lg"
+
+            <div ref={notificationsRef} className="relative">
+              <button
+                type="button"
+                className="relative rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
+                aria-label="Notificações"
+                aria-expanded={notificationsOpen}
+                aria-haspopup="true"
+                onClick={() => setNotificationsOpen(open => !open)}
               >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                  />
+                </svg>
                 {deliveryGestorConfig.temPendencia ? (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="flex w-full flex-col gap-1 px-3 py-2.5 text-left transition-colors hover:bg-gray-50"
-                    onClick={() => {
-                      setNotificationsOpen(false)
-                      setEmpresaDeliveryPendenteOpen(true)
-                    }}
-                  >
-                    <span className="text-sm font-semibold text-primary-text">
-                      Delivery ainda não ativado
-                    </span>
-                    <span className="text-xs leading-snug text-secondary-text">
-                      Defina o nome da loja e o cardápio para começar a vender por
-                      entrega no gestor.
-                    </span>
-                  </button>
-                ) : (
-                  <p className="px-3 py-2 text-center text-xs text-gray-600">
-                    Você não tem mensagens no momento.
-                  </p>
-                )}
-              </div>
-            ) : null}
+                  <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary ring-2 ring-white" />
+                ) : null}
+              </button>
+              {notificationsOpen ? (
+                <div
+                  role="menu"
+                  className="absolute right-0 top-full z-50 mt-2 w-72 rounded-lg border border-gray-200 bg-white py-2 text-left shadow-lg"
+                >
+                  {deliveryGestorConfig.temPendencia ? (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="flex w-full flex-col gap-1 px-3 py-2.5 text-left transition-colors hover:bg-gray-50"
+                      onClick={() => {
+                        setNotificationsOpen(false)
+                        setEmpresaDeliveryPendenteOpen(true)
+                      }}
+                    >
+                      <span className="text-sm font-semibold text-primary-text">
+                        Delivery ainda não ativado
+                      </span>
+                      <span className="text-xs leading-snug text-secondary-text">
+                        Defina o nome da loja e o cardápio para começar a vender por
+                        entrega no gestor.
+                      </span>
+                    </button>
+                  ) : (
+                    <p className="px-3 py-2 text-center text-xs text-gray-600">
+                      Você não tem mensagens no momento.
+                    </p>
+                  )}
+                </div>
+              ) : null}
+            </div>
+
+            <Link
+              href={toGestao('/configuracoes/empresa')}
+              onMouseEnter={() => handleLinkHover('/configuracoes/empresa')}
+              prefetch={true}
+              className={`rounded-lg p-2 transition-colors hover:bg-gray-100 ${
+                isConfiguracoesModulePath(pathname ?? '')
+                  ? 'bg-gray-100 text-gray-900'
+                  : 'text-gray-600'
+              }`}
+              title="Configurações"
+              aria-label="Configurações"
+            >
+              <MdSettings className="h-5 w-5" aria-hidden />
+            </Link>
+
+            <div
+              className="hidden min-w-0 max-w-[12rem] flex-col items-end justify-center border-l border-gray-200 px-2 py-1.5 text-right xl:flex 2xl:max-w-[16rem]"
+              title={
+                isHydrated
+                  ? `${user?.getName() || 'Usuário'}${user?.getEmail() ? ` • ${user.getEmail()}` : ''}`
+                  : 'Usuário'
+              }
+            >
+              <p className="truncate text-sm font-medium text-gray-900">
+                {isHydrated ? user?.getName() || user?.getEmail() || 'Usuário' : 'Usuário'}
+              </p>
+              <p className="truncate text-xs text-gray-500">
+                {isHydrated && user?.getEmail() ? user.getEmail() : 'Admin'}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => void handleLogout()}
+              className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
+              title="Logout"
+              aria-label="Sair da conta"
+            >
+              <MdLogout className="h-5 w-5" />
+            </button>
           </div>
-
-          <Link
-            href={toGestao('/configuracoes/empresa')}
-            onMouseEnter={() => handleLinkHover('/configuracoes/empresa')}
-            prefetch={true}
-            className={`rounded-lg p-2 transition-colors hover:bg-gray-100 ${
-              isConfiguracoesModulePath(pathname ?? '')
-                ? 'bg-gray-100 text-gray-900'
-                : 'text-gray-600'
-            }`}
-            title="Configurações"
-            aria-label="Configurações"
-          >
-            <MdSettings className="h-5 w-5" aria-hidden />
-          </Link>
-
-          {/* Dados do usuário (perfil será acessado noutro local) */}
-          <div
-            className="hidden min-w-0 max-w-[min(100%,14rem)] flex-col items-end justify-center border-l border-gray-200 px-2 py-1.5 text-right xl:flex xl:max-w-[min(100%,22rem)]"
-            title={
-              isHydrated
-                ? `${user?.getName() || 'Usuário'}${user?.getEmail() ? ` • ${user.getEmail()}` : ''}`
-                : 'Usuário'
-            }
-          >
-            <p className="truncate text-sm font-medium text-gray-900">
-              {isHydrated ? user?.getName() || user?.getEmail() || 'Usuário' : 'Usuário'}
-            </p>
-            <p className="truncate text-xs text-gray-500">
-              {isHydrated && user?.getEmail() ? user.getEmail() : 'Admin'}
-            </p>
-          </div>
-
-          {/* Logout */}
-          <button
-            type="button"
-            onClick={() => void handleLogout()}
-            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Logout"
-            aria-label="Sair da conta"
-          >
-            <MdLogout className="w-5 h-5" />
-          </button>
         </div>
       </div>
       {isMobileMenuOpen && MobileMenuSection}

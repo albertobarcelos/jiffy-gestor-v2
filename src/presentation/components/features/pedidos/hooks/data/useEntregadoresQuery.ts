@@ -1,7 +1,7 @@
 'use client'
 
 import type { QueryClient } from '@tanstack/react-query'
-import { listarEntregadoresDeliveryUseCase } from '@/src/application/use-cases/delivery/ListarEntregadoresDeliveryUseCase'
+import { listarEntregadoresDeliveryUseCase } from '@/src/infrastructure/composition/pedidoUseCases'
 import { HUB_ENTREGADORES_COUNT_QUERY_KEY } from '@/src/presentation/hooks/useDeliveryHubCadastrosRecomendados'
 import { buildTenantQueryKey } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'

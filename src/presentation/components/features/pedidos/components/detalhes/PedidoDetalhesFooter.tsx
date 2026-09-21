@@ -54,6 +54,7 @@ export function PedidoDetalhesFooter({
     isLoadingVenda,
     abaDetalhesPedido,
     podeAjustarPagamentoEntregaEmAberto,
+    ajustandoPagamentoAposEdicaoItens,
     cancelarVendaGestor,
     cancelarNotaFiscalVendaPdv,
     cancelarNotaFiscalVendaGestor,
@@ -82,7 +83,9 @@ export function PedidoDetalhesFooter({
     }
     if (podeExibirCancelarNotaFiscal) chaves.push('cancelNota')
     if (podeAjustarPagamentoEntregaEmAberto && abaDetalhesPedido === 'pagamentos') {
-      chaves.push('fechar')
+      if (!ajustandoPagamentoAposEdicaoItens) chaves.push('fechar')
+      chaves.push('salvarCobranca')
+    } else if (ajustandoPagamentoAposEdicaoItens) {
       chaves.push('salvarCobranca')
     } else {
       chaves.push('fechar')

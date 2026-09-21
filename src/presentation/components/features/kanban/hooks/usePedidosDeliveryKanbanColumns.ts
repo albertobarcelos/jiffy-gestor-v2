@@ -95,7 +95,11 @@ async function fetchDeltaPedidosDelivery(
       signal
     ),
     fetchPedidosDeliveryItems(
-      { ...base, statusDelivery: 'FINALIZADO', dataFinalizacaoInicio: lastPollAt },
+      {
+        statusDelivery: ['FINALIZADO', 'CANCELADO'],
+        cancelado: null,
+        dataUltimaModificacaoInicial: lastPollAt,
+      },
       token,
       queryClient,
       signal
@@ -216,7 +220,6 @@ export function usePedidosDeliveryKanbanColumns(
   const prontoQuery = usePedidosDeliveryKanbanColumnInfinite('PRONTO_ENTREGA', params, columnInfiniteOptions)
   const rotaQuery = usePedidosDeliveryKanbanColumnInfinite('EM_ROTA', params, columnInfiniteOptions)
   const finalizadasQuery = usePedidosDeliveryKanbanColumnInfinite('FINALIZADAS', params, columnInfiniteOptions)
-  const comFiscalQuery = usePedidosDeliveryKanbanColumnInfinite('COM_FISCAL', params, columnInfiniteOptions)
 
   const queryByColumn: Record<ColunaKanbanId, typeof novosQuery> = {
     NOVOS_PEDIDOS: novosQuery,
@@ -225,8 +228,8 @@ export function usePedidosDeliveryKanbanColumns(
     EM_ROTA: rotaQuery,
     FINALIZADAS: finalizadasQuery,
     PENDENTE_EMISSAO: finalizadasQuery,
-    COM_FISCAL: comFiscalQuery,
-    REJEITADAS: comFiscalQuery,
+    COM_FISCAL: finalizadasQuery,
+    REJEITADAS: finalizadasQuery,
   }
 
   const queryByColumnRef = useRef(queryByColumn)
@@ -271,7 +274,6 @@ export function usePedidosDeliveryKanbanColumns(
     prontoQuery.data,
     rotaQuery.data,
     finalizadasQuery.data,
-    comFiscalQuery.data,
   ])
 
   const refetchIntervalMs =
@@ -423,10 +425,6 @@ export function usePedidosDeliveryKanbanColumns(
     finalizadasQuery.isLoading,
     finalizadasQuery.isFetchingNextPage,
     finalizadasQuery.hasNextPage,
-    comFiscalQuery.data,
-    comFiscalQuery.isLoading,
-    comFiscalQuery.isFetchingNextPage,
-    comFiscalQuery.hasNextPage,
   ])
 
   const isLoading = DELIVERY_KANBAN_COLUMN_IDS.some(id => queryByColumn[id]?.isLoading)
@@ -444,7 +442,6 @@ export function usePedidosDeliveryKanbanColumns(
     prontoQuery.data,
     rotaQuery.data,
     finalizadasQuery.data,
-    comFiscalQuery.data,
   ])
 
   const refetch = useCallback(async () => {

@@ -1,25 +1,95 @@
 import { ApiClient } from '@/src/infrastructure/api/apiClient'
+import { parseImagemUrlProdutoIndex } from '@/src/shared/utils/catalogoProdutoIndex'
 
 /** Limite máximo aceito pelo GET /delivery/catalogo/:slug (backend: max 20). */
 const DELIVERY_CATALOGO_PAGE_LIMIT = 20
 
-type CatalogoPaginaResponse = {
-  catalogo?: {
-    gruposProdutos?: Array<{
-      id: string
-      imagemUrl: string | null
-      produtos?: Array<{ id: string; imagemUrl: string | null }> | null
-    }> | null
-    gruposComplementos?: Array<{ id: string; imagemUrl: string | null }> | null
-    complementos?: Array<{ id: string; imagemUrl: string | null }> | null
-    paginacao?: {
-      hasNext?: boolean
-    }
+type CatalogoItemComId = {
+  id?: unknown
+  [key: string]: unknown
+}
+
+type CatalogoGrupoProduto = CatalogoItemComId & {
+  produtos?: CatalogoItemComId[] | null
+}
+
+export type CatalogoDeliveryPagina = {
+  gruposProdutos?: CatalogoGrupoProduto[] | null
+  gruposComplementos?: CatalogoItemComId[] | null
+  complementos?: CatalogoItemComId[] | null
+  paginacao?: {
+    hasNext?: boolean
   }
 }
 
 type EmpresaDeliveryMeResponse = {
   slug?: string
+}
+
+function idDoItem(item: CatalogoItemComId | null | undefined): string {
+  if (item?.id == null) return ''
+  return String(item.id).trim()
+}
+
+function imagemUrlDoItem(item: unknown): string | null {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return null
+  return parseImagemUrlProdutoIndex(item as Record<string, unknown>)
+}
+
+export function extrairCatalogoDeliveryDoPayload(payload: unknown): CatalogoDeliveryPagina | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null
+  const rec = payload as Record<string, unknown>
+  const nested =
+    rec.data && typeof rec.data === 'object' && !Array.isArray(rec.data)
+      ? (rec.data as Record<string, unknown>)
+      : rec
+  const catalogoRaw = nested.catalogo
+  const catalogo =
+    catalogoRaw && typeof catalogoRaw === 'object' && !Array.isArray(catalogoRaw)
+      ? (catalogoRaw as Record<string, unknown>)
+      : nested.gruposProdutos != null || nested.complementos != null || nested.gruposComplementos != null
+        ? nested
+        : null
+  if (!catalogo) return null
+  return catalogo as CatalogoDeliveryPagina
+}
+
+export function mapearImagensComplementosDoCatalogo(
+  catalogo: CatalogoDeliveryPagina | null | undefined,
+  complementoIds: string[]
+): Record<string, string | null> {
+  const uniqueIds = [...new Set(complementoIds.map(id => id.trim()).filter(Boolean))]
+  const result: Record<string, string | null> = Object.fromEntries(
+    uniqueIds.map(id => [id, null])
+  )
+  if (uniqueIds.length === 0) return result
+
+  for (const complemento of catalogo?.complementos ?? []) {
+    const id = idDoItem(complemento)
+    if (!(id in result) || result[id]) continue
+    result[id] = imagemUrlDoItem(complemento)
+  }
+
+  return result
+}
+
+export function mapearImagensGruposComplementoDoCatalogo(
+  catalogo: CatalogoDeliveryPagina | null | undefined,
+  grupoComplementoIds: string[]
+): Record<string, string | null> {
+  const uniqueIds = [...new Set(grupoComplementoIds.map(id => id.trim()).filter(Boolean))]
+  const result: Record<string, string | null> = Object.fromEntries(
+    uniqueIds.map(id => [id, null])
+  )
+  if (uniqueIds.length === 0) return result
+
+  for (const grupo of catalogo?.gruposComplementos ?? []) {
+    const id = idDoItem(grupo)
+    if (!(id in result)) continue
+    result[id] = imagemUrlDoItem(grupo)
+  }
+
+  return result
 }
 
 async function resolveEmpresaDeliverySlug(
@@ -49,16 +119,16 @@ async function fetchCatalogoPagina(
   slug: string,
   offset: number,
   limit: number
-): Promise<CatalogoPaginaResponse['catalogo'] | null> {
+): Promise<CatalogoDeliveryPagina | null> {
   const safeLimit = Math.min(Math.max(limit, 1), DELIVERY_CATALOGO_PAGE_LIMIT)
-  const response = await apiClient.request<CatalogoPaginaResponse>(
+  const response = await apiClient.request<unknown>(
     `/api/v1/delivery/catalogo/${encodeURIComponent(slug)}?offset=${offset}&limit=${safeLimit}`,
     {
       method: 'GET',
       headers: { Accept: 'application/json' },
     }
   )
-  return response.data?.catalogo ?? null
+  return extrairCatalogoDeliveryDoPayload(response.data)
 }
 
 export async function resolveGruposProdutoImagemUrlsFromDeliveryCatalog(
@@ -85,9 +155,10 @@ export async function resolveGruposProdutoImagemUrlsFromDeliveryCatalog(
     if (!catalogo) break
 
     for (const grupo of catalogo.gruposProdutos ?? []) {
-      if (!pending.has(grupo.id)) continue
-      result[grupo.id] = grupo.imagemUrl ?? null
-      pending.delete(grupo.id)
+      const id = idDoItem(grupo)
+      if (!pending.has(id)) continue
+      result[id] = imagemUrlDoItem(grupo)
+      pending.delete(id)
     }
 
     if (!catalogo.paginacao?.hasNext) break
@@ -125,12 +196,10 @@ export async function resolveGruposComplementoImagemUrlsFromDeliveryCatalog(
 
   // gruposComplementos só vêm na primeira página do catálogo público
   const catalogo = await fetchCatalogoPagina(apiClient, slug, 0, DELIVERY_CATALOGO_PAGE_LIMIT)
-  for (const grupo of catalogo?.gruposComplementos ?? []) {
-    if (!(grupo.id in result)) continue
-    result[grupo.id] = grupo.imagemUrl ?? null
+  return {
+    ...result,
+    ...mapearImagensGruposComplementoDoCatalogo(catalogo, uniqueIds),
   }
-
-  return result
 }
 
 export async function resolveGrupoComplementoImagemUrlFromDeliveryCatalog(
@@ -171,9 +240,10 @@ export async function resolveProdutosImagemUrlsFromDeliveryCatalog(
 
     for (const grupo of catalogo.gruposProdutos ?? []) {
       for (const produto of grupo.produtos ?? []) {
-        if (!pending.has(produto.id)) continue
-        result[produto.id] = produto.imagemUrl ?? null
-        pending.delete(produto.id)
+        const id = idDoItem(produto)
+        if (!pending.has(id)) continue
+        result[id] = imagemUrlDoItem(produto)
+        pending.delete(id)
       }
     }
 
@@ -210,12 +280,10 @@ export async function resolveComplementosImagemUrlsFromDeliveryCatalog(
 
   // complementos só vêm na primeira página do catálogo público
   const catalogo = await fetchCatalogoPagina(apiClient, slug, 0, DELIVERY_CATALOGO_PAGE_LIMIT)
-  for (const complemento of catalogo?.complementos ?? []) {
-    if (!(complemento.id in result)) continue
-    result[complemento.id] = complemento.imagemUrl ?? null
+  return {
+    ...result,
+    ...mapearImagensComplementosDoCatalogo(catalogo, uniqueIds),
   }
-
-  return result
 }
 
 export async function resolveComplementoImagemUrlFromDeliveryCatalog(

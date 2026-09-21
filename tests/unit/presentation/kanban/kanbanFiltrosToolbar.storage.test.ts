@@ -34,8 +34,8 @@ describe('sanitizarSnapshotFiltrosToolbarKanban', () => {
     expect(snap.periodoInicioISO).toBeNull()
   })
 
-  it('migra origem legada PDV/GESTOR/DELIVERY para canal (tipo)', () => {
-    const legado = sanitizarSnapshotFiltrosToolbarKanban({
+  it('origem PDV no snapshot é origem, não canal', () => {
+    const snap = sanitizarSnapshotFiltrosToolbarKanban({
       searchInput: '',
       origemFilter: 'PDV',
       tipoEntregaFilter: '',
@@ -44,8 +44,8 @@ describe('sanitizarSnapshotFiltrosToolbarKanban', () => {
       periodoInicioISO: null,
       periodoFimISO: null,
     })
-    expect(legado.tipoCanalFilter).toBe('PDV')
-    expect(legado.origemFilter).toBe('')
+    expect(snap.origemFilter).toBe('PDV')
+    expect(snap.tipoCanalFilter).toBe('')
   })
 
   it('guarda datas só em últimos 7 dias e por data', () => {

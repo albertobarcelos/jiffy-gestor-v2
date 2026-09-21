@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { geoJsonPointFromLatLng } from '@/src/shared/types/geoJsonPoint'
 import { distanciaMetrosEntrePontos } from '@/src/shared/utils/calcularTaxaCoberturaPonto'
 import {
+  escolherPinAposGeocode,
   limitarPontoAoRaio,
   pinDentroDoRaioPermitido,
+  pinEmpresaDeveSeguirNovoEndereco,
   RAIO_AJUSTE_PIN_METROS,
 } from '@/src/shared/utils/ajustePinEmpresa'
 
@@ -37,5 +39,20 @@ describe('ajustePinEmpresa', () => {
     const { ponto, limitado } = limitarPontoAoRaio(CENTRO, CENTRO)
     expect(limitado).toBe(false)
     expect(ponto).toEqual(CENTRO)
+  })
+
+  it('exige recentrar o pin quando a empresa muda de cidade', () => {
+    const novaMutum = geoJsonPointFromLatLng(-13.83, -56.08)
+    expect(pinEmpresaDeveSeguirNovoEndereco(novaMutum, CENTRO)).toBe(true)
+    expect(pinEmpresaDeveSeguirNovoEndereco(CENTRO, CENTRO)).toBe(false)
+    expect(pinEmpresaDeveSeguirNovoEndereco(CENTRO, null)).toBe(true)
+  })
+
+  it('após geocode, troca o pin só se estiver a mais de 1 km', () => {
+    const novaMutum = geoJsonPointFromLatLng(-13.83, -56.08)
+    const perto = geoJsonPointFromLatLng(-15.6 + 0.002, -56.1)
+    expect(escolherPinAposGeocode(CENTRO, novaMutum)).toBe('usar-geocode')
+    expect(escolherPinAposGeocode(null, novaMutum)).toBe('usar-geocode')
+    expect(escolherPinAposGeocode(CENTRO, perto)).toBe('manter-pin')
   })
 })

@@ -22,6 +22,9 @@ function makeVenda(
       | 'dataFinalizacao'
       | 'dataCriacao'
       | 'numeroFiscal'
+      | 'tabelaOrigem'
+      | 'tipoVenda'
+      | 'statusEtapaOperacional'
     >
   > = {}
 ): VendaUnificadaDTO {
@@ -97,6 +100,28 @@ describe('vendaElegivelParaReemissaoAutomaticaLote', () => {
     const acoes: Record<string, 'emitindo' | 'reemitindo'> = { 'venda-test-1': 'reemitindo' }
     expect(vendaElegivelParaReemissaoAutomaticaLote(venda, acoes)).toBe(false)
   })
+
+  it('retorna false para delivery ainda em etapa operacional', () => {
+    const venda = makeVenda({
+      statusFiscal: 'REJEITADA',
+      documentoFiscalId: 'doc-op',
+      tabelaOrigem: 'venda_gestor',
+      tipoVenda: 'delivery',
+      statusEtapaOperacional: 'EM_PREPARO',
+    })
+    expect(vendaElegivelParaReemissaoAutomaticaLote(venda, SEM_ACAO_EM_ANDAMENTO)).toBe(false)
+  })
+
+  it('retorna true para delivery finalizado rejeitado sem documentId', () => {
+    const venda = makeVenda({
+      statusFiscal: 'REJEITADA',
+      documentoFiscalId: null,
+      tabelaOrigem: 'venda_gestor',
+      tipoVenda: 'delivery',
+      statusEtapaOperacional: 'FINALIZADO',
+    })
+    expect(vendaElegivelParaReemissaoAutomaticaLote(venda, SEM_ACAO_EM_ANDAMENTO)).toBe(true)
+  })
 })
 
 describe('fiscalKanbanPodeReemitirAposCooldown', () => {
@@ -169,8 +194,9 @@ describe('rotuloBotaoAvancarEtapaKanban', () => {
 describe('classeBordaEsquerdaColunaKanban', () => {
   it('usa as mesmas cores da faixa dos cards do quadro', () => {
     expect(classeBordaEsquerdaColunaKanban('EM_PREPARO')).toBe('border-l-amber-500')
-    expect(classeBordaEsquerdaColunaKanban('PRONTO_ENTREGA')).toBe('border-l-teal-500')
+    expect(classeBordaEsquerdaColunaKanban('PRONTO_ENTREGA')).toBe('border-l-sky-500')
     expect(classeBordaEsquerdaColunaKanban('EM_ROTA')).toBe('border-l-indigo-500')
     expect(classeBordaEsquerdaColunaKanban('FINALIZADAS')).toBe('border-l-primary')
+    expect(classeBordaEsquerdaColunaKanban('FINALIZADAS', 'delivery')).toBe('border-l-emerald-500')
   })
 })

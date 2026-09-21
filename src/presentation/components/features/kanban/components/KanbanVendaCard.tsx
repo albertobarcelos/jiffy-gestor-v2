@@ -95,7 +95,8 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
   const { borderClass: cardBorderClass, cardBgClass } = getCardBorderEFundoKanban(
     colunaIdParaEstiloCard,
     venda,
-    acaoFiscalEmAndamentoPorVenda
+    acaoFiscalEmAndamentoPorVenda,
+    modoKanbanVendas
   )
 
   const exibirAtribuirEntregador = exibirAtribuirEntregadorKanban(
@@ -120,8 +121,7 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
   const exibirQuickViewEntrega = venda.isPedidoEntregaGestor()
   const tabelaOrigemQuickView =
     venda.tabelaOrigem === 'venda_gestor' ? 'venda_gestor' : 'venda'
-  const tipoVendaQuickView =
-    (venda.tipoVenda ?? '').trim().toLowerCase() === 'retirada' ? 'retirada' : 'entrega'
+  const tipoEntregaQuickView = venda.tipoAtendimento()
 
   const exibirBotaoObservacaoPedido = deveExibirBotaoObservacaoPedidoKanban(
     colunaAtual,
@@ -147,7 +147,7 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
     ? formatarPrevisaoEntregaKanbanCard(venda)
     : null
   const formaCobrancaKanban = exibirMetaDeliveryKanban
-    ? rotuloFormaCobrancaKanbanCard(venda.tipoVenda, venda.fluxoPagamentoEntrega)
+    ? rotuloFormaCobrancaKanbanCard(venda.tipoAtendimento(), venda.fluxoPagamentoEntrega)
     : null
   const formaPagamentoKanban = exibirMetaDeliveryKanban
     ? formatarFormaPagamentoKanbanCard(venda.cobrancasDelivery, nomesMeiosPagamento)
@@ -252,12 +252,12 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
         onClose={() => cardState.setEnderecoEntregaOpen(false)}
       />
 
-      {exibirQuickViewEntrega && (
+      {exibirQuickViewEntrega && tipoEntregaQuickView && (
         <PedidoEntregaQuickViewPopover
           vendaId={venda.id}
           tabelaOrigem={tabelaOrigemQuickView}
           colunaAtual={colunaAtual}
-          tipoVenda={tipoVendaQuickView}
+          tipoVenda={tipoEntregaQuickView}
           observacaoPedidoHint={observacaoPedidoTexto || null}
           anchorEl={cardState.entregaQuickViewAnchor}
           open={Boolean(cardState.entregaQuickViewAnchor)}

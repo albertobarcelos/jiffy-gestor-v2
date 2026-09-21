@@ -23,7 +23,6 @@ import type {
   TabelaOrigemVenda,
 } from '@/src/domain/types/vendaDetalhe'
 import { deveUsarModuloDeliveryParaDetalhe } from '@/src/application/mappers/PedidoDeliveryDetalheAdapter'
-import { vendaDetalheReadRepository } from '@/src/infrastructure/api/repositories/VendaDetalheReadRepository'
 import {
   textoFromObservacoesApi,
   textoObservacaoProdutoApi,
@@ -173,14 +172,14 @@ async function resolverNomesMeiosPagamentoQuickView(args: {
 
 export class CarregarPedidoKanbanQuickViewUseCase {
   constructor(
-    private readonly repo: IVendaDetalheReadRepository = vendaDetalheReadRepository
+    private readonly repo: IVendaDetalheReadRepository
   ) {}
 
   async execute(params: {
     vendaId: string
     tabelaOrigem: TabelaOrigemVenda
     token: string
-    tipoVenda?: 'entrega' | 'retirada' | null
+    tipoVenda?: string | null
     /** Texto já conhecido no card do Kanban (GET unificado) — fallback se o GET detalhe vier vazio. */
     observacaoPedidoHint?: string | null
   }): Promise<PedidoKanbanQuickViewData> {
@@ -345,5 +344,3 @@ export class CarregarPedidoKanbanQuickViewUseCase {
     }
   }
 }
-
-export const carregarPedidoKanbanQuickViewUseCase = new CarregarPedidoKanbanQuickViewUseCase()

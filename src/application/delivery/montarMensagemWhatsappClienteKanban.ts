@@ -1,6 +1,6 @@
-import type { PedidoKanbanQuickViewData } from '@/src/presentation/components/features/delivery/kanban-panels/carregarPedidoKanbanQuickView'
-import type { ColunaKanbanId } from '@/src/presentation/components/features/kanban/types'
-import type { EnderecoEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import type { PedidoKanbanQuickViewData } from '@/src/application/use-cases/vendas/CarregarPedidoKanbanQuickViewUseCase'
+import type { EnderecoEmpresaMe } from '@/src/application/dto/EmpresaMeDTO'
+import type { ColunaKanbanId } from '@/src/domain/types/kanbanPedido'
 import {
   montarDetalhesPedidoClienteWhatsapp,
   resolverNomeClienteWhatsapp,

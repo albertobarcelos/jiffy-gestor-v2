@@ -42,12 +42,15 @@ export function DeliveryProdutoComplementosLista({
               {grupo.obrigatorio ? <span className="ml-1 text-red-400">*</span> : null}
             </p>
             <span className="shrink-0 text-xs font-medium tabular-nums opacity-90">
-              Min: {grupo.qtdMinima} - Max: {grupo.qtdMaxima}
+              Min: {grupo.qtdMinima} - Max:{' '}
+              {grupo.qtdMaxima > 0 ? grupo.qtdMaxima : '∞'}
             </span>
           </div>
           <div
             className={
-              grupo.complementos.length > 1 ? 'grid grid-cols-2 gap-x-3 gap-y-1' : undefined
+              grupo.complementos.length > 1
+                ? 'grid grid-cols-1 gap-x-3 gap-y-0 lg:grid-cols-2 lg:gap-y-1'
+                : undefined
             }
           >
             {grupo.complementos.map(comp => {
@@ -58,20 +61,28 @@ export function DeliveryProdutoComplementosLista({
               return (
                 <div
                   key={comp.id}
-                  className="flex min-w-0 items-center justify-between gap-2 py-1.5"
+                  className="flex min-w-0 items-center justify-between gap-2 py-0.5 lg:py-1.5"
                 >
-                  <div className="flex min-w-0 flex-1 items-start gap-2">
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
                     <DeliveryProdutoComplementoThumb
                       imagemUrl={comp.imagemUrl}
                       nome={comp.nome}
                     />
-                    <div className="min-w-0 flex-1 pt-0.5">
+                    <div className="min-w-0 flex-1">
                       <p
                         className="truncate text-sm font-medium leading-snug delivery-text-primary"
                         title={comp.nome}
                       >
                         {comp.nome}
                       </p>
+                      {comp.descricao?.trim() ? (
+                        <p
+                          className="mt-0.5 line-clamp-2 text-[11px] leading-snug delivery-text-secondary"
+                          title={comp.descricao}
+                        >
+                          {comp.descricao}
+                        </p>
+                      ) : null}
                       {valorTxt ? (
                         <p className="mt-0.5 text-xs font-semibold tabular-nums delivery-text-accent sm:text-sm">
                           {valorTxt}

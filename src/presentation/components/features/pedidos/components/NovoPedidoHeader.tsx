@@ -14,6 +14,7 @@ interface NovoPedidoHeaderProps {
   isLoadingVenda: boolean
   abaDetalhesPedido: AbaDetalhesPedido
   onAbaDetalhesPedidoChange: (aba: AbaDetalhesPedido) => void
+  bloquearAbasDetalhe?: boolean
   podeExibirAbaNotaFiscal: boolean
   podeExibirAbaDadosEntrega: boolean
   tipoInicioPedido: 'balcao' | 'entrega'
@@ -27,6 +28,7 @@ export function NovoPedidoHeader({
   isLoadingVenda,
   abaDetalhesPedido,
   onAbaDetalhesPedidoChange,
+  bloquearAbasDetalhe = false,
   podeExibirAbaNotaFiscal,
   podeExibirAbaDadosEntrega,
   tipoInicioPedido,
@@ -34,7 +36,7 @@ export function NovoPedidoHeader({
   const deveMostrarAbas = currentStep === 4 && !isLoadingVenda
 
   const titulo = modoEdicaoProdutos
-    ? 'Editar produtos'
+    ? 'Editar Pedido'
     : modoVisualizacao
       ? 'Detalhes do Pedido'
       : 'Novo Pedido'
@@ -70,6 +72,7 @@ export function NovoPedidoHeader({
           onAbaChange={onAbaDetalhesPedidoChange}
           podeExibirAbaNotaFiscal={podeExibirAbaNotaFiscal}
           podeExibirAbaDadosEntrega={podeExibirAbaDadosEntrega}
+          bloquearAbasExcetoPagamentos={bloquearAbasDetalhe}
         />
       )}
     </div>

@@ -8,6 +8,7 @@ export const TipoParcelamentoSchema = z.enum(['jurosVendedor', 'jurosCliente'])
 export const CriarMeioPagamentoSchema = z.object({
   nome: z.string().min(1, 'Nome é obrigatório'),
   tefAtivo: z.boolean().optional().default(true),
+  isDelivery: z.boolean().optional().default(false),
   formaPagamentoFiscal: z.string().optional().default('Dinheiro'),
   ativo: z.boolean().optional().default(true),
   isParcelavel: z.boolean().optional().default(false),

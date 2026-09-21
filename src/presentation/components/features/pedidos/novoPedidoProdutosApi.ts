@@ -2,7 +2,7 @@ import {
   buscarProdutoCatalogoPorIdUseCase,
   listarGruposCatalogoVendaUseCase,
   listarProdutosCatalogoVendaPaginaUseCase,
-} from '@/src/application/use-cases/vendas/ListarProdutosCatalogoUseCase'
+} from '@/src/infrastructure/composition/pedidoUseCases'
 import type { CanalVendaCatalogo } from '@/src/domain/repositories/INovoPedidoReadRepository'
 import { Produto } from '@/src/domain/entities/Produto'
 

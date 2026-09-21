@@ -104,8 +104,7 @@ function etapaKanbanDeliveryCache(v: VendaUnificadaDTO): string {
 
 /**
  * `true` se o card mapeia para alguma coluna conhecida do Kanban delivery.
- * Quando `false` (etapa ambígua/`'ABERTA'`), o card não pertence a nenhuma coluna e
- * um upsert o removeria de todos os caches, fazendo-o "sumir" da tela até o reload.
+ * Quando `false` (etapa operacional ausente ou terminal), o card não fica nas colunas em curso.
  */
 export function vendaPertenceAlgumaColunaDeliveryKanban(venda: VendaUnificadaDTO): boolean {
   return DELIVERY_KANBAN_COLUMN_IDS.some(columnId =>
@@ -185,7 +184,7 @@ export function aplicarPedidoDeliveryStatusAlteradoNoKanbanCache(
   const statusOp = String(card.statusEtapaOperacional ?? '')
     .trim()
     .toUpperCase()
-  // CANCELADO nao tem coluna operacional; getEtapaKanban pode cair em NOVOS_PEDIDOS.
+  // CANCELADO nao tem coluna operacional; remove do board em vez de projetar fiscal.
   if (statusOp === 'CANCELADO' || statusOp === 'CANCELADA') {
     removerVendaDeliveryKanbanColumnCaches(queryClient, card.id)
     return true
@@ -326,8 +325,7 @@ const STATUS_OPERACIONAL_POR_COLUNA_DESTINO: Partial<Record<ColunaKanbanId, stri
 
 /**
  * Garante que o patch carregue a etapa operacional do destino quando a resposta da transição
- * não devolve `statusDelivery`. Sem isso, o card perde a etapa, `getEtapaKanban()` cai em `'ABERTA'`
- * e o card é filtrado de todas as colunas (some até recarregar).
+ * não devolve `statusDelivery`. Sem a etapa, o card sai da coluna operacional.
  */
 function aplicarStatusDestinoNoPatch(
   patch: KanbanVendaCachePatch,
@@ -354,8 +352,7 @@ function aplicarStatusDestinoNoPatch(
  * Summary completo → upsert; payload fino → patch operacional no card já visível
  * (não pisa cliente/valor/cobrança com default do mapper). Sem card no cache: patch.
  *
- * `colunaDestino` (quando conhecida) força a etapa operacional caso a resposta não a traga,
- * evitando que o card caia em `'ABERTA'` e suma da tela.
+ * `colunaDestino` (quando conhecida) força a etapa operacional caso a resposta não a traga.
  */
 export function sincronizarVendaDeliveryKanbanColumnCaches(
   queryClient: QueryClient,

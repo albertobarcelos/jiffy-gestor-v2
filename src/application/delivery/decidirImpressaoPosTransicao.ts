@@ -1,4 +1,4 @@
-import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
+import type { AcaoTransicaoGestor } from '@/src/application/dto/TransicaoKanbanDTO'
 import type {
   DecidirImpressaoResultado,
   PreferenciasImpressaoDelivery,

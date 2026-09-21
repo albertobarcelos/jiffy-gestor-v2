@@ -4,6 +4,8 @@ import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQu
 import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
+import { hidratarGrupoComplemento } from '@/src/application/services/cadastroImagem'
+import { grupoComplementoImagemMedia } from '@/src/infrastructure/api/deliveryMediaApi'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
@@ -50,7 +52,9 @@ export function useGruposComplementos(params: GruposComplementosQueryParams = {}
       }
 
       const data: GruposComplementosResponse = await response.json()
-      return (data.items || []).map((item: any) => GrupoComplemento.fromJSON(item))
+      return (data.items || []).map((item: any) =>
+        hidratarGrupoComplemento(grupoComplementoImagemMedia, GrupoComplemento.fromJSON(item))
+      )
     },
     { staleTime: 1000 * 60 * 5 }
   )
@@ -92,7 +96,10 @@ export function useGruposComplementosInfinite(params: Omit<GruposComplementosQue
       const validGrupos: GrupoComplemento[] = []
       for (const item of data.items || []) {
         try {
-          const grupo = GrupoComplemento.fromJSON(item)
+          const grupo = hidratarGrupoComplemento(
+            grupoComplementoImagemMedia,
+            GrupoComplemento.fromJSON(item)
+          )
           validGrupos.push(grupo)
         } catch (error) {
           if (error instanceof Error && error.message.includes('Quantidade mínima não pode ser maior que máxima')) {
@@ -145,7 +152,7 @@ export function useGrupoComplemento(id: string) {
       }
 
       const data = await response.json()
-      return GrupoComplemento.fromJSON(data)
+      return hidratarGrupoComplemento(grupoComplementoImagemMedia, GrupoComplemento.fromJSON(data))
     },
     { staleTime: 1000 * 60 * 5, enabled: !!id }
   )

@@ -4,7 +4,7 @@ import {
   graphicRasterScale,
   rasterizeCupomHtmlToPngBase64,
 } from '@/src/infrastructure/printing/rasterizeCupomHtml'
-import type { PrintDocument } from '@/src/infrastructure/printing/agent/printJobTypes'
+import type { PrintDocument } from '@/src/application/ports/printDocument'
 import type { DeliveryCupomTemplateConfig } from '@/src/shared/types/deliveryCupomTemplate'
 import type { VendaGestorTicket, VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
 

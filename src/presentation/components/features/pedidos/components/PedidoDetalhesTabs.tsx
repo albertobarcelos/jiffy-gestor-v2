@@ -7,6 +7,7 @@ interface PedidoDetalhesTabsProps {
   onAbaChange: (aba: AbaDetalhesPedido) => void
   podeExibirAbaNotaFiscal: boolean
   podeExibirAbaDadosEntrega: boolean
+  bloquearAbasExcetoPagamentos?: boolean
 }
 
 const ABAS_DETALHES: Array<{ id: AbaDetalhesPedido; label: string; tabId: string }> = [
@@ -22,6 +23,7 @@ export function PedidoDetalhesTabs({
   onAbaChange,
   podeExibirAbaNotaFiscal,
   podeExibirAbaDadosEntrega,
+  bloquearAbasExcetoPagamentos = false,
 }: PedidoDetalhesTabsProps) {
   return (
     <div
@@ -41,10 +43,13 @@ export function PedidoDetalhesTabs({
           aria-selected={abaSelecionada === aba.id}
           id={aba.tabId}
           onClick={() => onAbaChange(aba.id)}
+          disabled={bloquearAbasExcetoPagamentos && aba.id !== 'pagamentos'}
           className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold transition-colors ${
             abaSelecionada === aba.id
               ? 'border-primary text-primary'
-              : 'border-transparent text-gray-500 hover:text-gray-800'
+              : bloquearAbasExcetoPagamentos && aba.id !== 'pagamentos'
+                ? 'cursor-not-allowed border-transparent text-gray-300'
+                : 'border-transparent text-gray-500 hover:text-gray-800'
           }`}
         >
           {aba.label}

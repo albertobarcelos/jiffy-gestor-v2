@@ -12,10 +12,11 @@
  * | id                       | id                             |            |
  * | numeroVenda              | numeroVenda                    |            |
  * | codigoVenda              | codigoVenda                    |            |
- * | tipoEntrega              | tipoVenda                      | usar entrega/retirada; ignorar `tipoVenda: "delivery"` da API |
+ * | tipoVenda                | tipoVenda                      | `"delivery"` no backend |
+ * | tipoEntrega              | tipoEntrega                    | `entrega` \| `retirada` |
  * | origem                   | origem                         | GESTOR / JIFFY_DELIVERY / AIQFOME (origem real) |
  * | (fixo)                   | tabelaOrigem                   | sempre `'venda_gestor'` |
- * | statusDelivery           | statusEtapaOperacional         | PENDENTE→NOVOS_PEDIDOS, EM_PREPARO, PRONTO→PRONTO_ENTREGA, EM_ROTA, FINALIZADO→regras fiscais |
+ * | statusDelivery           | statusEtapaOperacional         | Valor canônico da API (`PENDENTE`…`CANCELADO`). Coluna do Kanban é mapeada no domínio (`EtapaOperacionalDelivery`). |
  * | valorFinal               | valorFinal                     |            |
  * | totalFaltaPagar          | statusFinanceiro               | ≤0→pago; >0→pendente |
  * | dataCriacao              | dataCriacao                    |            |
@@ -109,7 +110,7 @@ export interface PedidoDeliverySummaryApi {
   id: string
   numeroVenda: number
   codigoVenda: string
-  /** Valor fixo `"delivery"` no backend; não usar no card — preferir `tipoEntrega`. */
+  /** Valor fixo `"delivery"` no backend. */
   tipoVenda: string
   tipoEntrega: TipoEntregaDeliveryApi
   tempoTotalEstimadoSegundos: number | null

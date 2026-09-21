@@ -1,4 +1,4 @@
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { fetchGestorApi } from '@/src/infrastructure/api/fetchGestorApi'
 import type { InstrucoesImpressaoResponse } from '@/src/shared/types/instrucoesImpressao'
 import { getEstacaoImpressaoId } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
 import {
@@ -31,6 +31,8 @@ function normalizarInstrucoes(raw: Record<string, unknown>): InstrucoesImpressao
           nomeImpressoraWindows:
             o.nomeImpressoraWindows != null ? String(o.nomeImpressoraWindows) : null,
           produtosLancadosIds,
+          modoImpressao: o.modoImpressao ?? o.modo_impressao,
+          modoFicha: o.modoFicha ?? o.modo_ficha,
         }
       })
     : []

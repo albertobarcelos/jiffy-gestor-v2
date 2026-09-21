@@ -25,11 +25,13 @@ export function NovoPedidoModalShell(props: NovoPedidoShellProps) {
     modoEdicaoProdutos,
     salvandoProdutos,
     onSalvarProdutos,
+    onCancelarEdicaoProdutos,
     nomeUsuario,
     currentStep,
     isLoadingVenda,
     abaDetalhesPedido,
     setAbaDetalhesPedido,
+    bloquearAbasDetalhe,
     podeExibirAbaNotaFiscal,
     podeExibirAbaDadosEntrega,
     tipoInicioPedido,
@@ -132,6 +134,7 @@ export function NovoPedidoModalShell(props: NovoPedidoShellProps) {
             isLoadingVenda={isLoadingVenda}
             abaDetalhesPedido={abaDetalhesPedido}
             onAbaDetalhesPedidoChange={setAbaDetalhesPedido}
+            bloquearAbasDetalhe={bloquearAbasDetalhe}
             podeExibirAbaNotaFiscal={podeExibirAbaNotaFiscal}
             podeExibirAbaDadosEntrega={podeExibirAbaDadosEntrega}
             tipoInicioPedido={tipoInicioPedido}
@@ -147,7 +150,7 @@ export function NovoPedidoModalShell(props: NovoPedidoShellProps) {
             className={`scrollbar-thin flex min-h-0 flex-1 flex-col ${NOVO_PEDIDO_SHELL_PADDING_X_CLASS}`}
           >
             {/* Loading em modo visualização - não mostrar steps até carregar */}
-            {modoVisualizacao && isLoadingVenda && (
+            {modoVisualizacao && isLoadingVenda && !modoEdicaoProdutos && (
               <div className="flex h-full items-center justify-center bg-gray-50">
                 <JiffyLoading />
               </div>
@@ -161,7 +164,7 @@ export function NovoPedidoModalShell(props: NovoPedidoShellProps) {
             <NovoPedidoFooterShell>
               <EdicaoProdutosFooter
                 salvando={salvandoProdutos}
-                onCancelar={onClose}
+                onCancelar={onCancelarEdicaoProdutos}
                 onSalvar={onSalvarProdutos}
               />
             </NovoPedidoFooterShell>

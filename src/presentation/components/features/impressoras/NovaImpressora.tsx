@@ -19,6 +19,12 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { Input } from '@/src/presentation/components/ui/input'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { MdCheck, MdExpandLess, MdExpandMore, MdPhone, MdSearch } from 'react-icons/md'
+import {
+  MODO_IMPRESSAO_IMPRESSORA_OPCOES,
+  modoFichaDerivado,
+  parseModoImpressaoImpressora,
+  type ModoImpressaoImpressora,
+} from '@/src/domain/types/modoImpressaoImpressora'
 
 interface TerminalConfig {
   terminalId: string
@@ -27,6 +33,7 @@ interface TerminalConfig {
   modeloDisplay: string // valor display: Genérico, Sunmi Integrada, Stone Integrada, Pagbank Integrada, Cielo Integrada
   ip: string
   porta: string
+  modoImpressao: ModoImpressaoImpressora
   modoFicha: boolean
   imprimirSenha: boolean
   ativo: boolean
@@ -83,6 +90,18 @@ const MODELOS_OPTIONS = [
   'Cielo Integrada',
 ]
 
+function aplicarModoNoTerminal(
+  config: TerminalConfig,
+  modoRaw: unknown
+): TerminalConfig {
+  const modoImpressao = parseModoImpressaoImpressora(modoRaw)
+  return {
+    ...config,
+    modoImpressao,
+    modoFicha: modoFichaDerivado(modoImpressao),
+  }
+}
+
 /**
  * Mesmo critério que `TerminaisTab` (`terminaisFiltrados`): só terminais não bloqueados.
  */
@@ -92,9 +111,9 @@ function terminaisAtivosParaNovaImpressora<T extends { bloqueado?: boolean | str
   return items.filter(t => !(t.bloqueado === true || t.bloqueado === 'true'))
 }
 
-/** Grid desktop (cabeçalho + linhas): switches compactos + modelo/IP/porta sempre visíveis */
+/** Grid desktop: modo (select) + switches compactos + modelo/IP/porta sempre visíveis */
 const DESKTOP_TERMINAL_ROW_GRID =
-  'grid grid-cols-[auto_minmax(0,1fr)_4.25rem_4.25rem_4.25rem_minmax(5.5rem,1fr)_minmax(5rem,0.85fr)_3.75rem] items-center gap-2 px-2 min-w-[44rem]'
+  'grid grid-cols-[auto_minmax(0,1fr)_minmax(7.25rem,8.5rem)_4.25rem_4.25rem_minmax(5.5rem,1fr)_minmax(5rem,0.85fr)_3.75rem] items-center gap-2 px-2 min-w-[50rem]'
 
 /** Debounce do termo enviado ao GET `/api/terminais?q=` (nova impressora — lista via API). */
 const BUSCA_TERMINAL_DEBOUNCE_MS = 480
@@ -179,6 +198,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
     const [bulkModelo, setBulkModelo] = useState('')
     const [bulkIP, setBulkIP] = useState('')
     const [bulkPorta, setBulkPorta] = useState('')
+    const [bulkModoImpressao, setBulkModoImpressao] = useState<ModoImpressaoImpressora | ''>('')
 
     const hasLoadedImpressoraRef = useRef(false)
     const hasLoadedTerminaisRef = useRef(false)
@@ -400,7 +420,8 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
             modeloDisplay: 'Genérico',
             ip: '192.168.1.100',
             porta: '9100',
-            modoFicha: true,
+            modoImpressao: 'normal' as const,
+            modoFicha: false,
             imprimirSenha: true,
             ativo: true,
             isHovering: false,
@@ -501,7 +522,8 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
             modeloDisplay: 'Genérico',
             ip: '192.168.1.100',
             porta: '9100',
-            modoFicha: true,
+            modoImpressao: 'normal' as const,
+            modoFicha: false,
             imprimirSenha: true,
             ativo: true,
             isHovering: false,
@@ -666,6 +688,10 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
             terminal?.bloqueado === 'true' ||
             false
 
+          const modoImpressao = parseModoImpressaoImpressora(
+            config.modoImpressao,
+            config.modoFicha === true || config.modoFicha === 'true'
+          )
           configs.push({
             terminalId: terminalId,
             nome: terminalName,
@@ -673,10 +699,8 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
             modeloDisplay: MODELO_MAP[modeloDB] || 'Genérico',
             ip: config.ip || '192.168.1.100',
             porta: config.porta || '9100',
-            modoFicha:
-              config.modoFicha === true ||
-              config.modoFicha === 'true' ||
-              config.modoFicha === undefined,
+            modoImpressao,
+            modoFicha: modoFichaDerivado(modoImpressao),
             imprimirSenha:
               config.imprimirSenha === true ||
               config.imprimirSenha === 'true' ||
@@ -804,7 +828,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
           config.modelo !== inicial.modelo ||
           config.ip !== inicial.ip ||
           config.porta !== inicial.porta ||
-          config.modoFicha !== inicial.modoFicha ||
+          config.modoImpressao !== inicial.modoImpressao ||
           config.imprimirSenha !== inicial.imprimirSenha ||
           config.ativo !== inicial.ativo
         ) {
@@ -915,6 +939,9 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
         const modelo = value as string
         return modelo !== '' && MODELOS_OPTIONS.includes(modelo)
       }
+      if (field === 'modoImpressao') {
+        return MODO_IMPRESSAO_IMPRESSORA_OPCOES.some(o => o.valor === value)
+      }
       return true
     }
 
@@ -992,6 +1019,8 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                 configCopy.ip = processedValue as string
               } else if (field === 'porta') {
                 configCopy.porta = processedValue as string
+              } else if (field === 'modoImpressao') {
+                Object.assign(configCopy, aplicarModoNoTerminal(configCopy, processedValue))
               } else {
                 ;(configCopy as any)[field] = processedValue
               }
@@ -1012,6 +1041,8 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
             config.ip = processedValue as string
           } else if (field === 'porta') {
             config.porta = processedValue as string
+          } else if (field === 'modoImpressao') {
+            Object.assign(config, aplicarModoNoTerminal(config, processedValue))
           } else {
             ;(config as any)[field] = processedValue
           }
@@ -1076,6 +1107,8 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
               configCopy.ip = processedValue as string
             } else if (field === 'porta') {
               configCopy.porta = processedValue as string
+            } else if (field === 'modoImpressao') {
+              Object.assign(configCopy, aplicarModoNoTerminal(configCopy, processedValue))
             } else {
               ;(configCopy as any)[field] = processedValue
             }
@@ -1157,7 +1190,8 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
           config: {
             modelo: config.modelo || 'generico',
             ativo: config.ativo !== undefined ? config.ativo : true,
-            modoFicha: config.modoFicha !== undefined ? config.modoFicha : true,
+            modoImpressao: config.modoImpressao || 'normal',
+            modoFicha: modoFichaDerivado(config.modoImpressao || 'normal'),
             imprimirSenha: config.imprimirSenha !== undefined ? config.imprimirSenha : true,
             tipoConexao: 'ethernet',
             ip: config.ip || '192.168.1.100',
@@ -1541,20 +1575,45 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                           </div>
                         </div>
                       </div>
+                      {/* Modo de impressão em lote */}
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs text-primary-text">Modo de impressão</label>
+                        <div className="flex gap-1">
+                          <select
+                            value={bulkModoImpressao}
+                            onChange={e =>
+                              setBulkModoImpressao(e.target.value as ModoImpressaoImpressora | '')
+                            }
+                            className="h-7 flex-1 rounded-lg border border-primary bg-info px-2 text-xs text-primary-text focus:border-primary focus:outline-none"
+                          >
+                            <option value="">Selecione...</option>
+                            {MODO_IMPRESSAO_IMPRESSORA_OPCOES.map(opcao => (
+                              <option key={opcao.valor} value={opcao.valor} title={opcao.hint}>
+                                {opcao.label}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (bulkModoImpressao) {
+                                applyBulkUpdate('modoImpressao', bulkModoImpressao)
+                                setBulkModoImpressao('')
+                              }
+                            }}
+                            disabled={!bulkModoImpressao || selectedTerminalIds.size === 0}
+                            className="whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-2 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <MdCheck className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
                       {/* Segunda linha: Ações Rápidas */}
                       <div className="flex flex-col gap-1">
                         <label className="text-xs text-primary-text">
                           Ações Rápidas
                         </label>
-                        <div className="grid grid-cols-3 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => applyBulkUpdate('modoFicha', true)}
-                            disabled={selectedTerminalIds.size === 0}
-                            className="w-full whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            Modo Ficha ON
-                          </button>
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                           <button
                             type="button"
                             onClick={() => applyBulkUpdate('imprimirSenha', true)}
@@ -1570,14 +1629,6 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                             className="w-full whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Ativar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => applyBulkUpdate('modoFicha', false)}
-                            disabled={selectedTerminalIds.size === 0}
-                            className="w-full whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            Modo Ficha OFF
                           </button>
                           <button
                             type="button"
@@ -1616,7 +1667,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                     </div>
                     <div className="flex min-w-0 w-full justify-center">
                       <span className="text-center text-[10px] font-semibold leading-tight text-primary-text">
-                        Modo Ficha
+                        Modo
                       </span>
                     </div>
                     <div className="flex min-w-0 w-full justify-center">
@@ -1755,17 +1806,25 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                               {config.nome}
                             </div>
                             <div className="flex min-w-0 w-full justify-center">
-                              <JiffyIconSwitch
-                                checked={config.modoFicha}
+                              <select
+                                value={config.modoImpressao}
                                 onChange={e =>
-                                  updateTerminalConfig(index, 'modoFicha', e.target.checked)
+                                  updateTerminalConfig(index, 'modoImpressao', e.target.value)
                                 }
-                                size="xs"
-                                className="justify-center gap-0 px-0 py-0"
-                                inputProps={{
-                                  'aria-label': `Modo ficha — ${config.nome}`,
-                                }}
-                              />
+                                title={
+                                  MODO_IMPRESSAO_IMPRESSORA_OPCOES.find(
+                                    o => o.valor === config.modoImpressao
+                                  )?.hint
+                                }
+                                className="h-7 w-full min-w-0 rounded-lg border border-primary bg-info px-1 text-[11px] text-primary-text focus:border-primary focus:outline-none"
+                                aria-label={`Modo de impressão — ${config.nome}`}
+                              >
+                                {MODO_IMPRESSAO_IMPRESSORA_OPCOES.map(opcao => (
+                                  <option key={opcao.valor} value={opcao.valor}>
+                                    {opcao.label}
+                                  </option>
+                                ))}
+                              </select>
                             </div>
                             <div className="flex min-w-0 w-full justify-center">
                               <JiffyIconSwitch
@@ -1859,21 +1918,29 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                               {config.nome}
                             </span>
                             <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 sm:gap-4">
-                              <div className="flex flex-col items-center gap-0.5">
+                              <div className="flex min-w-[7rem] flex-col items-stretch gap-0.5">
                                 <span className="text-[10px] leading-none text-secondary-text">
-                                  Modo Ficha
+                                  Modo
                                 </span>
-                                <JiffyIconSwitch
-                                  checked={config.modoFicha}
+                                <select
+                                  value={config.modoImpressao}
                                   onChange={e =>
-                                    updateTerminalConfig(index, 'modoFicha', e.target.checked)
+                                    updateTerminalConfig(index, 'modoImpressao', e.target.value)
                                   }
-                                  size="sm"
-                                  className="justify-center gap-0 px-0 py-0"
-                                  inputProps={{
-                                    'aria-label': `Modo ficha — ${config.nome}`,
-                                  }}
-                                />
+                                  title={
+                                    MODO_IMPRESSAO_IMPRESSORA_OPCOES.find(
+                                      o => o.valor === config.modoImpressao
+                                    )?.hint
+                                  }
+                                  className="h-7 w-full rounded-lg border border-primary bg-info px-1 text-[11px] text-primary-text focus:border-primary focus:outline-none"
+                                  aria-label={`Modo de impressão — ${config.nome}`}
+                                >
+                                  {MODO_IMPRESSAO_IMPRESSORA_OPCOES.map(opcao => (
+                                    <option key={opcao.valor} value={opcao.valor}>
+                                      {opcao.label}
+                                    </option>
+                                  ))}
+                                </select>
                               </div>
                               <div className="flex flex-col items-center gap-0.5">
                                 <span className="text-[10px] leading-none text-secondary-text">

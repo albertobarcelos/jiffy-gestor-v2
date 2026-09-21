@@ -1,9 +1,11 @@
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { fetchGestorApi } from '@/src/infrastructure/api/fetchGestorApi'
 import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
 import {
   normalizarEstacaoImpressaoResumo,
   normalizarListaEstacoesImpressao,
 } from '@/src/infrastructure/api/normalizarEstacaoImpressaoResumo'
+import { normalizarListaMapeamentosEstacao } from '@/src/infrastructure/api/normalizarEstacaoImpressaoMapeamentos'
+import type { ModoImpressaoImpressora } from '@/src/domain/types/modoImpressaoImpressora'
 import {
   getEstacaoImpressaoId,
   limparEstacaoImpressaoId,
@@ -32,6 +34,8 @@ export interface EstacaoImpressaoMapeamento {
   impressoraId: string
   nomeImpressora: string
   nomeImpressoraWindows: string
+  /** Homolog: modo da via nesta estação (`PUT/GET .../estacoes-impressao/{id}/impressoras`). */
+  modoImpressao?: ModoImpressaoImpressora
 }
 
 export class EstacaoImpressaoApiError extends Error {
@@ -183,10 +187,11 @@ export async function buscarMapeamentosEstacao(
   const cached = id ? MAPEAMENTOS_ESTACAO_CACHE.get(id) : undefined
   if (cached) return cached
 
-  const data = await requestJson<EstacaoImpressaoMapeamento[]>(
+  const raw = await requestJson<unknown>(
     `/api/gestor/estacoes-impressao/${encodeURIComponent(estacaoId)}/impressoras`,
     token
   )
+  const data = normalizarListaMapeamentosEstacao(raw)
   if (id) MAPEAMENTOS_ESTACAO_CACHE.set(id, data)
   return data
 }
@@ -194,15 +199,21 @@ export async function buscarMapeamentosEstacao(
 export async function salvarMapeamentosEstacao(
   token: string,
   estacaoId: string,
-  mapeamentos: Array<{ impressoraId: string; nomeImpressoraWindows: string }>
+  mapeamentos: Array<{
+    impressoraId: string
+    nomeImpressoraWindows: string
+    modoImpressao: ModoImpressaoImpressora
+  }>
 ): Promise<EstacaoImpressaoMapeamento[]> {
-  const data = await requestJson<EstacaoImpressaoMapeamento[]>(
-    `/api/gestor/estacoes-impressao/${encodeURIComponent(estacaoId)}/impressoras`,
-    token,
-    {
-      method: 'PUT',
-      body: JSON.stringify({ mapeamentos }),
-    }
+  const data = normalizarListaMapeamentosEstacao(
+    await requestJson<unknown>(
+      `/api/gestor/estacoes-impressao/${encodeURIComponent(estacaoId)}/impressoras`,
+      token,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ mapeamentos }),
+      }
+    )
   )
   const id = estacaoId.trim()
   if (id) MAPEAMENTOS_ESTACAO_CACHE.set(id, data)

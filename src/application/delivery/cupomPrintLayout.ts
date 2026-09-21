@@ -1,7 +1,7 @@
 import type { DeliveryCupomTemplateConfig } from '@/src/shared/types/deliveryCupomTemplate'
 import { DEFAULT_DELIVERY_CUPOM_TEMPLATE } from '@/src/shared/types/deliveryCupomTemplate'
 import type { TicketTipoCupomApi } from '@/src/shared/types/vendaGestorTickets'
-import type { PrintSize } from '@/src/infrastructure/printing/agent/printJobTypes'
+import type { PrintSize } from '@/src/application/ports/printDocument'
 
 export function mergeCupomTemplate(
   template?: DeliveryCupomTemplateConfig
@@ -20,6 +20,13 @@ export function printSizeFromFontePx(px: number): PrintSize {
   if (px >= 16) return 'double'
   if (px <= 10) return 'small'
   return 'normal'
+}
+
+/** CSS px de Font A 2/2 (48 dots de altura) na escala do cupom gráfico. */
+export function fonteProdutoEscPosA22Px(larguraMm: 58 | 80): number {
+  const dotsLargura = larguraMm === 58 ? 384 : 576
+  const cssLargura = larguraMm === 58 ? 220 : 300
+  return Math.max(16, Math.round((48 * cssLargura) / dotsLargura))
 }
 
 export function sectionFeedLines(densidade: DeliveryCupomTemplateConfig['densidade']): number {

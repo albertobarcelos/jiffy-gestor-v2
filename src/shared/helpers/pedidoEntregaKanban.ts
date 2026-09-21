@@ -1,8 +1,8 @@
 /**
- * Normaliza `tipoVenda` do unificado / detalhe para o Kanban operacional (entrega/retirada).
- * - Módulo delivery grava `delivery` na venda; `tipoEntrega` vem em `entrega` | `retirada`.
- * - Legado gestor usa `entrega` | `retirada` direto em `tipoVenda`.
+ * Classificação delivery vs balcão.
+ * Backend: `tipoVenda === "delivery"`. Atendimento é só `tipoEntrega`.
  */
+
 export function normalizarTipoAtendimentoKanban(tipoVenda?: string | null): string {
   return String(tipoVenda ?? '').trim().toLowerCase()
 }
@@ -12,20 +12,26 @@ export function isTipoVendaBalcaoGestor(tipoVenda?: string | null): boolean {
   return tipo === 'balcao' || tipo === 'mesa' || tipo === 'gestor'
 }
 
-/** Pedido de entrega/retirada no Kanban (não balcão). */
-export function isPedidoEntregaKanban(
-  tabelaOrigem: 'venda' | 'venda_gestor',
-  tipoVenda?: string | null,
-  statusEtapaOperacional?: string | null
-): boolean {
-  if (tabelaOrigem !== 'venda_gestor') return false
-  const tipo = normalizarTipoAtendimentoKanban(tipoVenda)
-  if (isTipoVendaBalcaoGestor(tipo)) return false
-  if (tipo === 'entrega' || tipo === 'retirada' || tipo === 'delivery') return true
-  if (!tipo && String(statusEtapaOperacional ?? '').trim()) return true
-  return false
+export function normalizarTipoEntregaKanban(
+  tipoEntrega?: string | null
+): 'entrega' | 'retirada' | null {
+  const tipo = String(tipoEntrega ?? '')
+    .trim()
+    .toLowerCase()
+  if (tipo === 'entrega' || tipo === 'retirada') return tipo
+  return null
 }
 
-export function isPedidoEntregaComEntregador(tipoVenda?: string | null): boolean {
-  return normalizarTipoAtendimentoKanban(tipoVenda) === 'entrega'
+/** Pedido do módulo delivery. POS nunca entra. */
+export function isPedidoEntregaKanban(
+  tabelaOrigem: 'venda' | 'venda_gestor',
+  tipoVenda?: string | null
+): boolean {
+  if (tabelaOrigem !== 'venda_gestor') return false
+  return normalizarTipoAtendimentoKanban(tipoVenda) === 'delivery'
+}
+
+/** Precisa de entregador para despachar: só `tipoEntrega=entrega`. */
+export function isPedidoEntregaComEntregador(tipoEntrega?: string | null): boolean {
+  return normalizarTipoEntregaKanban(tipoEntrega) === 'entrega'
 }

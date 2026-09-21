@@ -1,10 +1,12 @@
 'use client'
 
+import { FormControl, MenuItem, Select } from '@mui/material'
 import { MdWarningAmber } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { contarPendenciasExpedicao, montarLayoutExpedicao } from '../utils/kanbanExpedicaoLayout'
 import { useAgoraKanban } from '../hooks/useAgoraKanban'
-import type { ColunaKanbanId, KanbanColumn, Venda } from '../types'
+import type { ColunaKanbanId, FiltroStatusEntreguesKanban, KanbanColumn, Venda } from '../types'
+import { OPCOES_FILTRO_STATUS_ENTREGUES } from '../utils/kanbanDeliveryColumnConfig'
 import type { KanbanBoardRendererProps } from './KanbanBoardRenderer'
 import { KanbanExpedicaoCard } from './KanbanExpedicaoCard'
 
@@ -31,10 +33,14 @@ function CabecalhoBloco({
   column,
   count,
   pendencias,
+  filtroStatus,
+  onFiltroStatusChange,
 }: {
   column: KanbanColumn
   count: number
   pendencias: number
+  filtroStatus?: FiltroStatusEntreguesKanban
+  onFiltroStatusChange?: (filtro: FiltroStatusEntreguesKanban) => void
 }) {
   return (
     <div className="flex items-center gap-1.5 px-0.5 pb-1.5">
@@ -47,6 +53,21 @@ function CabecalhoBloco({
           <MdWarningAmber className="h-3 w-3" />
           {pendencias} atenção
         </span>
+      ) : null}
+      {filtroStatus && onFiltroStatusChange ? (
+        <FormControl size="small" sx={{ minWidth: 118, ml: 'auto' }}>
+          <Select
+            value={filtroStatus}
+            onChange={e => onFiltroStatusChange(e.target.value as FiltroStatusEntreguesKanban)}
+            sx={{ height: 26, fontSize: 12, borderRadius: '8px' }}
+          >
+            {OPCOES_FILTRO_STATUS_ENTREGUES.map(opcao => (
+              <MenuItem key={opcao.value} value={opcao.value}>
+                {opcao.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
       ) : null}
     </div>
   )
@@ -62,6 +83,9 @@ export function KanbanExpedicaoRenderer(props: KanbanBoardRendererProps) {
     avancandoEtapaIds,
     onViewDetails,
     onAvancarEtapa,
+    isModoDeliveryKanban,
+    filtroStatusFiscalComNf,
+    onFiltroStatusFiscalComNfChange,
   } = props
   const agoraMs = useAgoraKanban()
   const { primaria, laterais, arquivo } = montarLayoutExpedicao(columns)
@@ -117,6 +141,14 @@ export function KanbanExpedicaoRenderer(props: KanbanBoardRendererProps) {
             column.id === 'FINALIZADAS'
               ? 0
               : contarPendenciasExpedicao(vendasPorColuna[colId] ?? [], agoraMs)
+          }
+          filtroStatus={
+            isModoDeliveryKanban && colId === 'FINALIZADAS' ? filtroStatusFiscalComNf : undefined
+          }
+          onFiltroStatusChange={
+            isModoDeliveryKanban && colId === 'FINALIZADAS' && onFiltroStatusFiscalComNfChange
+              ? filtro => onFiltroStatusFiscalComNfChange(colId, filtro)
+              : undefined
           }
         />
         <div

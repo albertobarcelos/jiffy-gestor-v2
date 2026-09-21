@@ -62,6 +62,8 @@ export interface DetalhesPedidoMeta {
   numeroVenda?: number | null
   codigoVenda?: string | null
   tipoVenda?: string | null
+  /** Delivery: `entrega` | `retirada`. Não substitui `tipoVenda`. */
+  tipoEntrega?: 'entrega' | 'retirada' | null
   numeroMesa?: string | number | null
   statusMesa?: string | null
   abertoPorId?: string | null

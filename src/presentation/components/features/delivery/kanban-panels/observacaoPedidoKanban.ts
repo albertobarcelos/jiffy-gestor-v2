@@ -6,7 +6,7 @@ import type { Venda } from '@/src/presentation/components/features/kanban/types'
 
 export type ObservacaoPedidoKanbanEndpoint = 'delivery' | 'gestor' | 'pdv'
 
-/** Pedidos delivery (gestor entrega/retirada ou integradores) usam PATCH /delivery/pedidos/{id}. */
+/** Pedidos `tipoVenda=delivery` usam PATCH /delivery/pedidos/{id}. */
 export function pedidoKanbanUsaEndpointDelivery(venda: Venda): boolean {
   if (venda.isDelivery()) return true
   return venda.isPedidoEntregaGestor()

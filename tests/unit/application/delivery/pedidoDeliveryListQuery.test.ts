@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   extrairPedidosDeliveryQueryParamsDeSearchParams,
-  isRequisicaoListagemPedidosIntegradorLegada,
-  isRequisicaoListagemPedidosJiffy,
   mapOrigemApiParaFiltroKanban,
   mapOrigemFiltroKanbanParaApi,
   montarPedidosDeliveryQueryParams,
@@ -11,9 +9,9 @@ import {
 import { PEDIDOS_DELIVERY_KANBAN_PAGE_SIZE } from '@/src/application/dto/api/pedidoDeliveryListApi'
 
 describe('pedidoDeliveryListQuery — origem toolbar ↔ API', () => {
-  it('mapeia GESTOR e DELIVERY para valores da API', () => {
+  it('mapeia GESTOR e JIFFY_DELIVERY', () => {
     expect(mapOrigemFiltroKanbanParaApi('GESTOR')).toBe('GESTOR')
-    expect(mapOrigemFiltroKanbanParaApi('DELIVERY')).toBe('JIFFY_DELIVERY')
+    expect(mapOrigemFiltroKanbanParaApi('JIFFY_DELIVERY')).toBe('JIFFY_DELIVERY')
   })
 
   it('todas e PDV não enviam filtro de origem', () => {
@@ -24,16 +22,26 @@ describe('pedidoDeliveryListQuery — origem toolbar ↔ API', () => {
 
   it('inverte origem da API para filtro do Kanban', () => {
     expect(mapOrigemApiParaFiltroKanban('GESTOR')).toBe('GESTOR')
-    expect(mapOrigemApiParaFiltroKanban('JIFFY_DELIVERY')).toBe('DELIVERY')
-    expect(mapOrigemApiParaFiltroKanban('PDV')).toBeUndefined()
+    expect(mapOrigemApiParaFiltroKanban('JIFFY_DELIVERY')).toBe('JIFFY_DELIVERY')
+    expect(mapOrigemApiParaFiltroKanban('PDV')).toBe('PDV')
+    expect(mapOrigemApiParaFiltroKanban('IFOOD')).toBeUndefined()
   })
 })
 
 describe('pedidoDeliveryListQuery — serialização', () => {
+  it('omite cancelado quando o filtro manda null', () => {
+    const params = montarPedidosDeliveryQueryParams({
+      statusDelivery: ['FINALIZADO', 'CANCELADO'],
+      cancelado: null,
+    })
+    expect(params.cancelado).toBeUndefined()
+    expect(params.statusDelivery).toEqual(['FINALIZADO', 'CANCELADO'])
+  })
+
   it('monta params do Kanban com cancelado=false e datas de finalização renomeadas', () => {
     const params = montarPedidosDeliveryQueryParams({
       q: '  cliente  ',
-      origemFiltroKanban: 'DELIVERY',
+      origemFiltroKanban: 'JIFFY_DELIVERY',
       dataCriacaoInicial: '2026-06-01T00:00:00.000Z',
       dataCriacaoFinal: '2026-06-01T23:59:59.999Z',
       dataFinalizacaoInicio: '2026-06-02T00:00:00.000Z',
@@ -59,31 +67,13 @@ describe('pedidoDeliveryListQuery — serialização', () => {
       limit: 25,
     })
 
-    expect(qs.get('statusDelivery')).toBe('PENDENTE,EM_PREPARO')
-    expect(qs.get('origem')).toBe('GESTOR,JIFFY_DELIVERY')
+    expect(qs.getAll('statusDelivery')).toEqual(['PENDENTE', 'EM_PREPARO'])
+    expect(qs.getAll('origem')).toEqual(['GESTOR', 'JIFFY_DELIVERY'])
     expect(qs.get('limit')).toBe('25')
   })
 })
 
 describe('pedidoDeliveryListQuery — roteamento BFF', () => {
-  it('detecta query Jiffy vs integrador legado', () => {
-    const jiffy = new URLSearchParams('offset=0&limit=50&cancelado=false')
-    expect(isRequisicaoListagemPedidosJiffy(jiffy)).toBe(true)
-    expect(
-      isRequisicaoListagemPedidosIntegradorLegada(jiffy, { bearerHeaderCustom: 'token' })
-    ).toBe(false)
-
-    const legado = new URLSearchParams('status=1')
-    expect(isRequisicaoListagemPedidosIntegradorLegada(legado, {})).toBe(true)
-
-    const bearerOnly = new URLSearchParams('')
-    expect(
-      isRequisicaoListagemPedidosIntegradorLegada(bearerOnly, {
-        bearerHeaderCustom: 'integrador-token',
-      })
-    ).toBe(true)
-  })
-
   it('extrai params da URL do BFF com alias de datas do Kanban', () => {
     const params = extrairPedidosDeliveryQueryParamsDeSearchParams(
       new URLSearchParams(

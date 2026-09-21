@@ -97,10 +97,15 @@ export function KanbanVendaCardActions(props: KanbanVendaCardActionsProps) {
     venda,
     acaoFiscalEmAndamentoPorVenda
   )
+  const colunaArquivoFiscal =
+    colunaAtual === 'FINALIZADAS' ||
+    colunaAtual === 'COM_FISCAL' ||
+    colunaAtual === 'PENDENTE_EMISSAO' ||
+    colunaAtual === 'REJEITADAS'
   const mostrarInutilizada =
-    column.id === 'COM_FISCAL' && venda.statusFiscal === 'INUTILIZADA'
+    colunaArquivoFiscal && venda.statusFiscal === 'INUTILIZADA'
   const mostrarVerDocumento =
-    column.id === 'COM_FISCAL' &&
+    colunaArquivoFiscal &&
     !acaoFiscalEmAndamentoPorVenda[venda.id] &&
     Boolean(venda.documentoFiscalId) &&
     (venda.statusFiscal === 'EMITIDA' || venda.statusFiscal === 'CANCELADA')
@@ -115,7 +120,7 @@ export function KanbanVendaCardActions(props: KanbanVendaCardActionsProps) {
     mostrarEmitirNota ||
     mostrarInutilizada ||
     mostrarVerDocumento
-  const rotuloAvancar = rotuloBotaoAvancarEtapaKanban(colunaAtual, venda.tipoVenda)
+  const rotuloAvancar = rotuloBotaoAvancarEtapaKanban(colunaAtual, venda.tipoAtendimento())
   const [reimprimindo, setReimprimindo] = useState(false)
   const reimprimindoLockRef = useRef(false)
 

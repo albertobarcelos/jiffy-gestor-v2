@@ -32,6 +32,12 @@ export interface UseNovoPedidoNavegacaoParams {
   taxaEntregaOverride?: 'automatica' | 'sem_taxa' | 'catalogo'
   /** Edição de produtos de pedido existente: trava a navegação entre etapas. */
   modoEdicaoProdutos?: boolean
+  /** ESC/fechar no modo edição: restaura o snapshot e sai da edição. */
+  onFecharEdicaoProdutos?: () => void
+  /** true quando a edição começou na aba Lista Produtos (não fecha o painel). */
+  edicaoProdutosPermaneceNoPainel?: boolean
+  /** Após editar itens, o pagamento divergiu — não deixa sair sem gravar a cobrança. */
+  ajustandoPagamentoAposEdicaoItens?: boolean
   /**
    * Fecha o painel sem descartar o lançamento (atalho WhatsApp).
    * O rascunho volta ao reabrir o pedido da mesma conversa.
@@ -59,6 +65,9 @@ export function useNovoPedidoNavegacao({
   enderecoEntregaCoberturaStatus,
   taxaEntregaOverride,
   modoEdicaoProdutos,
+  onFecharEdicaoProdutos,
+  edicaoProdutosPermaneceNoPainel = false,
+  ajustandoPagamentoAposEdicaoItens = false,
   preservarRascunhoAoFechar = false,
 }: UseNovoPedidoNavegacaoParams) {
   const hrefCoberturaEntrega = useHrefCoberturaEntregaPedido()
@@ -72,6 +81,14 @@ export function useNovoPedidoNavegacao({
   }, [vendaId, modoVisualizacao, produtos.length, pagamentos.length, clienteId, currentStep])
 
   const handleClose = useCallback(() => {
+    if (ajustandoPagamentoAposEdicaoItens) {
+      showToast.warning('Ajuste o pagamento do pedido antes de sair.')
+      return
+    }
+    if (modoEdicaoProdutos && onFecharEdicaoProdutos) {
+      onFecharEdicaoProdutos()
+      return
+    }
     if (vendaId && modoVisualizacao) {
       onClose()
       return
@@ -81,7 +98,15 @@ export function useNovoPedidoNavegacao({
     } else {
       onClose()
     }
-  }, [vendaId, modoVisualizacao, temDadosVenda, onClose])
+  }, [
+    ajustandoPagamentoAposEdicaoItens,
+    modoEdicaoProdutos,
+    onFecharEdicaoProdutos,
+    vendaId,
+    modoVisualizacao,
+    temDadosVenda,
+    onClose,
+  ])
 
   const handleConfirmarSaida = useCallback(() => {
     setModalConfirmacaoSaidaOpen(false)
@@ -182,9 +207,23 @@ export function useNovoPedidoNavegacao({
           setInternalDialogOpen(true)
           return
         }
+        if (ajustandoPagamentoAposEdicaoItens) {
+          setInternalDialogOpen(true)
+          showToast.warning('Ajuste o pagamento do pedido antes de sair.')
+          return
+        }
         if (preservarRascunhoAoFechar && reason === 'backdropClick') {
           setInternalDialogOpen(false)
           onClose()
+          return
+        }
+        if (modoEdicaoProdutos && onFecharEdicaoProdutos) {
+          if (edicaoProdutosPermaneceNoPainel) {
+            setInternalDialogOpen(true)
+          } else {
+            setInternalDialogOpen(false)
+          }
+          onFecharEdicaoProdutos()
           return
         }
         if (temDadosVenda()) {
@@ -198,7 +237,15 @@ export function useNovoPedidoNavegacao({
         setInternalDialogOpen(true)
       }
     },
-    [temDadosVenda, onClose, preservarRascunhoAoFechar]
+    [
+      temDadosVenda,
+      onClose,
+      preservarRascunhoAoFechar,
+      ajustandoPagamentoAposEdicaoItens,
+      modoEdicaoProdutos,
+      onFecharEdicaoProdutos,
+      edicaoProdutosPermaneceNoPainel,
+    ]
   )
 
   useEffect(() => {

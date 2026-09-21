@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useCallback, useEffect } from 'react'
+import { useMemo, useRef, useCallback, useEffect, useState } from 'react'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
 import { ordenarMeiosPagamentoPadrao } from '@/src/shared/utils/corFormaPagamentoFiscal'
 import {
@@ -17,6 +17,9 @@ import { useMenuDeliveryId } from '@/src/presentation/hooks/useMenuDeliveryId'
 import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
 import { useImpressaoDelivery } from '@/features/delivery/hooks/useImpressaoDelivery'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useQueryClient } from '@tanstack/react-query'
+import { invalidateKanbanVendasListagens } from '@/features/kanban/hooks/kanbanListagemQueryCache'
+import { invalidateVendaDetalheCarregadaCache } from './data/useVendaDetalheCarregadaQuery'
 import type { NovoPedidoModalProps } from '../types'
 import {
   calcularTotalProduto,
@@ -95,6 +98,7 @@ export function useNovoPedidoOrchestrator({
   const { preferenciasImpressaoDelivery } = usePreferenciasImpressaoDelivery()
   const { processarAposTransicaoVendaGestorId } = useImpressaoDelivery()
   const empresaId = useTenantEmpresaId()
+  const queryClient = useQueryClient()
   const resetarAoSairRef = useRef(false)
   const notificarSucesso = useCallback(() => {
     resetarAoSairRef.current = true
@@ -112,6 +116,10 @@ export function useNovoPedidoOrchestrator({
   const transicaoPedidoDelivery = useTransicaoPedidoDelivery()
 
   const form = useNovoPedidoFormState(tipoInicioPedido)
+  const [editandoItensNoDetalhe, setEditandoItensNoDetalhe] = useState(false)
+  const [ajustandoPagamentoAposEdicaoItens, setAjustandoPagamentoAposEdicaoItens] = useState(false)
+  const editandoProdutosPedido = Boolean(modoEdicaoProdutos || editandoItensNoDetalhe)
+  const fecharEdicaoProdutosRef = useRef<() => void>(() => {})
   const {
     origem,
     setOrigem,
@@ -266,7 +274,8 @@ export function useNovoPedidoOrchestrator({
   const menuIdCarregando =
     canalVendaNovoPedido === 'entrega' ? menuDeliveryLoading : empresaMeLoading
   /** Balcão e delivery: passo de produtos é sempre o step 1 na criação. */
-  const estaNoPassoProdutos = open && !modoVisualizacao && currentStep === 1
+  const estaNoPassoProdutos =
+    open && (editandoProdutosPedido || (!modoVisualizacao && currentStep === 1))
 
   const {
     scrollRef: gruposScrollRef,
@@ -550,7 +559,7 @@ export function useNovoPedidoOrchestrator({
 
   const flags = useNovoPedidoOrchestratorFlags({
     modoVisualizacao,
-    modoEdicaoProdutos,
+    modoEdicaoProdutos: editandoProdutosPedido,
     tabelaOrigemVenda,
     statusFiscalUnificado,
     resumoFiscal,
@@ -574,6 +583,7 @@ export function useNovoPedidoOrchestrator({
     enderecoEntregaCoberturaValorTaxa,
     resumoFinanceiroDetalhes,
     detalhesEntregaPedido,
+    ajustandoPagamentoAposEdicaoItens,
   })
 
   const {
@@ -597,6 +607,7 @@ export function useNovoPedidoOrchestrator({
     podeEditarPagamentoEntregaEmAberto,
     podeAjustarPagamentoEntregaEmAberto,
     pagamentoEntregaConfirmado,
+    podeEditarItensPedidoDetalhe,
   } = flags
 
   /** Primeira carga ou fetch sem cache ainda — evita área vazia sem feedback */
@@ -729,7 +740,10 @@ export function useNovoPedidoOrchestrator({
     ),
     enderecoEntregaCoberturaStatus,
     taxaEntregaOverride: modoTaxaEntrega,
-    modoEdicaoProdutos,
+    modoEdicaoProdutos: editandoProdutosPedido,
+    onFecharEdicaoProdutos: () => fecharEdicaoProdutosRef.current(),
+    edicaoProdutosPermaneceNoPainel: editandoItensNoDetalhe,
+    ajustandoPagamentoAposEdicaoItens,
     preservarRascunhoAoFechar,
   })
 
@@ -739,17 +753,74 @@ export function useNovoPedidoOrchestrator({
     handleConfirmarSaida()
   }, [chaveRascunho, handleConfirmarSaida])
 
-  const { salvandoProdutos, handleSalvarProdutos } = useEdicaoProdutosDelivery({
-    ativo: modoEdicaoProdutos,
+  const voltarAoDetalheAposEditarItens = useCallback(() => {
+    setEditandoItensNoDetalhe(false)
+    setCurrentStep(4)
+    setAbaDetalhesPedido('listaProdutos')
+  }, [setCurrentStep, setAbaDetalhesPedido])
+
+  const handleSucessoEdicaoProdutos = useCallback(async () => {
+    if (editandoItensNoDetalhe && vendaId) {
+      await invalidateVendaDetalheCarregadaCache(queryClient, empresaId, vendaId)
+      invalidateKanbanVendasListagens(queryClient)
+      await carregarVendaExistente()
+      setEditandoItensNoDetalhe(false)
+      setCurrentStep(4)
+      setAbaDetalhesPedido('pagamentos')
+      setAjustandoPagamentoAposEdicaoItens(true)
+      return
+    }
+    onSuccess()
+  }, [
+    editandoItensNoDetalhe,
+    vendaId,
+    queryClient,
+    empresaId,
+    carregarVendaExistente,
+    setCurrentStep,
+    setAbaDetalhesPedido,
+    onSuccess,
+  ])
+
+  const { salvandoProdutos, handleSalvarProdutos, handleCancelarEdicao } = useEdicaoProdutosDelivery({
+    ativo: editandoProdutosPedido,
     vendaId,
     getToken: () => tenantAuthRef.current?.getAccessToken(),
     produtos,
     observacaoPedido,
     vendaDataUpdatedAt,
-    onSuccess,
-    onClose,
+    onSuccess: handleSucessoEdicaoProdutos,
+    onClose: editandoItensNoDetalhe ? voltarAoDetalheAposEditarItens : onClose,
     setInternalDialogOpen,
+    permanecerNoPainel: editandoItensNoDetalhe,
+    restaurarProdutos: setProdutos,
   })
+  fecharEdicaoProdutosRef.current = handleCancelarEdicao
+
+  const handleEditarPedidoNoDetalhe = useCallback(() => {
+    if (!podeEditarItensPedidoDetalhe) return
+    setAjustandoPagamentoAposEdicaoItens(false)
+    setEditandoItensNoDetalhe(true)
+    setCurrentStep(1)
+  }, [podeEditarItensPedidoDetalhe, setCurrentStep])
+
+  useEffect(() => {
+    if (!open) {
+      setEditandoItensNoDetalhe(false)
+      setAjustandoPagamentoAposEdicaoItens(false)
+    }
+  }, [open])
+
+  const handleAbaDetalhesPedidoChange = useCallback(
+    (aba: typeof abaDetalhesPedido) => {
+      if (ajustandoPagamentoAposEdicaoItens && aba !== 'pagamentos') {
+        showToast.warning('Ajuste o pagamento do pedido para continuar.')
+        return
+      }
+      setAbaDetalhesPedido(aba)
+    },
+    [ajustandoPagamentoAposEdicaoItens, setAbaDetalhesPedido]
+  )
 
   const { handleSubmit } = useNovoPedidoSubmit({
     isPending: createSubmitPending,
@@ -821,9 +892,20 @@ export function useNovoPedidoOrchestrator({
   )
 
   const formatarUsuarioPorId = useCallback(
-    (usuarioId: string | null | undefined) =>
-      formatarUsuarioPorIdOrchestrator(usuarioId, nomesUsuariosPedido),
-    [nomesUsuariosPedido]
+    (usuarioId: string | null | undefined) => {
+      const id = String(usuarioId || '').trim()
+      const nome = nomeUsuario.trim()
+      if (id && nome) {
+        const tenantId = tenantAuth?.getUser()?.getId()?.trim() ?? ''
+        const identityId =
+          useAuthStore.getState().identityAuth?.getUser()?.getId()?.trim() ?? ''
+        if ((tenantId && id === tenantId) || (identityId && id === identityId)) {
+          return nome
+        }
+      }
+      return formatarUsuarioPorIdOrchestrator(usuarioId, nomesUsuariosPedido)
+    },
+    [nomesUsuariosPedido, tenantAuth, nomeUsuario]
   )
 
   const rotuloModeloNfe = rotuloModeloNfeOrchestrator
@@ -846,6 +928,8 @@ export function useNovoPedidoOrchestrator({
     recarregarVendaExistente: carregarVendaExistente,
     confirmarPagamentoParaFinalizar:
       Boolean(modoVisualizacao) && abaDetalhesInicial === 'pagamentos',
+    ajustandoPagamentoAposEdicaoItens,
+    onPagamentoEntregaSalvo: () => setAjustandoPagamentoAposEdicaoItens(false),
   })
 
   const {
@@ -861,6 +945,8 @@ export function useNovoPedidoOrchestrator({
     open,
     vendaId,
     modoVisualizacao,
+    editandoItensNoDetalhe,
+    ajustandoPagamentoAposEdicaoItens,
     tipoInicioPedido,
     abaDetalhesInicial,
     vendaDataUpdatedAt,
@@ -957,6 +1043,8 @@ export function useNovoPedidoOrchestrator({
     clienteTabsModalEntregaState,
     clienteEntregaVinculado,
     clienteNome,
+    nomeUsuario,
+    usuarioLogadoId: tenantAuth?.getUser()?.getId()?.trim() ?? '',
     confirmarEdicaoProduto,
     confirmarLancamentoProdutoPainel,
     currentStep,
@@ -1051,6 +1139,10 @@ export function useNovoPedidoOrchestrator({
     podeEditarPagamentoEntregaEmAberto,
     podeAjustarPagamentoEntregaEmAberto,
     pagamentoEntregaConfirmado,
+    ajustandoPagamentoAposEdicaoItens,
+    modoEdicaoProdutos: editandoProdutosPedido,
+    podeEditarItensPedidoDetalhe,
+    handleEditarPedidoNoDetalhe,
     podeExibirAbaDadosEntrega,
     podeExibirAbaNotaFiscal,
     pedidoComEntrega,
@@ -1158,14 +1250,16 @@ export function useNovoPedidoOrchestrator({
     handlePedidoPainelExited,
     estaNoPassoProdutos,
     modoVisualizacao,
-    modoEdicaoProdutos,
+    modoEdicaoProdutos: editandoProdutosPedido,
     salvandoProdutos,
     onSalvarProdutos: handleSalvarProdutos,
+    onCancelarEdicaoProdutos: handleCancelarEdicao,
     nomeUsuario,
     currentStep,
     isLoadingVenda,
     abaDetalhesPedido,
-    setAbaDetalhesPedido,
+    setAbaDetalhesPedido: handleAbaDetalhesPedidoChange,
+    bloquearAbasDetalhe: ajustandoPagamentoAposEdicaoItens,
     podeExibirAbaNotaFiscal,
     podeExibirAbaDadosEntrega,
     tipoInicioPedido,

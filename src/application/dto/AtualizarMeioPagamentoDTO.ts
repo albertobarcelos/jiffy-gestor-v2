@@ -7,6 +7,7 @@ import { TipoParcelamentoSchema } from '@/src/application/dto/CriarMeioPagamento
 export const AtualizarMeioPagamentoSchema = z.object({
   nome: z.string().min(1, 'Nome é obrigatório').optional(),
   tefAtivo: z.boolean().optional(),
+  isDelivery: z.boolean().optional(),
   formaPagamentoFiscal: z.string().optional(),
   ativo: z.boolean().optional(),
   isParcelavel: z.boolean().optional(),

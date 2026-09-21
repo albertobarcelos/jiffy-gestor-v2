@@ -1,15 +1,18 @@
 import { mapTicketToPrintDocument } from '@/src/application/delivery/mapTicketToPrintDocument'
 import { mapTicketToGraphicPrintDocument } from '@/src/application/delivery/mapTicketToGraphicPrintDocument'
+import { mapTicketToProducaoHibridoDocument } from '@/src/application/delivery/mapTicketToProducaoHibridoDocument'
 import {
   avisosProdutoSemImpressora,
   CODES_PRODUTO_SEM_IMPRESSORA,
   mensagemProdutoSemImpressora,
 } from '@/src/application/delivery/deliveryProdutoSemImpressoraAvisos'
 import { warningRedundanteMapeamentoImpressoraWindows } from '@/src/application/delivery/deliveryTicketWarningUtils'
+import { ticketPrintKey } from '@/src/application/delivery/ticketPrintKey'
+import type { DesenharPilulaProducao } from '@/src/application/ports/IDesenharPilulaProducao'
+import type { EnviarCupomPrintJob } from '@/src/application/ports/IEnviarCupomPrintJob'
+import type { GerarPrintJobId } from '@/src/application/ports/IGerarPrintJobId'
 import { TOAST_CUPOM_NAO_IMPRIMIU_SEM_VINCULO_PC } from '@/src/shared/utils/deliveryImpressoraExpedicao'
 import type { VendaGestorTicket, VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
-import { printDeliveryCupom } from '@/src/infrastructure/printing/printDeliveryCupom'
-import { buildPrintJobId, ticketPrintKey } from '@/src/infrastructure/printing/agent/printJobId'
 import { erroImpressao, logImpressao, warnImpressao } from '@/src/shared/utils/logImpressaoDelivery'
 import type { DeliveryCupomTemplateConfig } from '@/src/shared/types/deliveryCupomTemplate'
 
@@ -68,10 +71,13 @@ export function notificarWarningsTickets(
   }
 }
 
-/**
- * Envia cada ticket ao Print Orchestrator (agente Windows).
- */
-export async function imprimirTicketsApiGestor(params: {
+export type ImprimirTicketsApiGestorDeps = {
+  desenharPilula: DesenharPilulaProducao
+  enviarCupom: EnviarCupomPrintJob
+  gerarJobId: GerarPrintJobId
+}
+
+export type ImprimirTicketsApiGestorParams = {
   response: VendaGestorTicketsResponse
   ticketsAImprimir: VendaGestorTicket[]
   nomeEmpresa?: string
@@ -83,7 +89,18 @@ export async function imprimirTicketsApiGestor(params: {
   onAviso?: (mensagem: string) => void
   /** Quando o quadro já avisou que o fluxo segue sem papel. */
   omitirAvisoSemVinculoPc?: boolean
-}): Promise<void> {
+}
+
+export type ImprimirTicketsApiGestor = (params: ImprimirTicketsApiGestorParams) => Promise<void>
+
+/**
+ * Envia cada ticket ao Jiffy Print. A composição (PNG, jobId, HTTP do agente)
+ * fica na infrastructure.
+ */
+export function criarImprimirTicketsApiGestor(
+  deps: ImprimirTicketsApiGestorDeps
+): ImprimirTicketsApiGestor {
+  return async function imprimirTicketsApiGestor(params: ImprimirTicketsApiGestorParams): Promise<void> {
   const {
     response,
     ticketsAImprimir,
@@ -155,22 +172,29 @@ export async function imprimirTicketsApiGestor(params: {
 
       let document
       try {
-        document =
-          cupomTemplate?.modoPapel === 'grafico'
-            ? await mapTicketToGraphicPrintDocument(response, ticket, {
-                nomeEmpresa,
-                template: cupomTemplate,
-              })
-            : mapTicketToPrintDocument(response, ticket, {
-                nomeEmpresa,
-                template: cupomTemplate,
-              })
+        if (ticket.tipoCupom === 'producao') {
+          document = mapTicketToProducaoHibridoDocument(response, ticket, {
+            reimpressao,
+            desenharPilula: deps.desenharPilula,
+          })
+        } else if (cupomTemplate?.modoPapel === 'grafico') {
+          document = await mapTicketToGraphicPrintDocument(response, ticket, {
+            nomeEmpresa,
+            template: cupomTemplate,
+          })
+        } else {
+          document = mapTicketToPrintDocument(response, ticket, {
+            nomeEmpresa,
+            template: cupomTemplate,
+            desenharPilula: deps.desenharPilula,
+          })
+        }
       } catch (error) {
         falhas += 1
         const mensagem =
           error instanceof Error && error.message.trim()
             ? error.message
-            : 'Falha ao montar o cupom gráfico.'
+            : 'Falha ao montar o cupom.'
         warnImpressao('ticket.grafico_falhou', {
           mensagem,
           causa: error instanceof Error ? error.message : String(error),
@@ -178,7 +202,7 @@ export async function imprimirTicketsApiGestor(params: {
         onErro?.(mensagem)
         return
       }
-      const jobId = buildPrintJobId({
+      const jobId = deps.gerarJobId({
         vendaId: response.vendaId,
         tipoCupom: ticket.tipoCupom,
         ticketKey: ticketPrintKey(ticket),
@@ -195,7 +219,7 @@ export async function imprimirTicketsApiGestor(params: {
         blocos: document.content.length,
       })
 
-      const r = await printDeliveryCupom({
+      const r = await deps.enviarCupom({
         jobId,
         printerName,
         copies,
@@ -226,4 +250,5 @@ export async function imprimirTicketsApiGestor(params: {
     ignoradosSemItens,
     ignoradosFallbackProdutoSemImpressora,
   })
+  }
 }

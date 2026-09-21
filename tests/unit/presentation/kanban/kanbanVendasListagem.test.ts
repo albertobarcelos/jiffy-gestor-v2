@@ -87,4 +87,20 @@ describe('filtrarVendaDeliveryKanbanColunaPorDatasToolbar', () => {
       filtrarVendaDeliveryKanbanColunaPorDatasToolbar(venda, 'FINALIZADAS', params)
     ).toBe(true)
   })
+
+  it('mantém nota emitida no período mesmo com finalização fora', () => {
+    const params = {
+      dataFinalizacaoInicio: '2026-06-15T00:00:00.000Z',
+      dataFinalizacaoFim: '2026-06-15T23:59:59.999Z',
+    }
+    const venda = {
+      dataCriacao: '2026-06-14T12:00:00.000Z',
+      dataFinalizacao: '2026-06-14T18:00:00.000Z',
+      dataEmissaoFiscal: '2026-06-15T10:00:00.000Z',
+    } as Venda
+
+    expect(
+      filtrarVendaDeliveryKanbanColunaPorDatasToolbar(venda, 'FINALIZADAS', params)
+    ).toBe(true)
+  })
 })

@@ -1,4 +1,4 @@
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { fetchGestorApi } from '@/src/infrastructure/api/fetchGestorApi'
 import type { DocumentoFiscalXmlDTO } from '@/src/application/dto/DocumentoFiscalXmlDTO'
 import type { IDocumentoFiscalRepository } from '@/src/domain/repositories/IDocumentoFiscalRepository'
 

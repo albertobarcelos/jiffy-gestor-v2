@@ -8,6 +8,7 @@ import { MdClose } from 'react-icons/md'
 import {
   flattenCatalogoGrupos,
   usePublicDeliveryCatalogInfinite,
+  usePublicDeliveryComplementosStore,
 } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import { showToast } from '@/src/shared/utils/toast'
 import { clienteAtingiuMaxEnderecosDelivery } from '@/src/shared/constants/deliveryClienteEnderecos'
@@ -30,13 +31,20 @@ import type { CotacaoPedidoPublicoDTO } from '@/src/application/dto/delivery-pub
 import { DELIVERY_PAIS_TELEFONE_PADRAO } from '@/src/shared/constants/deliveryPaisesTelefone'
 import { findCatalogoProdutoById } from '../../shared/utils/findCatalogoProdutoById'
 import { itemSemComplemento } from '../../shared/utils/deliveryCarrinhoItemUtils'
+import {
+  avaliarComplementosItemCarrinho,
+  type AvaliacaoComplementosItemCarrinho,
+  type GrupoComplementoAcimaDoMaximo,
+  type GrupoComplementoPendente,
+} from '../../shared/utils/produtoComplementosUtils'
 import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPublicaEndereco'
 import { formatDeliveryCurrency } from '../../shared/utils/formatDeliveryCurrency'
-import { isTokenCotacaoExpirado } from '../../shared/utils/deliveryCheckoutCotacaoUtils'
+import { isTokenCotacaoExpirado, MARGEM_RENOVACAO_TOKEN_COTACAO_MS } from '../../shared/utils/deliveryCheckoutCotacaoUtils'
 import { deliveryPublicoPedidoPath } from '../../shared/utils/deliveryPublicoRoutes'
 import { salvarPedidoPublicoConfirmado } from '../../shared/utils/pedidoConfirmadoStorage'
 import { useLocalizacaoEmpresaPublica } from '../../shared/hooks/useLocalizacaoEmpresaPublica'
 import { DeliveryProdutoModal } from '../components/DeliveryProdutoModal'
+import { DeliveryComplementosObrigatoriosAlertDialog } from '../components/DeliveryComplementosObrigatoriosAlertDialog'
 import { DeliveryCheckoutFooterActions } from '../components/checkout/DeliveryCheckoutFooterActions'
 import type { EnderecoGeoCheckoutInput } from '@/src/application/dto/delivery-publico/EnderecoGeoCheckoutDTO'
 import { enderecoTemGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoDelivery'
@@ -46,7 +54,34 @@ import { DeliveryCheckoutProgressProvider } from '../components/checkout/Deliver
 import { DeliveryCheckoutShell } from '../components/checkout/DeliveryCheckoutShell'
 import type { DeliveryCheckoutStep } from '../components/checkout/deliveryCheckoutProgress'
 
-/** Placeholder leve enquanto o chunk do modal carrega (P4.1). */
+const MSG_COMPLEMENTOS_INDEFINIDOS =
+  'Não foi possível validar os complementos. Tente novamente.'
+
+type AlertaComplementosCarrinho = {
+  pendentes: Array<GrupoComplementoPendente & { produtoNome: string }>
+  acimaDoMaximo: Array<GrupoComplementoAcimaDoMaximo & { produtoNome: string }>
+  origem: 'remocao' | 'continuar'
+}
+
+function alertaDeAvaliacao(
+  avaliacao: Extract<AvaliacaoComplementosItemCarrinho, { status: 'invalido' }>,
+  somenteMinimo: boolean
+): AlertaComplementosCarrinho {
+  return {
+    pendentes: avaliacao.pendentes.map(grupo => ({
+      ...grupo,
+      produtoNome: avaliacao.produtoNome,
+    })),
+    acimaDoMaximo: somenteMinimo
+      ? []
+      : avaliacao.acimaDoMaximo.map(grupo => ({
+          ...grupo,
+          produtoNome: avaliacao.produtoNome,
+        })),
+    origem: somenteMinimo ? 'remocao' : 'continuar',
+  }
+}
+
 function CheckoutModalChunkFallback() {
   return (
     <div
@@ -151,6 +186,8 @@ export function DeliveryPublicoCarrinhoScreen({
     message: string
     cotacao: CotacaoPedidoPublicoDTO
   } | null>(null)
+  const [alertaComplementos, setAlertaComplementos] =
+    useState<AlertaComplementosCarrinho | null>(null)
 
   const requestClose = () => setAberto(false)
 
@@ -188,6 +225,7 @@ export function DeliveryPublicoCarrinhoScreen({
     meiosPagamento,
     loadingMeios,
     enviando,
+    etapaEnvio,
     enviarPedido,
     salvarNomeCliente,
     limparIdentificacaoCliente,
@@ -221,6 +259,7 @@ export function DeliveryPublicoCarrinhoScreen({
   )
 
   const catalogQuery = usePublicDeliveryCatalogInfinite(slug)
+  const cacheComplementos = usePublicDeliveryComplementosStore(s => s.porSlug[slug] ?? null)
 
   const empresa = catalogQuery.data?.pages[0]?.empresa ?? null
   const enderecoEmpresaTexto = formatEmpresaPublicaEndereco(empresa?.endereco ?? null)
@@ -388,6 +427,20 @@ export function DeliveryPublicoCarrinhoScreen({
   ])
 
   useEffect(() => {
+    if (checkoutStep !== 'revisao' || enviando) return
+    const expiresAt = cotacao?.expiresAt
+    if (!expiresAt) return
+    const ts = Date.parse(expiresAt)
+    if (Number.isNaN(ts)) return
+
+    const atraso = Math.max(0, ts - MARGEM_RENOVACAO_TOKEN_COTACAO_MS - Date.now())
+    const timer = window.setTimeout(() => {
+      void recotarPedidoRef.current({ silencioso: true, forcar: true })
+    }, atraso)
+    return () => window.clearTimeout(timer)
+  }, [checkoutStep, cotacao?.expiresAt, enviando])
+
+  useEffect(() => {
     if (!itemEditando) return
     if (produtoEdicao) return
     if (catalogQuery.isLoading || catalogQuery.isFetchingNextPage || catalogQuery.hasNextPage) {
@@ -504,8 +557,61 @@ export function DeliveryPublicoCarrinhoScreen({
       showToast.error('A loja está fechada no momento. Não é possível finalizar pedidos.')
       return
     }
+
+    const pendentes: AlertaComplementosCarrinho['pendentes'] = []
+    const acimaDoMaximo: AlertaComplementosCarrinho['acimaDoMaximo'] = []
+
+    for (const item of itensVisiveis) {
+      const avaliacao = avaliarItemCarrinho(item, item.complementos)
+      if (avaliacao.status === 'indefinido') {
+        showToast.error(MSG_COMPLEMENTOS_INDEFINIDOS)
+        return
+      }
+      if (avaliacao.status === 'invalido') {
+        const alerta = alertaDeAvaliacao(avaliacao, false)
+        pendentes.push(...alerta.pendentes)
+        acimaDoMaximo.push(...alerta.acimaDoMaximo)
+      }
+    }
+
+    if (pendentes.length > 0 || acimaDoMaximo.length > 0) {
+      setAlertaComplementos({ pendentes, acimaDoMaximo, origem: 'continuar' })
+      return
+    }
+
     handleContinuarCheckoutFlow()
   }
+
+  const avaliarItemCarrinho = useCallback(
+    (
+      item: DeliveryCarrinhoItem,
+      complementos: DeliveryCarrinhoItem['complementos']
+    ) =>
+      avaliarComplementosItemCarrinho({
+        produto: findCatalogoProdutoById(grupos, item.produtoId),
+        cache: cacheComplementos,
+        produtoNome: item.produtoNome,
+        complementos,
+      }),
+    [cacheComplementos, grupos]
+  )
+
+  const handleRemoverComplemento = useCallback(
+    (item: DeliveryCarrinhoItem, complementoId: string, grupoComplementoId: string) => {
+      const proximo = itemSemComplemento(item, complementoId, grupoComplementoId)
+      const avaliacao = avaliarItemCarrinho(item, proximo.complementos)
+      if (avaliacao.status === 'indefinido') {
+        showToast.error(MSG_COMPLEMENTOS_INDEFINIDOS)
+        return
+      }
+      if (avaliacao.status === 'invalido' && avaliacao.pendentes.length > 0) {
+        setAlertaComplementos(alertaDeAvaliacao(avaliacao, true))
+        return
+      }
+      substituirItem(slug, item.id, proximo)
+    },
+    [avaliarItemCarrinho, slug, substituirItem]
+  )
 
   const handleChangeOpcaoEntrega = (opcao: ModoEntregaOpcao) => {
     updateForm('tipoEntrega', opcao.tipoEntrega)
@@ -524,6 +630,18 @@ export function DeliveryPublicoCarrinhoScreen({
     }
 
     avancarAposIdentificacao()
+  }
+
+  /** Após limpar identificação: só reconsulta, sem avançar de step. */
+  const handleBuscarTelefoneIdentificacao = async (digits: string) => {
+    const { status } = await consultarClientePorTelefone(digits)
+    if (status === 'invalido') {
+      showToast.error(DELIVERY_MSG_CELULAR_COMPLETO)
+      return
+    }
+    if (status === 'erro') {
+      showToast.error('Erro ao consultar cadastro. Tente novamente.')
+    }
   }
 
   const handleConfirmarEnderecoForm = async (geo: EnderecoGeoCheckoutInput) => {
@@ -651,11 +769,7 @@ export function DeliveryPublicoCarrinhoScreen({
                             onRemove={() => requestRemoveItem(item.id)}
                             onEdit={() => setItemEditando(item)}
                             onRemoveComplemento={(complementoId, grupoComplementoId) =>
-                              substituirItem(
-                                slug,
-                                item.id,
-                                itemSemComplemento(item, complementoId, grupoComplementoId)
-                              )
+                              handleRemoverComplemento(item, complementoId, grupoComplementoId)
                             }
                           />
                         </DeliveryCarrinhoSwipeableItem>
@@ -768,6 +882,7 @@ export function DeliveryPublicoCarrinhoScreen({
             novoEnderecoBloqueado={novoEnderecoBloqueado}
             onSalvarNome={salvarNomeCliente}
             onLimparIdentificacao={limparIdentificacaoCliente}
+            onBuscarTelefone={handleBuscarTelefoneIdentificacao}
             onClose={fecharOuRevisao}
             onContinuar={handleTelefoneContinuar}
           />
@@ -851,11 +966,16 @@ export function DeliveryPublicoCarrinhoScreen({
             taxaEntregaOficial={taxaEntregaOficial}
             totalOficial={totalOficial}
             cotacaoLoading={cotacaoLoading}
-            cotacaoPronta={cotacaoPronta}
+            cotacaoPronta={
+              cotacao != null &&
+              Boolean(cotacao.tokenCotacao) &&
+              !isTokenCotacaoExpirado(cotacao.expiresAt)
+            }
             pagamentos={pagamentosRevisao}
             observacaoPedido={form.observacaoPedido}
             cpfNotaFiscal={form.cpfNotaFiscal}
             enviando={enviando}
+            etapaEnvio={etapaEnvio}
             onClose={fecharCheckout}
             onVoltar={() => {
               goToCheckoutStep('pagamento')
@@ -927,6 +1047,17 @@ export function DeliveryPublicoCarrinhoScreen({
           handleContinuarCheckoutFlow()
         }}
       />
+
+      {alertaComplementos ? (
+        <DeliveryComplementosObrigatoriosAlertDialog
+          gruposPendentes={alertaComplementos.pendentes}
+          gruposAcimaDoMaximo={alertaComplementos.acimaDoMaximo}
+          origem={
+            alertaComplementos.origem === 'remocao' ? 'remocao-carrinho' : 'detalhe-produto'
+          }
+          onConfirmar={() => setAlertaComplementos(null)}
+        />
+      ) : null}
     </DeliveryCheckoutProgressProvider>
   )
 }

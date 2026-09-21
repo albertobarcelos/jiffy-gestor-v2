@@ -19,9 +19,17 @@ import {
 } from '@/src/application/mappers/VendaApiNormalizer'
 import type { VendaGestorApiResponse } from '@/src/application/dto/api/vendaGestorApi'
 import { deveUsarModuloDeliveryParaDetalhe } from '@/src/application/mappers/PedidoDeliveryDetalheAdapter'
+import {
+  atorUsuarioId,
+  copiarNomeEntreIdsDoAtor,
+  idUsuarioParaConsulta,
+  idsConsultaveisDoAtor,
+  nomeUsuarioDePayloadApi,
+  rotuloAtorPedido,
+  completarNomesAtoresPedidoDelivery,
+} from '@/src/application/mappers/atorPedidoDelivery'
 import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
 import type { IVendaDetalheReadRepository } from '@/src/domain/repositories/IVendaDetalheReadRepository'
-import { vendaDetalheReadRepository } from '@/src/infrastructure/api/repositories/VendaDetalheReadRepository'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
 import type {
   DetalhesEntregaPedido,
@@ -42,7 +50,7 @@ export interface CarregarVendaDetalheParams {
   token: string
   modoVisualizacao?: boolean
   meiosPagamentoCache?: MeioPagamentoCacheItem[]
-  /** Hint do Kanban/unificado (`entrega`, `retirada`, `balcao`) para escolher GET delivery vs gestor. */
+  /** Hint do Kanban (`delivery` vs balcão) para escolher GET delivery vs gestor. */
   tipoVendaGestor?: string | null
 }
 
@@ -51,6 +59,12 @@ function mapDetalhesPedidoMeta(vendaData: Record<string, unknown>): DetalhesPedi
     numeroVenda: (vendaData.numeroVenda as number | null | undefined) ?? null,
     codigoVenda: vendaData.codigoVenda != null ? String(vendaData.codigoVenda) : null,
     tipoVenda: vendaData.tipoVenda != null ? String(vendaData.tipoVenda) : null,
+    tipoEntrega: (() => {
+      const t = String(vendaData.tipoEntrega ?? '')
+        .trim()
+        .toLowerCase()
+      return t === 'entrega' || t === 'retirada' ? t : null
+    })(),
     numeroMesa: (vendaData.numeroMesa as string | number | null | undefined) ?? null,
     statusMesa: vendaData.statusMesa != null ? String(vendaData.statusMesa) : null,
     abertoPorId: vendaData.abertoPorId != null ? String(vendaData.abertoPorId) : null,
@@ -174,23 +188,58 @@ async function resolverNomesUsuarios(
   repo: IVendaDetalheReadRepository,
   idsUsuarios: Set<string>,
   tabelaOrigemVenda: 'venda' | 'venda_gestor',
-  token: string
+  token: string,
+  nomesEmbutidos: Record<string, string> = {}
 ): Promise<Record<string, string>> {
-  const mapUsuarios: Record<string, string> = {}
+  const mapUsuarios: Record<string, string> = { ...nomesEmbutidos }
+
+  const aliasesPorConsulta = new Map<string, string[]>()
+  for (const usuarioId of idsUsuarios) {
+    const consultaId = idUsuarioParaConsulta(usuarioId)
+    if (!consultaId) continue
+    const aliases = aliasesPorConsulta.get(consultaId) ?? []
+    aliases.push(usuarioId)
+    aliasesPorConsulta.set(consultaId, aliases)
+  }
 
   await Promise.all(
-    Array.from(idsUsuarios).map(async usuarioId => {
-      const d =
-        tabelaOrigemVenda === 'venda_gestor'
-          ? await repo.fetchUsuarioGestor(usuarioId, token)
-          : await repo.fetchUsuarioPdv(usuarioId, token)
-      if (!d) return
-      const nome = String(d.nome ?? d.name ?? d.username ?? '').trim()
-      if (nome) mapUsuarios[usuarioId] = nome
+    Array.from(aliasesPorConsulta.entries()).map(async ([consultaId, aliases]) => {
+      const nomeJaResolvido =
+        mapUsuarios[consultaId] || aliases.map(id => mapUsuarios[id]).find(Boolean) || ''
+      const nome =
+        nomeJaResolvido ||
+        (await buscarNomeUsuarioPedido(repo, consultaId, tabelaOrigemVenda, token))
+      if (!nome) return
+      mapUsuarios[consultaId] = nome
+      for (const alias of aliases) mapUsuarios[alias] = nome
     })
   )
 
   return mapUsuarios
+}
+
+async function buscarNomeUsuarioPedido(
+  repo: IVendaDetalheReadRepository,
+  usuarioId: string,
+  tabelaOrigemVenda: 'venda' | 'venda_gestor',
+  token: string
+): Promise<string> {
+  const tentativas =
+    tabelaOrigemVenda === 'venda_gestor'
+      ? [
+          () => repo.fetchUsuarioGestor(usuarioId, token),
+          () => repo.fetchUsuarioPdv(usuarioId, token),
+        ]
+      : [
+          () => repo.fetchUsuarioPdv(usuarioId, token),
+          () => repo.fetchUsuarioGestor(usuarioId, token),
+        ]
+
+  for (const tentar of tentativas) {
+    const nome = nomeUsuarioDePayloadApi(await tentar())
+    if (nome) return nome
+  }
+  return ''
 }
 
 async function resolverNomesMeiosPagamento(
@@ -245,36 +294,156 @@ async function resolverNomesMeiosPagamento(
 
 function coletarIdsUsuarios(vendaData: VendaGestorApiResponse): Set<string> {
   const idsUsuarios = new Set<string>()
+  const anexar = (ator: unknown) => {
+    for (const id of idsConsultaveisDoAtor(ator)) idsUsuarios.add(id)
+    const unico = atorUsuarioId(ator)
+    if (unico) idsUsuarios.add(unico)
+  }
+  const anexarId = (id: unknown) => {
+    const v = String(id || '').trim()
+    if (v) idsUsuarios.add(v)
+  }
+
   ;[vendaData.abertoPorId, vendaData.ultimoResponsavelId, vendaData.canceladoPorId].forEach(
-    (id: unknown) => {
-      const v = String(id || '').trim()
-      if (v) idsUsuarios.add(v)
-    }
+    anexarId
   )
+  anexar(vendaData.abertoPor)
+  anexar(vendaData.ultimoResponsavel)
+  anexar(vendaData.canceladoPor)
 
   pickProdutosLancados(vendaData).forEach((prod: unknown) => {
       const p = prod as Record<string, unknown>
-      const lancadoPorId = String(p.lancadoPorId ?? '').trim()
-      const removidoPorId = String(p.removidoPorId ?? '').trim()
+      const lancadoPorId =
+        String(p.lancadoPorId ?? '').trim() || atorUsuarioId(p.lancadoPor) || ''
+      const removidoPorId =
+        String(p.removidoPorId ?? '').trim() || atorUsuarioId(p.removidoPor) || ''
       if (lancadoPorId) idsUsuarios.add(lancadoPorId)
       if (removidoPorId) idsUsuarios.add(removidoPorId)
+      anexar(p.lancadoPor)
+      anexar(p.removidoPor)
   })
 
   const pagamentos = Array.isArray(vendaData.pagamentos) ? vendaData.pagamentos : []
   pagamentos.forEach((pag: unknown) => {
     const p = pag as Record<string, unknown>
-    const realizadoPorId = String(p.realizadoPorId ?? '').trim()
-    const canceladoPorId = String(p.canceladoPorId ?? '').trim()
-    if (realizadoPorId) idsUsuarios.add(realizadoPorId)
-    if (canceladoPorId) idsUsuarios.add(canceladoPorId)
+    anexarId(p.realizadoPorId)
+    anexarId(p.canceladoPorId)
+    anexar(p.realizadoPor)
+    anexar(p.criadaPor)
+    anexar(p.criadoPor)
+    anexar(p.canceladoPor)
+  })
+
+  const cobrancas = Array.isArray(vendaData.cobrancas) ? vendaData.cobrancas : []
+  cobrancas.forEach(raw => {
+    if (!raw || typeof raw !== 'object') return
+    const c = raw as Record<string, unknown>
+    anexar(c.criadaPor)
+    anexar(c.criadoPor)
+    anexar(c.lancadaPor)
+    anexar(c.abertaPor)
+    anexar(c.canceladaPor)
+    anexarId(c.criadaPorId)
+    anexarId(c.criadoPorId)
+    const efetivado =
+      c.pagamentoEfetivado && typeof c.pagamentoEfetivado === 'object'
+        ? (c.pagamentoEfetivado as Record<string, unknown>)
+        : null
+    anexar(efetivado?.realizadoPor)
+    anexarId(efetivado?.realizadoPorId)
   })
 
   return idsUsuarios
 }
 
+function registrarNomeAtor(map: Record<string, string>, ator: unknown) {
+  const id = atorUsuarioId(ator)
+  const rotulo = rotuloAtorPedido(ator)
+  if (id && rotulo) map[id] = rotulo
+}
+
+function coletarNomesAtoresEmbutidos(vendaData: VendaGestorApiResponse): Record<string, string> {
+  const map: Record<string, string> = {}
+  const anexar = (ator: unknown) => {
+    registrarNomeAtor(map, ator)
+    copiarNomeEntreIdsDoAtor(map, ator)
+  }
+  anexar(vendaData.abertoPor)
+  anexar(vendaData.ultimoResponsavel)
+  anexar(vendaData.canceladoPor)
+  anexar(vendaData.cliente)
+
+  pickProdutosLancados(vendaData).forEach(prod => {
+    const p = prod as Record<string, unknown>
+    anexar(p.lancadoPor)
+    anexar(p.removidoPor)
+  })
+
+  const pagamentos = Array.isArray(vendaData.pagamentos) ? vendaData.pagamentos : []
+  pagamentos.forEach(pag => {
+    const p = pag as Record<string, unknown>
+    anexar(p.realizadoPor)
+    anexar(p.canceladoPor)
+    anexar(p.criadaPor)
+    anexar(p.criadoPor)
+  })
+
+  const cobrancas = Array.isArray(vendaData.cobrancas) ? vendaData.cobrancas : []
+  cobrancas.forEach(raw => {
+    if (!raw || typeof raw !== 'object') return
+    const c = raw as Record<string, unknown>
+    anexar(c.criadaPor)
+    anexar(c.criadoPor)
+    anexar(c.lancadaPor)
+    anexar(c.abertaPor)
+    anexar(c.canceladaPor)
+    const efetivado =
+      c.pagamentoEfetivado && typeof c.pagamentoEfetivado === 'object'
+        ? (c.pagamentoEfetivado as Record<string, unknown>)
+        : null
+    anexar(efetivado?.realizadoPor)
+  })
+
+  return map
+}
+
+function propagarNomesEntreAtoresRelacionados(
+  map: Record<string, string>,
+  vendaData: VendaGestorApiResponse
+): Record<string, string> {
+  const next = { ...map }
+  const atores: unknown[] = [
+    vendaData.abertoPor,
+    vendaData.ultimoResponsavel,
+    vendaData.canceladoPor,
+  ]
+  pickProdutosLancados(vendaData).forEach(prod => {
+    const p = prod as Record<string, unknown>
+    atores.push(p.lancadoPor, p.removidoPor)
+  })
+  const pagamentos = Array.isArray(vendaData.pagamentos) ? vendaData.pagamentos : []
+  pagamentos.forEach(pag => {
+    const p = pag as Record<string, unknown>
+    atores.push(p.realizadoPor, p.criadaPor, p.criadoPor, p.canceladoPor)
+  })
+  const cobrancas = Array.isArray(vendaData.cobrancas) ? vendaData.cobrancas : []
+  cobrancas.forEach(raw => {
+    if (!raw || typeof raw !== 'object') return
+    const c = raw as Record<string, unknown>
+    atores.push(c.criadaPor, c.criadoPor, c.lancadaPor, c.abertaPor, c.canceladaPor)
+    const efetivado =
+      c.pagamentoEfetivado && typeof c.pagamentoEfetivado === 'object'
+        ? (c.pagamentoEfetivado as Record<string, unknown>)
+        : null
+    atores.push(efetivado?.realizadoPor)
+  })
+  for (const ator of atores) copiarNomeEntreIdsDoAtor(next, ator)
+  return next
+}
+
 export class CarregarVendaDetalheUseCase {
   constructor(
-    private readonly vendaDetalheRepo: IVendaDetalheReadRepository = vendaDetalheReadRepository
+    private readonly vendaDetalheRepo: IVendaDetalheReadRepository
   ) {}
 
   async execute(params: CarregarVendaDetalheParams): Promise<VendaDetalheCarregadaDTO> {
@@ -316,12 +485,13 @@ export class CarregarVendaDetalheUseCase {
     const tipoVendaCarregada = String(vendaData.tipoVenda ?? '')
       .trim()
       .toLowerCase()
+    const isDeliveryPedido = tipoVendaCarregada === 'delivery'
 
     let clienteId: string | null = null
     let clienteNome: string | null = null
     let detalhesEntregaPedido: DetalhesEntregaPedido | null = null
 
-    if (tipoVendaCarregada === 'entrega' || tipoVendaCarregada === 'retirada') {
+    if (isDeliveryPedido) {
       let detalhesEntrega = mapDetalhesEntregaFromVendaApi(vendaData)
       const clienteIdVenda = String(vendaData.clienteId ?? '').trim()
       let clienteData: Record<string, unknown> | null = null
@@ -407,7 +577,7 @@ export class CarregarVendaDetalheUseCase {
     const produtosResult = mapProdutosDetalheVenda(vendaData)
     let resumoFinanceiroDetalhes = produtosResult.resumoFinanceiroDetalhes
 
-    if (tipoVendaCarregada === 'entrega' || tipoVendaCarregada === 'retirada') {
+    if (isDeliveryPedido) {
       const taxaEntrega = await resolverTaxaEntregaDetalhe(
         vendaData,
         token,
@@ -433,19 +603,39 @@ export class CarregarVendaDetalheUseCase {
     }
 
     const valorFinalVendaNormalizado =
-      tipoVendaCarregada === 'entrega' || tipoVendaCarregada === 'retirada'
+      isDeliveryPedido
         ? (resumoFinanceiroDetalhes?.totalDosItens ?? valorFinalVenda)
         : valorFinalVenda
 
     const { pagamentos, fluxoPagamentoEntrega } = mapPagamentosDetalheVenda(vendaData)
 
     const idsUsuarios = coletarIdsUsuarios(vendaData)
-    const nomesUsuariosPedido = await resolverNomesUsuarios(
+    const nomesEmbutidos = coletarNomesAtoresEmbutidos(vendaData)
+    if (clienteId && clienteNome) nomesEmbutidos[clienteId] = clienteNome
+    const nomesResolvidos = await resolverNomesUsuarios(
       this.vendaDetalheRepo,
       idsUsuarios,
       tabelaOrigemVenda,
-      token
+      token,
+      nomesEmbutidos
     )
+    const nomesComAtoresRelacionados = propagarNomesEntreAtoresRelacionados(
+      nomesResolvidos,
+      vendaData
+    )
+    const nomesUsuariosPedido = completarNomesAtoresPedidoDelivery(
+      nomesComAtoresRelacionados,
+      [clienteId, vendaData.abertoPorId].filter(
+        (id): id is string => Boolean(String(id ?? '').trim())
+      ),
+      origemTextoApi,
+      clienteNome
+    )
+    for (const pagamento of pagamentos) {
+      const id = String(pagamento.realizadoPorId ?? '').trim()
+      const nome = String(pagamento.realizadoPorNome ?? '').trim()
+      if (id && nome && !nomesUsuariosPedido[id]) nomesUsuariosPedido[id] = nome
+    }
     const nomesMeiosPagamentoPedido = await resolverNomesMeiosPagamento(
       this.vendaDetalheRepo,
       vendaData,

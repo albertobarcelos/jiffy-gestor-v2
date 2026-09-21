@@ -1,4 +1,4 @@
-import type { PedidoKanbanQuickViewData } from '@/src/presentation/components/features/delivery/kanban-panels/carregarPedidoKanbanQuickView'
+import type { PedidoKanbanQuickViewData } from '@/src/application/use-cases/vendas/CarregarPedidoKanbanQuickViewUseCase'
 import {
   formatarCelularExibicao,
   formatarDataDetalhePedido,
@@ -6,7 +6,7 @@ import {
   formatarHoraPrevisaoEntrega,
 } from '@/src/application/mappers/PedidoDisplayMapper'
 import type { EnderecoEntregaDetalhe } from '@/src/domain/types/vendaDetalhe'
-import type { EnderecoEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import type { EnderecoEmpresaMe } from '@/src/application/dto/EmpresaMeDTO'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { E } from './whatsappMensagemEmojis'
 

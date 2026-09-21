@@ -61,6 +61,8 @@ export interface NovoPedidoFormSlice {
   setStatus: Dispatch<SetStateAction<StatusVenda>>
   statusDisponiveis: StatusOption[]
   clienteNome: string
+  nomeUsuario: string
+  usuarioLogadoId: string
   produtos: ProdutoSelecionado[]
   pagamentos: PagamentoSelecionado[]
   setPagamentos: Dispatch<SetStateAction<PagamentoSelecionado[]>>
@@ -280,6 +282,16 @@ export interface NovoPedidoDetalheSlice {
   podeEditarPagamentoEntregaEmAberto: boolean
   podeAjustarPagamentoEntregaEmAberto: boolean
   pagamentoEntregaConfirmado: boolean
+  /**
+   * Após salvar itens no detalhe, a cobrança divergiu do novo total.
+   * O operador precisa ajustar e gravar o pagamento antes de sair.
+   */
+  ajustandoPagamentoAposEdicaoItens: boolean
+  /** Catálogo de produtos de um pedido já existente (lápis do Kanban ou Editar Pedido no detalhe). */
+  modoEdicaoProdutos: boolean
+  /** Pedido delivery em PENDENTE/EM_PREPARO/PRONTO: o detalhe pode abrir a edição completa dos itens. */
+  podeEditarItensPedidoDetalhe: boolean
+  handleEditarPedidoNoDetalhe: () => void
   produtoTabsModalState: ProdutosTabsModalState
   handleAbrirEdicaoProdutoDetalhes: (
     produtoId: string | null | undefined,

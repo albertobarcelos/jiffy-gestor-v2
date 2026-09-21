@@ -217,7 +217,8 @@ describe('aplicarPedidoDeliveryStatusAlteradoNoKanbanCache', () => {
     expect(preparo?.pages[0].items).toEqual([])
     const card = rota?.pages[0].items[0]
     expect(card?.id).toBe('ped-rt-1')
-    expect(card?.tipoVenda).toBe('retirada')
+    expect(card?.tipoVenda).toBe('delivery')
+    expect(card?.tipoEntrega).toBe('retirada')
     expect(card?.valorFinal).toBe(39.9)
     expect(card?.cliente?.nome).toBe('KLEVERSON JARA')
     expect(card?.statusEtapaOperacional).toBe('EM_ROTA')

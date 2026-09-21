@@ -16,7 +16,7 @@ export interface VerificarCbenefEmissaoInput {
 export class VerificarCbenefEmissaoUseCase {
   constructor(
     private readonly fiscalRepo: IFiscalPainelRepository,
-    private readonly carregarVendaDetalhe = new CarregarVendaDetalheUseCase()
+    private readonly carregarVendaDetalhe: CarregarVendaDetalheUseCase
   ) {}
 
   async execute(input: VerificarCbenefEmissaoInput): Promise<ItemVendaCbenef[]> {

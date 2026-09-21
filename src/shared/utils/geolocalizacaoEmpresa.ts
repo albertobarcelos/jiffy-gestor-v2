@@ -120,6 +120,67 @@ export async function geocodificarEnderecoEmpresaViaGoogle(
   }
 }
 
+/** Chave estável dos campos que definem a coordenada da loja (ignora complemento). */
+export function assinaturaEnderecoEmpresaGeocode(input: EnderecoEmpresaGeocodeInput): string {
+  return [
+    (input.rua ?? '').trim().toLowerCase(),
+    (input.numero ?? '').trim().toLowerCase(),
+    (input.bairro ?? '').trim().toLowerCase(),
+    (input.cidade ?? '').trim().toLowerCase(),
+    (input.estado ?? '').trim().toUpperCase(),
+    normalizarCepEndereco(input.cep),
+  ].join('|')
+}
+
+export type ResolucaoPinEmpresa =
+  | { acao: 'manter'; point: GeoJsonPoint; providerEnderecoId: string | null }
+  | { acao: 'geocodificar' }
+  | { acao: 'bloquear'; motivo: string }
+
+/**
+ * Ao salvar a empresa: geocodifica se o endereço está completo.
+ * Exceção: Places nesta sessão (pin já alinhado ao formulário novo).
+ * Endereço já salvo com pin antigo (ex.: mudou de cidade antes) também geocodifica.
+ */
+export function resolverPinAoSalvarEmpresa(params: {
+  enderecoAtual: EnderecoEmpresaGeocodeInput
+  enderecoSalvo: EnderecoEmpresaGeocodeInput | null
+  pinAtual: GeoJsonPoint | null
+  providerEnderecoId: string | null
+  pinAlinhadoAoFormulario: boolean
+}): ResolucaoPinEmpresa {
+  const minimo = enderecoEmpresaGeocodeMinimo(params.enderecoAtual)
+  const enderecoMudou =
+    !params.enderecoSalvo ||
+    assinaturaEnderecoEmpresaGeocode(params.enderecoAtual) !==
+      assinaturaEnderecoEmpresaGeocode(params.enderecoSalvo)
+
+  if (!minimo) {
+    if (enderecoMudou || !params.pinAtual) {
+      return {
+        acao: 'bloquear',
+        motivo:
+          'Preencha rua, número, cidade e estado. Ao mudar o endereço, a localização da loja é atualizada automaticamente.',
+      }
+    }
+    return {
+      acao: 'manter',
+      point: params.pinAtual,
+      providerEnderecoId: params.providerEnderecoId,
+    }
+  }
+
+  if (params.pinAlinhadoAoFormulario && params.pinAtual && enderecoMudou) {
+    return {
+      acao: 'manter',
+      point: params.pinAtual,
+      providerEnderecoId: params.providerEnderecoId,
+    }
+  }
+
+  return { acao: 'geocodificar' }
+}
+
 export function montarPatchEnderecoGeolocalizacao(
   point: GeoJsonPoint | null,
   providerEnderecoId?: string | null

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildGraphicPrintDocument } from '@/src/application/delivery/mapTicketToGraphicPrintDocument'
+import { fonteProdutoEscPosA22Px } from '@/src/application/delivery/cupomPrintLayout'
 import { graphicRasterScale } from '@/src/infrastructure/printing/rasterizeCupomHtml'
 
 describe('mapTicketToGraphicPrintDocument', () => {
@@ -15,5 +16,10 @@ describe('mapTicketToGraphicPrintDocument', () => {
   it('escala o HTML para a largura em dots da térmica', () => {
     expect(graphicRasterScale(58)).toBeCloseTo(384 / 220)
     expect(graphicRasterScale(80)).toBeCloseTo(576 / 300)
+  })
+
+  it('Font A 2/2 nos produtos equivale a 48 dots de altura', () => {
+    expect(fonteProdutoEscPosA22Px(80)).toBe(25)
+    expect(fonteProdutoEscPosA22Px(58)).toBe(28)
   })
 })

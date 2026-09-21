@@ -4,7 +4,7 @@ import { proxyAuthenticatedBackendPost } from '@/src/shared/utils/proxyAuthentic
 
 /**
  * POST /api/delivery/complementos/[complementoId]/upload-intent
- * Proxy → POST /api/v1/delivery/complementos/:id/upload-intent
+ * Proxy → POST /api/v1/cardapio/complementos-produto/:id/upload-intent
  */
 export async function POST(
   request: NextRequest,
@@ -23,7 +23,7 @@ export async function POST(
   try {
     const body = await request.json()
     return proxyAuthenticatedBackendPost(
-      `/api/v1/delivery/complementos/${encodeURIComponent(complementoId.trim())}/upload-intent`,
+      `/api/v1/cardapio/complementos-produto/${encodeURIComponent(complementoId.trim())}/upload-intent`,
       validation.tokenInfo.token,
       body,
       201

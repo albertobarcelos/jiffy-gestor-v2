@@ -1,4 +1,4 @@
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { fetchGestorApi } from '@/src/infrastructure/api/fetchGestorApi'
 export interface UpdateGrupoProdutoStatusInput {
   grupoId: string
   novoStatus: boolean

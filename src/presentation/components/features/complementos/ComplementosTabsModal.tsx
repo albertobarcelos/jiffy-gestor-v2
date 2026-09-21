@@ -20,7 +20,7 @@ interface ComplementosTabsModalProps {
   state: ComplementosTabsModalState
   onClose: () => void
   onTabChange: (tab: TabKey) => void
-  onReload?: () => void
+  onReload?: (savedId?: string, imagemUrl?: string | null) => void
   /** Chamado ao criar um novo complemento — passa o id para quem precisar auto-vincular. */
   onCreated?: (id: string) => void
   /** Empilhar acima de outros painéis (ex.: modal de lançamento de produto em z-index 1400). */
@@ -129,11 +129,11 @@ export function ComplementosTabsModal({
               embeddedFormId={COMPLEMENTO_TABS_FORM_ID}
               hideEmbeddedFormActions
               onEmbedFormStateChange={setEmbedFormState}
-              onSaved={(savedId) => {
+              onSaved={async (savedId, imagemUrl) => {
                 if (state.mode === 'create' && savedId) {
                   onCreated?.(savedId)
                 }
-                onReload?.()
+                await Promise.resolve(onReload?.(savedId, imagemUrl))
                 onClose()
               }}
               onCancel={handleRequestClose}

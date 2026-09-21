@@ -10,7 +10,6 @@
  * | JIFFY_DELIVERY    | JIFFY_DELIVERY            | App / rota pública Jiffy |
  * | AIQFOME           | AIQFOME                   | Integração Aiqfome |
  * | PDV               | omitido                   | Não se aplica à listagem delivery |
- * | DELIVERY (legado) | JIFFY_DELIVERY            | Snapshot antigo da toolbar |
  *
  * Datas: o Kanban hoje envia `dataFinalizacaoInicio/Fim` ao unificado; na API delivery
  * os nomes são `dataFinalizacaoInicial/Final` (mapeados em `montarPedidosDeliveryQueryParams`).
@@ -26,17 +25,13 @@ import type {
 } from '@/src/application/dto/api/pedidoDeliveryApi'
 import { PEDIDOS_DELIVERY_KANBAN_PAGE_SIZE } from '@/src/application/dto/api/pedidoDeliveryListApi'
 
-/**
- * Espelho de `OrigemFiltro` do Kanban — origem real (sem `DELIVERY` como origem).
- * `DELIVERY` permanece só como legado de snapshot antigo → mapeia para JIFFY_DELIVERY.
- */
+/** Origem real da toolbar. Canal `DELIVERY` não entra aqui. */
 export type OrigemFiltroKanbanListagem =
   | ''
   | 'PDV'
   | 'GESTOR'
   | 'JIFFY_DELIVERY'
   | 'AIQFOME'
-  | 'DELIVERY'
 
 /** Filtros do hook `useKanbanFilters` adaptados para a listagem delivery. */
 export interface FiltrosKanbanParaPedidosDelivery {
@@ -53,8 +48,8 @@ export interface FiltrosKanbanParaPedidosDelivery {
   statusDelivery?: StatusDeliveryApi | StatusDeliveryApi[]
   /** Filtro por tipo de entrega (entrega/retirada) — modo delivery. */
   tipoEntrega?: TipoEntregaDeliveryApi | TipoEntregaDeliveryApi[]
-  /** Default operacional: excluir cancelados (`cancelado=false`). */
-  cancelado?: boolean
+  /** Default operacional: excluir cancelados (`cancelado=false`). `null` omite o param (Entregues mistura FINALIZADO+CANCELADO). */
+  cancelado?: boolean | null
   /** Filtro delta: retorna itens com `dataUltimaModificacao >= valor`. Usado no re-poll do Kanban. */
   dataUltimaModificacaoInicial?: string
 }
@@ -68,7 +63,7 @@ export function mapOrigemFiltroKanbanParaApi(
 ): OrigemPedidoDeliveryApi | undefined {
   if (!origem || origem === 'PDV') return undefined
   if (origem === 'GESTOR') return 'GESTOR'
-  if (origem === 'JIFFY_DELIVERY' || origem === 'DELIVERY') return 'JIFFY_DELIVERY'
+  if (origem === 'JIFFY_DELIVERY') return 'JIFFY_DELIVERY'
   if (origem === 'AIQFOME') return 'AIQFOME'
   return undefined
 }
@@ -157,7 +152,7 @@ export function montarPedidosDeliveryQueryParams(
     dataCriacaoFinal: filtros.dataCriacaoFinal,
     dataFinalizacaoInicial: filtros.dataFinalizacaoInicio,
     dataFinalizacaoFinal: filtros.dataFinalizacaoFim,
-    cancelado: filtros.cancelado ?? false,
+    cancelado: filtros.cancelado === null ? undefined : filtros.cancelado ?? false,
     dataUltimaModificacaoInicial: filtros.dataUltimaModificacaoInicial,
   }
 }
@@ -262,38 +257,3 @@ export function extrairPedidosDeliveryQueryParamsDeSearchParams(
   return params
 }
 
-const CHAVES_QUERY_JIFFY = [
-  'offset',
-  'limit',
-  'q',
-  'statusDelivery',
-  'tipoEntrega',
-  'origem',
-  'solicitarEmissaoFiscal',
-  'cancelado',
-  'dataCriacaoInicial',
-  'dataCriacaoFinal',
-  'dataFinalizacaoInicial',
-  'dataFinalizacaoFinal',
-  'dataFinalizacaoInicio',
-  'dataFinalizacaoFim',
-  'dataUltimaModificacaoInicial',
-] as const
-
-/** Indica se a requisição deve usar o módulo delivery Jiffy (vs integrador legado). */
-export function isRequisicaoListagemPedidosJiffy(searchParams: URLSearchParams): boolean {
-  if (CHAVES_QUERY_JIFFY.some(chave => searchParams.has(chave))) return true
-  return false
-}
-
-/** Integrador legado: `status`/`data_atualizacao` ou header `Bearer` customizado (não Authorization). */
-export function isRequisicaoListagemPedidosIntegradorLegada(
-  searchParams: URLSearchParams,
-  headers: { bearerHeaderCustom?: string | null; integradorToken?: string | null }
-): boolean {
-  if (isRequisicaoListagemPedidosJiffy(searchParams)) return false
-  if (searchParams.has('status') || searchParams.has('data_atualizacao')) return true
-  if (headers.bearerHeaderCustom?.trim()) return true
-  if (headers.integradorToken?.trim()) return true
-  return false
-}
