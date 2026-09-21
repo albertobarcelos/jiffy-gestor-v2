@@ -13,6 +13,7 @@ import { Produto } from '@/src/domain/entities/Produto'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { invalidarCatalogoVendaQueries } from '@/src/presentation/cache/catalogoVendaQueryCache'
 
 export interface ProdutosQueryParams {
   name?: string
@@ -313,6 +314,10 @@ export function useProdutoMutation() {
         if (variables.produtoId) {
           queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'produto', variables.produtoId] })
         }
+        invalidarCatalogoVendaQueries(queryClient, empresaId, {
+          tipo: 'produto-estrutura',
+          produtoId: variables.produtoId ?? '',
+        })
         showToast.success(variables.isUpdate ? 'Produto atualizado com sucesso!' : 'Produto criado com sucesso!')
       },
     }

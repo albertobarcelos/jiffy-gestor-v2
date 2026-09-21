@@ -59,6 +59,10 @@ export interface MenuProdutoComplementoItemResumo {
 export interface MenuProdutoComplementoResumo {
   id: string
   nome: string
+  /** Cadastro do grupo. Ausente no snapshot slim (só id/nome). */
+  qtdMinima?: number
+  /** Cadastro do grupo. 0 = sem teto. Ausente no snapshot slim. */
+  qtdMaxima?: number
   /** Presente só em alguns GETs; a listagem do menu costuma mandar só id/nome. */
   complementos?: MenuProdutoComplementoItemResumo[]
 }

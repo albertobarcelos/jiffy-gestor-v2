@@ -9,6 +9,7 @@ import { grupoComplementoImagemMedia } from '@/src/infrastructure/api/deliveryMe
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { invalidarCatalogoVendaQueries } from '@/src/presentation/cache/catalogoVendaQueryCache'
 
 interface GruposComplementosQueryParams {
   q?: string
@@ -190,6 +191,10 @@ export function useGrupoComplementoMutation() {
     {
       onSuccess: (_, variables) => {
         queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'grupos-complementos'] })
+        invalidarCatalogoVendaQueries(queryClient, empresaId, {
+          tipo: 'grupo-complemento',
+          grupoComplementoId: variables.grupoId,
+        })
         showToast.success(variables.isUpdate ? 'Grupo atualizado com sucesso!' : 'Grupo criado com sucesso!')
       },
     }

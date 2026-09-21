@@ -3,6 +3,9 @@ import {
   type UnidadeMedidaProduto,
 } from '@/src/shared/types/unidadeMedidaProduto'
 import type { ProdutoMenuResumo } from '@/src/shared/types/menus'
+import {
+  parseQuantidadeLimiteGrupo,
+} from '@/src/domain/policies/pedido/GrupoComplementoLimitesPolicy'
 
 /**
  * Entidade de domínio representando um Produto
@@ -17,6 +20,10 @@ interface ProdutoComplementoResumo {
 interface ProdutoGrupoComplementoResumo {
   id: string
   nome: string
+  qtdMinima: number
+  qtdMaxima: number
+  /** True quando min/máx vieram do cadastro (GET do grupo ou JSON com os campos). */
+  limitesDoCadastro?: boolean
   complementos: ProdutoComplementoResumo[]
 }
 
@@ -284,6 +291,14 @@ export class Produto {
         ? data.gruposComplementos.map((grupo: any) => ({
             id: grupo.id?.toString() || '',
             nome: grupo.nome?.toString() || '',
+            qtdMinima: parseQuantidadeLimiteGrupo(grupo.qtdMinima),
+            qtdMaxima: parseQuantidadeLimiteGrupo(grupo.qtdMaxima),
+            limitesDoCadastro:
+              grupo.limitesDoCadastro === true
+                ? true
+                : grupo.limitesDoCadastro === false
+                  ? false
+                  : grupo.qtdMinima != null || grupo.qtdMaxima != null,
             complementos: Array.isArray(grupo.complementos)
               ? grupo.complementos.map((comp: any) => ({
                   id: comp.id?.toString() || '',

@@ -3,7 +3,9 @@ import { Produto } from '@/src/domain/entities/Produto'
 import {
   aplicarPermissoesCadastroNoProdutoCatalogo,
   cacheProdutoCatalogoAtendePedido,
+  catalogoPermiteHidratacaoSomenteGrupos,
   produtoTemComplementosCarregados,
+  produtoTemIdsGruposComplementoParaHidratacao,
 } from '@/src/domain/policies/pedido/CarrinhoCatalogoPolicy'
 import type { MenuProdutoPermissoes } from '@/src/shared/utils/menuProdutoPermissoes'
 
@@ -19,6 +21,25 @@ function produtoSlim(params?: { abreComplementos?: boolean }): Produto {
   })
 }
 
+function produtoSlimComGrupos(): Produto {
+  return Produto.fromJSON({
+    id: 'p1',
+    codigoProduto: 'p1',
+    nome: 'X-Bacon',
+    valor: 20,
+    ativo: true,
+    abreComplementos: true,
+    gruposComplementos: [
+      {
+        id: 'g1',
+        nome: 'Extras',
+        limitesDoCadastro: false,
+        complementos: [],
+      },
+    ],
+  })
+}
+
 function produtoComComplementos(): Produto {
   return Produto.fromJSON({
     id: 'p1',
@@ -31,6 +52,8 @@ function produtoComComplementos(): Produto {
       {
         id: 'g1',
         nome: 'Extras',
+        qtdMinima: 0,
+        qtdMaxima: 3,
         complementos: [{ id: 'c1', nome: 'Bacon extra', valor: 3 }],
       },
     ],
@@ -51,6 +74,27 @@ describe('CarrinhoCatalogoPolicy — complementos da venda', () => {
     expect(produtoTemComplementosCarregados(produtoComComplementos())).toBe(true)
   })
 
+  it('não considera carregado quando há itens mas os limites do cadastro ainda não vieram', () => {
+    const semLimites = Produto.fromJSON({
+      id: 'p1',
+      codigoProduto: 'p1',
+      nome: 'X-Bacon',
+      valor: 20,
+      ativo: true,
+      abreComplementos: true,
+      gruposComplementos: [
+        {
+          id: 'g1',
+          nome: 'Extras',
+          limitesDoCadastro: false,
+          complementos: [{ id: 'c1', nome: 'Bacon extra', valor: 3 }],
+        },
+      ],
+    })
+    expect(produtoTemComplementosCarregados(semLimites)).toBe(false)
+    expect(cacheProdutoCatalogoAtendePedido(semLimites, { requireComplementos: true })).toBe(false)
+  })
+
   it('não reutiliza cache slim quando o painel precisa dos complementos', () => {
     const slim = produtoSlim({ abreComplementos: true })
     expect(cacheProdutoCatalogoAtendePedido(slim)).toBe(true)
@@ -60,6 +104,31 @@ describe('CarrinhoCatalogoPolicy — complementos da venda', () => {
     ).toBe(true)
     expect(cacheProdutoCatalogoAtendePedido(slim, { forceRefresh: true })).toBe(false)
     expect(cacheProdutoCatalogoAtendePedido(undefined, { requireComplementos: true })).toBe(false)
+  })
+
+  it('permite hidratar só os grupos quando a grade já trouxe os ids', () => {
+    expect(produtoTemIdsGruposComplementoParaHidratacao(produtoSlimComGrupos())).toBe(true)
+    expect(produtoTemIdsGruposComplementoParaHidratacao(produtoSlim())).toBe(false)
+    expect(
+      catalogoPermiteHidratacaoSomenteGrupos(produtoSlimComGrupos(), {
+        requireComplementos: true,
+      })
+    ).toBe(true)
+    expect(
+      catalogoPermiteHidratacaoSomenteGrupos(produtoSlim(), { requireComplementos: true })
+    ).toBe(false)
+    expect(catalogoPermiteHidratacaoSomenteGrupos(produtoSlimComGrupos())).toBe(false)
+    expect(
+      catalogoPermiteHidratacaoSomenteGrupos(produtoComComplementos(), {
+        requireComplementos: true,
+      })
+    ).toBe(false)
+    expect(
+      catalogoPermiteHidratacaoSomenteGrupos(produtoSlimComGrupos(), {
+        requireComplementos: true,
+        forceRefresh: true,
+      })
+    ).toBe(false)
   })
 
   it('não sobrescreve abreComplementos do produto do menu com o cadastro', () => {

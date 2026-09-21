@@ -1,5 +1,7 @@
 import {
   buscarProdutoCatalogoPorIdUseCase,
+  hidratarGruposComplementosCatalogoUseCase,
+  limparCacheGruposComplementosCatalogoUseCase,
   listarGruposCatalogoVendaUseCase,
   listarProdutosCatalogoVendaPaginaUseCase,
 } from '@/src/infrastructure/composition/pedidoUseCases'
@@ -31,6 +33,17 @@ export async function fetchProdutoCatalogoPorId(
   menuId?: string | null
 ) {
   return buscarProdutoCatalogoPorIdUseCase.execute(produtoId, token, menuId)
+}
+
+export async function fetchHidratacaoGruposComplementosCatalogo(
+  produto: Produto,
+  token: string
+) {
+  return hidratarGruposComplementosCatalogoUseCase.execute(produto, token)
+}
+
+export function limparCacheGruposComplementosCatalogoVenda() {
+  limparCacheGruposComplementosCatalogoUseCase.execute()
 }
 
 export type { Produto }

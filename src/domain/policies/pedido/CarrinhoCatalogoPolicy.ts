@@ -15,9 +15,18 @@ export type CarregarProdutoCatalogoOptions = {
 export function produtoTemComplementosCarregados(
   produto: Pick<Produto, 'getGruposComplementos'>
 ): boolean {
-  return produto
-    .getGruposComplementos()
-    .some(grupo => (grupo.complementos?.length ?? 0) > 0)
+  const grupos = produto.getGruposComplementos()
+  if (grupos.length === 0) return false
+  return grupos.every(
+    grupo => (grupo.complementos?.length ?? 0) > 0 && grupo.limitesDoCadastro === true
+  )
+}
+
+/** Grade slim já trouxe os ids dos grupos do menu — dá para hidratar só eles. */
+export function produtoTemIdsGruposComplementoParaHidratacao(
+  produto: Pick<Produto, 'getGruposComplementos'>
+): boolean {
+  return produto.getGruposComplementos().some(grupo => grupo.id.trim() !== '')
 }
 
 /**
@@ -34,6 +43,21 @@ export function cacheProdutoCatalogoAtendePedido(
     return false
   }
   return true
+}
+
+/**
+ * Lançar com `requireComplementos`: o slim da grade basta para completar grupos
+ * (cache de sessão ou GET por id). Evita GET cadastro + GET snapshot.
+ */
+export function catalogoPermiteHidratacaoSomenteGrupos(
+  produto: Produto | undefined,
+  options?: CarregarProdutoCatalogoOptions
+): produto is Produto {
+  if (options?.forceRefresh) return false
+  if (!options?.requireComplementos) return false
+  if (!produto) return false
+  if (produtoTemComplementosCarregados(produto)) return false
+  return produtoTemIdsGruposComplementoParaHidratacao(produto)
 }
 
 /**

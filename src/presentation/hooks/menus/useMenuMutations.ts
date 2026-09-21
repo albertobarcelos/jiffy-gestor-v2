@@ -12,8 +12,11 @@ import {
   uploadImagemMenuProdutoViaBffUseCase,
   uploadImagemMenuGrupoViaBffUseCase,
 } from '@/src/application/use-cases/menus/menuBffUseCases'
+import { useQueryClient } from '@tanstack/react-query'
+import { invalidarCatalogoVendaQueries } from '@/src/presentation/cache/catalogoVendaQueryCache'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import type {
   CreateMenuInput,
   UpdateMenuInput,
@@ -23,8 +26,11 @@ import type {
 
 async function invalidateMenuTree(
   invalidate: ReturnType<typeof useInvalidateTenantQueries>,
+  queryClient: ReturnType<typeof useQueryClient>,
+  empresaId: string | null,
   menuId?: string
 ) {
+  invalidarCatalogoVendaQueries(queryClient, empresaId, { tipo: 'cardapio', menuId })
   await invalidate(['menus'])
   if (menuId) {
     await invalidate(['menu', menuId])
@@ -36,11 +42,18 @@ async function invalidateMenuTree(
 /** Mutations CRUD + vínculos do esboço de Menus. */
 export function useMenuMutations(menuId?: string) {
   const invalidate = useInvalidateTenantQueries()
+  const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
 
   const createMenu = useSecureTenantMutation(
     async ({ token }, input: CreateMenuInput) =>
       criarMenuViaBffUseCase.execute({ token, data: input }),
-    { onSuccess: () => invalidate(['menus']) }
+    {
+      onSuccess: () => {
+        invalidarCatalogoVendaQueries(queryClient, empresaId, { tipo: 'cardapio' })
+        return invalidate(['menus'])
+      },
+    }
   )
 
   const updateMenu = useSecureTenantMutation(
@@ -50,12 +63,20 @@ export function useMenuMutations(menuId?: string) {
         menuId: vars.id,
         data: vars.input,
       }),
-    { onSuccess: (_data, vars) => invalidateMenuTree(invalidate, vars.id) }
+    {
+      onSuccess: (_data, vars) =>
+        invalidateMenuTree(invalidate, queryClient, empresaId, vars.id),
+    }
   )
 
   const deleteMenu = useSecureTenantMutation(
     async ({ token }, id: string) => excluirMenuViaBffUseCase.execute({ token, menuId: id }),
-    { onSuccess: () => invalidate(['menus']) }
+    {
+      onSuccess: () => {
+        invalidarCatalogoVendaQueries(queryClient, empresaId, { tipo: 'cardapio' })
+        return invalidate(['menus'])
+      },
+    }
   )
 
   const syncProdutos = useSecureTenantMutation(
@@ -67,7 +88,7 @@ export function useMenuMutations(menuId?: string) {
         data: input,
       })
     },
-    { onSuccess: () => invalidateMenuTree(invalidate, menuId) }
+    { onSuccess: () => invalidateMenuTree(invalidate, queryClient, empresaId, menuId) }
   )
 
   const updateProduto = useSecureTenantMutation(
@@ -83,7 +104,16 @@ export function useMenuMutations(menuId?: string) {
         data: vars.input,
       })
     },
-    { onSuccess: () => invalidateMenuTree(invalidate, menuId) }
+    {
+      onSuccess: (_data, vars) => {
+        invalidarCatalogoVendaQueries(queryClient, empresaId, {
+          tipo: 'produto-estrutura',
+          produtoId: vars.produtoId,
+          menuIds: menuId ? [menuId] : undefined,
+        })
+        return invalidate(['menu-produtos', menuId])
+      },
+    }
   )
 
   const reorderProduto = useSecureTenantMutation(
@@ -99,7 +129,15 @@ export function useMenuMutations(menuId?: string) {
         novaPosicao: vars.novaPosicao,
       })
     },
-    { onSuccess: () => invalidate(['menu-produtos', menuId]) }
+    {
+      onSuccess: () => {
+        invalidarCatalogoVendaQueries(queryClient, empresaId, {
+          tipo: 'ordem-produtos',
+          menuId,
+        })
+        return invalidate(['menu-produtos', menuId])
+      },
+    }
   )
 
   const uploadImagemProduto = useSecureTenantMutation(
@@ -112,7 +150,16 @@ export function useMenuMutations(menuId?: string) {
         file: vars.file,
       })
     },
-    { onSuccess: () => invalidateMenuTree(invalidate, menuId) }
+    {
+      onSuccess: (_data, vars) => {
+        invalidarCatalogoVendaQueries(queryClient, empresaId, {
+          tipo: 'imagem-produto',
+          produtoId: vars.produtoId,
+          menuIds: menuId ? [menuId] : undefined,
+        })
+        return invalidate(['menu-produtos', menuId])
+      },
+    }
   )
 
   const renameGrupo = useSecureTenantMutation(
@@ -128,7 +175,16 @@ export function useMenuMutations(menuId?: string) {
         nome: vars.nome,
       })
     },
-    { onSuccess: () => invalidate(['menu-grupos', menuId]) }
+    {
+      onSuccess: (_data, vars) => {
+        invalidarCatalogoVendaQueries(queryClient, empresaId, {
+          tipo: 'categoria',
+          menuId,
+          grupoProdutoId: vars.grupoProdutoId,
+        })
+        return invalidate(['menu-grupos', menuId])
+      },
+    }
   )
 
   const reorderGrupo = useSecureTenantMutation(
@@ -144,7 +200,15 @@ export function useMenuMutations(menuId?: string) {
         novaPosicao: vars.novaPosicao,
       })
     },
-    { onSuccess: () => invalidate(['menu-grupos', menuId]) }
+    {
+      onSuccess: () => {
+        invalidarCatalogoVendaQueries(queryClient, empresaId, {
+          tipo: 'ordem-categorias',
+          menuId,
+        })
+        return invalidate(['menu-grupos', menuId])
+      },
+    }
   )
 
   const uploadImagemGrupo = useSecureTenantMutation(
@@ -157,7 +221,7 @@ export function useMenuMutations(menuId?: string) {
         file: vars.file,
       })
     },
-    { onSuccess: () => invalidateMenuTree(invalidate, menuId) }
+    { onSuccess: () => invalidateMenuTree(invalidate, queryClient, empresaId, menuId) }
   )
 
   return {

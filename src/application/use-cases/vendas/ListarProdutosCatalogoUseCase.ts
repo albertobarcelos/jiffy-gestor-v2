@@ -1,4 +1,5 @@
 import type { INovoPedidoReadRepository } from '@/src/domain/repositories/INovoPedidoReadRepository'
+import type { Produto } from '@/src/domain/entities/Produto'
 
 export class ListarGruposCatalogoVendaUseCase {
   constructor(private readonly repo: INovoPedidoReadRepository) {}
@@ -30,5 +31,13 @@ export class BuscarProdutoCatalogoPorIdUseCase {
 
   execute(produtoId: string, token: string, menuId?: string | null) {
     return this.repo.buscarProdutoPorId(produtoId, token, menuId)
+  }
+}
+
+export class HidratarGruposComplementosCatalogoUseCase {
+  constructor(private readonly repo: INovoPedidoReadRepository) {}
+
+  execute(produto: Produto, token: string) {
+    return this.repo.hidratarGruposComplementosDoProduto(produto, token)
   }
 }

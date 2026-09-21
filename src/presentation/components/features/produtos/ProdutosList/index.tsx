@@ -14,6 +14,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { CATALOGO_PRODUTOS_INDEX_QUERY_KEY } from '@/src/presentation/hooks/produtos/useProdutosCodigoPorId'
+import { invalidarCatalogoVendaQueries } from '@/src/presentation/cache/catalogoVendaQueryCache'
 import { syncCadastroComMenuPrincipalAtivo } from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
 import { buscarIdMenuPrincipal } from '@/src/presentation/utils/uploadImagemProdutoMenus'
 import { useIsMobile } from '@/src/presentation/hooks/useIsMobile'
@@ -288,19 +289,25 @@ export function ProdutosList() {
   const handleTabsModalReload = useCallback((produtoId?: string, produtoData?: unknown) => {
     if (produtoId && produtoData) {
       updateProdutoInCache(produtoId, produtoData)
-      return
+    } else if (empresaId) {
+      void queryClient.invalidateQueries({
+        queryKey: ['tenant', empresaId, 'produtos', 'infinite'],
+        exact: false,
+        refetchType: 'active',
+      })
+      void queryClient.invalidateQueries({
+        queryKey: ['tenant', empresaId, 'grupos-produtos'],
+        exact: false,
+        refetchType: 'active',
+      })
     }
-    if (!empresaId) return
-    void queryClient.invalidateQueries({
-      queryKey: ['tenant', empresaId, 'produtos', 'infinite'],
-      exact: false,
-      refetchType: 'active',
-    })
-    void queryClient.invalidateQueries({
-      queryKey: ['tenant', empresaId, 'grupos-produtos'],
-      exact: false,
-      refetchType: 'active',
-    })
+    invalidarCatalogoVendaQueries(
+      queryClient,
+      empresaId,
+      produtoId
+        ? { tipo: 'produto-campos-simples', produtoId }
+        : { tipo: 'cardapio' }
+    )
   }, [queryClient, empresaId, updateProdutoInCache])
 
   const handleExcluirProduto = useCallback((produtoId: string) => {
@@ -363,6 +370,10 @@ export function ProdutosList() {
         void queryClient.invalidateQueries({
           queryKey: ['tenant', empresaId, 'menu-produtos'],
           exact: false,
+        })
+        invalidarCatalogoVendaQueries(queryClient, empresaId, {
+          tipo: 'produto-removido',
+          produtoId,
         })
       }
 
