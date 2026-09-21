@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { MdSearch, MdAddLocation, MdEdit, MdDelete, MdLocationOn, MdPhone, MdPerson, MdCheckCircle } from 'react-icons/md'
 import { Button } from '@/src/presentation/components/ui/button'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -15,6 +16,7 @@ import { maiusculasEnderecoInput } from '@/src/shared/utils/normalizarTextoEnder
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { JiffyConfirmDialog } from '@/src/presentation/components/ui/jiffy-confirm-dialog'
 import {
+  moradasTelefoneQueryKey,
   useMoradasPorTelefone,
   useCriarMoradaTelefone,
   useAtualizarMoradaTelefone,
@@ -23,9 +25,10 @@ import {
   useCriarClienteDeliveryRapido,
   useGeoEmpresaEntrega,
 } from '@/src/presentation/hooks/useMoradaTelefone'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import type { MoradaTelefone, EnderecoMorada } from '@/src/domain/types/moradaEntrega'
 import {
-  useBuscarClientePorTelefone,
+  useIdentificarClienteEMoradasEntrega,
   useCriarClienteRapido,
   useAtualizarNomeCliente,
 } from '@/src/presentation/hooks/useClientes'
@@ -368,6 +371,10 @@ export function EntregaClienteSelector({
   const ignorarBlurSalvarNomeRef = useRef(false)
   /** Evita Enter + blur dispararem dois PATCH. */
   const salvandoNomeRef = useRef(false)
+  /** Evita onChange (11 dígitos) + blur dispararem a mesma busca duas vezes. */
+  const buscaEmAndamentoRef = useRef<string | null>(null)
+  const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
 
   // Foca o campo de telefone ao montar (ex.: ao entrar na step de informações do pedido).
   useEffect(() => {
@@ -386,7 +393,7 @@ export function EntregaClienteSelector({
   const atualizarMorada = useAtualizarMoradaTelefone(moradaHookOptions)
   const excluirMorada = useExcluirMoradaTelefone(moradaHookOptions)
   const registrarUsoMorada = useRegistrarUsoMoradaTelefone(moradaHookOptions)
-  const buscarCliente = useBuscarClientePorTelefone()
+  const identificarCliente = useIdentificarClienteEMoradasEntrega()
   const criarCliente = useCriarClienteRapido()
   const criarClienteDelivery = useCriarClienteDeliveryRapido()
   const atualizarNomeCliente = useAtualizarNomeCliente()
@@ -709,6 +716,9 @@ export function EntregaClienteSelector({
       return
     }
 
+    if (buscaEmAndamentoRef.current === digitos) return
+    buscaEmAndamentoRef.current = digitos
+
     setClienteNaoEncontrado(false)
     setNomeDigitado('')
     onClienteVinculado(null)
@@ -716,20 +726,35 @@ export function EntregaClienteSelector({
     setTelefoneBuscado(digitos)
 
     try {
-      const clienteErp = await buscarCliente.mutateAsync(digitos)
-      if (clienteErp) {
-        onClienteVinculado({ id: clienteErp.getId(), nome: clienteErp.getNome() })
+      const resultado = await identificarCliente.mutateAsync({
+        telefone: digitos,
+        usarModuloDelivery: usarModuloDeliveryClientes,
+      })
+
+      queryClient.setQueryData(
+        moradasTelefoneQueryKey(digitos, usarModuloDeliveryClientes, empresaId),
+        resultado.moradas
+      )
+
+      if (resultado.cliente) {
+        onClienteVinculado(resultado.cliente)
         return
       }
 
       setClienteNaoEncontrado(true)
     } catch {
       setClienteNaoEncontrado(true)
+    } finally {
+      if (buscaEmAndamentoRef.current === digitos) {
+        buscaEmAndamentoRef.current = null
+      }
     }
   }, [
     telefoneInput,
     usarModuloDeliveryClientes,
-    buscarCliente,
+    identificarCliente,
+    queryClient,
+    empresaId,
     onClienteVinculado,
     onMoradaSelecionada,
     setTelefoneBuscado,
@@ -1003,7 +1028,7 @@ export function EntregaClienteSelector({
 
   const moradasEncontradas = moradas ?? []
   const buscaRealizada = telefoneBuscado !== null || clienteVinculado !== null
-  const buscandoCliente = buscarCliente.isPending
+  const buscandoCliente = identificarCliente.isPending
   const clienteCadastrado = podeGerenciarEnderecos
 
   useEffect(() => {
@@ -1029,7 +1054,7 @@ export function EntregaClienteSelector({
     <div className="relative space-y-3">
       {/* Bloqueia a área enquanto busca o cliente/endereços, garantindo o carregamento completo. */}
       {(buscando || buscandoCliente) && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-white/70 backdrop-blur-[1px]">
+        <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-white/70">
           <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2 shadow-md ring-1 ring-primary/10">
             <JiffyLoading size={20} className="gap-0 py-0" />
             <span className="text-sm font-medium text-primary">Buscando cliente...</span>

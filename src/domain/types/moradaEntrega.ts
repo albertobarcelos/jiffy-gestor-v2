@@ -22,6 +22,13 @@ export interface MoradaTelefone {
   endereco?: EnderecoMorada
 }
 
+/** Resultado do índice delivery por telefone (nome + vínculo ERP + moradas). */
+export interface ClienteDeliveryIdentificacao {
+  nome: string | null
+  clienteIdVinculado: string | null
+  moradas: MoradaTelefone[]
+}
+
 export interface CriarMoradaTelefoneDTO {
   telefone: string
   tipoEtiqueta?: string
