@@ -426,10 +426,10 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
                 <JiffyIconSwitch
                   checked={ativo}
                   onChange={(e) => setAtivo(e.target.checked)}
-                  label="Ativo"
+                  label="POS Ativo"
                   size="sm"
                   className="gap-3"
-                  inputProps={{ 'aria-label': 'Meio de pagamento ativo' }}
+                  inputProps={{ 'aria-label': 'POS Ativo' }}
                 />
                 <JiffyIconSwitch
                   checked={tefAtivo}

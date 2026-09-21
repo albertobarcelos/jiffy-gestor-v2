@@ -453,8 +453,8 @@ export function useNovoPedidoOrchestrator({
     isFetching: isFetchingMeiosPagamento,
   } = useMeiosPagamentoInfinite({
     limit: 100,
-    ativo: true,
-    ...(pedidoDeliveryGestor ? { ativoDelivery: true } : {}),
+    // POS filtra por ativo; delivery filtra só por ativoDelivery (independente do POS).
+    ...(pedidoDeliveryGestor ? { ativoDelivery: true } : { ativo: true }),
     // Step 3 usa meios de pagamento; em visualizacao/edicao pode ser usado para resolver nomes.
     enabled: open && (currentStep >= 3 || modoVisualizacao || !!vendaId),
     refetchOnWindowFocus: false,
