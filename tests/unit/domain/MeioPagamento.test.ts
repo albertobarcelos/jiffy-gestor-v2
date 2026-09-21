@@ -9,24 +9,30 @@ const base = {
   ativo: true,
 }
 
-describe('MeioPagamento.fromJSON isDelivery', () => {
+describe('MeioPagamento.fromJSON ativoDelivery', () => {
   it('ausente → false', () => {
     expect(MeioPagamento.fromJSON(base).isDelivery()).toBe(false)
   })
 
   it('true → disponível no delivery', () => {
-    expect(MeioPagamento.fromJSON({ ...base, isDelivery: true }).isDelivery()).toBe(true)
+    expect(MeioPagamento.fromJSON({ ...base, ativoDelivery: true }).isDelivery()).toBe(true)
   })
 
   it('string "true" → disponível no delivery', () => {
-    expect(MeioPagamento.fromJSON({ ...base, isDelivery: 'true' }).isDelivery()).toBe(true)
+    expect(MeioPagamento.fromJSON({ ...base, ativoDelivery: 'true' }).isDelivery()).toBe(true)
   })
 
   it('false permanece false', () => {
-    expect(MeioPagamento.fromJSON({ ...base, isDelivery: false }).isDelivery()).toBe(false)
+    expect(MeioPagamento.fromJSON({ ...base, ativoDelivery: false }).isDelivery()).toBe(false)
   })
 
-  it('toJSON inclui isDelivery', () => {
-    expect(MeioPagamento.fromJSON({ ...base, isDelivery: true }).toJSON().isDelivery).toBe(true)
+  it('aceita legado isDelivery na leitura', () => {
+    expect(MeioPagamento.fromJSON({ ...base, isDelivery: true }).isDelivery()).toBe(true)
+  })
+
+  it('toJSON inclui ativoDelivery', () => {
+    expect(MeioPagamento.fromJSON({ ...base, ativoDelivery: true }).toJSON().ativoDelivery).toBe(
+      true
+    )
   })
 })

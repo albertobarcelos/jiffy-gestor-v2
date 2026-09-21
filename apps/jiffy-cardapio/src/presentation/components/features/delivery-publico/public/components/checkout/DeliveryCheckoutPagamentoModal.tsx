@@ -288,6 +288,15 @@ export function DeliveryCheckoutPagamentoModal({
   const continuarDisabled =
     cotacaoLoading || !cotacaoPronta || pagamentoInconsistente
 
+  /** Duas linhas só com mais de 4 meios; com 4 ou menos, uma linha. */
+  const quantidadeMeios = meiosPagamento.length
+  const usarDuasLinhasMeios = quantidadeMeios > 4
+  /** Preenche por linha (4 por linha). Com >8, amplia colunas e usa scroll. */
+  const colunasMeios = usarDuasLinhasMeios
+    ? Math.max(4, Math.ceil(quantidadeMeios / 2))
+    : 4
+  const precisaScrollMeios = colunasMeios > 4
+
   const fieldClass =
     'w-full rounded-xl border bg-transparent px-3 py-3 text-base outline-none delivery-text-primary'
   const fieldStyle = { borderColor: 'var(--delivery-border)' } as const
@@ -367,16 +376,35 @@ export function DeliveryCheckoutPagamentoModal({
           ) : (
             <div
               ref={scrollRef}
-              className={`scrollbar-thin overflow-x-auto px-0.5 py-2 ${
-                cardsDesabilitados
-                  ? 'cursor-default'
-                  : 'cursor-grab select-none active:cursor-grabbing'
+              className={`px-0.5 py-2 ${
+                precisaScrollMeios
+                  ? `scrollbar-thin overflow-x-auto ${
+                      cardsDesabilitados
+                        ? 'cursor-default'
+                        : 'cursor-grab select-none active:cursor-grabbing'
+                    }`
+                  : 'overflow-x-hidden'
               }`}
-              style={{ scrollbarWidth: 'thin' }}
-              onMouseDown={cardsDesabilitados ? undefined : handleMouseDown}
-              onWheel={handleWheel}
+              style={precisaScrollMeios ? { scrollbarWidth: 'thin' } : undefined}
+              onMouseDown={
+                cardsDesabilitados || !precisaScrollMeios
+                  ? undefined
+                  : handleMouseDown
+              }
+              onWheel={precisaScrollMeios ? handleWheel : undefined}
             >
-              <div className="grid w-max grid-flow-col grid-rows-2 gap-2.5 auto-cols-[132px]">
+              <div
+                className={
+                  precisaScrollMeios
+                    ? 'grid w-max grid-rows-2 gap-2.5'
+                    : 'grid w-full gap-2.5'
+                }
+                style={{
+                  gridTemplateColumns: precisaScrollMeios
+                    ? `repeat(${colunasMeios}, 132px)`
+                    : 'repeat(4, minmax(0, 1fr))',
+                }}
+              >
                 {meiosPagamento.map(meio => {
                   const Icone = obterIconeMeioPagamento(meio.nome)
                   const estilo = obterEstiloMeioPagamentoPublico(meio)

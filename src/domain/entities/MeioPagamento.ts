@@ -62,7 +62,7 @@ export class MeioPagamento {
       parseBooleanFlag(data.ativo),
       parseBooleanFlag(data.isParcelavel),
       tipoParcelamento,
-      parseBooleanFlag(data.isDelivery)
+      parseBooleanFlag(data.ativoDelivery ?? data.isDelivery)
     )
   }
 
@@ -103,7 +103,7 @@ export class MeioPagamento {
       id: this.id,
       nome: this.nome,
       tefAtivo: this.tefAtivo,
-      isDelivery: this.isDeliveryFlag,
+      ativoDelivery: this.isDeliveryFlag,
       formaPagamentoFiscal: this.formaPagamentoFiscal,
       ativo: this.ativo,
       isParcelavel: this.parcelavel,

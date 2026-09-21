@@ -23,6 +23,8 @@ export async function GET(request: NextRequest) {
     const q = searchParams.get('q') || ''
     const ativoParam = searchParams.get('ativo')
     const ativo = ativoParam !== null ? ativoParam === 'true' : null
+    const ativoDeliveryParam = searchParams.get('ativoDelivery')
+    const ativoDelivery = ativoDeliveryParam !== null ? ativoDeliveryParam === 'true' : null
 
     const repository = new MeioPagamentoRepository(undefined, tokenInfo.token)
     const useCase = new BuscarMeiosPagamentosUseCase(repository)
@@ -32,6 +34,7 @@ export async function GET(request: NextRequest) {
       offset,
       q,
       ativo,
+      ativoDelivery,
     })
 
     return NextResponse.json({

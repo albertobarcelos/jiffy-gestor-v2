@@ -11,6 +11,7 @@ import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 interface MeiosPagamentoQueryParams {
   q?: string
   ativo?: boolean | null
+  ativoDelivery?: boolean | null
   limit?: number
   offset?: number
   enabled?: boolean
@@ -35,6 +36,9 @@ export function useMeiosPagamentoInfinite(params: Omit<MeiosPagamentoQueryParams
       if (params.q) searchParams.append('q', params.q)
       if (params.ativo !== undefined && params.ativo !== null) {
         searchParams.append('ativo', params.ativo.toString())
+      }
+      if (params.ativoDelivery !== undefined && params.ativoDelivery !== null) {
+        searchParams.append('ativoDelivery', params.ativoDelivery.toString())
       }
       searchParams.append('limit', limit.toString())
       searchParams.append('offset', String(pageParam))
