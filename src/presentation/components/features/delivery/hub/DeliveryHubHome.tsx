@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo, type ReactNode } from 'react'
-import { MdCheckCircle } from 'react-icons/md'
+import { useMemo, useState, type ReactNode } from 'react'
+import { MdCheck, MdCheckCircle, MdChevronLeft, MdChevronRight } from 'react-icons/md'
 import { cn } from '@/src/shared/utils/cn'
 import type { DeliveryEtapaId } from '@/src/shared/constants/configuracoesRoutes'
 import type { DeliveryHubProgresso } from './deliveryHubProgresso'
@@ -23,19 +23,26 @@ type DeliveryHubHomeProps = {
 function MenuItemButton({
   passo,
   active,
+  collapsed,
   onClick,
 }: {
   passo: DeliveryHubPassoUi
   active: boolean
+  collapsed: boolean
   onClick: () => void
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      title={collapsed ? passo.titulo : undefined}
+      aria-label={passo.titulo}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors',
+        'relative flex items-center rounded-lg text-left text-sm transition-colors',
+        collapsed
+          ? 'mx-auto h-9 w-9 justify-center'
+          : 'w-full gap-1.5 px-2 py-2',
         active
           ? 'bg-primary/10 font-semibold text-primary'
           : 'text-primary-text hover:bg-primary/5 hover:text-primary'
@@ -45,14 +52,28 @@ function MenuItemButton({
         className={cn('h-4 w-4 shrink-0', active ? 'text-primary' : 'text-secondary')}
         aria-hidden
       />
-      <span className="min-w-0 flex-1 truncate font-medium">{passo.titulo}</span>
-      {passo.concluido ? (
-        <span className="shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800">
-          OK
-        </span>
-      ) : passo.obrigatoria ? (
-        <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
-          !
+      {!collapsed ? (
+        <>
+          <span className="min-w-0 flex-1 truncate font-medium">{passo.titulo}</span>
+          {passo.concluido ? (
+            <span
+              className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500"
+              aria-label="Concluído"
+            >
+              <MdCheck className="h-2.5 w-2.5 text-white" aria-hidden />
+            </span>
+          ) : passo.obrigatoria ? (
+            <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+              !
+            </span>
+          ) : null}
+        </>
+      ) : passo.concluido ? (
+        <span
+          className="absolute right-0.5 top-0.5 flex h-2.5 w-2.5 items-center justify-center rounded-full bg-emerald-500"
+          aria-hidden
+        >
+          <MdCheck className="h-1.5 w-1.5 text-white" />
         </span>
       ) : null}
     </button>
@@ -63,24 +84,32 @@ function MenuGroup({
   title,
   passos,
   activeEtapaId,
+  collapsed,
   onAbrirEtapa,
 }: {
   title: string
   passos: DeliveryHubPassoUi[]
   activeEtapaId: DeliveryEtapaId | null
+  collapsed: boolean
   onAbrirEtapa: (etapaId: DeliveryEtapaId) => void
 }) {
   return (
-    <div className="mb-4">
-      <p className="mb-1.5 px-2.5 text-[11px] font-semibold uppercase tracking-wide text-secondary-text">
-        {title}
-      </p>
-      <nav className="flex flex-col gap-0.5" aria-label={title}>
+    <div className={cn(collapsed ? 'mb-2' : 'mb-4')}>
+      {!collapsed ? (
+        <p className="mb-1.5 px-2 text-[11px] font-semibold uppercase tracking-wide text-secondary-text">
+          {title}
+        </p>
+      ) : null}
+      <nav
+        className={cn('flex flex-col', collapsed ? 'items-center gap-1' : 'gap-0.5')}
+        aria-label={title}
+      >
         {passos.map(passo => (
           <MenuItemButton
             key={passo.id}
             passo={passo}
             active={activeEtapaId === passo.etapaId}
+            collapsed={collapsed}
             onClick={() => onAbrirEtapa(passo.etapaId)}
           />
         ))}
@@ -135,6 +164,7 @@ export function DeliveryHubHome({
   onAbrirEtapa,
   panel,
 }: DeliveryHubHomeProps) {
+  const [menuCollapsed, setMenuCollapsed] = useState(false)
   const loja = useMemo(
     () => montarPassosLojaHub(progresso, passosExtras),
     [progresso, passosExtras]
@@ -146,20 +176,52 @@ export function DeliveryHubHome({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-gray-50 lg:flex-row">
-      <aside className="shrink-0 overflow-y-auto border-b border-gray-200 bg-white p-3 sm:p-4 lg:w-64 lg:border-b-0 lg:border-r xl:w-72">
-        <h1 className="mb-4 px-2.5 text-lg font-bold text-primary sm:text-xl">
-          Configurações Delivery
-        </h1>
+      <aside
+        className={cn(
+          'relative shrink-0 overflow-y-auto border-b border-gray-200 bg-white transition-[width] duration-200 lg:border-b-0 lg:border-r',
+          menuCollapsed
+            ? 'p-2 lg:w-14'
+            : 'p-2.5 pr-1 sm:p-3 sm:pr-1 lg:w-56 xl:w-60'
+        )}
+      >
+        <div
+          className={cn(
+            'mb-3 flex items-center',
+            menuCollapsed ? 'justify-center' : 'gap-0 pl-2'
+          )}
+        >
+          {!menuCollapsed ? (
+            <h1 className="min-w-0 flex-1 truncate text-base font-semibold leading-tight text-primary">
+              Configurações Delivery
+            </h1>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setMenuCollapsed(prev => !prev)}
+            title={menuCollapsed ? 'Expandir menu' : 'Ocultar menu'}
+            aria-label={menuCollapsed ? 'Expandir menu' : 'Ocultar menu'}
+            aria-expanded={!menuCollapsed}
+            className="flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-secondary-text transition-colors hover:bg-primary/5 hover:text-primary"
+          >
+            {menuCollapsed ? (
+              <MdChevronRight className="h-5 w-5" aria-hidden />
+            ) : (
+              <MdChevronLeft className="h-5 w-5" aria-hidden />
+            )}
+          </button>
+        </div>
         <MenuGroup
           title="Loja"
           passos={loja}
           activeEtapaId={activeEtapaId}
+          collapsed={menuCollapsed}
           onAbrirEtapa={onAbrirEtapa}
         />
         <MenuGroup
           title="Operações"
           passos={operacao}
           activeEtapaId={activeEtapaId}
+          collapsed={menuCollapsed}
           onAbrirEtapa={onAbrirEtapa}
         />
       </aside>

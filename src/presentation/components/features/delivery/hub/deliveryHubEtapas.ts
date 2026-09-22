@@ -133,8 +133,8 @@ export const DELIVERY_HUB_ETAPAS: DeliveryEtapaConfig[] = [
   {
     id: 'delivery-agenda',
     step: 4,
-    title: 'Agenda e funcionamento',
-    label: 'Agenda',
+    title: 'Horário Funcionamento',
+    label: 'Horário',
     descricao: 'Horários em que a loja aceita pedidos.',
     path: deliveryHubEtapaPath('delivery-agenda'),
     component: AgendaDeliveryEtapa,

@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   MdDeleteOutline,
+  MdExpandLess,
+  MdExpandMore,
   MdMap,
   MdMyLocation,
   MdWarning,
@@ -343,6 +345,7 @@ export function CoberturaDeliveryTab() {
   const [rascunhoPaths, setRascunhoPaths] = useState<LatLngLiteral[] | null>(null)
   const [mapaVisivel, setMapaVisivel] = useState(true)
   const [painelAba, setPainelAba] = useState<CoberturaPainelAba>('raios')
+  const [painelRecolhido, setPainelRecolhido] = useState(false)
   const [areaFormaEditandoId, setAreaFormaEditandoId] = useState<string | null>(null)
   const [formaPathsRascunho, setFormaPathsRascunho] = useState<LatLngLiteral[] | null>(null)
   const [formaAlterada, setFormaAlterada] = useState(false)
@@ -1321,9 +1324,32 @@ export function CoberturaDeliveryTab() {
         </div>
 
         <div className="pointer-events-none absolute inset-0 z-20 flex items-start p-3 md:p-4">
-          <div className="pointer-events-auto relative mr-14 flex max-h-full w-full max-w-[380px] flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
-            <div className="shrink-0 px-4 pt-3">
-              <h2 className="text-base font-semibold text-primary-text">Áreas de Entrega</h2>
+          <div
+            className={`pointer-events-auto relative mr-14 flex w-full max-w-[380px] flex-col overflow-hidden rounded-2xl bg-white shadow-xl ${
+              painelRecolhido ? '' : 'max-h-full'
+            }`}
+          >
+            <div className={`shrink-0 px-4 ${painelRecolhido ? 'py-3' : 'pt-3'}`}>
+              <div className="flex items-center gap-1">
+                <h2 className="min-w-0 flex-1 truncate text-base font-semibold text-primary-text">
+                  Áreas de Entrega
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setPainelRecolhido(prev => !prev)}
+                  title={painelRecolhido ? 'Expandir painel' : 'Ocultar painel'}
+                  aria-label={painelRecolhido ? 'Expandir painel' : 'Ocultar painel'}
+                  aria-expanded={!painelRecolhido}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-gray-100 hover:text-primary-text"
+                >
+                  {painelRecolhido ? (
+                    <MdExpandMore className="h-5 w-5" aria-hidden />
+                  ) : (
+                    <MdExpandLess className="h-5 w-5" aria-hidden />
+                  )}
+                </button>
+              </div>
+              {!painelRecolhido ? (
               <nav
                 className="mt-2 flex flex-wrap gap-3 border-b border-gray-100"
                 aria-label="Painel de cobertura"
@@ -1343,8 +1369,11 @@ export function CoberturaDeliveryTab() {
                   </button>
                 ))}
               </nav>
+              ) : null}
             </div>
 
+            {!painelRecolhido ? (
+            <>
             {setupInicial ? (
               <div className="mx-3 mt-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5">
                 <p className="text-sm font-semibold text-primary-text">Confirme a loja e o alcance</p>
@@ -1786,7 +1815,11 @@ export function CoberturaDeliveryTab() {
               </div>
             )}
 
+            </>
+            ) : null}
+
             {!mapaIndisponivel &&
+            !painelRecolhido &&
             (definindoAlcance || confirmandoSetup || salvandoPin) ? (
               <div
                 className="absolute inset-0 z-10 flex items-center justify-center bg-white/85"
