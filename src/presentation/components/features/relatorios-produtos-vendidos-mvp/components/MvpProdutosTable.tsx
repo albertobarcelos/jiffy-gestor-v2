@@ -295,15 +295,9 @@ export function MvpProdutosTable(props: {
   const shellClass =
     'm-1 flex max-h-[min(90vh,32rem)] flex-col overflow-hidden border border-[#d0d7de] bg-white'
 
-  if (!rows.length) {
-    return (
-      <div className={`${shellClass} min-h-[10rem] items-center justify-center py-10`}>
-        <p className="text-secondary-text">Nenhum produto encontrado para os filtros selecionados.</p>
-      </div>
-    )
-  }
-
-  const muitasColunas = colunas.length > 8
+  const vazia = rows.length === 0
+  /** Linhas fantasma só para preencher a grade quando não há resultado no período. */
+  const EMPTY_PLACEHOLDER_ROWS = 14
 
   return (
     <div className={shellClass}>
@@ -343,27 +337,53 @@ export function MvpProdutosTable(props: {
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, idx) => (
-              <tr
-                key={row.produtoId}
-                className={`transition-colors hover:bg-[#e8f4fc] ${
-                  idx % 2 === 1 ? 'bg-[#fafafa]' : 'bg-white'
-                }`}
-              >
-                {colunas.map(id => {
-                  const isVar = id === 'varQtd' || id === 'varFat'
-                  return (
-                    <td
-                      key={id}
-                      className={`${TD_BASE} ${colAlign(id)} ${tdExtraClass(id, row)}`}
-                      title={isVar ? headerTitle(id) : undefined}
-                    >
-                      {renderCell(id, row, idx)}
-                    </td>
-                  )
-                })}
-              </tr>
-            ))}
+            {vazia ? (
+              <>
+                <tr className="bg-white">
+                  <td
+                    colSpan={colunas.length}
+                    className={`${TD_BASE} h-9 px-3 text-left text-sm text-secondary-text`}
+                  >
+                    Nenhum produto neste período
+                  </td>
+                </tr>
+                {Array.from({ length: EMPTY_PLACEHOLDER_ROWS - 1 }, (_, idx) => (
+                  <tr
+                    key={`empty-${idx}`}
+                    className={idx % 2 === 0 ? 'bg-[#fafafa]' : 'bg-white'}
+                    aria-hidden
+                  >
+                    {colunas.map(id => (
+                      <td key={id} className={`${TD_BASE} ${colAlign(id)} h-9`}>
+                        &nbsp;
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </>
+            ) : (
+              rows.map((row, idx) => (
+                <tr
+                  key={row.produtoId}
+                  className={`transition-colors hover:bg-[#e8f4fc] ${
+                    idx % 2 === 1 ? 'bg-[#fafafa]' : 'bg-white'
+                  }`}
+                >
+                  {colunas.map(id => {
+                    const isVar = id === 'varQtd' || id === 'varFat'
+                    return (
+                      <td
+                        key={id}
+                        className={`${TD_BASE} ${colAlign(id)} ${tdExtraClass(id, row)}`}
+                        title={isVar ? headerTitle(id) : undefined}
+                      >
+                        {renderCell(id, row, idx)}
+                      </td>
+                    )
+                  })}
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
 
@@ -377,9 +397,8 @@ export function MvpProdutosTable(props: {
       {exibirRodapeContagem && totalFiltrado > 0 ? (
         <p className="shrink-0 border-t border-[#d0d7de] bg-[#f9fafb] px-3 py-2 text-xs text-secondary-text">
           Exibindo {rows.length} de {totalFiltrado} produtos
-          {hasNextPage ? ' — role para carregar mais' : ''}
+          {hasNextPage || isFetchingNextPage ? ' — carregando restante…' : ''}
         </p>
-      
       ) : null}
     </div>
   )

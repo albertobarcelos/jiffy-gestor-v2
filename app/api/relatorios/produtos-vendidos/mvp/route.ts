@@ -19,6 +19,12 @@ import {
   montarRankingEVariacoes,
 } from '@/src/infrastructure/relatorios/montarRelatorioProdutosVendidosMvpPayload'
 import {
+  agregarComplementosVendidos,
+  filtrarEOrdenarComplementos,
+  montarKpisComplementos,
+} from '@/src/infrastructure/relatorios/agregarComplementosVendidos'
+import { enriquecerNomesGruposComplemento } from '@/src/infrastructure/relatorios/enriquecerNomesGruposComplemento'
+import {
   buildRelatorioAgregadoCacheKey,
   getRelatorioAgregadoCache,
   obterRelatorioAgregadoComSingleFlight,
@@ -36,12 +42,22 @@ import {
   resolverGranularidadeSerie,
   resolverTopProdutoIdsPorValor,
 } from '@/src/infrastructure/relatorios/serieDiariaProdutosVendidos'
-import type { RelatorioSerieGranularidade } from '@/src/shared/types/relatoriosProdutosVendidosMvpApi'
+import type {
+  RelatorioComplementoImpacto,
+  RelatorioSerieGranularidade,
+} from '@/src/shared/types/relatoriosProdutosVendidosMvpApi'
 import type {
   ProdutoRankingAnteriorDTO,
   RelatorioProdutosVendidosMvpResponseDTO,
 } from '@/src/shared/types/relatoriosProdutosVendidosMvpApi'
 import type { RelatorioProdutosVendidosTotaisFiltradosDTO } from '@/src/shared/types/relatoriosProdutosVendidosApi'
+
+function parseImpactoComplementoQuery(
+  raw: string | null
+): RelatorioComplementoImpacto | 'todos' {
+  if (raw === 'aumenta' || raw === 'diminui' || raw === 'nenhum') return raw
+  return 'todos'
+}
 
 /**
  * GET /api/relatorios/produtos-vendidos/mvp
@@ -50,7 +66,7 @@ import type { RelatorioProdutosVendidosTotaisFiltradosDTO } from '@/src/shared/t
  * - Agregação cacheada ~90s por empresa + filtros.
  * - Carga principal: só período atual (`comparativo=0` na 1ª página).
  * - `somenteComparativo=1`: período anterior em 2ª requisição (usa cache do atual).
- * - `somenteParticipacao=1` / `somenteParticipacaoAbc=1` / `somenteSerie=1`: blocos SPA sob demanda.
+ * - `somenteParticipacao=1` / `somenteParticipacaoAbc=1` / `somenteSerie=1` / `somenteComplementos=1`: blocos SPA sob demanda.
  * - `participacao=0` / `serie=0` na carga base: lista leve sem gráficos.
  * - `somentePagina=1` + `offset>0`: paginação em memória.
  */
@@ -330,12 +346,27 @@ export async function GET(request: NextRequest) {
   const somenteParticipacao = searchParams.get('somenteParticipacao') === '1'
   const somenteParticipacaoAbc = searchParams.get('somenteParticipacaoAbc') === '1'
   const somenteSerie = searchParams.get('somenteSerie') === '1'
+  const somenteComplementos = searchParams.get('somenteComplementos') === '1'
+  const impactoComplemento = parseImpactoComplementoQuery(
+    searchParams.get('impactoComplemento')
+  )
 
   const grupoIdsParam = searchParams.get('grupoIds')?.trim()
   const grupoIdSet =
     grupoIdsParam && grupoIdsParam.length > 0
       ? new Set(
           grupoIdsParam
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean)
+        )
+      : null
+
+  const grupoComplementoIdsParam = searchParams.get('grupoComplementoIds')?.trim()
+  const grupoComplementoIdSet =
+    grupoComplementoIdsParam && grupoComplementoIdsParam.length > 0
+      ? new Set(
+          grupoComplementoIdsParam
             .split(',')
             .map(s => s.trim())
             .filter(Boolean)
@@ -402,6 +433,54 @@ export async function GET(request: NextRequest) {
       intervaloSlot != null
         ? diasAbsIntervaloUtc(intervaloSlot.inicioUtc, intervaloSlot.fimUtc)
         : 0
+
+    if (somenteComplementos) {
+      // Detalhes de venda não dependem do filtro de grupo de produto; usa cache sem
+      // grupoIds para reaproveitar o agregado do período e filtrar grupos de complemento depois.
+      const cacheKeyComplementos = buildRelatorioAgregadoCacheKey({
+        empresaId,
+        paramsIntervaloPdV,
+        sort,
+        grupoIdsKey: '',
+        valorMin,
+        valorMax,
+        qtdMin,
+        qtdMax,
+        qBusca,
+        timezone,
+      })
+      const agregado = await obterAgregadoComCache({
+        cacheKey: cacheKeyComplementos,
+        pipelineBase: { ...pipelineBase, grupoIdSet: null },
+        intervaloSlot,
+        diasPeriodo,
+        timezone,
+        incluirSerie: false,
+      })
+
+      const brutas = agregarComplementosVendidos(agregado.atual.detalhes)
+      const enriquecidas = await enriquecerNomesGruposComplemento({
+        apiClient,
+        headers,
+        linhas: brutas,
+      })
+      const items = filtrarEOrdenarComplementos(enriquecidas, {
+        qBusca,
+        impacto: impactoComplemento,
+        sort: searchParams.get('sort') || 'quantidade_desc',
+        grupoComplementoIdSet,
+      })
+
+      return NextResponse.json(
+        {
+          somenteComplementos: true,
+          items,
+          kpis: montarKpisComplementos(items),
+          totalFiltrado: items.length,
+        },
+        { headers: { 'Cache-Control': 'private, max-age=30' } }
+      )
+    }
 
     if (somenteParticipacao) {
       const agregado = await obterAgregadoComCache({
