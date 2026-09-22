@@ -94,7 +94,7 @@ function seedFormFromProduto(produto: Produto, isCopy: boolean) {
   return {
     nomeProduto: isCopy ? (nome ? `${nome} - Cópia` : 'Cópia ') : nome,
     precoVenda: produto.getValor() ? formatCurrencyValue(produto.getValor()) : '',
-    unidadeProduto: (produto.getUnidadeMedida() as string | null) || null,
+    unidadeProduto: (produto.getUnidadeMedida() as string | null) || 'UN',
     grupoProduto: produto.getGrupoId() || null,
     favorito: produto.isFavorito(),
     permiteDesconto: produto.permiteDescontoAtivo(),
@@ -477,7 +477,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
     const [descricaoProduto, setDescricaoProduto] = useState('')
     const [precoVenda, setPrecoVenda] = useState(() => formSeed?.precoVenda ?? '')
     const [unidadeProduto, setUnidadeProduto] = useState<string | null>(
-      () => formSeed?.unidadeProduto ?? null
+      () => formSeed?.unidadeProduto ?? 'UN'
     )
     const [grupoProduto, setGrupoProduto] = useState<string | null>(
       () => formSeed?.grupoProduto ?? defaultGrupoProdutoId ?? null
@@ -788,7 +788,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           : produto.nome || ''
         const descricaoProduto = produto.descricao || ''
         const precoVenda = produto.valor ? formatCurrency(produto.valor as number | string) : ''
-        const unidadeProduto = (produto.unidadeMedida || null) as string | null
+        const unidadeProduto = (produto.unidadeMedida || 'UN') as string | null
         const grupoProduto = extrairGrupoProdutoIdDoJsonProduto(produto)
         const eanRaw =
           produto.codigoEan ?? produto.codigoBarras ?? produto.ean ?? produto.codigoEanBarras
@@ -911,7 +911,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
             // Preenche os campos com os dados do produto
             setPrecoVenda(produto.valor ? formatCurrency(produto.valor) : '')
-            setUnidadeProduto(produto.unidadeMedida || null)
+            setUnidadeProduto(produto.unidadeMedida || 'UN')
             {
               const grupoFromApi = extrairGrupoProdutoIdDoJsonProduto(
                 produto as Record<string, unknown>
