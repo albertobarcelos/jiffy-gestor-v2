@@ -7,6 +7,7 @@ import { mapTicketToPrintDocument } from '@/src/application/delivery/mapTicketTo
 import { mapTicketToProducaoHibridoDocument } from '@/src/application/delivery/mapTicketToProducaoHibridoDocument'
 import { printDeliveryCupom } from '@/src/infrastructure/printing/printDeliveryCupom'
 import { desenharPilulaProducaoPng } from '@/src/infrastructure/printing/pilulaProducaoPng'
+import { desenharSeparadorTracejadoPng } from '@/src/infrastructure/printing/receiptBitmaps'
 import { showToast } from '@/src/shared/utils/toast'
 import { DeliveryConfigCollapsibleSection } from './DeliveryConfigCollapsibleSection'
 import { larguraCupomDeliveryPx, renderDeliveryCupomHtml } from '@/src/application/delivery/renderDeliveryCupomHtml'
@@ -457,6 +458,7 @@ export function DeliveryCupomTemplateEditor({
         modeloSelecionado === 'producao'
           ? mapTicketToProducaoHibridoDocument(sample.root, sample.ticket, {
               desenharPilula: desenharPilulaProducaoPng,
+              desenharSeparador: desenharSeparadorTracejadoPng,
             })
           : value.modoPapel === 'grafico'
             ? await mapTicketToGraphicPrintDocument(sample.root, sample.ticket, {

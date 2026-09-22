@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { buildGraphicPrintDocument } from '@/src/application/delivery/mapTicketToGraphicPrintDocument'
+import {
+  buildGraphicPrintDocument,
+  LINHAS_ANTES_DO_CORTE_GRAFICO,
+} from '@/src/application/delivery/mapTicketToGraphicPrintDocument'
 import { fonteProdutoEscPosA22Px } from '@/src/application/delivery/cupomPrintLayout'
 import { graphicRasterScale } from '@/src/infrastructure/printing/rasterizeCupomHtml'
 
@@ -9,7 +12,8 @@ describe('mapTicketToGraphicPrintDocument', () => {
     expect(doc.type).toBe('ORDER')
     expect(doc.columns).toBe(48)
     expect(doc.content[0]).toEqual({ type: 'image', data: 'iVBORw0KGgo=', align: 'center' })
-    expect(doc.content.at(-2)).toEqual({ type: 'feed', lines: 3 })
+    expect(doc.content.at(-2)).toEqual({ type: 'feed', lines: LINHAS_ANTES_DO_CORTE_GRAFICO })
+    expect(LINHAS_ANTES_DO_CORTE_GRAFICO).toBe(2)
     expect(doc.content.at(-1)).toEqual({ type: 'cut' })
   })
 

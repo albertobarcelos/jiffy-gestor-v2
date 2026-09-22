@@ -14,12 +14,19 @@ type EstiloPilula = {
   paddingY: number
   paddingX: number
   letterSpacing: number
+  fontFamily: string
 }
 
+const FONTE_TITULO = 'Arial, Tahoma, sans-serif'
+
 const ESTILO: Record<VariantePilulaProducao, EstiloPilula> = {
-  senha: { fontPx: 40, fontWeight: 800, paddingY: 4, paddingX: 48, letterSpacing: 0 },
-  codigo: { fontPx: 36, fontWeight: 800, paddingY: 6, paddingX: 28, letterSpacing: 0 },
-  identidade: { fontPx: 30, fontWeight: 700, paddingY: 6, paddingX: 32, letterSpacing: 0 },
+  senha: { fontPx: 40, fontWeight: 800, paddingY: 4, paddingX: 48, letterSpacing: 0, fontFamily: FONTE_TITULO },
+  codigo: { fontPx: 38, fontWeight: 800, paddingY: 6, paddingX: 24, letterSpacing: 0, fontFamily: FONTE_TITULO },
+  identidade: { fontPx: 34, fontWeight: 800, paddingY: 6, paddingX: 28, letterSpacing: 0, fontFamily: FONTE_TITULO },
+}
+
+function cssFonte(estilo: EstiloPilula, fontPx: number): string {
+  return `${estilo.fontWeight} ${fontPx}px ${estilo.fontFamily}`
 }
 
 function canvas2d(): CanvasRenderingContext2D | null {
@@ -51,8 +58,10 @@ function roundRect(
   ctx.closePath()
 }
 
+const ESPESSURA_CONTORNO_PILULA = 4
+
 /**
- * Pílula preta com texto branco. Não usa reverse nativo da impressora.
+ * Pílula só com contorno (sem preenchimento preto) — foodservice imprime o dia todo.
  * Retorna data URL PNG ou vazio se não houver canvas (teste Node).
  */
 export function desenharPilulaProducaoPng(
@@ -69,12 +78,12 @@ export function desenharPilulaProducaoPng(
   const margem = PILULA_80MM.margemPilulaPx
   const gap = PILULA_80MM.gapAbaixoPilulaPx
   const pillW = Math.max(8, larguraPx - margem * 2)
-  ctx.font = `${estilo.fontWeight} ${estilo.fontPx}px "Arial", "Segoe UI", sans-serif`
+  ctx.font = cssFonte(estilo, estilo.fontPx)
   let fontPx = estilo.fontPx
   const fontMin = variante === 'codigo' ? 22 : variante === 'identidade' ? 24 : 12
   while (fontPx > fontMin && ctx.measureText(t).width + estilo.paddingX * 2 > pillW) {
     fontPx -= 1
-    ctx.font = `${estilo.fontWeight} ${fontPx}px "Arial", "Segoe UI", sans-serif`
+    ctx.font = cssFonte(estilo, fontPx)
   }
 
   const textH = Math.ceil(fontPx * 1.15)
@@ -83,13 +92,25 @@ export function desenharPilulaProducaoPng(
   canvas.width = larguraPx
   canvas.height = pillH + gap
 
+  ctx.imageSmoothingEnabled = false
   ctx.fillStyle = '#ffffff'
   ctx.fillRect(0, 0, canvas.width, canvas.height)
+  const meiaBorda = ESPESSURA_CONTORNO_PILULA / 2
+  ctx.lineWidth = ESPESSURA_CONTORNO_PILULA
+  ctx.strokeStyle = '#000000'
+  ctx.setLineDash([10, 6])
+  roundRect(
+    ctx,
+    margem + meiaBorda,
+    meiaBorda,
+    Math.max(1, pillW - ESPESSURA_CONTORNO_PILULA),
+    Math.max(1, pillH - ESPESSURA_CONTORNO_PILULA),
+    PILULA_80MM.raioPilulaPx
+  )
+  ctx.stroke()
+  ctx.setLineDash([])
   ctx.fillStyle = '#000000'
-  roundRect(ctx, margem, 0, pillW, pillH, PILULA_80MM.raioPilulaPx)
-  ctx.fill()
-  ctx.fillStyle = '#ffffff'
-  ctx.font = `${estilo.fontWeight} ${fontPx}px "Arial", "Segoe UI", sans-serif`
+  ctx.font = cssFonte(estilo, fontPx)
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   if (variante === 'senha' && 'letterSpacing' in ctx) {

@@ -37,11 +37,17 @@ Preview HTML (`renderDeliveryCupomHtml`) e impressão de produção compartilham
 Um único modelo 80 mm (`layoutProducao80mm.ts`) vira:
 
 1. **Pílulas PNG** — senha, `PEDIDO codigo - i DE N` (unidade), identidade
-   (tipo / código / cliente). Texto longo parte em duas pílulas para não
-   encolher a fonte.
-2. **Texto ESC/POS** — item Font A 2×2 (`double`), complemento Font B 2×2
-   (`double-b`), resumo centralizado (`N ITENS • Impressora | HH:MM | Atend:`).
+   (tipo / código / cliente). Contorno tracejado, texto Arial 800 cheio
+   (sem furar tinta). Texto longo parte em duas pílulas para não encolher
+   a fonte.
+2. **Texto ESC/POS** — item Font A 2×2 (`double`) recuado 2 colunas da
+   margem, complemento Font B 2×2
+   (`double-b`) com 16 pontos entre modificadores do mesmo tipo e 32 na
+   virada `*` ↔ `+`/`-`. Jiffy Print
+   **1.1.5+**. Resumo centralizado (`N ITENS • Impressora | HH:MM | Atend:`).
 3. **Folga** — 4 linhas antes do corte.
+4. **Separador** — tracejado PNG 4 px entre produtos, com folga; sem linha
+   acima do primeiro item. Sem o PNG cai no `divider` de hífens.
 
 Reimpressão: `** REIMPRESSAO **` no topo, negrito, tamanho normal (sem pílula).
 
@@ -55,7 +61,8 @@ O planner (`planejarTicketsProducaoImpressora`) decide as vias:
 
 Cupom de entrega/retirada/balcão com valores, endereço, QR WhatsApp e pagamento.
 Itens no tamanho do cupom (não 2×2 da cozinha): nome à esquerda, preço à
-direita; nome longo é cortado, valor não.
+direita; nome longo é cortado, valor não. Corpo em Arial 500, sem antialias
+e com traço fino — nítido no térmico, sem negrito em tudo.
 
 ## Agente
 
@@ -71,4 +78,14 @@ pode “comer” pílula.
 - Emitir NF / NFC-e
 - Flutter / PDV
 - MQTT / orquestrador cloud
-- Destino físico (Windows vs `tcp://IP:9100`) — fica no vínculo da estação
+- Destino físico — fica no vínculo da estação. Nome da impressora do
+  Windows (mesmo se ela for IP no PC) vai para o spooler. `tcp://IP:9100`
+  é o RAW direto do agente, outro caminho.
+
+A via de expedição gráfica é a foto do HTML. Código do pedido e pílula da
+cozinha são só contorno tracejado (sem faixa preta). QR continua cheio.
+
+Expedição gráfica envia a foto + 2 linhas de avanço + corte. O `GS V 65` do
+agente já leva o papel até a faca; mais que isso vira faixa em branco. O Jiffy
+Print precisa de timeout TCP longo o bastante para o raster (job gráfico é
+grande e a impressora segura o socket enquanto imprime).
