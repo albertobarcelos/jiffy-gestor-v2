@@ -2,8 +2,8 @@
 
 import type { ReactNode } from 'react'
 import { useState } from 'react'
-import { MdCalendarToday, MdFilterAltOff, MdFilterList, MdSearch } from 'react-icons/md'
-import { FormControl, InputLabel, MenuItem, Select, TextField } from '@mui/material'
+import { MdCalendarToday, MdClose, MdFilterAltOff, MdFilterList, MdSearch } from 'react-icons/md'
+import { FormControl, IconButton, InputAdornment, InputLabel, MenuItem, Select, TextField } from '@mui/material'
 import {
   OPCOES_PERIODO_RELATORIO_MVP,
   type FiltroPeriodoRelatorio,
@@ -70,6 +70,20 @@ export function MvpFiltersBar({
   const handleGrupoChange = (nextId: string) => {
     if (onGrupoIdChange) onGrupoIdChange(nextId)
     else set({ grupoId: nextId })
+  }
+
+  const periodoEstaNoPadrao =
+    values.filtroPeriodo === 'hoje' &&
+    values.periodoPersonalizadoInicio == null &&
+    values.periodoPersonalizadoFim == null
+
+  const resetPeriodoParaHoje = () => {
+    onChange({
+      ...values,
+      filtroPeriodo: 'hoje',
+      periodoPersonalizadoInicio: null,
+      periodoPersonalizadoFim: null,
+    })
   }
 
   const filtrosVisiveis = filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'
@@ -241,10 +255,11 @@ export function MvpFiltersBar({
           <button
             type="button"
             onClick={onLimpar}
-            className="flex h-8 items-center justify-center gap-1 rounded-lg bg-primary px-3 text-sm text-white transition-colors hover:bg-primary/90"
+            aria-label="Limpar filtros"
+            title="Limpar filtros"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-white transition-colors hover:bg-primary/90"
           >
             <MdFilterAltOff size={18} aria-hidden />
-            Limpar
           </button>
 
           <button
@@ -258,7 +273,13 @@ export function MvpFiltersBar({
 
         <div className="flex flex-wrap items-end justify-end gap-x-2 gap-y-3">
           <span className="shrink-0 self-center text-sm text-primary">Período:</span>
-          <FormControl size="small" sx={sxRelatorioFiltroSelectPeriodo}>
+          <FormControl
+            size="small"
+            sx={{
+              ...sxRelatorioFiltroSelectPeriodo,
+              minWidth: periodoEstaNoPadrao ? 150 : 168,
+            }}
+          >
             <Select
               value={values.filtroPeriodo}
               onChange={e =>
@@ -267,6 +288,25 @@ export function MvpFiltersBar({
                   periodoPersonalizadoInicio: null,
                   periodoPersonalizadoFim: null,
                 })
+              }
+              endAdornment={
+                periodoEstaNoPadrao ? undefined : (
+                  <InputAdornment position="end" sx={{ position: 'absolute', right: 28 }}>
+                    <IconButton
+                      size="small"
+                      aria-label="Voltar período para Hoje"
+                      title="Voltar para Hoje"
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={e => {
+                        e.stopPropagation()
+                        resetPeriodoParaHoje()
+                      }}
+                      sx={{ color: 'white', p: 0.25 }}
+                    >
+                      <MdClose size={16} aria-hidden />
+                    </IconButton>
+                  </InputAdornment>
+                )
               }
             >
               {OPCOES_PERIODO_RELATORIO_MVP.map(op => (

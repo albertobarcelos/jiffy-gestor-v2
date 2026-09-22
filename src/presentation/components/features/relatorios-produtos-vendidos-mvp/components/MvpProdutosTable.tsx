@@ -297,7 +297,7 @@ export function MvpProdutosTable(props: {
 
   const vazia = rows.length === 0
   /** Linhas fantasma só para preencher a grade quando não há resultado no período. */
-  const EMPTY_PLACEHOLDER_ROWS = 14
+  const EMPTY_PLACEHOLDER_ROWS = 5
 
   return (
     <div className={shellClass}>

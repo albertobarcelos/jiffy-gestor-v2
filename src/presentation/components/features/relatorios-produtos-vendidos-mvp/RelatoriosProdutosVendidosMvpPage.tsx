@@ -269,8 +269,18 @@ export function RelatoriosProdutosVendidosMvpPage() {
   }, [filtros])
 
   const onLimpar = useCallback(() => {
-    setFiltros(defaultFiltros)
-    setFiltrosQuery(defaultFiltros)
+    setFiltros(prev => ({
+      ...defaultFiltros,
+      filtroPeriodo: prev.filtroPeriodo,
+      periodoPersonalizadoInicio: prev.periodoPersonalizadoInicio,
+      periodoPersonalizadoFim: prev.periodoPersonalizadoFim,
+    }))
+    setFiltrosQuery(prev => ({
+      ...defaultFiltros,
+      filtroPeriodo: prev.filtroPeriodo,
+      periodoPersonalizadoInicio: prev.periodoPersonalizadoInicio,
+      periodoPersonalizadoFim: prev.periodoPersonalizadoFim,
+    }))
     setImpactoComplemento('todos')
     setGrupoComplementoId('')
   }, [])

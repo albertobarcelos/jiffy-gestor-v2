@@ -92,4 +92,37 @@ describe('agregarComplementosVendidos', () => {
     expect(kpis.skusDistintos).toBe(2)
     expect(kpis.valorAumenta).toBe(2)
   })
+
+  it('filtra por valor líquido e quantidade', () => {
+    const detalhes: VendaDetalheProdutos[] = [
+      {
+        produtosLancados: [
+          {
+            produtoId: 'p1',
+            complementos: [
+              {
+                complementoId: 'c-barato',
+                nomeComplemento: 'Barato',
+                quantidade: 2,
+                valorUnitario: 1,
+                tipoImpactoPreco: 'aumenta',
+              },
+              {
+                complementoId: 'c-caro',
+                nomeComplemento: 'Caro',
+                quantidade: 10,
+                valorUnitario: 5,
+                tipoImpactoPreco: 'aumenta',
+              },
+            ],
+          },
+        ],
+      },
+    ]
+    const all = agregarComplementosVendidos(detalhes)
+    const porValor = filtrarEOrdenarComplementos(all, { valorMin: 10 })
+    expect(porValor.map(r => r.complementoId)).toEqual(['c-caro'])
+    const porQtd = filtrarEOrdenarComplementos(all, { qtdMax: 5 })
+    expect(porQtd.map(r => r.complementoId)).toEqual(['c-barato'])
+  })
 })

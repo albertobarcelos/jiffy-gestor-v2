@@ -103,7 +103,7 @@ export function MvpComplementosPainel(props: {
                       Nenhum complemento neste período
                     </td>
                   </tr>
-                  {Array.from({ length: 13 }, (_, idx) => (
+                  {Array.from({ length: 4 }, (_, idx) => (
                     <tr
                       key={`empty-comp-${idx}`}
                       className={idx % 2 === 0 ? 'bg-[#fafafa]' : 'bg-white'}

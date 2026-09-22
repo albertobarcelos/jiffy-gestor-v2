@@ -435,23 +435,31 @@ export async function GET(request: NextRequest) {
         : 0
 
     if (somenteComplementos) {
-      // Detalhes de venda não dependem do filtro de grupo de produto; usa cache sem
-      // grupoIds para reaproveitar o agregado do período e filtrar grupos de complemento depois.
+      // Detalhes de venda não dependem de filtros de linha (grupo produto / valor / qtd / busca);
+      // agrega o período uma vez e aplica filtros de complemento depois.
       const cacheKeyComplementos = buildRelatorioAgregadoCacheKey({
         empresaId,
         paramsIntervaloPdV,
         sort,
         grupoIdsKey: '',
-        valorMin,
-        valorMax,
-        qtdMin,
-        qtdMax,
-        qBusca,
+        valorMin: null,
+        valorMax: null,
+        qtdMin: null,
+        qtdMax: null,
+        qBusca: null,
         timezone,
       })
       const agregado = await obterAgregadoComCache({
         cacheKey: cacheKeyComplementos,
-        pipelineBase: { ...pipelineBase, grupoIdSet: null },
+        pipelineBase: {
+          ...pipelineBase,
+          grupoIdSet: null,
+          valorMin: null,
+          valorMax: null,
+          qtdMin: null,
+          qtdMax: null,
+          qBusca: null,
+        },
         intervaloSlot,
         diasPeriodo,
         timezone,
@@ -469,6 +477,10 @@ export async function GET(request: NextRequest) {
         impacto: impactoComplemento,
         sort: searchParams.get('sort') || 'quantidade_desc',
         grupoComplementoIdSet,
+        valorMin,
+        valorMax,
+        qtdMin,
+        qtdMax,
       })
 
       return NextResponse.json(

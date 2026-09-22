@@ -181,6 +181,10 @@ export function filtrarEOrdenarComplementos(
     sort?: string
     /** Filtra por `grupoComplementoId` (não confundir com grupo de produto). */
     grupoComplementoIdSet?: Set<string> | null
+    valorMin?: number | null
+    valorMax?: number | null
+    qtdMin?: number | null
+    qtdMax?: number | null
   }
 ): LinhaComplementoVendidoInterna[] {
   let out = linhas
@@ -194,6 +198,19 @@ export function filtrarEOrdenarComplementos(
   if (impacto) {
     // Alinhado à coluna Impacto da grade (badge = impactoPredominante).
     out = out.filter(r => r.impactoPredominante === impacto)
+  }
+
+  if (opts.valorMin != null) {
+    out = out.filter(r => r.valorLiquido >= opts.valorMin!)
+  }
+  if (opts.valorMax != null) {
+    out = out.filter(r => r.valorLiquido <= opts.valorMax!)
+  }
+  if (opts.qtdMin != null) {
+    out = out.filter(r => r.quantidade >= opts.qtdMin!)
+  }
+  if (opts.qtdMax != null) {
+    out = out.filter(r => r.quantidade <= opts.qtdMax!)
   }
 
   const q = opts.qBusca?.trim().toLowerCase()
