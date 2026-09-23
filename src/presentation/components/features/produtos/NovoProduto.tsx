@@ -41,8 +41,8 @@ import {
   type DestinoAlteracaoProduto,
 } from '@/src/shared/types/propagarAlteracaoProduto'
 import {
-  garantirMenuPrincipalNosIds,
   menuIdsParaEspelharAposSalvarCadastro,
+  menuIdsProntosParaCriacaoProduto,
   syncCadastroComMenuPrincipalAtivo,
 } from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
 
@@ -411,6 +411,10 @@ export interface NovoProdutoProps {
   onWizardSavingChange?: (saving: boolean) => void
   /** Passo 2 com fiscal indisponível: só “Voltar” no fluxo interno */
   onFiscalUnavailableChange?: (onlyBack: boolean) => void
+  /**
+   * Cópia: menus do GET do produto origem — o pai usa para seed da aba Menus / POST.
+   */
+  onMenusVinculadosLoaded?: (menuIds: string[]) => void
   /** Preview de celular à direita (padrão: true no painel embutido). */
   showMobilePreview?: boolean
   /** Imagem exibida no preview (ex.: snapshot do cardápio). */
@@ -442,6 +446,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       onWizardStepChange,
       onWizardSavingChange,
       onFiscalUnavailableChange,
+      onMenusVinculadosLoaded,
       showMobilePreview,
       previewImagemUrl = null,
       previewMenuId,
@@ -953,6 +958,9 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
             const menuIdsLoaded = extrairMenuIdsDoProdutoJson(produto)
             setMenusVinculadosIds(menuIdsLoaded)
+            if (currentEffectiveIsCopyMode) {
+              onMenusVinculadosLoaded?.(menuIdsLoaded)
+            }
             if (imagemNoCardapio) {
               const imagemLegado = extrairImagemUrlDoProdutoJson(produto)
               if (imagemLegado) setServerPreviewImage(imagemLegado)
@@ -1624,8 +1632,15 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
         const isEditMode = Boolean(idPersistidoParaSave)
         if (!isEditMode) {
-          const principalId = await buscarIdMenuPrincipal(token)
-          menuIdsFinal = garantirMenuPrincipalNosIds(menuIdsFinal, principalId)
+          const [principalId, menusEmpresa] = await Promise.all([
+            buscarIdMenuPrincipal(token),
+            buscarMenusDaEmpresa({ token }),
+          ])
+          menuIdsFinal = menuIdsProntosParaCriacaoProduto({
+            candidatos: menuIdsFinal,
+            menusEmpresa,
+            principalId,
+          })
         }
 
         const body: Record<string, unknown> = {

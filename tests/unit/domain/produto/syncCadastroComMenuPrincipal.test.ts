@@ -6,6 +6,9 @@ import {
   ehMenuPrincipal,
   garantirMenuPrincipalNosIds,
   menuIdsParaEspelharAposSalvarCadastro,
+  filtrarMenuIdsExistentesNaEmpresa,
+  menuIdsParaSeedCopiaProduto,
+  menuIdsProntosParaCriacaoProduto,
   idMenuPrincipalDeLista,
   idsMenuPrincipalTravados,
   labelCadastroNaPropagacao,
@@ -215,5 +218,39 @@ describe('syncCadastroComMenuPrincipal', () => {
     expect(descricaoVinculoMenusCriacao(false)).toContain('não pode ser desmarcado')
     expect(descricaoVinculoMenusCriacao(false, false)).toContain('desmarcá-lo')
     expect(ehMenuPrincipal(PRINCIPAL, PRINCIPAL)).toBe(true)
+  })
+
+  it('na cópia descarta menus órfãos e mantém só os existentes + principal', () => {
+    const menusEmpresa = [{ id: PRINCIPAL }, { id: DELIVERY }]
+    expect(
+      filtrarMenuIdsExistentesNaEmpresa(
+        [PRINCIPAL, 'mn_orfaao_stale', DELIVERY],
+        menusEmpresa
+      )
+    ).toEqual([PRINCIPAL, DELIVERY])
+
+    expect(
+      menuIdsParaSeedCopiaProduto({
+        candidatosDoProduto: ['mn_orfaao_stale', DELIVERY],
+        menusEmpresa,
+        principalId: PRINCIPAL,
+      })
+    ).toEqual([PRINCIPAL, DELIVERY])
+
+    expect(
+      menuIdsProntosParaCriacaoProduto({
+        candidatos: ['mn_orfaao_stale'],
+        menusEmpresa,
+        principalId: PRINCIPAL,
+      })
+    ).toEqual([PRINCIPAL])
+
+    expect(
+      menuIdsProntosParaCriacaoProduto({
+        candidatos: ['mn_orfaao_stale', DELIVERY],
+        menusEmpresa,
+        principalId: 'mn_principal_fantasma',
+      })
+    ).toEqual([DELIVERY])
   })
 })
