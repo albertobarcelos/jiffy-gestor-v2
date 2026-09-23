@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import type { ProdutoSelecionado } from '@/src/domain/types/pedido'
 import {
   obterUnidadeMedidaProdutoLinha,
@@ -29,6 +30,7 @@ import { useNovoPedidoFormContext } from '../../context/NovoPedidoFormContext'
 import { useNovoPedidoDetalheContext } from '../../context/NovoPedidoDetalheContext'
 import { useNovoPedidoUIContext } from '../../context/NovoPedidoUIContext'
 import { criarHandlersLongPressLinha } from '../../utils/longPressLinhaPedido'
+import { PedidoCarrinhoFiscalSobNome } from './PedidoCarrinhoCamposFiscais'
 import { PedidoCarrinhoLinhaComplemento } from './PedidoCarrinhoLinhaComplemento'
 import { PedidoCarrinhoQtdStepper } from './PedidoCarrinhoQtdStepper'
 import type { ProdutoPendendoRemocao } from './PedidoCarrinhoRemoverDialog'
@@ -59,11 +61,23 @@ export function PedidoCarrinhoLinhaProduto({
     formatarDescontoAcrescimo,
     formatarNumeroComMilhar,
     produtosList,
+    hidratarFiscalProdutoNasLinhas,
     setValoresEmEdicao,
     valoresEmEdicao,
   } = useNovoPedidoFormContext()
   const { handleAbrirEdicaoProdutoDetalhes } = useNovoPedidoDetalheContext()
   const { longPressIndexRef, longPressTimeoutRef } = useNovoPedidoUIContext()
+  const fiscalHidratacaoSolicitadaRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (fiscalHidratacaoSolicitadaRef.current === produto.produtoId) return
+    if (produto.ncm?.trim() || produto.cest?.trim()) {
+      fiscalHidratacaoSolicitadaRef.current = produto.produtoId
+      return
+    }
+    fiscalHidratacaoSolicitadaRef.current = produto.produtoId
+    void hidratarFiscalProdutoNasLinhas(produto.produtoId)
+  }, [produto.produtoId, produto.ncm, produto.cest, hidratarFiscalProdutoNasLinhas])
 
   const totalProdutoComComplementos = calcularTotalProduto(produto)
   const qtdProdKey = `qtd-prod-${index}`
@@ -181,7 +195,7 @@ export function PedidoCarrinhoLinhaProduto({
             }
           }}
         />
-        <div className="min-w-0">
+        <div className="min-w-0 py-0.5">
           <span
             className="block truncate text-xs text-gray-900 cursor-pointer"
             title="Duplo clique para editar o produto"
@@ -194,6 +208,7 @@ export function PedidoCarrinhoLinhaProduto({
           >
             {produto.nome}
           </span>
+          <PedidoCarrinhoFiscalSobNome ncm={produto.ncm} cest={produto.cest} />
         </div>
         <div>
           <span className="block text-center text-xs text-gray-600">

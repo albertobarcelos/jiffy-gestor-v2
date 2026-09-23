@@ -147,6 +147,25 @@ function extrairGrupoProdutoIdDoJsonProduto(produto: Record<string, unknown>): s
   return null
 }
 
+/** GET `/api/produtos/:id` às vezes vem como `{ data: produto }` — normaliza para o objeto do produto. */
+function unwrapProdutoJsonResposta(raw: unknown): Record<string, unknown> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  const obj = raw as Record<string, unknown>
+  const nested = obj.data
+  if (
+    nested &&
+    typeof nested === 'object' &&
+    !Array.isArray(nested) &&
+    ((nested as Record<string, unknown>).id != null ||
+      (nested as Record<string, unknown>).nome != null ||
+      (nested as Record<string, unknown>).grupoId != null ||
+      (nested as Record<string, unknown>).grupo != null)
+  ) {
+    return nested as Record<string, unknown>
+  }
+  return obj
+}
+
 /** Defaults de origem/tipo não contam como dados fiscais — o microserviço exige NCM. */
 function fiscalDeveSerEnviado(fiscalData: Record<string, unknown>): boolean {
   return typeof fiscalData.ncm === 'string' && fiscalData.ncm.trim() !== ''
@@ -912,15 +931,13 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           })
 
           if (response.ok) {
-            const produto = await response.json()
+            const produto = unwrapProdutoJsonResposta(await response.json())
 
             // Preenche os campos com os dados do produto
-            setPrecoVenda(produto.valor ? formatCurrency(produto.valor) : '')
-            setUnidadeProduto(produto.unidadeMedida || 'UN')
+            setPrecoVenda(produto.valor ? formatCurrency(produto.valor as number | string) : '')
+            setUnidadeProduto((produto.unidadeMedida as string) || 'UN')
             {
-              const grupoFromApi = extrairGrupoProdutoIdDoJsonProduto(
-                produto as Record<string, unknown>
-              )
+              const grupoFromApi = extrairGrupoProdutoIdDoJsonProduto(produto)
               // Não apaga categoria já seedada (lista/menu) se o GET vier sem grupoId.
               if (grupoFromApi) {
                 setGrupoProduto(grupoFromApi)

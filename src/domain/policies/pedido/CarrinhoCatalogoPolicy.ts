@@ -10,6 +10,13 @@ export type CarregarProdutoCatalogoOptions = {
   forceRefresh?: boolean
   /** Não reutilizar snapshot slim da grade — precisa dos itens dos grupos do produto do menu. */
   requireComplementos?: boolean
+  /**
+   * Precisa do cadastro base (GET produto) para NCM/CEST — o snapshot do menu não traz fiscal.
+   * Use com `fiscalCadastroHidratado` para não refetch infinito em produtos sem NCM.
+   */
+  requireFiscalCadastro?: boolean
+  /** Já houve GET de cadastro (com fiscal) para este produto nesta sessão do pedido. */
+  fiscalCadastroHidratado?: boolean
 }
 
 export function produtoTemComplementosCarregados(
@@ -42,18 +49,26 @@ export function cacheProdutoCatalogoAtendePedido(
   if (options?.requireComplementos && !produtoTemComplementosCarregados(produto)) {
     return false
   }
+  if (options?.requireFiscalCadastro && !options.fiscalCadastroHidratado) {
+    // Slim do menu nunca traz NCM/CEST; se já temos dígitos, basta para a linha.
+    if (!produto.getNcm().trim() && !produto.getCest().trim()) {
+      return false
+    }
+  }
   return true
 }
 
 /**
  * Lançar com `requireComplementos`: o slim da grade basta para completar grupos
  * (cache de sessão ou GET por id). Evita GET cadastro + GET snapshot.
+ * Com `requireFiscalCadastro`, força o caminho completo (cadastro traz NCM/CEST).
  */
 export function catalogoPermiteHidratacaoSomenteGrupos(
   produto: Produto | undefined,
   options?: CarregarProdutoCatalogoOptions
 ): produto is Produto {
   if (options?.forceRefresh) return false
+  if (options?.requireFiscalCadastro) return false
   if (!options?.requireComplementos) return false
   if (!produto) return false
   if (produtoTemComplementosCarregados(produto)) return false
@@ -169,13 +184,15 @@ export function aplicarProdutoAtualizadoNasLinhasCarrinho(
       }
     })
 
-    const ncmAtualizado = produtoAtualizado.getNcm()
+    const ncmAtualizado = produtoAtualizado.getNcm().trim()
+    const cestAtualizado = produtoAtualizado.getCest().trim()
 
     return {
       ...linha,
       nome: produtoAtualizado.getNome(),
       unidadeMedida: produtoAtualizado.getUnidadeMedida(),
-      ncm: ncmAtualizado || linha.ncm,
+      ncm: ncmAtualizado || undefined,
+      cest: cestAtualizado || undefined,
       valorCatalogo: novoValorCatalogo,
       permiteAlterarPreco,
       complementos,

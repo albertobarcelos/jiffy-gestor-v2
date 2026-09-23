@@ -112,6 +112,8 @@ export function useNovoPedidoCatalogoData({
   }, [permissoesPorId, aplicarPermissoesCadastro, setCatalogoProdutosPorId])
 
   const inflightProdutoPorIdRef = useRef<Map<string, Promise<Produto | null>>>(new Map())
+  /** IDs que já passaram por GET cadastro+menu (traz NCM/CEST), nesta sessão do pedido. */
+  const fiscalCadastroHidratadoIdsRef = useRef<Set<string>>(new Set())
 
   const carregarProdutoNoCatalogoSeNecessario = useCallback(
     async (
@@ -124,8 +126,15 @@ export function useNovoPedidoCatalogoData({
         produtosList
       )
 
-      if (!options?.forceRefresh) {
-        if (cacheProdutoCatalogoAtendePedido(emCache, options)) {
+      const optionsComFiscal: CarregarProdutoCatalogoOptions | undefined = options
+        ? {
+            ...options,
+            fiscalCadastroHidratado: fiscalCadastroHidratadoIdsRef.current.has(produtoId),
+          }
+        : undefined
+
+      if (!optionsComFiscal?.forceRefresh) {
+        if (cacheProdutoCatalogoAtendePedido(emCache, optionsComFiscal)) {
           setCatalogoProdutosPorId(prev =>
             prev[produtoId] ? prev : { ...prev, [emCache.getId()]: emCache }
           )
@@ -138,17 +147,20 @@ export function useNovoPedidoCatalogoData({
 
       if (!token) return null
 
-      if (options?.forceRefresh) {
+      if (optionsComFiscal?.forceRefresh) {
         limparCacheGruposComplementosCatalogoVenda()
       }
 
       const fetchProduto = (async (): Promise<Produto | null> => {
         try {
-          const entity =
-            !options?.forceRefresh && catalogoPermiteHidratacaoSomenteGrupos(emCache, options)
-              ? await fetchHidratacaoGruposComplementosCatalogo(emCache, token)
-              : await fetchProdutoCatalogoPorId(produtoId, token, menuId)
+          const soGrupos = catalogoPermiteHidratacaoSomenteGrupos(emCache, optionsComFiscal)
+          const entity = soGrupos
+            ? await fetchHidratacaoGruposComplementosCatalogo(emCache, token)
+            : await fetchProdutoCatalogoPorId(produtoId, token, menuId)
           if (!entity) return null
+          if (!soGrupos) {
+            fiscalCadastroHidratadoIdsRef.current.add(entity.getId())
+          }
           setCatalogoProdutosPorId(prev => ({ ...prev, [entity.getId()]: entity }))
           return entity
         } catch {
@@ -156,7 +168,7 @@ export function useNovoPedidoCatalogoData({
         }
       })()
 
-      if (!options?.forceRefresh) {
+      if (!optionsComFiscal?.forceRefresh) {
         inflightProdutoPorIdRef.current.set(produtoId, fetchProduto)
       }
 

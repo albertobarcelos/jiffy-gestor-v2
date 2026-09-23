@@ -76,7 +76,10 @@ export function useNovoPedidoProdutos({
       }
 
       setCarregandoComplementosPainel(true)
-      void carregarProdutoNoCatalogoSeNecessario(produtoId, { requireComplementos: true })
+      void carregarProdutoNoCatalogoSeNecessario(produtoId, {
+        requireComplementos: true,
+        requireFiscalCadastro: true,
+      })
         .then(produtoAtualizado => {
           if (!produtoAtualizado) return
           setProdutoParaLancamentoPainel(prev =>
@@ -88,6 +91,35 @@ export function useNovoPedidoProdutos({
         })
     },
     [carregarProdutoNoCatalogoSeNecessario]
+  )
+
+  /**
+   * Snapshot do menu não traz NCM/CEST — busca o cadastro e reaplica nas linhas.
+   */
+  const hidratarFiscalProdutoNasLinhas = useCallback(
+    async (produtoId: string, produtoAnterior?: Produto | null) => {
+      const id = produtoId.trim()
+      if (!id) return
+
+      const atualizado = await carregarProdutoNoCatalogoSeNecessario(id, {
+        requireFiscalCadastro: true,
+      })
+      if (!atualizado) return
+
+      setProdutos(prev =>
+        aplicarProdutoAtualizadoNasLinhasCarrinho(prev, atualizado, produtoAnterior)
+      )
+
+      if (produtoParaLancamentoPainel?.getId() === id) {
+        setProdutoParaLancamentoPainel(atualizado)
+      }
+    },
+    [
+      carregarProdutoNoCatalogoSeNecessario,
+      setProdutos,
+      produtoParaLancamentoPainel,
+      setProdutoParaLancamentoPainel,
+    ]
   )
 
   const abrirEdicaoComplementoNoPainel = useCallback(
@@ -190,9 +222,14 @@ export function useNovoPedidoProdutos({
             valorCatalogo: produto.getValor(),
             permiteAlterarPreco: false,
             unidadeMedida: produto.getUnidadeMedida(),
+            ncm: produto.getNcm() || undefined,
+            cest: produto.getCest() || undefined,
             complementos: [],
           },
         ])
+        if (!produto.getNcm().trim() && !produto.getCest().trim()) {
+          void hidratarFiscalProdutoNasLinhas(produtoId, produto)
+        }
         return
       }
 
@@ -201,11 +238,15 @@ export function useNovoPedidoProdutos({
       setProdutoParaLancamentoPainel(produto)
       setModalLancamentoProdutoPainelOpen(true)
       garantirComplementosProdutoNoPainel(produtoId, produto)
+      if (!produto.getNcm().trim() && !produto.getCest().trim()) {
+        void hidratarFiscalProdutoNasLinhas(produtoId, produto)
+      }
     },
     [
       catalogoProdutosPorId,
       produtosList,
       garantirComplementosProdutoNoPainel,
+      hidratarFiscalProdutoNasLinhas,
       setCatalogoProdutosPorId,
       setProdutos,
     ]
@@ -266,6 +307,8 @@ export function useNovoPedidoProdutos({
             valorCatalogo: atual.valorCatalogo ?? valorCatalogo,
             permiteAlterarPreco:
               atual.permiteAlterarPreco ?? permiteAlterarPreco,
+            ncm: atual.ncm || produto.getNcm() || undefined,
+            cest: atual.cest || produto.getCest() || undefined,
           })
           return novos
         })
@@ -280,6 +323,8 @@ export function useNovoPedidoProdutos({
             valorCatalogo,
             permiteAlterarPreco,
             unidadeMedida: produto.getUnidadeMedida(),
+            ncm: produto.getNcm() || undefined,
+            cest: produto.getCest() || undefined,
             complementos: complementosLinha,
             tipoDesconto: null,
             valorDesconto: null,
@@ -287,6 +332,9 @@ export function useNovoPedidoProdutos({
             valorAcrescimo: null,
           }),
         ])
+        if (!produto.getNcm().trim() && !produto.getCest().trim()) {
+          void hidratarFiscalProdutoNasLinhas(produto.getId(), produto)
+        }
       }
       setCatalogoProdutosPorId(prev => ({ ...prev, [produto.getId()]: produto }))
     },
@@ -297,6 +345,7 @@ export function useNovoPedidoProdutos({
       produtos,
       setProdutos,
       setCatalogoProdutosPorId,
+      hidratarFiscalProdutoNasLinhas,
     ]
   )
 
@@ -514,6 +563,7 @@ export function useNovoPedidoProdutos({
     handleTabChangeComplementoTabsModalPainel,
     recarregarProdutoPainelAposEdicaoComplemento,
     recarregarProdutoCarrinhoAposEdicao,
+    hidratarFiscalProdutoNasLinhas,
     adicionarProduto,
     confirmarLancamentoProdutoPainel,
     abrirModalComplementosProdutoExistente,
