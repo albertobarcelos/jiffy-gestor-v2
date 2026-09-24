@@ -167,6 +167,32 @@ function extrairIdProdutoDaRespostaApi(payload: unknown): string | undefined {
   return undefined
 }
 
+function asRecordUnknown(raw: unknown): Record<string, unknown> {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>
+  }
+  return {}
+}
+
+function asStringField(raw: unknown, fallback = ''): string {
+  if (typeof raw === 'string') return raw
+  if (typeof raw === 'number' || typeof raw === 'boolean') return String(raw)
+  return fallback
+}
+
+function idsDeRelacaoProduto(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map(item => {
+      if (!item || typeof item !== 'object') return null
+      const id = (item as Record<string, unknown>).id
+      if (typeof id === 'string' && id.trim() !== '') return id.trim()
+      if (typeof id === 'number') return String(id)
+      return null
+    })
+    .filter((id): id is string => id != null)
+}
+
 /** Compara ids de grupo para o PATCH parcial (null, undefined e string vazia tratados como ausência). */
 function grupoProdutoIdsIguaisParaPatch(a: unknown, b: unknown): boolean {
   const norm = (v: unknown): string | null => {
@@ -818,14 +844,14 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           unidadeProduto,
           grupoProduto,
           codigoEanBarras,
-          favorito: !!(produto.favorito || false),
-          permiteDesconto: !!(produto.permiteDesconto || false),
-          permiteAcrescimo: !!(produto.permiteAcrescimo || false),
-          abreComplementos: !!(produto.abreComplementos || false),
-          permiteAlterarPreco: !!(produto.permiteAlterarPreco ?? false),
-          incideTaxa: !!(produto.incideTaxa ?? false),
-          // Mesma semântica que `setAtivo(produto.ativo ?? true)` — unknown precisa virar boolean explícito
-          ativo: produto.ativo === false ? false : true,
+          favorito: produto.favorito === true,
+          permiteDesconto: produto.permiteDesconto === true,
+          permiteAcrescimo: produto.permiteAcrescimo === true,
+          abreComplementos: produto.abreComplementos === true,
+          permiteAlterarPreco: produto.permiteAlterarPreco === true,
+          incideTaxa: produto.incideTaxa === true,
+          // Mesma semântica que `setAtivo(produto.ativo !== false)` — unknown precisa virar boolean explícito
+          ativo: produto.ativo !== false,
           grupoComplementosIds: [...gruposIds].map(id => String(id)).sort(),
           impressorasIds: [...impressorasIdsArr].map(id => String(id)).sort(),
           // Antes do passo 3: igual ao estado inicial do formulário (alinhado a `getFormSnapshot` pós-load)
@@ -943,17 +969,17 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
                 ? String(eanRaw).replace(/\D/g, '').slice(0, 14)
                 : ''
             )
-            setFavorito(produto.favorito || false)
-            setPermiteDesconto(produto.permiteDesconto || false)
-            setPermiteAcrescimo(produto.permiteAcrescimo || false)
-            setAbreComplementos(produto.abreComplementos || false)
-            setPermiteAlterarPreco(produto.permiteAlterarPreco ?? false)
-            setIncideTaxa(produto.incideTaxa ?? false)
-            setAtivo(produto.ativo ?? true)
-            const gruposIds = produto.gruposComplementos?.map((g: any) => g.id) || []
+            setFavorito(produto.favorito === true)
+            setPermiteDesconto(produto.permiteDesconto === true)
+            setPermiteAcrescimo(produto.permiteAcrescimo === true)
+            setAbreComplementos(produto.abreComplementos === true)
+            setPermiteAlterarPreco(produto.permiteAlterarPreco === true)
+            setIncideTaxa(produto.incideTaxa === true)
+            setAtivo(produto.ativo !== false)
+            const gruposIds = idsDeRelacaoProduto(produto.gruposComplementos)
             setGrupoComplementosIds(gruposIds)
             setOriginalGrupoComplementosIds(gruposIds) // Guardar os grupos originais
-            setImpressorasIds(produto.impressoras?.map((i: any) => i.id) || [])
+            setImpressorasIds(idsDeRelacaoProduto(produto.impressoras))
 
             const menuIdsLoaded = extrairMenuIdsDoProdutoJson(produto)
             setMenusVinculadosIds(menuIdsLoaded)
@@ -978,18 +1004,24 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
             // IMPORTANTE: Não preencher campos fiscais imediatamente para evitar chamadas ao microserviço fiscal
             // Os dados fiscais serão carregados apenas quando o usuário chegar no passo 3 (ConfiguracaoFiscalStep)
             // Armazenar dados fiscais em uma ref para uso posterior
-            const dadosFiscais = produto.fiscal || {}
+            const dadosFiscais = asRecordUnknown(produto.fiscal)
+            const fiscalStatusRaw = produto.fiscalStatus
             fiscalDataFromProductRef.current = {
-              ncm: dadosFiscais.ncm || produto.ncm || '',
-              cest: dadosFiscais.cest || '',
-              origemMercadoria:
-                dadosFiscais.origemMercadoria?.toString() ||
-                produto.origemMercadoria?.toString() ||
-                '',
-              tipoProduto: dadosFiscais.tipoProduto || produto.tipoProduto || '',
-              indicadorProducaoEscala:
-                dadosFiscais.indicadorProducaoEscala || produto.indicadorProducaoEscala || null,
-              fiscalStatus: produto.fiscalStatus || undefined,
+              ncm: asStringField(dadosFiscais.ncm || produto.ncm),
+              cest: asStringField(dadosFiscais.cest),
+              origemMercadoria: asStringField(
+                dadosFiscais.origemMercadoria ?? produto.origemMercadoria
+              ),
+              tipoProduto: asStringField(dadosFiscais.tipoProduto || produto.tipoProduto),
+              indicadorProducaoEscala: (() => {
+                const raw = dadosFiscais.indicadorProducaoEscala ?? produto.indicadorProducaoEscala
+                if (raw == null || raw === '') return null
+                return asStringField(raw)
+              })(),
+              fiscalStatus:
+                fiscalStatusRaw === 'available' || fiscalStatusRaw === 'unavailable'
+                  ? fiscalStatusRaw
+                  : undefined,
             }
             // Resetar flag de carregamento fiscal quando produto muda
             hasLoadedFiscalDataRef.current = false
@@ -1005,12 +1037,12 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               null
 
             if (currentEffectiveIsCopyMode) {
-              const nomeOriginal = produto.nome || ''
+              const nomeOriginal = asStringField(produto.nome)
               setNomeProduto(nomeOriginal ? `${nomeOriginal} - Cópia` : 'Cópia ')
-              setDescricaoProduto(produto.descricao || '')
+              setDescricaoProduto(asStringField(produto.descricao))
             } else {
-              setNomeProduto(produto.nome || '')
-              setDescricaoProduto(produto.descricao || '')
+              setNomeProduto(asStringField(produto.nome))
+              setDescricaoProduto(asStringField(produto.descricao))
             }
 
             // Após o React aplicar o estado vindo da API (debounce curto evita baseline antes do flush)
