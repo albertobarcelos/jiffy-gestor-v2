@@ -54,6 +54,12 @@ export function MvpRelatorioToolbarActions(props: {
   onToggleModalEvolucao: () => void
   modalAbcAberto: boolean
   onToggleModalAbc: () => void
+  /** Na aba Complementos: oculta gráficos e personalizar (só produtos). */
+  mostrarAcoesSomenteProdutos?: boolean
+  modalImpactoAberto?: boolean
+  onToggleModalImpacto?: () => void
+  modalQuantidadeAberto?: boolean
+  onToggleModalQuantidade?: () => void
 }) {
   const {
     onAtualizar,
@@ -67,6 +73,11 @@ export function MvpRelatorioToolbarActions(props: {
     onToggleModalEvolucao,
     modalAbcAberto,
     onToggleModalAbc,
+    mostrarAcoesSomenteProdutos = true,
+    modalImpactoAberto = false,
+    onToggleModalImpacto,
+    modalQuantidadeAberto = false,
+    onToggleModalQuantidade,
   } = props
 
   return (
@@ -77,32 +88,51 @@ export function MvpRelatorioToolbarActions(props: {
         icon={<MdInsights size={18} />}
         label="KPIs"
       />
-      <TogglePainelBtn
-        active={modalGruposAberto}
-        onClick={onToggleModalGrupos}
-        icon={<MdDonutLarge size={18} />}
-        label="Grupos"
-      />
-      <TogglePainelBtn
-        active={modalAbcAberto}
-        onClick={onToggleModalAbc}
-        icon={<MdPieChart size={18} />}
-        label="ABC"
-      />
-      <TogglePainelBtn
-        active={modalEvolucaoAberto}
-        onClick={onToggleModalEvolucao}
-        icon={<MdBarChart size={18} />}
-        label="Evolução"
-      />
-      <button
-        type="button"
-        onClick={onPersonalizar}
-        className="flex h-8 items-center gap-1.5 rounded-lg border border-primary/25 bg-info px-2.5 text-xs font-medium text-primary-text hover:border-primary/50 sm:text-sm"
-      >
-        <MdTune size={18} />
-        <span className="hidden sm:inline">Personalizar</span>
-      </button>
+      {mostrarAcoesSomenteProdutos ? (
+        <>
+          <TogglePainelBtn
+            active={modalGruposAberto}
+            onClick={onToggleModalGrupos}
+            icon={<MdDonutLarge size={18} />}
+            label="Grupos"
+          />
+          <TogglePainelBtn
+            active={modalAbcAberto}
+            onClick={onToggleModalAbc}
+            icon={<MdPieChart size={18} />}
+            label="ABC"
+          />
+          <TogglePainelBtn
+            active={modalEvolucaoAberto}
+            onClick={onToggleModalEvolucao}
+            icon={<MdBarChart size={18} />}
+            label="Evolução"
+          />
+          <button
+            type="button"
+            onClick={onPersonalizar}
+            className="flex h-8 items-center gap-1.5 rounded-lg border border-primary/25 bg-info px-2.5 text-xs font-medium text-primary-text hover:border-primary/50 sm:text-sm"
+          >
+            <MdTune size={18} />
+            <span className="hidden sm:inline">Personalizar</span>
+          </button>
+        </>
+      ) : (
+        <>
+          <TogglePainelBtn
+            active={modalImpactoAberto}
+            onClick={() => onToggleModalImpacto?.()}
+            icon={<MdDonutLarge size={18} />}
+            label="Impacto"
+          />
+          <TogglePainelBtn
+            active={modalQuantidadeAberto}
+            onClick={() => onToggleModalQuantidade?.()}
+            icon={<MdBarChart size={18} />}
+            label="Quantidade"
+          />
+        </>
+      )}
       <button
         type="button"
         onClick={onAtualizar}

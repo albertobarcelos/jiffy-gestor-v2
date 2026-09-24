@@ -33,6 +33,9 @@ import { MvpChartParticipacao } from './components/MvpChartParticipacao'
 import { MvpChartEvolucao } from './components/MvpChartEvolucao'
 import { MvpProdutosTable } from './components/MvpProdutosTable'
 import { MvpComplementosPainel } from './components/MvpComplementosPainel'
+import { MvpComplementosKpiGrid } from './components/MvpComplementosKpiGrid'
+import { MvpChartImpactoComplementos } from './components/MvpChartImpactoComplementos'
+import { MvpChartQuantidadeComplementos } from './components/MvpChartQuantidadeComplementos'
 import {
   MvpPlanilhaAbas,
   type MvpPlanilhaAbaId,
@@ -69,7 +72,9 @@ export function RelatoriosProdutosVendidosMvpPage() {
   const [filtros, setFiltros] = useState<RelatoriosProdutosVendidosFiltersValues>(defaultFiltros)
   const [filtrosQuery, setFiltrosQuery] = useState<RelatoriosProdutosVendidosFiltersValues>(defaultFiltros)
   const [drawerAberto, setDrawerAberto] = useState(false)
-  const [modalGrafico, setModalGrafico] = useState<'grupos' | 'abc' | 'evolucao' | null>(null)
+  const [modalGrafico, setModalGrafico] = useState<
+    'grupos' | 'abc' | 'evolucao' | 'impacto' | 'quantidade' | null
+  >(null)
   const [abaPlanilha, setAbaPlanilha] = useState<MvpPlanilhaAbaId>('produtos')
   const [impactoComplemento, setImpactoComplemento] = useState<
     RelatorioComplementoImpacto | 'todos'
@@ -80,6 +85,8 @@ export function RelatoriosProdutosVendidosMvpPage() {
   const modalGruposAberto = modalGrafico === 'grupos'
   const modalAbcAberto = modalGrafico === 'abc'
   const modalEvolucaoAberto = modalGrafico === 'evolucao'
+  const modalImpactoAberto = modalGrafico === 'impacto'
+  const modalQuantidadeAberto = modalGrafico === 'quantidade'
 
   const { layout, persistLayout, patchPaineis } = useMvpPersonalizacao()
   const { tipoGrupos, tipoEvolucao, setTipoGrupos, setTipoEvolucao } = useMvpChartTipos()
@@ -372,6 +379,14 @@ export function RelatoriosProdutosVendidosMvpPage() {
     setModalGrafico(prev => (prev === 'evolucao' ? null : 'evolucao'))
   }, [])
 
+  const handleToggleModalImpacto = useCallback(() => {
+    setModalGrafico(prev => (prev === 'impacto' ? null : 'impacto'))
+  }, [])
+
+  const handleToggleModalQuantidade = useCallback(() => {
+    setModalGrafico(prev => (prev === 'quantidade' ? null : 'quantidade'))
+  }, [])
+
   const handleFecharModalGrafico = useCallback(() => {
     setModalGrafico(null)
   }, [])
@@ -442,6 +457,11 @@ export function RelatoriosProdutosVendidosMvpPage() {
               onToggleModalAbc={handleToggleModalAbc}
               modalEvolucaoAberto={modalEvolucaoAberto}
               onToggleModalEvolucao={handleToggleModalEvolucao}
+              mostrarAcoesSomenteProdutos={!modoComplementos}
+              modalImpactoAberto={modalImpactoAberto}
+              onToggleModalImpacto={handleToggleModalImpacto}
+              modalQuantidadeAberto={modalQuantidadeAberto}
+              onToggleModalQuantidade={handleToggleModalQuantidade}
             />
           }
         />
@@ -456,24 +476,34 @@ export function RelatoriosProdutosVendidosMvpPage() {
           </div>
         ) : (
           <>
-            {layout.paineis.kpis && !modoComplementos ? (
+            {layout.paineis.kpis ? (
               <MvpPainelAsync
                 compact
-                loading={kpisComparativoPendente}
+                loading={
+                  modoComplementos
+                    ? (complementosLoading || complementosFetching) && !complementosData
+                    : kpisComparativoPendente
+                }
                 error={null}
               >
                 <div className="scrollbar-thin -m-1 flex gap-1 overflow-x-auto pb-1">
-                  <MvpKpiGrid kpis={kpisExibicao} comparativoPendente={kpisComparativoPendente} />
+                  {modoComplementos ? (
+                    <MvpComplementosKpiGrid kpis={complementosData?.kpis} />
+                  ) : (
+                    <MvpKpiGrid
+                      kpis={kpisExibicao}
+                      comparativoPendente={kpisComparativoPendente}
+                    />
+                  )}
                 </div>
               </MvpPainelAsync>
             ) : null}
 
             <div className="flex flex-col pb-2">
               {modoComplementos ? (
-                <div className="m-1 mb-0 min-h-[min(50vh,32rem)] rounded-t-none border border-b-0 border-[#d0d7de] bg-white p-3">
+                <div className="mb-0 [&>div]:mb-0 [&>div]:rounded-b-none [&>div]:border-b-0">
                   <MvpComplementosPainel
                     items={complementosData?.items ?? []}
-                    kpis={complementosData?.kpis}
                     isLoading={
                       (complementosLoading || complementosFetching) && !complementosData
                     }
@@ -501,7 +531,16 @@ export function RelatoriosProdutosVendidosMvpPage() {
                   />
                 </div>
               )}
-              <MvpPlanilhaAbas abaAtiva={abaPlanilha} onChange={setAbaPlanilha} />
+              <MvpPlanilhaAbas
+                abaAtiva={abaPlanilha}
+                onChange={aba => {
+                  setAbaPlanilha(aba)
+                  if (aba === 'complementos') {
+                    setModalGrafico(null)
+                    setDrawerAberto(false)
+                  }
+                }}
+              />
             </div>
           </>
         )}
@@ -567,6 +606,46 @@ export function RelatoriosProdutosVendidosMvpPage() {
             tipoGrafico={tipoEvolucao}
             onTipoGraficoChange={setTipoEvolucao}
           />
+        </MvpPainelAsync>
+      </MvpChartModal>
+
+      <MvpChartModal
+        open={modalImpactoAberto}
+        onClose={handleFecharModalGrafico}
+        title="Distribuição por impacto"
+      >
+        <MvpPainelAsync
+          loading={(complementosLoading || complementosFetching) && !complementosData}
+          error={
+            complementosIsError
+              ? complementosError instanceof Error
+                ? complementosError
+                : new Error('Não foi possível carregar os complementos.')
+              : null
+          }
+          minHeightClass="min-h-[min(24rem,50vh)]"
+        >
+          <MvpChartImpactoComplementos items={complementosData?.items} />
+        </MvpPainelAsync>
+      </MvpChartModal>
+
+      <MvpChartModal
+        open={modalQuantidadeAberto}
+        onClose={handleFecharModalGrafico}
+        title="Quantidade vendida"
+      >
+        <MvpPainelAsync
+          loading={(complementosLoading || complementosFetching) && !complementosData}
+          error={
+            complementosIsError
+              ? complementosError instanceof Error
+                ? complementosError
+                : new Error('Não foi possível carregar os complementos.')
+              : null
+          }
+          minHeightClass="min-h-[min(24rem,50vh)]"
+        >
+          <MvpChartQuantidadeComplementos items={complementosData?.items} />
         </MvpPainelAsync>
       </MvpChartModal>
     </div>
