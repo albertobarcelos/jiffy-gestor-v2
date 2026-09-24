@@ -139,7 +139,8 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
       acoesExecutadas: AcaoTransicaoGestor[],
       respostaTransicao: unknown,
       colunaDestino: ColunaKanbanId,
-      ticketsPreload?: VendaGestorTicketsResponse
+      ticketsPreload?: VendaGestorTicketsResponse,
+      opcoes?: { pularPosTransicao?: boolean }
     ) => {
       marcarTransicaoLocal(venda.id)
       const cardCompleto = sincronizarVendaAposTransicao?.(
@@ -151,7 +152,9 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
         limparEtapaLocal(venda.id)
       }
       showToast.success('Etapa do pedido atualizada.')
-      void onAfterTransicaoSucesso?.({ venda, acoesExecutadas, ticketsPreload })
+      if (!opcoes?.pularPosTransicao) {
+        void onAfterTransicaoSucesso?.({ venda, acoesExecutadas, ticketsPreload })
+      }
       if (!cardCompleto) {
         agendarSincronizacaoLista?.(venda.id, colunaDestino, () => limparEtapaLocal(venda.id))
       }
@@ -226,18 +229,11 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
 
       iniciarTransicaoUi(venda.id, colunaOrigem, colunaDestino)
 
-      let ticketsPreload: VendaGestorTicketsResponse | undefined
+      const ticketsPromise = verificarImpressaoAntesTransicoes
+        ? verificarImpressaoAntesTransicoes(venda, acoes)
+        : null
 
       try {
-        if (verificarImpressaoAntesTransicoes) {
-          const verificacao = await verificarImpressaoAntesTransicoes(venda, acoes)
-          if (!verificacao.ok) {
-            reverterTransicaoUi(venda.id)
-            return
-          }
-          ticketsPreload = verificacao.ticketsPayload
-        }
-
         if (acoes.includes('despachar') && verificarEntregadorAntesDespachar) {
           const podeDespachar = await verificarEntregadorAntesDespachar(venda)
           if (!podeDespachar) {
@@ -252,7 +248,23 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
             ? await executarTransicao({ id: venda.id, acoes })
             : await executarTransicao({ id: venda.id, acao: acoes[0] })
 
-        concluirTransicaoComSucesso(venda, acoes, resposta, colunaDestino, ticketsPreload)
+        concluirTransicaoComSucesso(venda, acoes, resposta, colunaDestino, undefined, {
+          pularPosTransicao: Boolean(ticketsPromise),
+        })
+
+        if (ticketsPromise) {
+          void ticketsPromise
+            .then(verificacao => {
+              void onAfterTransicaoSucesso?.({
+                venda,
+                acoesExecutadas: acoes,
+                ticketsPreload: verificacao.ok ? verificacao.ticketsPayload : undefined,
+              })
+            })
+            .catch(() => {
+              void onAfterTransicaoSucesso?.({ venda, acoesExecutadas: acoes })
+            })
+        }
       } catch (error) {
         reverterTransicaoUi(venda.id)
         throw error
@@ -265,6 +277,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
       executarTransicao,
       finalizarTransicaoUi,
       iniciarTransicaoUi,
+      onAfterTransicaoSucesso,
       onEntregadorAusenteAoDespachar,
       reverterTransicaoUi,
       verificarEntregadorAntesDespachar,
