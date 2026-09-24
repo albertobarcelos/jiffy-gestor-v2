@@ -68,6 +68,8 @@ export interface CriarVendaGestorApiRequest {
   tipoVenda: string
   origem: string
   statusVenda: string
+  /** Estação deste PC (caixa / impressão) — obrigatória no create balcão. */
+  estacaoId: string
   /** Totais da venda: calculados pelo backend — não enviar no create. */
   valorFinal?: number
   totalDesconto?: number

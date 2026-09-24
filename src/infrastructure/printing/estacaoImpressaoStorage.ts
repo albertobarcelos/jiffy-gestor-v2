@@ -1,5 +1,12 @@
 const ESTACAO_IMPRESSAO_ID_STORAGE_KEY = 'gestor-estacao-impressao-id'
 
+/** Disparado para abrir o painel de estação deste PC (ex.: create sem estação). */
+export const EVENTO_ABRIR_CONFIG_ESTACAO_IMPRESSAO =
+  'jiffy:abrir-configuracoes-estacao-impressao'
+
+export const MSG_ESTACAO_OBRIGATORIA_CRIAR_PEDIDO =
+  'Configure a estação deste computador antes de criar o pedido. Selecione ou cadastre a estação em Configurações → Estação deste PC.'
+
 export function getEstacaoImpressaoId(): string | null {
   if (typeof window === 'undefined') return null
   try {
@@ -30,4 +37,9 @@ export function limparEstacaoImpressaoId(): void {
   } catch {
     /* storage indisponível */
   }
+}
+
+export function solicitarAbrirConfigEstacaoImpressao(): void {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new Event(EVENTO_ABRIR_CONFIG_ESTACAO_IMPRESSAO))
 }

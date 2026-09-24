@@ -16,6 +16,11 @@ import { showToast } from '@/src/shared/utils/toast'
 import { notificarEnderecoForaDaCobertura, useHrefCoberturaEntregaPedido } from '../utils/coberturaEntregaPedidoUi'
 import { validarObservacoesPedido } from '@/src/shared/helpers/observacaoPedido'
 import { salvarRascunhoInformacoesAdicionais } from '@/src/shared/helpers/informacoesAdicionaisNota'
+import { resolverEstacaoIdParaCriarVendaGestor } from '@/src/infrastructure/api/estacoesImpressaoApi'
+import {
+  MSG_ESTACAO_OBRIGATORIA_CRIAR_PEDIDO,
+  solicitarAbrirConfigEstacaoImpressao,
+} from '@/src/infrastructure/printing/estacaoImpressaoStorage'
 
 export { validarInformacoesPedido }
 
@@ -191,11 +196,31 @@ export function useNovoPedidoSubmit({
       return
     }
 
+    const isPedidoDelivery = tipoInicioPedido === 'delivery'
+    let estacaoIdCriacao = ''
+
+    if (!isPedidoDelivery) {
+      try {
+        estacaoIdCriacao =
+          (await resolverEstacaoIdParaCriarVendaGestor(accessToken))?.trim() ?? ''
+      } catch (error) {
+        console.error('Falha ao resolver estação para create:', error)
+        showToast.error(
+          'Não foi possível validar a estação deste computador. Tente novamente.'
+        )
+        return
+      }
+
+      if (!estacaoIdCriacao) {
+        showToast.error(MSG_ESTACAO_OBRIGATORIA_CRIAR_PEDIDO)
+        solicitarAbrirConfigEstacaoImpressao()
+        return
+      }
+    }
+
     if (!iniciarSubmit()) return
 
     try {
-      const isPedidoDelivery = tipoInicioPedido === 'delivery'
-
       const resultado = isPedidoDelivery
         ? await criarPedidoDeliveryUseCase.execute(
             {
@@ -208,8 +233,9 @@ export function useNovoPedidoSubmit({
             payload => createPedidoDelivery!.mutateAsync(payload),
             accessToken
           )
-        : await criarVendaGestorUseCase.execute(input, payload =>
-            createVendaGestor.mutateAsync(payload)
+        : await criarVendaGestorUseCase.execute(
+            { ...input, estacaoId: estacaoIdCriacao },
+            payload => createVendaGestor.mutateAsync(payload)
           )
 
       showToast.success('Pedido criado com sucesso!')
@@ -270,6 +296,15 @@ export function useNovoPedidoSubmit({
           'Não foi possível obter a localização. Confira o endereço e a geo da empresa no hub Delivery.'
         )
         setCurrentStep(2)
+        return
+      }
+
+      if (
+        /estacaoId|esta[cç][aã]o.*obrigat/i.test(rawMessage) ||
+        /esta[cç][aã]o do gestor/i.test(rawMessage)
+      ) {
+        showToast.error(MSG_ESTACAO_OBRIGATORIA_CRIAR_PEDIDO)
+        solicitarAbrirConfigEstacaoImpressao()
         return
       }
 
