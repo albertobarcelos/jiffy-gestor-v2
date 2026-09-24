@@ -12,7 +12,7 @@ import { menuApiErrorResponse } from '@/src/shared/utils/menuApiRoute'
 
 type RouteContext = { params: Promise<{ id: string; grupoProdutoId: string }> }
 
-/** PATCH — renomeia grupo no snapshot do menu */
+/** PATCH — atualiza o snapshot do grupo neste menu (`nome` e/ou `ativo`) */
 export async function PATCH(req: NextRequest, { params }: RouteContext) {
   try {
     const validation = validateRequest(req)
@@ -23,7 +23,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     const grupoId = parseMenuRouteInput(MenuRouteGrupoProdutoIdSchema, grupoProdutoId)
     const body = parseMenuRouteInput(UpdateMenuGrupoBodySchema, await req.json())
     const useCase = new AtualizarMenuGrupoUseCase(createMenuRepository(validation.tokenInfo.token))
-    const grupo = await useCase.execute(menuId, grupoId, body.nome)
+    const grupo = await useCase.execute(menuId, grupoId, body)
 
     return NextResponse.json({ success: true, data: grupo })
   } catch (error) {

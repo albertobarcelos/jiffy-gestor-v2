@@ -52,6 +52,8 @@ describe('PedidoDeliveryListMapper — origem e financeiro', () => {
     expect(mapOrigemApiDeliveryParaVendaUnificada('JIFFY_DELIVERY')).toBe('JIFFY_DELIVERY')
     expect(mapOrigemApiDeliveryParaVendaUnificada('GESTOR')).toBe('GESTOR')
     expect(mapOrigemApiDeliveryParaVendaUnificada('AIQFOME')).toBe('AIQFOME')
+    expect(mapOrigemApiDeliveryParaVendaUnificada('IFOOD')).toBe('IFOOD')
+    expect(mapOrigemApiDeliveryParaVendaUnificada('DELIVERY_IFOOD')).toBe('IFOOD')
   })
 
   it('deriva status financeiro pago, pendente e parcial', () => {

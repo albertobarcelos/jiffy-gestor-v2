@@ -24,7 +24,8 @@ describe('pedidoDeliveryListQuery — origem toolbar ↔ API', () => {
     expect(mapOrigemApiParaFiltroKanban('GESTOR')).toBe('GESTOR')
     expect(mapOrigemApiParaFiltroKanban('JIFFY_DELIVERY')).toBe('JIFFY_DELIVERY')
     expect(mapOrigemApiParaFiltroKanban('PDV')).toBe('PDV')
-    expect(mapOrigemApiParaFiltroKanban('IFOOD')).toBeUndefined()
+    expect(mapOrigemApiParaFiltroKanban('IFOOD')).toBe('IFOOD')
+    expect(mapOrigemApiParaFiltroKanban('DELIVERY_IFOOD')).toBe('IFOOD')
   })
 })
 

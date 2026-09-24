@@ -15,4 +15,14 @@ describe('normalizeOrigemApi / rotuloOrigemParaExibicao', () => {
     expect(normalizeOrigemApi('CANAL_DESCONHECIDO')).toBe('OUTROS')
     expect(rotuloOrigemParaExibicao('OUTROS')).toBe('Outros')
   })
+
+  it('mapeia AIQFOME para Aiqfome (não Outros)', () => {
+    expect(normalizeOrigemApi('AIQFOME')).toBe('AIQFOME')
+    expect(rotuloOrigemParaExibicao(normalizeOrigemApi('AIQFOME'))).toBe('Aiqfome')
+  })
+
+  it('mapeia o alias DELIVERY_IFOOD para IFOOD', () => {
+    expect(normalizeOrigemApi('DELIVERY_IFOOD')).toBe('IFOOD')
+    expect(rotuloOrigemParaExibicao(normalizeOrigemApi('DELIVERY_IFOOD'))).toBe('iFood')
+  })
 })

@@ -1,3 +1,4 @@
+import { temSeloCanalMarketplace } from '@/src/domain/policies/pedido/origemCanalMarketplace'
 import type { Venda } from '../types'
 
 export type TipoVendaExibicaoCard =
@@ -61,6 +62,20 @@ export function derivarTipoVendaCardKanban(venda: Venda): KanbanVendaCardTipoVen
   }
 }
 
+export function codigoVendaKanban(venda: Venda): string | null {
+  const codigo = String(venda.codigoVenda ?? '').trim()
+  return codigo ? `#${codigo}` : null
+}
+
+export function rotuloNumeroVendaKanban(venda: Venda): string {
+  return `Pedido ${venda.numeroVenda}`
+}
+
+export function exibirSeloCanalMarketplace(origem: string | null | undefined): boolean {
+  return temSeloCanalMarketplace(origem)
+}
+
 export function linhaIdentificacaoVendaKanban(venda: Venda): string {
-  return `Venda ${venda.numeroVenda}${venda.codigoVenda ? ` - #${venda.codigoVenda}` : ''}`
+  const codigo = codigoVendaKanban(venda)
+  return codigo ? `${rotuloNumeroVendaKanban(venda)} - ${codigo}` : rotuloNumeroVendaKanban(venda)
 }

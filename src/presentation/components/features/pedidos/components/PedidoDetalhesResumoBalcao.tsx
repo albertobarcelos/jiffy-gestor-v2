@@ -2,6 +2,8 @@
 
 import type { ReactNode } from 'react'
 import { rotuloOrigemExibicao } from '@/src/application/mappers/PedidoDisplayMapper'
+import { temSeloCanalMarketplace } from '@/src/domain/policies/pedido/origemCanalMarketplace'
+import { OrigemCanalMark } from '@/src/presentation/components/features/origem/OrigemCanalMark'
 import { useNovoPedidoDetalheContext } from '../context/NovoPedidoDetalheContext'
 import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
 import { PedidoDetalhesInfo } from './PedidoDetalhesInfo'
@@ -53,7 +55,16 @@ export function PedidoDetalhesResumoBalcao() {
       <h3 className="text-lg font-semibold">Informações do Pedido</h3>
       <div className="flex flex-col gap-3 text-sm">
         <Linha label="Data:" value={dataExibicao} destaque />
-        <Linha label="Origem:" value={rotuloOrigemExibicao(origem)} />
+        <Linha
+          label="Origem:"
+          value={
+            temSeloCanalMarketplace(origem) ? (
+              <OrigemCanalMark origem={origem} size={24} />
+            ) : (
+              rotuloOrigemExibicao(origem)
+            )
+          }
+        />
         <Linha label="Status:" value={rotuloStatusResumoModal} destaque />
         {clienteNome ? <Linha label="Cliente:" value={clienteNome} /> : null}
         <Linha

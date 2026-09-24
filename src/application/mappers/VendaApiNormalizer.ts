@@ -1,3 +1,4 @@
+import { canonicalizarAliasOrigemApi } from '@/src/application/mappers/canonicalizarAliasOrigemApi'
 import type { StatusVenda } from '@/src/domain/types/pedido'
 import type { OrigemVenda } from '@/src/domain/types/vendaDetalhe'
 import type {
@@ -29,9 +30,9 @@ const ORIGEM_API_MAP: Record<string, OrigemVenda> = {
   JIFFY_DELIVERY: 'DELIVERY',
   DELIVERY: 'DELIVERY',
   IFOOD: 'IFOOD',
-  DELIVERY_IFOOD: 'IFOOD',
   RAPPI: 'RAPPI',
   DELIVERY_UBER: 'RAPPI',
+  AIQFOME: 'AIQFOME',
   OUTROS: 'OUTROS',
 }
 
@@ -39,7 +40,7 @@ export function normalizeOrigemApi(raw: string | null | undefined): OrigemVenda 
   if (raw == null || String(raw).trim() === '') {
     return null
   }
-  const key = String(raw).trim().toUpperCase()
+  const key = canonicalizarAliasOrigemApi(raw)
   return ORIGEM_API_MAP[key] ?? 'OUTROS'
 }
 
@@ -49,6 +50,7 @@ export function rotuloOrigemParaExibicao(origem: OrigemVenda | null, origemBruta
   if (origem === 'DELIVERY') return 'Delivery'
   if (origem === 'IFOOD') return 'iFood'
   if (origem === 'RAPPI') return 'Rappi'
+  if (origem === 'AIQFOME') return 'Aiqfome'
   if (origem === 'OUTROS') return 'Outros'
   if (origemBrutaApi == null || String(origemBrutaApi).trim() === '') {
     return 'PDV'

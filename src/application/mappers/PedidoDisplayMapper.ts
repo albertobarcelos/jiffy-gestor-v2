@@ -15,6 +15,7 @@ import type {
 } from '@/src/domain/types/vendaDetalhe'
 import { formatarTelefoneBr } from '@/src/shared/utils/telefoneBr'
 import { idUsuarioGestorConsultavel } from '@/src/application/mappers/atorPedidoDelivery'
+import { temSeloCanalMarketplace } from '@/src/domain/policies/pedido/origemCanalMarketplace'
 
 export {
   formatarDataDetalhePedido,
@@ -97,7 +98,13 @@ export function rotuloUsuarioPagamentoPedido(params: {
 
   if (cliente) return cliente
   const origem = String(params.origem ?? '').trim().toUpperCase()
-  if (origem === 'DELIVERY' || origem === 'JIFFY_DELIVERY') return 'Cliente'
+  if (
+    origem === 'DELIVERY' ||
+    origem === 'JIFFY_DELIVERY' ||
+    temSeloCanalMarketplace(origem)
+  ) {
+    return 'Cliente'
+  }
   return formatarUsuarioPorId(abertoPorId, params.nomesUsuariosPedido)
 }
 

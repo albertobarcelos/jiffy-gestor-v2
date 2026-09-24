@@ -11,6 +11,7 @@ import {
 } from '@/src/presentation/hooks/menus/useMenuCatalog'
 import { useMenuProdutosFilters } from '@/src/presentation/hooks/menus/useMenuProdutosFilters'
 import { useMenuProdutoLista } from '@/src/presentation/hooks/menus/useMenuProdutoLista'
+import { useStatusCategoriaNesteCardapio } from '@/src/presentation/hooks/menus/useStatusCategoriaNesteCardapio'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
 import { useIsMobile } from '@/src/presentation/hooks/useIsMobile'
 import { AddProdutosToMenuPanel } from './AddProdutosToMenuPanel'
@@ -38,11 +39,8 @@ import { coletarGruposMenuPorSnapshot, ordemSnapshotCategoria } from './ordenarG
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyFriendlyAlertDialog } from '@/src/presentation/components/ui/JiffyFriendlyAlertDialog'
-import { showToast } from '@/src/shared/utils/toast'
-import { atualizarGrupoProdutoViaBffUseCase } from '@/src/application/use-cases/grupos-produtos/AtualizarGrupoProdutoViaBffUseCase'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { categoriaAtivaNoSnapshot } from '@/src/domain/policies/menu/categoriaStatusNoMenu'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
-import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { resolverCodigoMenuProduto, resolverImagemMenuProduto } from '@/src/shared/utils/catalogoProdutoIndex'
 import { podeDesvincularProdutoDoMenu } from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
 import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
@@ -94,7 +92,8 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   })
   const { data: gruposComplementos = [], isLoading: isLoadingGruposComplementos } =
     useGruposComplementos({ limit: 100, ativo: true })
-  const invalidate = useInvalidateTenantQueries()
+  const { toggleStatus: toggleStatusCategoria, dialogReplicacao } =
+    useStatusCategoriaNesteCardapio({ menuId })
 
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
   const [tabsState, setTabsState] = useState<MenuProdutoTabsModalState>({
@@ -178,7 +177,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         grupoId: baseId,
         grupoVisual:
           cor && icon ? { corHex: cor, iconName: icon } : undefined,
-        grupoAtivo: grupo.grupoBase.ativo ?? true,
+        grupoAtivo: categoriaAtivaNoSnapshot(grupo),
         ordem: ordemSnapshotCategoria(grupo),
         items: produtosPorGrupo.get(baseId) ?? [],
       }
@@ -339,33 +338,16 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   }, [])
 
   const handleToggleGrupoStatus = useCallback(
-    async (grupoId: string) => {
+    (grupoId: string) => {
       const grupo = findGrupo(grupoId)
       if (!grupo) return
-
-      const novoStatus = !(grupo.grupoBase.ativo ?? true)
-      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-      if (!token) return
-
-      try {
-        await atualizarGrupoProdutoViaBffUseCase.execute({
-          token,
-          grupoId,
-          patch: { ativo: novoStatus },
-        })
-
-        showToast.success(
-          novoStatus ? 'Categoria ativada com sucesso!' : 'Categoria desativada com sucesso!'
-        )
-        await invalidate(['menu-grupos', menuId])
-        await invalidate(['grupos-produtos'])
-      } catch (err) {
-        showToast.error(
-          err instanceof Error ? err.message : 'Não foi possível atualizar o status da categoria.'
-        )
-      }
+      void toggleStatusCategoria({
+        grupoId,
+        nome: grupo.nome || grupo.grupoBase.nome,
+        ativoAtual: categoriaAtivaNoSnapshot(grupo),
+      })
     },
-    [findGrupo, invalidate, menuId]
+    [findGrupo, toggleStatusCategoria]
   )
 
   const renderItem = useCallback(
@@ -571,6 +553,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         onClose={() => setReorderOpen(false)}
       />
       {dialogPropagacao}
+      {dialogReplicacao}
       <JiffyFriendlyAlertDialog
         open={Boolean(statusConfirm)}
         onClose={fecharStatusConfirm}

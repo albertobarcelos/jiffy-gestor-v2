@@ -329,6 +329,7 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
               </MenuItem>
               <MenuItem value="JIFFY_DELIVERY">Jiffy Delivery</MenuItem>
               <MenuItem value="AIQFOME">Aiqfome</MenuItem>
+              <MenuItem value="IFOOD">iFood</MenuItem>
             </Select>
           </FormControl>
         </div>

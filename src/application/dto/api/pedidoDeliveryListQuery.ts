@@ -9,6 +9,7 @@
  * | GESTOR            | GESTOR                    | Pedidos criados no gestor web |
  * | JIFFY_DELIVERY    | JIFFY_DELIVERY            | App / rota pública Jiffy |
  * | AIQFOME           | AIQFOME                   | Integração Aiqfome |
+ * | IFOOD             | IFOOD                     | Integração iFood |
  * | PDV               | omitido                   | Não se aplica à listagem delivery |
  *
  * Datas: o Kanban hoje envia `dataFinalizacaoInicio/Fim` ao unificado; na API delivery
@@ -24,6 +25,7 @@ import type {
   TipoEntregaDeliveryApi,
 } from '@/src/application/dto/api/pedidoDeliveryApi'
 import { PEDIDOS_DELIVERY_KANBAN_PAGE_SIZE } from '@/src/application/dto/api/pedidoDeliveryListApi'
+import { canonicalizarAliasOrigemApi } from '@/src/application/mappers/canonicalizarAliasOrigemApi'
 
 /** Origem real da toolbar. Canal `DELIVERY` não entra aqui. */
 export type OrigemFiltroKanbanListagem =
@@ -32,6 +34,7 @@ export type OrigemFiltroKanbanListagem =
   | 'GESTOR'
   | 'JIFFY_DELIVERY'
   | 'AIQFOME'
+  | 'IFOOD'
 
 /** Filtros do hook `useKanbanFilters` adaptados para a listagem delivery. */
 export interface FiltrosKanbanParaPedidosDelivery {
@@ -65,6 +68,7 @@ export function mapOrigemFiltroKanbanParaApi(
   if (origem === 'GESTOR') return 'GESTOR'
   if (origem === 'JIFFY_DELIVERY') return 'JIFFY_DELIVERY'
   if (origem === 'AIQFOME') return 'AIQFOME'
+  if (origem === 'IFOOD') return 'IFOOD'
   return undefined
 }
 
@@ -72,10 +76,11 @@ export function mapOrigemFiltroKanbanParaApi(
 export function mapOrigemApiParaFiltroKanban(
   origem: string | null | undefined
 ): OrigemFiltroKanbanListagem | undefined {
-  const o = String(origem ?? '').trim().toUpperCase()
+  const o = canonicalizarAliasOrigemApi(origem)
   if (o === 'GESTOR') return 'GESTOR'
   if (o === 'JIFFY_DELIVERY') return 'JIFFY_DELIVERY'
   if (o === 'AIQFOME') return 'AIQFOME'
+  if (o === 'IFOOD') return 'IFOOD'
   if (o === 'PDV') return 'PDV'
   return undefined
 }

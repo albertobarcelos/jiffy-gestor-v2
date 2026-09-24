@@ -8,17 +8,17 @@ import {
   mapItemJsonParaVendaUnificadaDTO,
   type VendaUnificadaDTO,
 } from '@/src/application/dto/VendaUnificadaDTO'
+import { canonicalizarAliasOrigemApi } from '@/src/application/mappers/canonicalizarAliasOrigemApi'
 
 /** Origem comercial no card Kanban (`VendaUnificadaDTO.origem`). */
 export function mapOrigemApiDeliveryParaVendaUnificada(
   origem: string | null | undefined
 ): VendaUnificadaDTO['origem'] {
-  const o = String(origem ?? '')
-    .trim()
-    .toUpperCase()
+  const o = canonicalizarAliasOrigemApi(origem)
   if (o === 'GESTOR') return 'GESTOR'
   if (o === 'JIFFY_DELIVERY') return 'JIFFY_DELIVERY'
   if (o === 'AIQFOME') return 'AIQFOME'
+  if (o === 'IFOOD') return 'IFOOD'
   if (o === 'PDV') return 'PDV'
   return null
 }

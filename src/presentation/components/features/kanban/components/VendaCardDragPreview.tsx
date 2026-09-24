@@ -1,5 +1,7 @@
 import type { VendaUnificadaDTO } from '../hooks/useVendasUnificadas'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
+import { OrigemCanalMark } from '@/src/presentation/components/features/origem/OrigemCanalMark'
+import { exibirSeloCanalMarketplace } from '../utils/kanbanVendaCardViewModel'
 import { LABEL_SEM_CLIENTE } from '../rules/vendasKanban.rules'
 
 /** Preview do card durante o arraste (DragOverlay): leve inclinação via classe global `.drag-preview-card`. */
@@ -19,7 +21,11 @@ export function VendaCardDragPreview({ venda }: { venda: VendaUnificadaDTO }) {
           <span className="text-sm font-semibold text-gray-900">{valorFormatado}</span>
         </p>
       </div>
-      {venda.origem && <p className="text-xs text-gray-500">Origem: {venda.origem}</p>}
+      {exibirSeloCanalMarketplace(venda.origem) ? (
+        <OrigemCanalMark origem={venda.origem} size={22} />
+      ) : venda.origem ? (
+        <p className="text-xs text-gray-500">Origem: {venda.origem}</p>
+      ) : null}
     </div>
   )
 }

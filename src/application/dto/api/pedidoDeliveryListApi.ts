@@ -52,7 +52,7 @@ export interface ObservacaoPedidoDeliverySummaryApi {
 }
 
 /** Valores persistidos em `origem` no módulo delivery (`OrigemVendaExterna`). */
-export type OrigemPedidoDeliveryApi = 'GESTOR' | 'JIFFY_DELIVERY' | 'AIQFOME'
+export type OrigemPedidoDeliveryApi = 'GESTOR' | 'JIFFY_DELIVERY' | 'AIQFOME' | 'IFOOD'
 
 export interface AtorPedidoDeliverySummaryApi {
   id: string

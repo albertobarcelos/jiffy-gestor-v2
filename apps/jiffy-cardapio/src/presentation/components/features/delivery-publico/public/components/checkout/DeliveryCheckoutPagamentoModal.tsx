@@ -21,7 +21,10 @@ import {
 import { showToast } from '@/src/shared/utils/toast'
 import { useHorizontalDragScroll } from '@/src/presentation/hooks/useHorizontalDragScroll'
 import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurrency'
-import { isMeioPagamentoDinheiro } from '../../../shared/utils/isMeioPagamentoDinheiro'
+import {
+  isMeioPagamentoDinheiro,
+  ordenarMeioDinheiroPrimeiro,
+} from '../../../shared/utils/isMeioPagamentoDinheiro'
 import { obterIconeMeioPagamento } from '../../../shared/utils/obterIconeMeioPagamento'
 import { obterEstiloMeioPagamentoPublico } from '../../../shared/utils/obterEstiloMeioPagamentoPublico'
 import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
@@ -91,6 +94,11 @@ export function DeliveryCheckoutPagamentoModal({
     for (const m of meiosPagamento) map.set(m.id, m)
     return map
   }, [meiosPagamento])
+
+  const meiosOrdenados = useMemo(
+    () => ordenarMeioDinheiroPrimeiro(meiosPagamento),
+    [meiosPagamento]
+  )
 
   const isEntrega = tipoEntrega === 'entrega'
   const subtotalExibicao = subtotalOficial ?? subtotal
@@ -405,7 +413,7 @@ export function DeliveryCheckoutPagamentoModal({
                     : 'repeat(4, minmax(0, 1fr))',
                 }}
               >
-                {meiosPagamento.map(meio => {
+                {meiosOrdenados.map(meio => {
                   const Icone = obterIconeMeioPagamento(meio.nome)
                   const estilo = obterEstiloMeioPagamentoPublico(meio)
                   const selecionado = meioSelecionadoId === meio.id

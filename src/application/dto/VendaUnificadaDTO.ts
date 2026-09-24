@@ -9,6 +9,7 @@ import type { StatusFiscalVendaValor } from '@/src/domain/types/statusFiscalVend
 import type { ColunaKanbanFiscalId } from '@/src/domain/types/kanbanPedido'
 import type { ContextoEntregaDeliveryApi } from '@/src/application/dto/api/pedidoDeliveryApi'
 import { derivarFluxoPagamentoEntregaDeliverySummary } from '@/src/application/mappers/DeliveryFluxoPagamentoMapper'
+import { canonicalizarAliasOrigemApi } from '@/src/application/mappers/canonicalizarAliasOrigemApi'
 
 /** Cobrança resumida da listagem delivery (Kanban). */
 export type CobrancaKanbanDeliveryResumo = {
@@ -270,14 +271,13 @@ function extrairEtapaKanbanBalcao(item: Record<string, unknown>): EtapaKanbanBal
   return null
 }
 
-export type OrigemVendaUnificada = 'PDV' | 'GESTOR' | 'JIFFY_DELIVERY' | 'AIQFOME'
+export type OrigemVendaUnificada = 'PDV' | 'GESTOR' | 'JIFFY_DELIVERY' | 'AIQFOME' | 'IFOOD'
 
 export type TipoEntregaUnificada = 'entrega' | 'retirada'
 
 function normalizarOrigemUnificado(raw: unknown): OrigemVendaUnificada | null {
-  const s = String(raw ?? '')
-    .trim()
-    .toUpperCase()
+  const s = canonicalizarAliasOrigemApi(raw)
+  if (s === 'IFOOD') return 'IFOOD'
   if (s === 'PDV' || s === 'GESTOR' || s === 'JIFFY_DELIVERY' || s === 'AIQFOME') {
     return s
   }
@@ -513,14 +513,14 @@ export function resolveModeloParaEmitirNota(v: VendaUnificadaDTO): 55 | 65 | nul
 
 /**
  * Parâmetros alinhados ao contrato do backend GET /vendas/unificado:
- * - origem (PDV | GESTOR | JIFFY_DELIVERY | AIQFOME) — canal de criação real
+ * - origem (PDV | GESTOR | JIFFY_DELIVERY | AIQFOME | IFOOD) — canal de criação real
  * - tipo (PDV | GESTOR | DELIVERY) — canal de negócio unificado
  * - periodoInicial, periodoFinal (filtro por dataCriacao)
  * - dataFinalizacaoInicio, dataFinalizacaoFim
  * - q (busca no servidor — pesquisa em todo o dataset, não só itens já carregados)
  */
 export interface VendasUnificadasQueryParams {
-  origem?: 'PDV' | 'GESTOR' | 'JIFFY_DELIVERY' | 'AIQFOME'
+  origem?: 'PDV' | 'GESTOR' | 'JIFFY_DELIVERY' | 'AIQFOME' | 'IFOOD'
   /** Canal unificado (`tipo` na API). Não confundir com `origem`. */
   tipo?: 'PDV' | 'GESTOR' | 'DELIVERY'
   /** Filtro operacional do modo delivery (entrega/retirada). Ignorado pelo unificado/balcão. */
