@@ -81,6 +81,35 @@ describe('montarPedidoPublico + CreatePedidoPublicoInputSchema', () => {
     })
     expect(result.ok).toBe(false)
   })
+
+  it('permite CPF vazio quando exigeCpfVenda é false', () => {
+    const result = montarPedidoPublico({
+      slug: 'loja',
+      itens: [item],
+      total: 30.5,
+      form: formBase({ cpfNotaFiscal: '' }),
+      tokenCotacao: 'token-teste',
+      exigeCpfVenda: false,
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.payload.documentoCpfCnpj).toBeUndefined()
+  })
+
+  it('rejeita CPF vazio quando exigeCpfVenda é true', () => {
+    const result = montarPedidoPublico({
+      slug: 'loja',
+      itens: [item],
+      total: 30.5,
+      form: formBase({ cpfNotaFiscal: '' }),
+      tokenCotacao: 'token-teste',
+      exigeCpfVenda: true,
+    })
+    expect(result).toEqual({
+      ok: false,
+      error: 'Informe o CPF para finalizar o pedido',
+    })
+  })
 })
 
 describe('checkoutPagamentos (application)', () => {

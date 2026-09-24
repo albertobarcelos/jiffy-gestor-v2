@@ -222,8 +222,13 @@ export class CarregarPedidoKanbanQuickViewUseCase {
       fetchClienteDelivery: telefone =>
         this.repo.fetchClienteDeliveryByTelefone(telefone, token),
     })
-    if (enderecoResolvido !== undefined) {
-      detalhesEntrega = { ...detalhesEntrega, enderecoEntrega: enderecoResolvido }
+    detalhesEntrega = {
+      ...detalhesEntrega,
+      enderecoEntrega: enderecoResolvido.enderecoEntrega,
+      clienteCpfCnpj:
+        detalhesEntrega.clienteCpfCnpj?.trim() ||
+        enderecoResolvido.documentoClienteDelivery ||
+        null,
     }
 
     let nomeEntregador = detalhesEntrega.entregadorNome?.trim() || ''

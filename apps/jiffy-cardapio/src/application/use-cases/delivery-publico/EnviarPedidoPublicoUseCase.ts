@@ -35,6 +35,8 @@ export type EnviarPedidoPublicoInput = {
   form: CheckoutFormData
   clienteLookup: ClienteDeliveryPublicoDTO | null
   tokenCotacao: string
+  /** Quando true, o CPF é obrigatório no payload. */
+  exigeCpfVenda?: boolean
   onEtapa?: (etapa: EtapaEnvioPedidoPublico) => void
 }
 
@@ -129,6 +131,7 @@ export class EnviarPedidoPublicoUseCase {
       enderecoIdEntrega,
       telefoneApi: tel,
       tokenCotacao: input.tokenCotacao,
+      exigeCpfVenda: input.exigeCpfVenda === true,
     })
     if (!resultado.ok) {
       return resultado

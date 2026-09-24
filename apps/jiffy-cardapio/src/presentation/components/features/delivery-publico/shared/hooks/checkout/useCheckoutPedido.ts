@@ -131,6 +131,7 @@ export function useCheckoutPedido({
         form,
         clienteLookup: clienteLookup.cliente,
         tokenCotacao,
+        exigeCpfVenda: options?.exigeCpfVenda === true,
         onEtapa: setEtapaEnvio,
       })
 
@@ -180,6 +181,7 @@ export function useCheckoutPedido({
     }
   }, [
     slug,
+    options?.exigeCpfVenda,
     itens,
     total,
     form,
