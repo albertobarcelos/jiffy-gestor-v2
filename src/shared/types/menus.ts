@@ -31,11 +31,18 @@ export interface MenuGrupoProduto {
   id: string
   nome: string
   ordem: number
+  /** Status do snapshot neste menu. Independente de `grupoBase.ativo`. */
+  ativo?: boolean
   menuId: string
   grupoBase: MenuGrupoBase
   image?: MenuProdutoImage | null
   dataCriacao: string
   dataAtualizacao: string
+}
+
+export interface UpdateMenuGrupoInput {
+  nome?: string
+  ativo?: boolean
 }
 
 export interface MenuProdutoGrupoResumo {

@@ -1,22 +1,36 @@
-import { fetchGestorApi } from '@/src/infrastructure/api/fetchGestorApi'
+import type { IGrupoProdutoStatusWriter } from '@/src/application/ports/IGrupoProdutoStatusWriter'
+import type { ReplicarStatusCategoriaBaseNosMenusUseCase } from '@/src/application/use-cases/menus/ReplicarStatusCategoriaBaseNosMenusUseCase'
+
 export interface UpdateGrupoProdutoStatusInput {
   grupoId: string
   novoStatus: boolean
   token: string
 }
 
-export async function updateGrupoProdutoStatus({ grupoId, novoStatus, token }: UpdateGrupoProdutoStatusInput): Promise<void> {
-  const response = await fetchGestorApi(`/api/grupos-produtos/${grupoId}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ ativo: novoStatus }),
-  })
+export class UpdateGrupoProdutoStatusUseCase {
+  constructor(
+    private readonly grupoStatusWriter: IGrupoProdutoStatusWriter,
+    private readonly replicarNosMenus: Pick<
+      ReplicarStatusCategoriaBaseNosMenusUseCase,
+      'execute'
+    >
+  ) {}
 
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}))
-    throw new Error(err.message || 'Erro ao atualizar status do grupo')
+  async execute(input: UpdateGrupoProdutoStatusInput): Promise<void> {
+    if (!input.grupoId.trim()) {
+      throw new Error('ID do grupo é obrigatório')
+    }
+
+    await this.grupoStatusWriter.atualizarAtivo({
+      token: input.token,
+      grupoId: input.grupoId.trim(),
+      ativo: input.novoStatus,
+    })
+
+    await this.replicarNosMenus.execute({
+      token: input.token,
+      grupoProdutoId: input.grupoId.trim(),
+      ativo: input.novoStatus,
+    })
   }
 }

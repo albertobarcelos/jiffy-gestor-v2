@@ -2,6 +2,31 @@
  * Cliente HTTP para o BFF Next.js (`/api/*`) a partir do browser ou do servidor.
  * Não depende da camada de presentation (diferente de fetchGestorApi).
  */
+
+export class BffHttpError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number
+  ) {
+    super(message)
+    this.name = 'BffHttpError'
+  }
+}
+
+export function isBffNotFound(error: unknown): boolean {
+  return error instanceof BffHttpError && error.status === 404
+}
+
+async function rejeitarSeNaoOk(response: Response): Promise<void> {
+  if (response.ok) return
+  const errorData = await response.json().catch(() => ({}))
+  const message =
+    (errorData as { message?: string }).message ||
+    (errorData as { error?: string }).error ||
+    'Erro na requisição'
+  throw new BffHttpError(message, response.status)
+}
+
 export async function fetchBffJson<T>(
   url: string,
   token: string,
@@ -17,15 +42,7 @@ export async function fetchBffJson<T>(
     cache: 'no-store',
   })
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    const message =
-      (errorData as { message?: string }).message ||
-      (errorData as { error?: string }).error ||
-      'Erro na requisição'
-    throw new Error(message)
-  }
-
+  await rejeitarSeNaoOk(response)
   return (await response.json()) as T
 }
 
@@ -44,14 +61,7 @@ export async function fetchBffVoid(
     cache: 'no-store',
   })
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    const message =
-      (errorData as { message?: string }).message ||
-      (errorData as { error?: string }).error ||
-      'Erro na requisição'
-    throw new Error(message)
-  }
+  await rejeitarSeNaoOk(response)
 }
 
 export async function fetchBffDelete(url: string, token: string): Promise<void> {
@@ -63,14 +73,7 @@ export async function fetchBffDelete(url: string, token: string): Promise<void> 
     cache: 'no-store',
   })
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    const message =
-      (errorData as { message?: string }).message ||
-      (errorData as { error?: string }).error ||
-      'Erro na requisição'
-    throw new Error(message)
-  }
+  await rejeitarSeNaoOk(response)
 }
 
 export async function fetchBffFormData<T>(
@@ -89,14 +92,6 @@ export async function fetchBffFormData<T>(
     cache: 'no-store',
   })
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    const message =
-      (errorData as { message?: string }).message ||
-      (errorData as { error?: string }).error ||
-      'Erro na requisição'
-    throw new Error(message)
-  }
-
+  await rejeitarSeNaoOk(response)
   return (await response.json()) as T
 }
