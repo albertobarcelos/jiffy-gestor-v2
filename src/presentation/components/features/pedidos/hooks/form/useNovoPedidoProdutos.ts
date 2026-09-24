@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import type { Produto } from '@/src/domain/entities/Produto'
 import type { ModalLancamentoProdutoPainelConfirmPayload, ModalLancamentoProdutoPainelModo } from '../../components/ModalLancamentoProdutoPainel'
 import type { ComplementoSelecionado, ProdutoSelecionado } from '../../types'
@@ -62,6 +62,8 @@ export function useNovoPedidoProdutos({
   const longPressComplementoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressComplementoIndexRef = useRef<number | null>(null)
   const produtoIdContextoEdicaoComplementoRef = useRef<string | undefined>(undefined)
+  /** IDs já solicitados para hidratação fiscal nesta sessão do pedido (evita loop). */
+  const fiscalHidratacaoSolicitadaIdsRef = useRef<Set<string>>(new Set())
 
   const produtoTemComplementos = useCallback(
     (produto: Produto): boolean => produtoTemComplementosCarregados(produto),
@@ -94,7 +96,7 @@ export function useNovoPedidoProdutos({
   )
 
   /**
-   * Snapshot do menu não traz NCM/CEST — busca o cadastro e reaplica nas linhas.
+   * Snapshot do menu não traz NCM/CEST — busca o cadastro (caminho leve) e reaplica nas linhas.
    */
   const hidratarFiscalProdutoNasLinhas = useCallback(
     async (produtoId: string, produtoAnterior?: Produto | null) => {
@@ -121,6 +123,30 @@ export function useNovoPedidoProdutos({
       setProdutoParaLancamentoPainel,
     ]
   )
+
+  /** Uma passagem no carrinho: IDs únicos sem NCM/CEST ainda não pedidos nesta sessão. */
+  useEffect(() => {
+    const pendentes: string[] = []
+    const vistos = new Set<string>()
+    for (const linha of produtos) {
+      const id = linha.produtoId?.trim()
+      if (!id || vistos.has(id)) continue
+      vistos.add(id)
+      if (linha.ncm?.trim() || linha.cest?.trim()) continue
+      if (fiscalHidratacaoSolicitadaIdsRef.current.has(id)) continue
+      fiscalHidratacaoSolicitadaIdsRef.current.add(id)
+      pendentes.push(id)
+    }
+    if (pendentes.length === 0) return
+
+    void Promise.all(
+      pendentes.map(id => {
+        const anterior =
+          catalogoProdutosPorId[id] ?? produtosList.find(p => p.getId() === id) ?? null
+        return hidratarFiscalProdutoNasLinhas(id, anterior)
+      })
+    )
+  }, [produtos, catalogoProdutosPorId, produtosList, hidratarFiscalProdutoNasLinhas])
 
   const abrirEdicaoComplementoNoPainel = useCallback(
     (complementoId: string, options?: { produtoIdCarrinho?: string }) => {
@@ -227,9 +253,6 @@ export function useNovoPedidoProdutos({
             complementos: [],
           },
         ])
-        if (!produto.getNcm().trim() && !produto.getCest().trim()) {
-          void hidratarFiscalProdutoNasLinhas(produtoId, produto)
-        }
         return
       }
 
@@ -238,15 +261,11 @@ export function useNovoPedidoProdutos({
       setProdutoParaLancamentoPainel(produto)
       setModalLancamentoProdutoPainelOpen(true)
       garantirComplementosProdutoNoPainel(produtoId, produto)
-      if (!produto.getNcm().trim() && !produto.getCest().trim()) {
-        void hidratarFiscalProdutoNasLinhas(produtoId, produto)
-      }
     },
     [
       catalogoProdutosPorId,
       produtosList,
       garantirComplementosProdutoNoPainel,
-      hidratarFiscalProdutoNasLinhas,
       setCatalogoProdutosPorId,
       setProdutos,
     ]
@@ -332,9 +351,6 @@ export function useNovoPedidoProdutos({
             valorAcrescimo: null,
           }),
         ])
-        if (!produto.getNcm().trim() && !produto.getCest().trim()) {
-          void hidratarFiscalProdutoNasLinhas(produto.getId(), produto)
-        }
       }
       setCatalogoProdutosPorId(prev => ({ ...prev, [produto.getId()]: produto }))
     },
@@ -345,7 +361,6 @@ export function useNovoPedidoProdutos({
       produtos,
       setProdutos,
       setCatalogoProdutosPorId,
-      hidratarFiscalProdutoNasLinhas,
     ]
   )
 

@@ -1,4 +1,5 @@
 import {
+  buscarFiscalCadastroProdutoUseCase,
   buscarProdutoCatalogoPorIdUseCase,
   hidratarGruposComplementosCatalogoUseCase,
   limparCacheGruposComplementosCatalogoUseCase,
@@ -33,6 +34,10 @@ export async function fetchProdutoCatalogoPorId(
   menuId?: string | null
 ) {
   return buscarProdutoCatalogoPorIdUseCase.execute(produtoId, token, menuId)
+}
+
+export async function fetchFiscalCadastroProdutoPorId(produtoId: string, token: string) {
+  return buscarFiscalCadastroProdutoUseCase.execute(produtoId, token)
 }
 
 export async function fetchHidratacaoGruposComplementosCatalogo(

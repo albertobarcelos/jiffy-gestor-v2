@@ -12,6 +12,7 @@ export type CarregarProdutoCatalogoOptions = {
   requireComplementos?: boolean
   /**
    * Precisa do cadastro base (GET produto) para NCM/CEST — o snapshot do menu não traz fiscal.
+   * Com produto já em cache do menu, o catálogo usa só GET cadastro + merge fiscal (sem snapshot/grupos).
    * Use com `fiscalCadastroHidratado` para não refetch infinito em produtos sem NCM.
    */
   requireFiscalCadastro?: boolean
@@ -61,7 +62,7 @@ export function cacheProdutoCatalogoAtendePedido(
 /**
  * Lançar com `requireComplementos`: o slim da grade basta para completar grupos
  * (cache de sessão ou GET por id). Evita GET cadastro + GET snapshot.
- * Com `requireFiscalCadastro`, força o caminho completo (cadastro traz NCM/CEST).
+ * Com `requireFiscalCadastro`, não usa este atalho — o catálogo faz GET cadastro leve + merge.
  */
 export function catalogoPermiteHidratacaoSomenteGrupos(
   produto: Produto | undefined,
@@ -73,6 +74,23 @@ export function catalogoPermiteHidratacaoSomenteGrupos(
   if (!produto) return false
   if (produtoTemComplementosCarregados(produto)) return false
   return produtoTemIdsGruposComplementoParaHidratacao(produto)
+}
+
+/**
+ * Copia só campos fiscais do cadastro base para o snapshot do menu em cache.
+ * Não troca grupos/complementos/menus/nome/valor do produto do cardápio.
+ */
+export function mesclarFiscalCadastroNoProdutoCatalogo(
+  produtoEmCache: Produto,
+  produtoCadastro: Produto
+): Produto {
+  return produtoEmCache.withDadosFiscais({
+    ncm: produtoCadastro.getNcm(),
+    cest: produtoCadastro.getCest(),
+    origemMercadoria: produtoCadastro.getOrigemMercadoria() || undefined,
+    tipoProduto: produtoCadastro.getTipoProduto() || undefined,
+    indicadorProducaoEscala: produtoCadastro.getIndicadorProducaoEscala(),
+  })
 }
 
 /**

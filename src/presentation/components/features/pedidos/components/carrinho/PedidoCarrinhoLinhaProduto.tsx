@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
 import type { ProdutoSelecionado } from '@/src/domain/types/pedido'
 import {
   obterUnidadeMedidaProdutoLinha,
@@ -61,23 +60,11 @@ export function PedidoCarrinhoLinhaProduto({
     formatarDescontoAcrescimo,
     formatarNumeroComMilhar,
     produtosList,
-    hidratarFiscalProdutoNasLinhas,
     setValoresEmEdicao,
     valoresEmEdicao,
   } = useNovoPedidoFormContext()
   const { handleAbrirEdicaoProdutoDetalhes } = useNovoPedidoDetalheContext()
   const { longPressIndexRef, longPressTimeoutRef } = useNovoPedidoUIContext()
-  const fiscalHidratacaoSolicitadaRef = useRef<string | null>(null)
-
-  useEffect(() => {
-    if (fiscalHidratacaoSolicitadaRef.current === produto.produtoId) return
-    if (produto.ncm?.trim() || produto.cest?.trim()) {
-      fiscalHidratacaoSolicitadaRef.current = produto.produtoId
-      return
-    }
-    fiscalHidratacaoSolicitadaRef.current = produto.produtoId
-    void hidratarFiscalProdutoNasLinhas(produto.produtoId)
-  }, [produto.produtoId, produto.ncm, produto.cest, hidratarFiscalProdutoNasLinhas])
 
   const totalProdutoComComplementos = calcularTotalProduto(produto)
   const qtdProdKey = `qtd-prod-${index}`

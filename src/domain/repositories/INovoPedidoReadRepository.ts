@@ -36,6 +36,12 @@ export interface INovoPedidoReadRepository {
     menuId?: string | null
   ): Promise<Produto | null>
 
+  /**
+   * Só GET do cadastro base (NCM/CEST) — sem snapshot do menu nem hidratação de grupos.
+   * Usado para merge fiscal no produto já em cache do cardápio.
+   */
+  buscarFiscalCadastroProdutoPorId(produtoId: string, token: string): Promise<Produto | null>
+
   /** Completa itens/limites dos grupos já listados no produto do menu, sem GET cadastro+snapshot. */
   hidratarGruposComplementosDoProduto(produto: Produto, token: string): Promise<Produto>
 

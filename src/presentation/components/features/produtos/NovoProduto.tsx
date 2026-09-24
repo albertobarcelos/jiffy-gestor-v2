@@ -30,6 +30,7 @@ import {
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast, handleApiError } from '@/src/shared/utils/toast'
+import { unwrapProdutoApiPayloadAsRecord } from '@/src/shared/utils/unwrapProdutoApiPayload'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { Produto } from '@/src/domain/entities/Produto'
@@ -145,25 +146,6 @@ function extrairGrupoProdutoIdDoJsonProduto(produto: Record<string, unknown>): s
     if (typeof id === 'number' && Number.isFinite(id)) return String(id)
   }
   return null
-}
-
-/** GET `/api/produtos/:id` às vezes vem como `{ data: produto }` — normaliza para o objeto do produto. */
-function unwrapProdutoJsonResposta(raw: unknown): Record<string, unknown> {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
-  const obj = raw as Record<string, unknown>
-  const nested = obj.data
-  if (
-    nested &&
-    typeof nested === 'object' &&
-    !Array.isArray(nested) &&
-    ((nested as Record<string, unknown>).id != null ||
-      (nested as Record<string, unknown>).nome != null ||
-      (nested as Record<string, unknown>).grupoId != null ||
-      (nested as Record<string, unknown>).grupo != null)
-  ) {
-    return nested as Record<string, unknown>
-  }
-  return obj
 }
 
 /** Defaults de origem/tipo não contam como dados fiscais — o microserviço exige NCM. */
@@ -931,7 +913,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           })
 
           if (response.ok) {
-            const produto = unwrapProdutoJsonResposta(await response.json())
+            const produto = unwrapProdutoApiPayloadAsRecord(await response.json())
 
             // Preenche os campos com os dados do produto
             setPrecoVenda(produto.valor ? formatCurrency(produto.valor as number | string) : '')
