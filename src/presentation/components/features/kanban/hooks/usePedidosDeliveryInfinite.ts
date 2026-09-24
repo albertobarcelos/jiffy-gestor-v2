@@ -64,7 +64,8 @@ export function vendasUnificadasQueryParamsParaPedidosDelivery(
     origem === 'PDV' ||
     origem === 'GESTOR' ||
     origem === 'JIFFY_DELIVERY' ||
-    origem === 'AIQFOME'
+    origem === 'AIQFOME' ||
+    origem === 'IFOOD'
       ? origem
       : undefined
 
