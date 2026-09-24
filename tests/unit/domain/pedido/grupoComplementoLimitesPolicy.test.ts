@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  alteracaoComplementoRespeitaLimitesGrupo,
+  alteracaoComplementoRespeitaMaximoGrupo,
+  alteracaoComplementoRespeitaMinimoGrupo,
   grupoComplementoAtingiuMaximo,
   limiteMaximoEfetivoGrupo,
   parseQuantidadeLimiteGrupo,
   podeIncrementarComplementoNoGrupo,
+  quantidadeSelecionadaNoGrupoCarrinho,
   somarQuantidadeComplementosNoGrupo,
   validarLimitesGruposComplementosLancamento,
 } from '@/src/domain/policies/pedido/GrupoComplementoLimitesPolicy'
@@ -66,5 +70,33 @@ describe('GrupoComplementoLimitesPolicy', () => {
         'g-doces-c2': 1,
       })
     ).toMatchObject({ valido: false, mensagem: 'Máximo de 2 opção(ões) em "Doces"' })
+  })
+
+  it('bloqueia remoção/redução no carrinho abaixo do mínimo do grupo', () => {
+    const complementos = [
+      { grupoId: 'g-add', quantidade: 1 },
+      { grupoId: 'g-doces', quantidade: 1 },
+    ]
+    expect(quantidadeSelecionadaNoGrupoCarrinho(complementos, 'g-add')).toBe(1)
+
+    expect(alteracaoComplementoRespeitaMinimoGrupo(add, 0)).toMatchObject({
+      permitido: false,
+      mensagem: 'Selecione pelo menos 1 em "ADD"',
+    })
+    expect(alteracaoComplementoRespeitaMinimoGrupo(add, 1)).toEqual({ permitido: true })
+    expect(alteracaoComplementoRespeitaMinimoGrupo(doces, 0)).toEqual({ permitido: true })
+    expect(alteracaoComplementoRespeitaMinimoGrupo(null, 0)).toEqual({ permitido: true })
+  })
+
+  it('bloqueia aumento no carrinho acima do máximo do grupo', () => {
+    expect(alteracaoComplementoRespeitaMaximoGrupo(doces, 3)).toMatchObject({
+      permitido: false,
+      mensagem: 'Máximo de 2 opção(ões) em "Doces"',
+    })
+    expect(alteracaoComplementoRespeitaMaximoGrupo(doces, 2)).toEqual({ permitido: true })
+    expect(alteracaoComplementoRespeitaMaximoGrupo(add, 99)).toEqual({ permitido: true })
+
+    expect(alteracaoComplementoRespeitaLimitesGrupo(doces, 3)).toMatchObject({ permitido: false })
+    expect(alteracaoComplementoRespeitaLimitesGrupo(add, 0)).toMatchObject({ permitido: false })
   })
 })

@@ -85,3 +85,57 @@ export function validarLimitesGruposComplementosLancamento(
   }
   return { valido: true }
 }
+
+/** Soma as quantidades já lançadas na linha do carrinho para um grupo. */
+export function quantidadeSelecionadaNoGrupoCarrinho(
+  complementos: ReadonlyArray<{ grupoId: string; quantidade: number }>,
+  grupoId: string
+): number {
+  let total = 0
+  for (const complemento of complementos) {
+    if (complemento.grupoId !== grupoId) continue
+    total += Math.max(0, Math.floor(complemento.quantidade))
+  }
+  return total
+}
+
+/**
+ * Após remover ou reduzir complemento no carrinho, o total do grupo não pode
+ * ficar abaixo de `qtdMinima` (mesma regra do lançamento). Sem grupo/mínimo, libera.
+ */
+export function alteracaoComplementoRespeitaMinimoGrupo(
+  grupo: Pick<GrupoComplementoLimites, 'nome' | 'qtdMinima'> | null | undefined,
+  quantidadeNoGrupoApos: number
+): { permitido: boolean; mensagem?: string } {
+  if (!grupo || grupo.qtdMinima <= 0) return { permitido: true }
+  if (quantidadeNoGrupoApos < grupo.qtdMinima) {
+    return { permitido: false, mensagem: mensagemMinimoGrupoComplemento(grupo) }
+  }
+  return { permitido: true }
+}
+
+/**
+ * Após aumentar a quantidade no carrinho, o total do grupo não pode passar de
+ * `qtdMaxima` (0 = sem teto). Mesma regra do lançamento.
+ */
+export function alteracaoComplementoRespeitaMaximoGrupo(
+  grupo: Pick<GrupoComplementoLimites, 'nome' | 'qtdMaxima'> | null | undefined,
+  quantidadeNoGrupoApos: number
+): { permitido: boolean; mensagem?: string } {
+  if (!grupo) return { permitido: true }
+  const maximo = limiteMaximoEfetivoGrupo(grupo.qtdMaxima)
+  if (maximo != null && quantidadeNoGrupoApos > maximo) {
+    return { permitido: false, mensagem: mensagemMaximoGrupoComplemento(grupo) }
+  }
+  return { permitido: true }
+}
+
+/** Valida mínimo e máximo do grupo após qualquer alteração de quantidade no carrinho. */
+export function alteracaoComplementoRespeitaLimitesGrupo(
+  grupo: Pick<GrupoComplementoLimites, 'nome' | 'qtdMinima' | 'qtdMaxima'> | null | undefined,
+  quantidadeNoGrupoApos: number
+): { permitido: boolean; mensagem?: string } {
+  const minimo = alteracaoComplementoRespeitaMinimoGrupo(grupo, quantidadeNoGrupoApos)
+  if (!minimo.permitido) return minimo
+  return alteracaoComplementoRespeitaMaximoGrupo(grupo, quantidadeNoGrupoApos)
+}

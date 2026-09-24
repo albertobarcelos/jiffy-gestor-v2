@@ -19,7 +19,13 @@ import {
   aplicarQuantidadeProdutoNaLinha,
   normalizarComplementosLinha,
 } from '@/src/domain/policies/pedido/ComplementoQuantidadeLinhaPolicy'
+import {
+  alteracaoComplementoRespeitaLimitesGrupo,
+  alteracaoComplementoRespeitaMinimoGrupo,
+  quantidadeSelecionadaNoGrupoCarrinho,
+} from '@/src/domain/policies/pedido/GrupoComplementoLimitesPolicy'
 import { showToast } from '@/src/shared/utils/toast'
+import { obterLimitesGrupoComplementoCarrinho } from '../../utils/obterLimitesGrupoComplementoCarrinho'
 
 export interface UseNovoPedidoProdutosParams {
   produtos: ProdutoSelecionado[]
@@ -506,6 +512,27 @@ export function useNovoPedidoProdutos({
             if (resultado.mensagem) showToast.error(resultado.mensagem)
             return prev
           }
+
+          const alvo = linhaAtual.complementos[complementoIndex]
+          if (alvo) {
+            const grupo = obterLimitesGrupoComplementoCarrinho(
+              catalogoProdutosPorId[linhaAtual.produtoId],
+              alvo.grupoId
+            )
+            const quantidadeNoGrupoApos = quantidadeSelecionadaNoGrupoCarrinho(
+              resultado.produto.complementos,
+              alvo.grupoId
+            )
+            const limites = alteracaoComplementoRespeitaLimitesGrupo(
+              grupo,
+              quantidadeNoGrupoApos
+            )
+            if (!limites.permitido) {
+              if (limites.mensagem) showToast.error(limites.mensagem)
+              return prev
+            }
+          }
+
           novosProdutos[produtoIndex] = resultado.produto
           return novosProdutos
         }
@@ -522,24 +549,47 @@ export function useNovoPedidoProdutos({
         return novosProdutos
       })
     },
-    [setProdutos]
+    [catalogoProdutosPorId, setProdutos]
   )
 
   const removerComplemento = useCallback(
     (produtoIndex: number, complementoIndex: number) => {
       setProdutos(prev => {
-        const novosProdutos = [...prev]
-        const novosComplementos = novosProdutos[produtoIndex].complementos.filter(
+        const linhaAtual = prev[produtoIndex]
+        if (!linhaAtual) return prev
+
+        const alvo = linhaAtual.complementos[complementoIndex]
+        if (!alvo) return prev
+
+        const novosComplementos = linhaAtual.complementos.filter(
           (_, i) => i !== complementoIndex
         )
+        const grupo = obterLimitesGrupoComplementoCarrinho(
+          catalogoProdutosPorId[linhaAtual.produtoId],
+          alvo.grupoId
+        )
+        const quantidadeNoGrupoApos = quantidadeSelecionadaNoGrupoCarrinho(
+          novosComplementos,
+          alvo.grupoId
+        )
+        const minimo = alteracaoComplementoRespeitaMinimoGrupo(
+          grupo,
+          quantidadeNoGrupoApos
+        )
+        if (!minimo.permitido) {
+          if (minimo.mensagem) showToast.error(minimo.mensagem)
+          return prev
+        }
+
+        const novosProdutos = [...prev]
         novosProdutos[produtoIndex] = {
-          ...novosProdutos[produtoIndex],
+          ...linhaAtual,
           complementos: novosComplementos,
         }
         return novosProdutos
       })
     },
-    [setProdutos]
+    [catalogoProdutosPorId, setProdutos]
   )
 
   const limparLongPressTimeouts = useCallback(() => {
