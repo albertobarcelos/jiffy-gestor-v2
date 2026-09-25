@@ -25,7 +25,7 @@ describe('valorComplementoImpressao', () => {
       valorFinal: -20,
     })
     expect(valorAssinadoComplementoImpressao('nenhum', 10, 2)).toEqual({
-      valorUnitario: 10,
+      valorUnitario: 0,
       valorFinal: 0,
     })
   })

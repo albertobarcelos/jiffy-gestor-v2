@@ -27,10 +27,10 @@ export function valorAssinadoComplementoImpressao(
   quantidade: number
 ): { valorUnitario: number; valorFinal: number } {
   const tipo = normalizeTipoImpactoPreco(tipoImpactoPreco)
-  const qtd = Math.max(1, Math.floor(quantidade) || 1)
+  const qtd = Math.max(1, Math.floor(quantidade))
   const mag = Math.abs(valorUnitarioMagnitude)
   if (tipo === 'nenhum' || mag < 0.0005) {
-    return { valorUnitario: mag, valorFinal: 0 }
+    return { valorUnitario: 0, valorFinal: 0 }
   }
   const signedUnit = tipo === 'diminui' ? -mag : mag
   return { valorUnitario: signedUnit, valorFinal: signedUnit * qtd }
