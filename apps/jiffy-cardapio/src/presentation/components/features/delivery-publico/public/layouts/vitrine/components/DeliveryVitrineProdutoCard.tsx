@@ -3,16 +3,20 @@
 import { Camera } from 'lucide-react'
 import { formatDeliveryCurrency } from '../../../../shared/utils/formatDeliveryCurrency'
 import type { DeliveryPublicoProdutoViewModel } from '../../../../shared/types/deliveryPublicoViewModel'
+import { DeliveryPublicoMidiaImagem } from '../../../../shared/media/DeliveryPublicoMidiaImagem'
+import { DELIVERY_IMAGEM_SIZES } from '../../../../shared/media/deliveryPublicoImageHosts'
 
 type DeliveryVitrineProdutoCardProps = {
   produto: DeliveryPublicoProdutoViewModel
   interactive?: boolean
+  priority?: boolean
   onClick?: (produtoId: string) => void
 }
 
 export function DeliveryVitrineProdutoCard({
   produto,
   interactive = false,
+  priority = false,
   onClick,
 }: DeliveryVitrineProdutoCardProps) {
   const cardStyle = {
@@ -27,14 +31,12 @@ export function DeliveryVitrineProdutoCard({
         style={{ backgroundColor: '#ffffff', borderColor: '#e5e7eb' }}
       >
         {produto.imagemUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <DeliveryPublicoMidiaImagem
             src={produto.imagemUrl}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            data-delivery-produto-img={produto.id}
-            className="absolute inset-0 h-full w-full object-cover"
+            sizes={DELIVERY_IMAGEM_SIZES.vitrineCard}
+            priority={priority}
+            produtoId={produto.id}
+            className="object-cover"
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">

@@ -14,7 +14,10 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   images: {
-    domains: ['localhost'],
+    formats: ['image/avif', 'image/webp'],
+    deviceSizes: [390, 430, 768, 1080, 1280],
+    imageSizes: [48, 64, 96, 128, 160, 256, 384],
+    minimumCacheTTL: 60 * 60 * 24,
     remotePatterns: [
       {
         protocol: 'http',
@@ -22,8 +25,11 @@ const nextConfig = {
         port: '3845',
         pathname: '/assets/**',
       },
+      { protocol: 'https', hostname: '**.amazonaws.com' },
+      { protocol: 'https', hostname: '**.cloudfront.net' },
+      { protocol: 'https', hostname: '**.r2.dev' },
+      { protocol: 'https', hostname: '**.r2.cloudflarestorage.com' },
     ],
-    unoptimized: true,
   },
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
