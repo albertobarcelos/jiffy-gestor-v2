@@ -39,4 +39,6 @@ export type UseDeliveryCheckoutOptions = {
    * (ainda no step telefone), em overlap com o resto do fluxo.
    */
   prefetchMeiosAposIdentificacao?: boolean
+  /** Loja exige CPF no checkout público (`empresa.exigeCpfVenda`). */
+  exigeCpfVenda?: boolean
 }

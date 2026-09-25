@@ -83,6 +83,11 @@ export type EmpresaPublicaDTO = {
   segmento: string | null
   logoUrl: string | null
   bannerUrl: string | null
+  /**
+   * Quando true, o checkout exige CPF do cliente para finalizar o pedido.
+   * Vem na raiz da empresa pública (não em parametroDelivery).
+   */
+  exigeCpfVenda?: boolean
   endereco: {
     rua: string
     numero: string

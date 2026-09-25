@@ -26,6 +26,7 @@ import {
 import { salvarPedidoDeliveryDetalheCache } from '@/src/infrastructure/api/pedidoDeliveryDetalheCache'
 import { anexarInformacoesAdicionaisEmitirNota } from '@/src/shared/helpers/informacoesAdicionaisNota'
 import { montarBodyReemitirNotaDelivery } from '@/src/domain/services/pedido/RegrasEmissaoFiscalDelivery'
+import { unwrapProdutoApiPayload } from '@/src/shared/utils/unwrapProdutoApiPayload'
 
 async function fetchJson<T>(url: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetchGestorApi(url, {
@@ -50,29 +51,13 @@ async function fetchJson<T>(url: string, token: string, init?: RequestInit): Pro
   return (await response.json()) as T
 }
 
-function unwrapProdutoCadastroPayload(raw: unknown): unknown {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw
-  const obj = raw as Record<string, unknown>
-  const nested = obj.data
-  if (
-    nested &&
-    typeof nested === 'object' &&
-    !Array.isArray(nested) &&
-    ((nested as Record<string, unknown>).id != null ||
-      (nested as Record<string, unknown>).gruposComplementos != null)
-  ) {
-    return nested
-  }
-  return raw
-}
-
 async function fetchProdutoCadastroPorId(produtoId: string, token: string): Promise<Produto | null> {
   try {
     const data = await fetchJson<unknown>(
       `/api/produtos/${encodeURIComponent(produtoId)}`,
       token
     )
-    return Produto.fromJSON(unwrapProdutoCadastroPayload(data))
+    return Produto.fromJSON(unwrapProdutoApiPayload(data))
   } catch {
     return null
   }

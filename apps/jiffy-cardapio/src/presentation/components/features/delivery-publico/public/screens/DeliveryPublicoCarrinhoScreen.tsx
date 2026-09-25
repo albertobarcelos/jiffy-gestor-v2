@@ -11,6 +11,7 @@ import {
   usePublicDeliveryComplementosStore,
 } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import { showToast } from '@/src/shared/utils/toast'
+import { validarPagamentosPedidoPublico } from '@/src/domain/policies/PagamentoObrigatorioPedidoPublico'
 import { clienteAtingiuMaxEnderecosDelivery } from '@/src/shared/constants/deliveryClienteEnderecos'
 import { DeliveryCarrinhoItemCard } from '../../shared/components/DeliveryCarrinhoItemCard'
 import { DeliveryCarrinhoSwipeableItem } from '../../shared/components/DeliveryCarrinhoSwipeableItem'
@@ -209,6 +210,10 @@ export function DeliveryPublicoCarrinhoScreen({
     [removerItem, slug]
   )
 
+  const catalogQuery = usePublicDeliveryCatalogInfinite(slug)
+  const empresa = catalogQuery.data?.pages[0]?.empresa ?? null
+  const exigeCpfVenda = empresa?.exigeCpfVenda === true
+
   const {
     itens,
     total,
@@ -246,6 +251,7 @@ export function DeliveryPublicoCarrinhoScreen({
   } = useDeliveryCheckout(slug, {
     fetchMeiosPagamento: true,
     prefetchMeiosAposIdentificacao: true,
+    exigeCpfVenda,
   })
 
   const quantidadeItens = useMemo(
@@ -258,10 +264,8 @@ export function DeliveryPublicoCarrinhoScreen({
     [itens, removingIds]
   )
 
-  const catalogQuery = usePublicDeliveryCatalogInfinite(slug)
   const cacheComplementos = usePublicDeliveryComplementosStore(s => s.porSlug[slug] ?? null)
 
-  const empresa = catalogQuery.data?.pages[0]?.empresa ?? null
   const enderecoEmpresaTexto = formatEmpresaPublicaEndereco(empresa?.endereco ?? null)
   const { localizacaoEmpresa } = useLocalizacaoEmpresaPublica(
     slug,
@@ -343,6 +347,7 @@ export function DeliveryPublicoCarrinhoScreen({
     usarNovoEndereco,
     selecionarEnderecoExistente,
     limparCotacao,
+    temPagamento: form.pagamentos.length > 0,
   })
 
   const {
@@ -465,6 +470,13 @@ export function DeliveryPublicoCarrinhoScreen({
   const handleEnviarPedido = async () => {
     if (!lojaAberta) {
       showToast.error('A loja está fechada no momento. Não é possível finalizar pedidos.')
+      return
+    }
+
+    const pagamentosGate = validarPagamentosPedidoPublico(form.pagamentos, totalCheckout)
+    if (!pagamentosGate.ok) {
+      showToast.error(pagamentosGate.error)
+      abrirStepDaRevisao('pagamento')
       return
     }
 
@@ -974,6 +986,7 @@ export function DeliveryPublicoCarrinhoScreen({
             pagamentos={pagamentosRevisao}
             observacaoPedido={form.observacaoPedido}
             cpfNotaFiscal={form.cpfNotaFiscal}
+            exigeCpfVenda={exigeCpfVenda}
             enviando={enviando}
             etapaEnvio={etapaEnvio}
             onClose={fecharCheckout}

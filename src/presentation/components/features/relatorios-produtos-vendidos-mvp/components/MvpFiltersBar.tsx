@@ -2,8 +2,8 @@
 
 import type { ReactNode } from 'react'
 import { useState } from 'react'
-import { MdCalendarToday, MdFilterAltOff, MdFilterList, MdSearch } from 'react-icons/md'
-import { FormControl, InputLabel, MenuItem, Select, TextField } from '@mui/material'
+import { MdCalendarToday, MdClose, MdFilterAltOff, MdFilterList, MdSearch } from 'react-icons/md'
+import { FormControl, IconButton, InputAdornment, InputLabel, MenuItem, Select, TextField } from '@mui/material'
 import {
   OPCOES_PERIODO_RELATORIO_MVP,
   type FiltroPeriodoRelatorio,
@@ -18,6 +18,7 @@ import {
 } from '../mvpFiltrosVendasSx'
 import { formatarDataHoraFiltroCurta } from '../utils/mvpFormatDataHora'
 import { MvpPorDatasModal } from './MvpPorDatasModal'
+import type { RelatorioComplementoImpacto } from '@/src/shared/types/relatoriosProdutosVendidosMvpApi'
 
 interface MvpFiltersBarProps {
   values: RelatoriosProdutosVendidosFiltersValues
@@ -29,6 +30,16 @@ interface MvpFiltersBarProps {
   grupos: { id: string; nome: string }[]
   /** KPIs, gráficos, personalizar e atualizar — na mesma linha da busca. */
   acoesToolbar?: ReactNode
+  /** Só na aba Complementos: filtro de impacto de preço. */
+  exibirFiltroImpacto?: boolean
+  impactoComplemento?: RelatorioComplementoImpacto | 'todos'
+  onImpactoComplementoChange?: (v: RelatorioComplementoImpacto | 'todos') => void
+  /** Rótulo do select de grupo (produtos vs complementos). */
+  grupoLabel?: string
+  grupoPlaceholder?: string
+  /** Valor controlado do grupo (produto ou complemento, conforme a aba). */
+  grupoIdValue?: string
+  onGrupoIdChange?: (grupoId: string) => void
 }
 
 export function MvpFiltersBar({
@@ -40,12 +51,39 @@ export function MvpFiltersBar({
   gruposLoading,
   grupos,
   acoesToolbar,
+  exibirFiltroImpacto = false,
+  impactoComplemento = 'todos',
+  onImpactoComplementoChange,
+  grupoLabel = 'Grupo de produtos',
+  grupoPlaceholder = 'Todos os grupos',
+  grupoIdValue,
+  onGrupoIdChange,
 }: MvpFiltersBarProps) {
   const [filtrosVisiveisMobile, setFiltrosVisiveisMobile] = useState(false)
   const [isDatasModalOpen, setIsDatasModalOpen] = useState(false)
 
   const set = (patch: Partial<RelatoriosProdutosVendidosFiltersValues>) => {
     onChange({ ...values, ...patch })
+  }
+
+  const grupoSelecionado = grupoIdValue !== undefined ? grupoIdValue : values.grupoId
+  const handleGrupoChange = (nextId: string) => {
+    if (onGrupoIdChange) onGrupoIdChange(nextId)
+    else set({ grupoId: nextId })
+  }
+
+  const periodoEstaNoPadrao =
+    values.filtroPeriodo === 'hoje' &&
+    values.periodoPersonalizadoInicio == null &&
+    values.periodoPersonalizadoFim == null
+
+  const resetPeriodoParaHoje = () => {
+    onChange({
+      ...values,
+      filtroPeriodo: 'hoje',
+      periodoPersonalizadoInicio: null,
+      periodoPersonalizadoFim: null,
+    })
   }
 
   const filtrosVisiveis = filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'
@@ -94,116 +132,154 @@ export function MvpFiltersBar({
         className={`flex flex-wrap items-end justify-between gap-x-1 gap-y-3 rounded-t-lg bg-custom-2 px-2 pb-2 pt-3 ${filtrosVisiveis}`}
       >
         <div className="flex flex-wrap items-end justify-center gap-x-1 gap-y-3 md:justify-start">
-        <FormControl size="small" variant="outlined" sx={{ ...sxRelatorioFiltroSelectBase, minWidth: 200 }}>
-          <InputLabel id="mvp-filtro-grupo-label" shrink>
-            Grupo de produtos
-          </InputLabel>
-          <Select
-            labelId="mvp-filtro-grupo-label"
-            label="Grupo de produtos"
-            value={values.grupoId}
-            onChange={e => set({ grupoId: e.target.value })}
-            disabled={gruposLoading}
-            displayEmpty
-            MenuProps={menuPropsRelatorioFiltroListaLonga}
-            className=""
+          <FormControl
+            size="small"
+            variant="outlined"
+            sx={{ ...sxRelatorioFiltroSelectBase, minWidth: exibirFiltroImpacto ? 160 : 180 }}
           >
-            <MenuItem value="">
-              <span className="text-secondary-text">Todos os grupos</span>
-            </MenuItem>
-            {grupos.map(g => (
-              <MenuItem key={g.id} value={g.id}>
-                {g.nome}
+            <InputLabel id="mvp-filtro-grupo-label" shrink>
+              {grupoLabel}
+            </InputLabel>
+            <Select
+              labelId="mvp-filtro-grupo-label"
+              label={grupoLabel}
+              value={grupoSelecionado}
+              onChange={e => handleGrupoChange(e.target.value)}
+              disabled={gruposLoading}
+              displayEmpty
+              MenuProps={menuPropsRelatorioFiltroListaLonga}
+            >
+              <MenuItem value="">
+                <span className="text-secondary-text">{grupoPlaceholder}</span>
               </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+              {grupos.map(g => (
+                <MenuItem key={g.id} value={g.id}>
+                  {g.nome}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
-        <TextField
-          size="small"
-          variant="outlined"
-          margin="none"
-          label="Valor mín. (R$)"
-          type="text"
-          inputMode="decimal"
-          placeholder="0"
-          value={values.valorMin}
-          onChange={e => set({ valorMin: e.target.value })}
-          onKeyDown={e => {
-            if (e.key === 'Enter') onAplicar()
-          }}
-          sx={sxRelatorioFiltroTextFieldMoeda}
-          InputLabelProps={{ shrink: true }}
-        />
-        <TextField
-          size="small"
-          variant="outlined"
-          margin="none"
-          label="Valor máx. (R$)"
-          type="text"
-          inputMode="decimal"
-          placeholder="0"
-          value={values.valorMax}
-          onChange={e => set({ valorMax: e.target.value })}
-          onKeyDown={e => {
-            if (e.key === 'Enter') onAplicar()
-          }}
-          sx={sxRelatorioFiltroTextFieldMoeda}
-          InputLabelProps={{ shrink: true }}
-        />
+          {exibirFiltroImpacto ? (
+            <FormControl
+              size="small"
+              variant="outlined"
+              sx={{ ...sxRelatorioFiltroSelectBase, minWidth: 128 }}
+            >
+              <InputLabel id="mvp-filtro-impacto-label" shrink>
+                Impacto
+              </InputLabel>
+              <Select
+                labelId="mvp-filtro-impacto-label"
+                label="Impacto"
+                value={impactoComplemento}
+                onChange={e =>
+                  onImpactoComplementoChange?.(
+                    e.target.value as RelatorioComplementoImpacto | 'todos'
+                  )
+                }
+                displayEmpty
+              >
+                <MenuItem value="todos">Todos</MenuItem>
+                <MenuItem value="aumenta">Aumenta</MenuItem>
+                <MenuItem value="diminui">Diminui</MenuItem>
+                <MenuItem value="nenhum">Nenhum</MenuItem>
+              </Select>
+            </FormControl>
+          ) : null}
 
-        <TextField
-          size="small"
-          variant="outlined"
-          margin="none"
-          label="Qtd. mín."
-          type="number"
-          inputProps={{ min: 0, step: 1 }}
-          value={values.qtdMin}
-          onChange={e => set({ qtdMin: e.target.value })}
-          onKeyDown={e => {
-            if (e.key === 'Enter') onAplicar()
-          }}
-          sx={sxRelatorioFiltroTextFieldNumero}
-          InputLabelProps={{ shrink: true }}
-        />
-        <TextField
-          size="small"
-          variant="outlined"
-          margin="none"
-          label="Qtd. máx."
-          type="number"
-          inputProps={{ min: 0, step: 1 }}
-          value={values.qtdMax}
-          onChange={e => set({ qtdMax: e.target.value })}
-          onKeyDown={e => {
-            if (e.key === 'Enter') onAplicar()
-          }}
-          sx={sxRelatorioFiltroTextFieldNumero}
-          InputLabelProps={{ shrink: true }}
-        />
+          <TextField
+            size="small"
+            variant="outlined"
+            margin="none"
+            label="Valor mín. (R$)"
+            type="text"
+            inputMode="decimal"
+            placeholder="0"
+            value={values.valorMin}
+            onChange={e => set({ valorMin: e.target.value })}
+            onKeyDown={e => {
+              if (e.key === 'Enter') onAplicar()
+            }}
+            sx={sxRelatorioFiltroTextFieldMoeda}
+            InputLabelProps={{ shrink: true }}
+          />
+          <TextField
+            size="small"
+            variant="outlined"
+            margin="none"
+            label="Valor máx. (R$)"
+            type="text"
+            inputMode="decimal"
+            placeholder="0"
+            value={values.valorMax}
+            onChange={e => set({ valorMax: e.target.value })}
+            onKeyDown={e => {
+              if (e.key === 'Enter') onAplicar()
+            }}
+            sx={sxRelatorioFiltroTextFieldMoeda}
+            InputLabelProps={{ shrink: true }}
+          />
 
-        <button
-          type="button"
-          onClick={onLimpar}
-          className="flex h-8 items-center justify-center gap-1 rounded-lg bg-primary px-3 text-sm text-white transition-colors hover:bg-primary/90"
-        >
-          <MdFilterAltOff size={18} aria-hidden />
-          Limpar
-        </button>
+          <TextField
+            size="small"
+            variant="outlined"
+            margin="none"
+            label="Qtd. mín."
+            type="number"
+            inputProps={{ min: 0, step: 1 }}
+            value={values.qtdMin}
+            onChange={e => set({ qtdMin: e.target.value })}
+            onKeyDown={e => {
+              if (e.key === 'Enter') onAplicar()
+            }}
+            sx={sxRelatorioFiltroTextFieldNumero}
+            InputLabelProps={{ shrink: true }}
+          />
+          <TextField
+            size="small"
+            variant="outlined"
+            margin="none"
+            label="Qtd. máx."
+            type="number"
+            inputProps={{ min: 0, step: 1 }}
+            value={values.qtdMax}
+            onChange={e => set({ qtdMax: e.target.value })}
+            onKeyDown={e => {
+              if (e.key === 'Enter') onAplicar()
+            }}
+            sx={sxRelatorioFiltroTextFieldNumero}
+            InputLabelProps={{ shrink: true }}
+          />
 
-        <button
-          type="button"
-          onClick={onAplicar}
-          className="flex h-8 items-center rounded-lg bg-primary px-3 text-sm text-white transition-colors hover:bg-primary/90"
-        >
-          Aplicar filtros
-        </button>
+          <button
+            type="button"
+            onClick={onLimpar}
+            aria-label="Limpar filtros"
+            title="Limpar filtros"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-white transition-colors hover:bg-primary/90"
+          >
+            <MdFilterAltOff size={18} aria-hidden />
+          </button>
+
+          <button
+            type="button"
+            onClick={onAplicar}
+            className="flex h-8 items-center rounded-lg bg-primary px-3 text-sm text-white transition-colors hover:bg-primary/90"
+          >
+            Aplicar filtros
+          </button>
         </div>
 
         <div className="flex flex-wrap items-end justify-end gap-x-2 gap-y-3">
           <span className="shrink-0 self-center text-sm text-primary">Período:</span>
-          <FormControl size="small" sx={sxRelatorioFiltroSelectPeriodo}>
+          <FormControl
+            size="small"
+            sx={{
+              ...sxRelatorioFiltroSelectPeriodo,
+              minWidth: periodoEstaNoPadrao ? 150 : 168,
+            }}
+          >
             <Select
               value={values.filtroPeriodo}
               onChange={e =>
@@ -212,6 +288,25 @@ export function MvpFiltersBar({
                   periodoPersonalizadoInicio: null,
                   periodoPersonalizadoFim: null,
                 })
+              }
+              endAdornment={
+                periodoEstaNoPadrao ? undefined : (
+                  <InputAdornment position="end" sx={{ position: 'absolute', right: 28 }}>
+                    <IconButton
+                      size="small"
+                      aria-label="Voltar período para Hoje"
+                      title="Voltar para Hoje"
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={e => {
+                        e.stopPropagation()
+                        resetPeriodoParaHoje()
+                      }}
+                      sx={{ color: 'white', p: 0.25 }}
+                    >
+                      <MdClose size={16} aria-hidden />
+                    </IconButton>
+                  </InputAdornment>
+                )
               }
             >
               {OPCOES_PERIODO_RELATORIO_MVP.map(op => (

@@ -11,6 +11,7 @@ import {
   comporTelefoneApi,
   telefoneNacionalValido,
 } from '@/src/shared/utils/deliveryTelefonePais'
+import { validarPagamentosPedidoPublico } from '@/src/domain/policies/PagamentoObrigatorioPedidoPublico'
 
 export type MontarPedidoPublicoParams = {
   slug: string
@@ -24,6 +25,8 @@ export type MontarPedidoPublicoParams = {
    * após encontrar o cliente.
    */
   telefoneApi?: string | null
+  /** Quando true, CPF vazio ou incompleto bloqueia o pedido. */
+  exigeCpfVenda?: boolean
 }
 
 export type MontarPedidoPublicoResult =
@@ -41,11 +44,27 @@ type ComposicaoPedidoPublico = {
   cpfDocumento: string | null
 }
 
+export function validarCpfPedidoPublico(
+  cpfMascarado: string,
+  exigeCpfVenda: boolean
+): { ok: true; cpf: string | null } | { ok: false; error: string } {
+  return extrairCpfPedido(cpfMascarado, exigeCpfVenda)
+}
+
+/** Reexport da policy de domínio — consumidores application/presentation. */
+export { validarPagamentosPedidoPublico } from '@/src/domain/policies/PagamentoObrigatorioPedidoPublico'
+
 function extrairCpfPedido(
-  cpfMascarado: string
+  cpfMascarado: string,
+  exigeCpfVenda: boolean
 ): { ok: true; cpf: string | null } | { ok: false; error: string } {
   const digits = cpfMascarado.replace(/\D/g, '').slice(0, 11)
-  if (!digits) return { ok: true, cpf: null }
+  if (!digits) {
+    if (exigeCpfVenda) {
+      return { ok: false, error: 'Informe o CPF para finalizar o pedido' }
+    }
+    return { ok: true, cpf: null }
+  }
   if (digits.length !== 11) {
     return { ok: false, error: 'Informe um CPF completo com 11 dígitos' }
   }
@@ -57,6 +76,7 @@ function montarComposicaoPedidoPublico({
   form,
   enderecoIdEntrega,
   telefoneApi,
+  exigeCpfVenda = false,
 }: Omit<MontarPedidoPublicoParams, 'slug' | 'total'>):
   | { ok: true; composicao: ComposicaoPedidoPublico }
   | { ok: false; error: string } {
@@ -86,7 +106,7 @@ function montarComposicaoPedidoPublico({
     }
   }
 
-  const cpfResult = extrairCpfPedido(form.cpfNotaFiscal)
+  const cpfResult = extrairCpfPedido(form.cpfNotaFiscal, exigeCpfVenda)
   if (!cpfResult.ok) return cpfResult
 
   const produtos = itens.map(item => ({
@@ -148,6 +168,9 @@ export function montarPedidoPublico(
   const composicao = montarComposicaoPedidoPublico(params)
   if (!composicao.ok) return composicao
 
+  const pagamentosGate = validarPagamentosPedidoPublico(params.form.pagamentos, params.total)
+  if (!pagamentosGate.ok) return pagamentosGate
+
   const payload: CreatePedidoPublicoInput = {
     slug: params.slug,
     origem: 'JIFFY_DELIVERY',
@@ -155,18 +178,15 @@ export function montarPedidoPublico(
     tipoEntrega: composicao.composicao.tipoEntrega,
     cliente: composicao.composicao.cliente,
     produtos: composicao.composicao.produtos,
+    cobrancas: params.form.pagamentos.map(p => ({
+      meioPagamentoId: p.meioPagamentoId,
+      valor: p.valor,
+      momentoCobranca: 'na_entrega',
+    })),
   }
 
   if (composicao.composicao.cpfDocumento) {
     payload.documentoCpfCnpj = composicao.composicao.cpfDocumento
-  }
-
-  if (params.form.pagamentos.length > 0) {
-    payload.cobrancas = params.form.pagamentos.map(p => ({
-      meioPagamentoId: p.meioPagamentoId,
-      valor: p.valor,
-      momentoCobranca: 'na_entrega',
-    }))
   }
 
   const obsPedido = params.form.observacaoPedido.trim()

@@ -21,7 +21,10 @@ import {
   descricaoVinculoMenusCriacao,
   garantirMenuPrincipalNosIds,
   idsMenuPrincipalTravados,
+  menuIdsParaSeedCopiaProduto,
 } from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
+
+const MENUS_EMPRESA_LIMIT = 100
 
 export type ProdutosTabsTabKey = 'produto' | 'complementos' | 'impressoras' | 'menus'
 type TabKey = ProdutosTabsTabKey
@@ -58,12 +61,19 @@ export function ProdutosTabsModal({
   const menusRef = useRef<ProdutoMenusHandle>(null)
 
   const isDraftProduto = state.mode === 'create' || state.mode === 'copy'
+  /** Complementos/Impressoras só no produto já persistido (edição) — cópia não reusa o id origem. */
+  const produtoIdAbasPersistidas = state.mode === 'edit' ? produtoId : undefined
 
   const { data: menusPrincipais } = useMenus({
     tipo: 'principal',
     limit: 10,
     enabled: state.open,
   })
+  const { data: menusEmpresaData } = useMenus({
+    limit: MENUS_EMPRESA_LIMIT,
+    enabled: state.open && isDraftProduto,
+  })
+  const menusEmpresa = menusEmpresaData?.items ?? []
   const principalMenuId = useMemo(
     () =>
       menusPrincipais?.items.find(m => m.tipo === 'principal')?.id ??
@@ -73,6 +83,7 @@ export function ProdutosTabsModal({
   )
 
   const [draftMenuIds, setDraftMenuIds] = useState<string[]>([])
+  const draftMenusDirtyRef = useRef(false)
   const [wizardStep, setWizardStep] = useState<0 | 1 | 2>(state.initialStepProduto ?? 0)
   const [wizardSaving, setWizardSaving] = useState(false)
   const [fiscalOnlyBack, setFiscalOnlyBack] = useState(false)
@@ -108,11 +119,41 @@ export function ProdutosTabsModal({
   )
   const handleEmbedMenusChange = useCallback(
     (next: { isDirty: boolean; isSaving: boolean }) => {
+      draftMenusDirtyRef.current = next.isDirty
       setEmbedMenus(prev =>
         prev.isDirty === next.isDirty && prev.isSaving === next.isSaving ? prev : next
       )
     },
     []
+  )
+
+  const aplicarSeedMenusCopia = useCallback(
+    (candidatos: readonly string[]) => {
+      if (draftMenusDirtyRef.current) return
+      const next = menuIdsParaSeedCopiaProduto({
+        candidatosDoProduto: candidatos,
+        menusEmpresa,
+        principalId: principalMenuId,
+      })
+      setDraftMenuIds(prev => {
+        if (
+          prev.length === next.length &&
+          [...prev].sort().every((id, i) => id === [...next].sort()[i])
+        ) {
+          return prev
+        }
+        return next
+      })
+    },
+    [menusEmpresa, principalMenuId]
+  )
+
+  const handleMenusVinculadosLoaded = useCallback(
+    (ids: string[]) => {
+      if (state.mode !== 'copy') return
+      aplicarSeedMenusCopia(ids)
+    },
+    [state.mode, aplicarSeedMenusCopia]
   )
 
   /** Confirmação ao fechar o painel com produto em edição e alterações não salvas */
@@ -130,6 +171,7 @@ export function ProdutosTabsModal({
     if (state.open && !prevPainelAbertoRef.current) {
       setProdutoFormSession(s => s + 1)
       seededPrincipalCreateRef.current = false
+      draftMenusDirtyRef.current = false
       if (state.mode === 'create') {
         const fromCaller = state.createMenuIds ?? []
         if (fromCaller.length > 0) {
@@ -143,10 +185,11 @@ export function ProdutosTabsModal({
         }
       } else if (state.mode === 'copy') {
         setDraftMenuIds(
-          garantirMenuPrincipalNosIds(
-            (state.produto?.getMenus() ?? []).map(m => m.id).filter(Boolean),
-            principalMenuId
-          )
+          menuIdsParaSeedCopiaProduto({
+            candidatosDoProduto: (state.produto?.getMenus() ?? []).map(m => m.id),
+            menusEmpresa,
+            principalId: principalMenuId,
+          })
         )
       } else {
         setDraftMenuIds([])
@@ -154,11 +197,12 @@ export function ProdutosTabsModal({
     }
     if (!state.open) {
       seededPrincipalCreateRef.current = false
+      draftMenusDirtyRef.current = false
     }
     prevPainelAbertoRef.current = state.open
-  }, [state.open, state.mode, state.createMenuIds, state.produto, principalMenuId])
+  }, [state.open, state.mode, state.createMenuIds, state.produto, principalMenuId, menusEmpresa])
 
-  /** Cadastro sem createMenuIds: pré-marca o principal uma vez quando ele chega após abrir. */
+  /** Cadastro: pré-marca o principal quando ele chega após abrir. */
   useEffect(() => {
     if (!state.open || state.mode !== 'create') return
     if ((state.createMenuIds?.length ?? 0) > 0) return
@@ -166,6 +210,29 @@ export function ProdutosTabsModal({
     seededPrincipalCreateRef.current = true
     setDraftMenuIds(prev => garantirMenuPrincipalNosIds(prev, principalMenuId))
   }, [state.open, state.mode, state.createMenuIds, principalMenuId])
+
+  /** Cópia: quando a lista de menus da empresa chega, remove órfãos e garante o principal. */
+  useEffect(() => {
+    if (!state.open || state.mode !== 'copy') return
+    if (draftMenusDirtyRef.current) return
+    if (!principalMenuId && menusEmpresa.length === 0) return
+    setDraftMenuIds(prev => {
+      const candidatos =
+        prev.length > 0 ? prev : (state.produto?.getMenus() ?? []).map(m => m.id)
+      const next = menuIdsParaSeedCopiaProduto({
+        candidatosDoProduto: candidatos,
+        menusEmpresa,
+        principalId: principalMenuId,
+      })
+      if (
+        prev.length === next.length &&
+        [...prev].sort().every((id, i) => id === [...next].sort()[i])
+      ) {
+        return prev
+      }
+      return next
+    })
+  }, [state.open, state.mode, state.produto, principalMenuId, menusEmpresa])
 
   // Limpa overlay de confirmação ao fechar
   useEffect(() => {
@@ -271,23 +338,27 @@ export function ProdutosTabsModal({
       return
     }
     if (isDraftProduto || state.tab === 'produto') setMountedProduto(true)
-    if (produtoId) {
+    if (produtoIdAbasPersistidas) {
       setMountedComplementos(true)
       setMountedImpressoras(true)
     }
-    if (isDraftProduto || (produtoId && state.mode === 'edit')) {
+    if (isDraftProduto || (produtoIdAbasPersistidas && state.mode === 'edit')) {
       setMountedMenus(true)
     }
-  }, [state.open, state.tab, produtoId, state.mode, isDraftProduto])
+  }, [state.open, state.tab, produtoIdAbasPersistidas, state.mode, isDraftProduto])
 
   const showProdutoPanel = state.open && (mountedProduto || state.tab === 'produto')
   const showComplementosPanel =
-    state.open && !!produtoId && (mountedComplementos || state.tab === 'complementos')
+    state.open &&
+    !!produtoIdAbasPersistidas &&
+    (mountedComplementos || state.tab === 'complementos')
   const showImpressorasPanel =
-    state.open && !!produtoId && (mountedImpressoras || state.tab === 'impressoras')
+    state.open &&
+    !!produtoIdAbasPersistidas &&
+    (mountedImpressoras || state.tab === 'impressoras')
   const showMenusPanel =
     state.open &&
-    (isDraftProduto || (state.mode === 'edit' && !!produtoId)) &&
+    (isDraftProduto || (state.mode === 'edit' && !!produtoIdAbasPersistidas)) &&
     (mountedMenus || state.tab === 'menus')
 
   useEffect(() => {
@@ -493,12 +564,20 @@ export function ProdutosTabsModal({
             {(
               [
                 { key: 'produto' as const, label: 'Produto', disabled: false },
-                { key: 'complementos' as const, label: 'Complementos', disabled: !produtoId },
-                { key: 'impressoras' as const, label: 'Impressoras', disabled: !produtoId },
+                {
+                  key: 'complementos' as const,
+                  label: 'Complementos',
+                  disabled: !produtoIdAbasPersistidas,
+                },
+                {
+                  key: 'impressoras' as const,
+                  label: 'Impressoras',
+                  disabled: !produtoIdAbasPersistidas,
+                },
                 {
                   key: 'menus' as const,
                   label: 'Menus',
-                  disabled: !(isDraftProduto || (state.mode === 'edit' && !!produtoId)),
+                  disabled: !(isDraftProduto || (state.mode === 'edit' && !!produtoIdAbasPersistidas)),
                 },
               ] as const
             ).map(tab => (
@@ -554,6 +633,7 @@ export function ProdutosTabsModal({
                 onWizardStepChange={setWizardStep}
                 onWizardSavingChange={setWizardSaving}
                 onFiscalUnavailableChange={setFiscalOnlyBack}
+                onMenusVinculadosLoaded={handleMenusVinculadosLoaded}
                 onClose={handleRequestClose}
                 onSuccess={produtoData => {
                   onReload?.(produtoData?.produtoId, produtoData?.produtoData)
@@ -574,7 +654,7 @@ export function ProdutosTabsModal({
               <ComplementosMultiSelectDialog
                 ref={complementosRef}
                 open={state.open}
-                produtoId={produtoId}
+                produtoId={produtoIdAbasPersistidas}
                 produtoNome={state.produto?.getNome()}
                 initialGruposResumo={state.produto?.getGruposComplementos()}
                 onClose={handleRequestClose}
@@ -582,7 +662,7 @@ export function ProdutosTabsModal({
                 onEmbedStateChange={handleEmbedComplementosChange}
               />
             </div>
-          ) : state.open && state.tab === 'complementos' && !produtoId ? (
+          ) : state.open && state.tab === 'complementos' && !produtoIdAbasPersistidas ? (
             <div className="flex h-full min-h-0 flex-1 items-center justify-center text-sm text-secondary-text">
               Selecione um produto para gerenciar complementos.
             </div>
@@ -599,7 +679,7 @@ export function ProdutosTabsModal({
               <ProdutoImpressorasDialog
                 ref={impressorasRef}
                 open={state.open}
-                produtoId={produtoId}
+                produtoId={produtoIdAbasPersistidas}
                 produtoNome={state.produto?.getNome()}
                 initialImpressorasResumo={state.produto?.getImpressoras()}
                 onClose={handleRequestClose}
@@ -607,7 +687,7 @@ export function ProdutosTabsModal({
                 onEmbedStateChange={handleEmbedImpressorasChange}
               />
             </div>
-          ) : state.open && state.tab === 'impressoras' && !produtoId ? (
+          ) : state.open && state.tab === 'impressoras' && !produtoIdAbasPersistidas ? (
             <div className="flex h-full min-h-0 flex-1 items-center justify-center text-sm text-secondary-text">
               Selecione um produto para gerenciar impressoras.
             </div>
@@ -624,10 +704,12 @@ export function ProdutosTabsModal({
               <ProdutoMenusPanel
                 key={`menus-${produtoFormSession}`}
                 ref={menusRef}
-                produtoId={state.mode === 'edit' ? produtoId : undefined}
+                produtoId={state.mode === 'edit' ? produtoIdAbasPersistidas : undefined}
                 persistChanges={state.mode === 'edit'}
                 isEmbedded
-                initialMenusResumo={state.mode === 'edit' ? state.produto?.getMenus() : undefined}
+                initialMenusResumo={
+                  state.mode === 'edit' ? state.produto?.getMenus() : undefined
+                }
                 initialMenuIds={isDraftProduto ? draftMenuIds : undefined}
                 lockedMenuIds={idsMenuPrincipalTravados(principalMenuId)}
                 onSelectionChange={isDraftProduto ? setDraftMenuIds : undefined}
@@ -637,7 +719,7 @@ export function ProdutosTabsModal({
                 }
               />
             </div>
-          ) : state.open && state.tab === 'menus' && state.mode === 'edit' && !produtoId ? (
+          ) : state.open && state.tab === 'menus' && state.mode === 'edit' && !produtoIdAbasPersistidas ? (
             <div className="flex h-full min-h-0 flex-1 items-center justify-center px-4 text-center text-sm text-secondary-text">
               Selecione um produto para vincular aos cardápios.
             </div>

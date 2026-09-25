@@ -275,3 +275,19 @@ export async function resolverEstacaoImpressaoConfig(
     return CONFIG_VAZIA
   }
 }
+
+/**
+ * Resolve a estação para o create da venda gestor.
+ * Com token, revalida no backend e limpa ID inválido do storage.
+ */
+export async function resolverEstacaoIdParaCriarVendaGestor(
+  token?: string | null
+): Promise<string | null> {
+  const access = token?.trim()
+  if (access) {
+    const cfg = await resolverEstacaoImpressaoConfig(access)
+    const id = cfg.estacaoId.trim()
+    return id || null
+  }
+  return getEstacaoImpressaoId()
+}

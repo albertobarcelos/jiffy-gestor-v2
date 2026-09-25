@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Camera, MapPin, Pencil, UserRound } from 'lucide-react'
 import { MdDeliveryDining } from 'react-icons/md'
 import { TbPaperBag } from 'react-icons/tb'
@@ -17,6 +17,10 @@ import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPrefere
 import { observacaoItemCarrinho } from '../../../shared/utils/deliveryCarrinhoItemUtils'
 import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurrency'
 import { etiquetaEnderecoPublicoLabel } from '../../../shared/utils/etiquetaEnderecoPublicoLabel'
+import { showToast } from '@/src/shared/utils/toast'
+import {
+  validarPagamentosPedidoPublico,
+} from '@/src/domain/policies/PagamentoObrigatorioPedidoPublico'
 import {
   calcularDistanciaAproximadaDaLoja,
   pontoClienteParaDistancia,
@@ -55,6 +59,8 @@ type DeliveryCheckoutRevisaoModalProps = {
   }>
   observacaoPedido: string
   cpfNotaFiscal: string
+  /** Loja exige CPF para finalizar — campo obrigatório, sem opção de pular. */
+  exigeCpfVenda?: boolean
   enviando?: boolean
   etapaEnvio?: 'validando' | 'salvando_endereco' | 'enviando_pedido' | null
   onClose?: () => void
@@ -162,6 +168,7 @@ export function DeliveryCheckoutRevisaoModal({
   pagamentos,
   observacaoPedido,
   cpfNotaFiscal,
+  exigeCpfVenda = false,
   enviando = false,
   etapaEnvio = null,
   onClose: _onClose,
@@ -181,8 +188,12 @@ export function DeliveryCheckoutRevisaoModal({
     () => observacaoPedido.trim().length > 0
   )
   const [desejaNotaFiscal, setDesejaNotaFiscal] = useState(
-    () => cpfNotaFiscal.replace(/\D/g, '').length > 0
+    () => exigeCpfVenda || cpfNotaFiscal.replace(/\D/g, '').length > 0
   )
+
+  useEffect(() => {
+    if (exigeCpfVenda) setDesejaNotaFiscal(true)
+  }, [exigeCpfVenda])
   const telefoneTrim = telefone.trim()
   const telefoneExibicao = telefoneTrim
     ? formatarTelefoneExibicao(telefone, telefonePaisIso2)
@@ -210,6 +221,12 @@ export function DeliveryCheckoutRevisaoModal({
   const IconePagamento = obterIconeMeioPagamento(primeiroMeioNome)
   const observacaoTrim = observacaoPedido.trim()
   const cpfTrim = cpfNotaFiscal.replace(/\D/g, '')
+  const cpfObrigatorioIncompleto = exigeCpfVenda && cpfTrim.length !== 11
+  const pagamentosGate = validarPagamentosPedidoPublico(
+    pagamentos.map(p => ({ meioPagamentoId: p.meioPagamentoId, valor: p.valor })),
+    totalExibicao
+  )
+  const pagamentoIncompleto = !pagamentosGate.ok
 
   const handleToggleObservacao = (checked: boolean) => {
     if (somenteLeitura || !onChangeObservacaoPedido) return
@@ -220,7 +237,7 @@ export function DeliveryCheckoutRevisaoModal({
   }
 
   const handleToggleNotaFiscal = (checked: boolean) => {
-    if (somenteLeitura || !onChangeCpfNotaFiscal) return
+    if (somenteLeitura || !onChangeCpfNotaFiscal || exigeCpfVenda) return
     setDesejaNotaFiscal(checked)
     if (!checked) {
       onChangeCpfNotaFiscal('')
@@ -258,8 +275,17 @@ export function DeliveryCheckoutRevisaoModal({
         ) : (
           <DeliveryCheckoutFooterActions
             onVoltar={onVoltar}
-            onContinuar={() => onEnviar?.()}
-            continuarDisabled={enviando || !cotacaoPronta}
+            onContinuar={() => {
+              if (!pagamentosGate.ok) {
+                showToast.error(pagamentosGate.error)
+                onEditarPagamento?.()
+                return
+              }
+              onEnviar?.()
+            }}
+            continuarDisabled={
+              enviando || !cotacaoPronta || cpfObrigatorioIncompleto
+            }
             continuarLabel={
               etapaEnvio === 'validando'
                 ? 'Validando valores...'
@@ -269,7 +295,11 @@ export function DeliveryCheckoutRevisaoModal({
                     ? 'Enviando pedido...'
                     : cotacaoLoading && !cotacaoPronta
                       ? 'Atualizando valores...'
-                      : 'Enviar pedido'
+                      : cpfObrigatorioIncompleto
+                        ? 'Informe o CPF'
+                        : pagamentoIncompleto
+                          ? 'Escolha o pagamento'
+                          : 'Enviar pedido'
             }
           />
         )}
@@ -534,56 +564,17 @@ export function DeliveryCheckoutRevisaoModal({
               </div>
             ) : null}
 
-            <div
-              className="flex items-center justify-between gap-3 rounded-xl px-3 py-2"
-              style={{ backgroundColor: '#000000', color: '#ffffff' }}
-            >
-              <span className="min-w-0 text-sm font-medium text-white">
-                Deseja Nota fiscal?
-              </span>
-              <div
-                className="flex shrink-0 rounded-full p-0.5"
-                style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}
-                role="group"
-                aria-label="Deseja nota fiscal"
-              >
-                <button
-                  type="button"
-                  onClick={() => handleToggleNotaFiscal(true)}
-                  aria-pressed={desejaNotaFiscal}
-                  className="min-w-[3.25rem] rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
-                  style={
-                    desejaNotaFiscal
-                      ? { backgroundColor: '#ffffff', color: '#000000' }
-                      : { backgroundColor: 'transparent', color: '#ffffff' }
-                  }
-                >
-                  Sim
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleToggleNotaFiscal(false)}
-                  aria-pressed={!desejaNotaFiscal}
-                  className="min-w-[3.25rem] rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
-                  style={
-                    !desejaNotaFiscal
-                      ? { backgroundColor: '#ffffff', color: '#000000' }
-                      : { backgroundColor: 'transparent', color: '#ffffff' }
-                  }
-                >
-                  Não
-                </button>
-              </div>
-            </div>
-
-            {desejaNotaFiscal ? (
+            {exigeCpfVenda ? (
               <div className="space-y-2">
                 <label
                   className="block text-sm font-medium delivery-text-primary"
                   htmlFor="cpf-nota-fiscal"
                 >
-                  CPF
+                  CPF <span className="text-red-500">*</span>
                 </label>
+                <p className="text-xs delivery-text-secondary">
+                  Obrigatório para finalizar o pedido nesta loja.
+                </p>
                 <input
                   id="cpf-nota-fiscal"
                   className="w-full rounded-xl border bg-transparent px-3 py-3 text-base outline-none delivery-text-primary"
@@ -594,13 +585,84 @@ export function DeliveryCheckoutRevisaoModal({
                   value={cpfNotaFiscal}
                   onChange={e => handleCpfChange(e.target.value)}
                   maxLength={14}
-                  aria-label="CPF para nota fiscal"
+                  aria-label="CPF obrigatório"
+                  aria-required
                 />
                 <p className="text-right text-[11px] delivery-text-secondary">
                   {cpfNotaFiscal.replace(/\D/g, '').length}/11
                 </p>
               </div>
-            ) : null}
+            ) : (
+              <>
+                <div
+                  className="flex items-center justify-between gap-3 rounded-xl px-3 py-2"
+                  style={{ backgroundColor: '#000000', color: '#ffffff' }}
+                >
+                  <span className="min-w-0 text-sm font-medium text-white">
+                    Deseja Nota fiscal?
+                  </span>
+                  <div
+                    className="flex shrink-0 rounded-full p-0.5"
+                    style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}
+                    role="group"
+                    aria-label="Deseja nota fiscal"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleToggleNotaFiscal(true)}
+                      aria-pressed={desejaNotaFiscal}
+                      className="min-w-[3.25rem] rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
+                      style={
+                        desejaNotaFiscal
+                          ? { backgroundColor: '#ffffff', color: '#000000' }
+                          : { backgroundColor: 'transparent', color: '#ffffff' }
+                      }
+                    >
+                      Sim
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleNotaFiscal(false)}
+                      aria-pressed={!desejaNotaFiscal}
+                      className="min-w-[3.25rem] rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
+                      style={
+                        !desejaNotaFiscal
+                          ? { backgroundColor: '#ffffff', color: '#000000' }
+                          : { backgroundColor: 'transparent', color: '#ffffff' }
+                      }
+                    >
+                      Não
+                    </button>
+                  </div>
+                </div>
+
+                {desejaNotaFiscal ? (
+                  <div className="space-y-2">
+                    <label
+                      className="block text-sm font-medium delivery-text-primary"
+                      htmlFor="cpf-nota-fiscal"
+                    >
+                      CPF
+                    </label>
+                    <input
+                      id="cpf-nota-fiscal"
+                      className="w-full rounded-xl border bg-transparent px-3 py-3 text-base outline-none delivery-text-primary"
+                      style={{ borderColor: 'var(--delivery-border)' }}
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder="000.000.000-00"
+                      value={cpfNotaFiscal}
+                      onChange={e => handleCpfChange(e.target.value)}
+                      maxLength={14}
+                      aria-label="CPF para nota fiscal"
+                    />
+                    <p className="text-right text-[11px] delivery-text-secondary">
+                      {cpfNotaFiscal.replace(/\D/g, '').length}/11
+                    </p>
+                  </div>
+                ) : null}
+              </>
+            )}
           </div>
         )}
 

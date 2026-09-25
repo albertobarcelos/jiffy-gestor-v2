@@ -16,11 +16,24 @@ const MAP_OPCAO_PERIODO: Record<string, string> = {
 }
 
 export type VendaDetalheProdutos = {
+  valorFinal?: number
   produtosLancados?: Array<{
-    produtoId: string
-    quantidade: number
-    valorFinal: number
+    produtoId?: string | null
+    quantidade?: number
+    valorFinal?: number
     removido?: boolean
+    tipoItem?: string
+    nomeProduto?: string
+    complementos?: Array<{
+      id?: string
+      complementoId?: string
+      nomeComplemento?: string
+      quantidade?: number
+      valorUnitario?: number
+      grupoComplementoId?: string
+      tipoImpactoPreco?: string
+      tipoComplemento?: string
+    }>
   }>
 } | null
 
@@ -77,8 +90,8 @@ async function fetchWithConcurrency<T, R>(
 }
 
 /**
- * Lista todos os IDs de vendas FINALIZADAS no período (paginação interna; limite 50 por página
- * para compatibilidade com APIs que capam abaixo de 100).
+ * Lista todos os IDs de vendas FINALIZADAS no período (paginação interna).
+ * `limit` = 100 = máximo do `PaginationValidator` do backend (default sem param seria 10).
  */
 export async function listarIdsVendasFinalizadasNoPeriodo(args: {
   apiClient: ApiClient
@@ -89,7 +102,7 @@ export async function listarIdsVendasFinalizadasNoPeriodo(args: {
   const params = new URLSearchParams(paramsComIntervalo.toString())
   params.append('status', 'FINALIZADA')
 
-  const limitPerPage = 50
+  const limitPerPage = 100
   const maxPagesSemTotal = 400
   const vendaIds = new Set<string>()
   let page = 0

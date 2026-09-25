@@ -14,6 +14,11 @@ export interface CriarVendaGestorInputDTO {
   tipoInicioPedido: 'balcao' | 'delivery'
   origem: OrigemVenda
   status: StatusVenda
+  /**
+   * Estação deste PC (caixa). Obrigatória no create balcão — resolvida no submit
+   * a partir do storage / config deste computador.
+   */
+  estacaoId?: string
   produtos: ProdutoSelecionado[]
   pagamentos: PagamentoSelecionado[]
   totalProdutos: number

@@ -67,8 +67,20 @@ describe('deliveryCheckoutFlow', () => {
           tipoEntrega: 'entrega',
           enderecoSelecionado: { id: '1', temGeolocalizacao: true },
           voltarParaRevisao: true,
+          temPagamento: true,
         })
       ).toEqual({ action: 'go', step: 'revisao' })
+    })
+
+    it('sem pagamento não volta à revisão — manda ao pagamento', () => {
+      expect(
+        resolverAvancarAposIdentificacao({
+          tipoEntrega: 'retirada',
+          enderecoSelecionado: null,
+          voltarParaRevisao: true,
+          temPagamento: false,
+        })
+      ).toEqual({ action: 'pagamento_com_cotacao' })
     })
   })
 
@@ -145,6 +157,17 @@ describe('deliveryCheckoutFlow', () => {
           cotacaoValidaParaPagamento: false,
         })
       ).toEqual({ action: 'cotar_e_pagamento' })
+    })
+
+    it('sem pagamento não volta à revisão', () => {
+      expect(
+        resolverProximoAposEndereco({
+          voltarParaRevisao: true,
+          voltarParaIdentificacao: false,
+          cotacaoValidaParaPagamento: true,
+          temPagamento: false,
+        })
+      ).toEqual({ action: 'go', step: 'pagamento' })
     })
   })
 

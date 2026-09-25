@@ -30,6 +30,7 @@ import {
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast, handleApiError } from '@/src/shared/utils/toast'
+import { unwrapProdutoApiPayloadAsRecord } from '@/src/shared/utils/unwrapProdutoApiPayload'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { Produto } from '@/src/domain/entities/Produto'
@@ -41,10 +42,11 @@ import {
   type DestinoAlteracaoProduto,
 } from '@/src/shared/types/propagarAlteracaoProduto'
 import {
-  garantirMenuPrincipalNosIds,
   menuIdsParaEspelharAposSalvarCadastro,
+  menuIdsProntosParaCriacaoProduto,
   syncCadastroComMenuPrincipalAtivo,
 } from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
+import { ncmCestDoBlocoFiscal } from '@/src/domain/policies/produto/ncmCestDoBlocoFiscal'
 
 /** Snapshot serializado por `getFormSnapshot` — deve permanecer alinhado a esse método. */
 interface BaselineSnapshotProduto {
@@ -94,7 +96,7 @@ function seedFormFromProduto(produto: Produto, isCopy: boolean) {
   return {
     nomeProduto: isCopy ? (nome ? `${nome} - Cópia` : 'Cópia ') : nome,
     precoVenda: produto.getValor() ? formatCurrencyValue(produto.getValor()) : '',
-    unidadeProduto: (produto.getUnidadeMedida() as string | null) || null,
+    unidadeProduto: (produto.getUnidadeMedida() as string | null) || 'UN',
     grupoProduto: produto.getGrupoId() || null,
     favorito: produto.isFavorito(),
     permiteDesconto: produto.permiteDescontoAtivo(),
@@ -164,6 +166,32 @@ function extrairIdProdutoDaRespostaApi(payload: unknown): string | undefined {
     if (typeof c === 'string' && c.trim() !== '') return c.trim()
   }
   return undefined
+}
+
+function asRecordUnknown(raw: unknown): Record<string, unknown> {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>
+  }
+  return {}
+}
+
+function asStringField(raw: unknown, fallback = ''): string {
+  if (typeof raw === 'string') return raw
+  if (typeof raw === 'number' || typeof raw === 'boolean') return String(raw)
+  return fallback
+}
+
+function idsDeRelacaoProduto(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map(item => {
+      if (!item || typeof item !== 'object') return null
+      const id = (item as Record<string, unknown>).id
+      if (typeof id === 'string' && id.trim() !== '') return id.trim()
+      if (typeof id === 'number') return String(id)
+      return null
+    })
+    .filter((id): id is string => id != null)
 }
 
 /** Compara ids de grupo para o PATCH parcial (null, undefined e string vazia tratados como ausência). */
@@ -411,6 +439,10 @@ export interface NovoProdutoProps {
   onWizardSavingChange?: (saving: boolean) => void
   /** Passo 2 com fiscal indisponível: só “Voltar” no fluxo interno */
   onFiscalUnavailableChange?: (onlyBack: boolean) => void
+  /**
+   * Cópia: menus do GET do produto origem — o pai usa para seed da aba Menus / POST.
+   */
+  onMenusVinculadosLoaded?: (menuIds: string[]) => void
   /** Preview de celular à direita (padrão: true no painel embutido). */
   showMobilePreview?: boolean
   /** Imagem exibida no preview (ex.: snapshot do cardápio). */
@@ -442,6 +474,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       onWizardStepChange,
       onWizardSavingChange,
       onFiscalUnavailableChange,
+      onMenusVinculadosLoaded,
       showMobilePreview,
       previewImagemUrl = null,
       previewMenuId,
@@ -477,7 +510,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
     const [descricaoProduto, setDescricaoProduto] = useState('')
     const [precoVenda, setPrecoVenda] = useState(() => formSeed?.precoVenda ?? '')
     const [unidadeProduto, setUnidadeProduto] = useState<string | null>(
-      () => formSeed?.unidadeProduto ?? null
+      () => formSeed?.unidadeProduto ?? 'UN'
     )
     const [grupoProduto, setGrupoProduto] = useState<string | null>(
       () => formSeed?.grupoProduto ?? defaultGrupoProdutoId ?? null
@@ -788,7 +821,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           : produto.nome || ''
         const descricaoProduto = produto.descricao || ''
         const precoVenda = produto.valor ? formatCurrency(produto.valor as number | string) : ''
-        const unidadeProduto = (produto.unidadeMedida || null) as string | null
+        const unidadeProduto = (produto.unidadeMedida || 'UN') as string | null
         const grupoProduto = extrairGrupoProdutoIdDoJsonProduto(produto)
         const eanRaw =
           produto.codigoEan ?? produto.codigoBarras ?? produto.ean ?? produto.codigoEanBarras
@@ -812,14 +845,14 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           unidadeProduto,
           grupoProduto,
           codigoEanBarras,
-          favorito: !!(produto.favorito || false),
-          permiteDesconto: !!(produto.permiteDesconto || false),
-          permiteAcrescimo: !!(produto.permiteAcrescimo || false),
-          abreComplementos: !!(produto.abreComplementos || false),
-          permiteAlterarPreco: !!(produto.permiteAlterarPreco ?? false),
-          incideTaxa: !!(produto.incideTaxa ?? false),
-          // Mesma semântica que `setAtivo(produto.ativo ?? true)` — unknown precisa virar boolean explícito
-          ativo: produto.ativo === false ? false : true,
+          favorito: produto.favorito === true,
+          permiteDesconto: produto.permiteDesconto === true,
+          permiteAcrescimo: produto.permiteAcrescimo === true,
+          abreComplementos: produto.abreComplementos === true,
+          permiteAlterarPreco: produto.permiteAlterarPreco === true,
+          incideTaxa: produto.incideTaxa === true,
+          // Mesma semântica que `setAtivo(produto.ativo !== false)` — unknown precisa virar boolean explícito
+          ativo: produto.ativo !== false,
           grupoComplementosIds: [...gruposIds].map(id => String(id)).sort(),
           impressorasIds: [...impressorasIdsArr].map(id => String(id)).sort(),
           // Antes do passo 3: igual ao estado inicial do formulário (alinhado a `getFormSnapshot` pós-load)
@@ -899,23 +932,24 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
         setIsLoadingProduto(!hasFormSeedRef.current)
         try {
-          const response = await fetchGestorApi(`/api/produtos/${currentEffectiveProdutoId}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          })
+          const response = await fetchGestorApi(
+            `/api/produtos/${currentEffectiveProdutoId}?include=fiscal`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            }
+          )
 
           if (response.ok) {
-            const produto = await response.json()
+            const produto = unwrapProdutoApiPayloadAsRecord(await response.json())
 
             // Preenche os campos com os dados do produto
-            setPrecoVenda(produto.valor ? formatCurrency(produto.valor) : '')
-            setUnidadeProduto(produto.unidadeMedida || null)
+            setPrecoVenda(produto.valor ? formatCurrency(produto.valor as number | string) : '')
+            setUnidadeProduto((produto.unidadeMedida as string) || 'UN')
             {
-              const grupoFromApi = extrairGrupoProdutoIdDoJsonProduto(
-                produto as Record<string, unknown>
-              )
+              const grupoFromApi = extrairGrupoProdutoIdDoJsonProduto(produto)
               // Não apaga categoria já seedada (lista/menu) se o GET vier sem grupoId.
               if (grupoFromApi) {
                 setGrupoProduto(grupoFromApi)
@@ -939,20 +973,23 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
                 ? String(eanRaw).replace(/\D/g, '').slice(0, 14)
                 : ''
             )
-            setFavorito(produto.favorito || false)
-            setPermiteDesconto(produto.permiteDesconto || false)
-            setPermiteAcrescimo(produto.permiteAcrescimo || false)
-            setAbreComplementos(produto.abreComplementos || false)
-            setPermiteAlterarPreco(produto.permiteAlterarPreco ?? false)
-            setIncideTaxa(produto.incideTaxa ?? false)
-            setAtivo(produto.ativo ?? true)
-            const gruposIds = produto.gruposComplementos?.map((g: any) => g.id) || []
+            setFavorito(produto.favorito === true)
+            setPermiteDesconto(produto.permiteDesconto === true)
+            setPermiteAcrescimo(produto.permiteAcrescimo === true)
+            setAbreComplementos(produto.abreComplementos === true)
+            setPermiteAlterarPreco(produto.permiteAlterarPreco === true)
+            setIncideTaxa(produto.incideTaxa === true)
+            setAtivo(produto.ativo !== false)
+            const gruposIds = idsDeRelacaoProduto(produto.gruposComplementos)
             setGrupoComplementosIds(gruposIds)
             setOriginalGrupoComplementosIds(gruposIds) // Guardar os grupos originais
-            setImpressorasIds(produto.impressoras?.map((i: any) => i.id) || [])
+            setImpressorasIds(idsDeRelacaoProduto(produto.impressoras))
 
             const menuIdsLoaded = extrairMenuIdsDoProdutoJson(produto)
             setMenusVinculadosIds(menuIdsLoaded)
+            if (currentEffectiveIsCopyMode) {
+              onMenusVinculadosLoaded?.(menuIdsLoaded)
+            }
             if (imagemNoCardapio) {
               const imagemLegado = extrairImagemUrlDoProdutoJson(produto)
               if (imagemLegado) setServerPreviewImage(imagemLegado)
@@ -971,18 +1008,25 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
             // IMPORTANTE: Não preencher campos fiscais imediatamente para evitar chamadas ao microserviço fiscal
             // Os dados fiscais serão carregados apenas quando o usuário chegar no passo 3 (ConfiguracaoFiscalStep)
             // Armazenar dados fiscais em uma ref para uso posterior
-            const dadosFiscais = produto.fiscal || {}
+            const dadosFiscais = asRecordUnknown(produto.fiscal)
+            const fiscalNcmCest = ncmCestDoBlocoFiscal(produto)
+            const fiscalStatusRaw = produto.fiscalStatus
             fiscalDataFromProductRef.current = {
-              ncm: dadosFiscais.ncm || produto.ncm || '',
-              cest: dadosFiscais.cest || '',
-              origemMercadoria:
-                dadosFiscais.origemMercadoria?.toString() ||
-                produto.origemMercadoria?.toString() ||
-                '',
-              tipoProduto: dadosFiscais.tipoProduto || produto.tipoProduto || '',
-              indicadorProducaoEscala:
-                dadosFiscais.indicadorProducaoEscala || produto.indicadorProducaoEscala || null,
-              fiscalStatus: produto.fiscalStatus || undefined,
+              ncm: asStringField(fiscalNcmCest.ncm),
+              cest: asStringField(fiscalNcmCest.cest),
+              origemMercadoria: asStringField(
+                dadosFiscais.origemMercadoria ?? produto.origemMercadoria
+              ),
+              tipoProduto: asStringField(dadosFiscais.tipoProduto || produto.tipoProduto),
+              indicadorProducaoEscala: (() => {
+                const raw = dadosFiscais.indicadorProducaoEscala ?? produto.indicadorProducaoEscala
+                if (raw == null || raw === '') return null
+                return asStringField(raw)
+              })(),
+              fiscalStatus:
+                fiscalStatusRaw === 'available' || fiscalStatusRaw === 'unavailable'
+                  ? fiscalStatusRaw
+                  : undefined,
             }
             // Resetar flag de carregamento fiscal quando produto muda
             hasLoadedFiscalDataRef.current = false
@@ -998,12 +1042,12 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               null
 
             if (currentEffectiveIsCopyMode) {
-              const nomeOriginal = produto.nome || ''
+              const nomeOriginal = asStringField(produto.nome)
               setNomeProduto(nomeOriginal ? `${nomeOriginal} - Cópia` : 'Cópia ')
-              setDescricaoProduto(produto.descricao || '')
+              setDescricaoProduto(asStringField(produto.descricao))
             } else {
-              setNomeProduto(produto.nome || '')
-              setDescricaoProduto(produto.descricao || '')
+              setNomeProduto(asStringField(produto.nome))
+              setDescricaoProduto(asStringField(produto.descricao))
             }
 
             // Após o React aplicar o estado vindo da API (debounce curto evita baseline antes do flush)
@@ -1061,7 +1105,9 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
         const loadFiscalData = async () => {
           try {
-            const response = await fetchGestorApi(`/api/produtos/${effectiveProdutoId}`, {
+            const response = await fetchGestorApi(
+              `/api/produtos/${effectiveProdutoId}?include=fiscal`,
+              {
               headers: {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
@@ -1071,8 +1117,9 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
             if (response.ok) {
               const produto = await response.json()
               const dadosFiscais = produto.fiscal || {}
-              setNcm(dadosFiscais.ncm || produto.ncm || '')
-              setCest(dadosFiscais.cest || '')
+              const fiscalNcmCest = ncmCestDoBlocoFiscal(produto)
+              setNcm(fiscalNcmCest.ncm)
+              setCest(fiscalNcmCest.cest)
               setOrigemMercadoria(
                 dadosFiscais.origemMercadoria?.toString() ||
                   produto.origemMercadoria?.toString() ||
@@ -1421,7 +1468,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       if (!token) return
 
       setIsLoadingProduto(true)
-      fetchGestorApi(`/api/produtos/${currentEffectiveProdutoId}`, {
+      fetchGestorApi(`/api/produtos/${currentEffectiveProdutoId}?include=fiscal`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -1431,8 +1478,9 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           if (response.ok) {
             const produto = await response.json()
             const dadosFiscais = produto.fiscal || {}
-            setNcm(dadosFiscais.ncm || produto.ncm || '')
-            setCest(dadosFiscais.cest || '')
+            const fiscalNcmCest = ncmCestDoBlocoFiscal(produto)
+            setNcm(fiscalNcmCest.ncm)
+            setCest(fiscalNcmCest.cest)
             setOrigemMercadoria(
               dadosFiscais.origemMercadoria?.toString() ||
                 produto.origemMercadoria?.toString() ||
@@ -1624,8 +1672,15 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
         const isEditMode = Boolean(idPersistidoParaSave)
         if (!isEditMode) {
-          const principalId = await buscarIdMenuPrincipal(token)
-          menuIdsFinal = garantirMenuPrincipalNosIds(menuIdsFinal, principalId)
+          const [principalId, menusEmpresa] = await Promise.all([
+            buscarIdMenuPrincipal(token),
+            buscarMenusDaEmpresa({ token }),
+          ])
+          menuIdsFinal = menuIdsProntosParaCriacaoProduto({
+            candidatos: menuIdsFinal,
+            menusEmpresa,
+            principalId,
+          })
         }
 
         const body: Record<string, unknown> = {

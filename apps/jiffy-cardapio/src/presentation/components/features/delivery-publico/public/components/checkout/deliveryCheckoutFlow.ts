@@ -67,15 +67,17 @@ export function resolverAvancarAposIdentificacao(params: {
   tipoEntrega: 'entrega' | 'retirada'
   enderecoSelecionado: EnderecoFlowSnapshot | null
   voltarParaRevisao: boolean
+  /** Sem pagamento não pode pular para revisão (troca entrega/retirada zera o lançamento). */
+  temPagamento?: boolean
 }): AvancarAposIdentificacaoResult {
-  const { tipoEntrega, enderecoSelecionado, voltarParaRevisao } = params
+  const { tipoEntrega, enderecoSelecionado, voltarParaRevisao, temPagamento = true } = params
   if (entregaExigeEndereco(tipoEntrega, enderecoSelecionado)) {
     return { action: 'abrir_fluxo_endereco' }
   }
   if (entregaExigeGeo(tipoEntrega, enderecoSelecionado)) {
     return { action: 'go', step: 'enderecoGeo' }
   }
-  if (voltarParaRevisao) {
+  if (voltarParaRevisao && temPagamento) {
     return { action: 'go', step: 'revisao' }
   }
   return { action: 'pagamento_com_cotacao' }
@@ -138,9 +140,16 @@ export function resolverProximoAposEndereco(params: {
   voltarParaRevisao: boolean
   voltarParaIdentificacao: boolean
   cotacaoValidaParaPagamento: boolean
+  temPagamento?: boolean
 }): ProximoAposEnderecoResult {
-  if (params.voltarParaRevisao) return { action: 'go', step: 'revisao' }
+  const temPagamento = params.temPagamento ?? true
+  if (params.voltarParaRevisao && temPagamento) return { action: 'go', step: 'revisao' }
   if (params.voltarParaIdentificacao) return { action: 'go', step: 'telefone' }
+  if (params.voltarParaRevisao && !temPagamento) {
+    return params.cotacaoValidaParaPagamento
+      ? { action: 'go', step: 'pagamento' }
+      : { action: 'cotar_e_pagamento' }
+  }
   if (params.cotacaoValidaParaPagamento) return { action: 'go', step: 'pagamento' }
   return { action: 'cotar_e_pagamento' }
 }
@@ -157,6 +166,7 @@ export function resolverCancelarEnderecoForm(params: {
   voltarParaIdentificacao: boolean
   voltarParaRevisao: boolean
   quantidadeEnderecos: number
+  temPagamento?: boolean
 }): CancelarEnderecoFormResult {
   const {
     origemFormEndereco,
@@ -165,6 +175,7 @@ export function resolverCancelarEnderecoForm(params: {
     voltarParaRevisao,
     quantidadeEnderecos,
   } = params
+  const temPagamento = params.temPagamento ?? true
 
   if (origemFormEndereco === 'geo' && restauradoOuSelecionado) {
     return { step: 'enderecoGeo', limparOrigem: true }
@@ -175,7 +186,7 @@ export function resolverCancelarEnderecoForm(params: {
   }
 
   if (voltarParaRevisao) {
-    return { step: 'revisao', limparOrigem: true }
+    return { step: temPagamento ? 'revisao' : 'pagamento', limparOrigem: true }
   }
 
   if (quantidadeEnderecos > 0) {
@@ -187,15 +198,17 @@ export function resolverCancelarEnderecoForm(params: {
 
 export type FecharOuRevisaoResult =
   | { action: 'fechar_checkout' }
-  | { action: 'go'; step: 'revisao' | 'telefone' }
+  | { action: 'go'; step: 'revisao' | 'telefone' | 'pagamento' }
   | { action: 'fechar_checkout_apos_restore' }
 
 export function resolverFecharOuRevisao(params: {
   checkoutStep: DeliveryCheckoutStep
   voltarParaRevisao: boolean
   voltarParaIdentificacao: boolean
+  temPagamento?: boolean
 }): FecharOuRevisaoResult {
   const { checkoutStep, voltarParaRevisao, voltarParaIdentificacao } = params
+  const temPagamento = params.temPagamento ?? true
   const saindoDeFluxoEndereco =
     checkoutStep === 'enderecoForm' ||
     checkoutStep === 'enderecos' ||
@@ -203,6 +216,7 @@ export function resolverFecharOuRevisao(params: {
 
   if (voltarParaRevisao) {
     if (checkoutStep === 'revisao') return { action: 'fechar_checkout' }
+    if (!temPagamento) return { action: 'go', step: 'pagamento' }
     return { action: 'go', step: 'revisao' }
   }
 

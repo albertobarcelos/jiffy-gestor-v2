@@ -12,6 +12,8 @@ import { BuscarClienteParaEntregaUseCase } from '@/src/application/use-cases/cli
 import { AtualizarPagamentoEntregaGestorUseCase } from '@/src/application/use-cases/vendas/AtualizarPagamentoEntregaGestorUseCase'
 import { CarregarPedidoKanbanQuickViewUseCase } from '@/src/application/use-cases/vendas/CarregarPedidoKanbanQuickViewUseCase'
 import { CarregarVendaDetalheUseCase } from '@/src/application/use-cases/vendas/CarregarVendaDetalheUseCase'
+import { ResolverEstacaoIdParaCriarVendaGestorUseCase } from '@/src/application/use-cases/vendas/ResolverEstacaoIdParaCriarVendaGestorUseCase'
+import { estacaoParaCriarVendaPort } from '@/src/infrastructure/api/EstacaoParaCriarVendaAdapter'
 import {
   BuscarProdutoCatalogoPorIdUseCase,
   HidratarGruposComplementosCatalogoUseCase,
@@ -78,3 +80,5 @@ export const carregarVendaDetalheUseCase = new CarregarVendaDetalheUseCase(
 export const carregarPedidoKanbanQuickViewUseCase = new CarregarPedidoKanbanQuickViewUseCase(
   vendaDetalheReadRepository
 )
+export const resolverEstacaoIdParaCriarVendaGestorUseCase =
+  new ResolverEstacaoIdParaCriarVendaGestorUseCase(estacaoParaCriarVendaPort)

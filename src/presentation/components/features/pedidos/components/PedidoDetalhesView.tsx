@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Label } from '@/src/presentation/components/ui/label'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
@@ -34,6 +35,16 @@ import { useNovoPedidoDetalheContext } from '../context/NovoPedidoDetalheContext
 import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
 import { useNovoPedidoUIContext } from '../context/NovoPedidoUIContext'
 import { deveUsarVisaoUnicaDetalhePedido } from '../utils/detalheVisaoUnica'
+import {
+  COLUNA_CEST_DETALHE_CLASS,
+  COLUNA_NCM_DETALHE_CLASS,
+  PedidoDetalheColunaFiscal,
+  rotulosNcmCestFiscal,
+} from './PedidoNcmCestFiscalTexto'
+import {
+  ncmCestFiscalDoMapa,
+  useNcmCestFiscalPorProdutoIds,
+} from '@/src/presentation/hooks/pedidos/useNcmCestFiscalPorProdutoIds'
 
 function BannerAjustePagamentoAposEdicao({
   direcao,
@@ -153,6 +164,13 @@ export function PedidoDetalhesView() {
     valorAPagarLancamento,
     valorRecebido,
   } = useNovoPedidoFormContext()
+
+  const produtoIdsDetalhe = useMemo(
+    () => produtos.map(produto => String(produto.produtoId ?? '')),
+    [produtos]
+  )
+  const { data: ncmCestFiscalPorProdutoId, isPending: ncmCestFiscalCarregando } =
+    useNcmCestFiscalPorProdutoIds(produtoIdsDetalhe)
 
   const divergenciaPagamentoAposEdicao = ajustandoPagamentoAposEdicaoItens
     ? divergenciaPagamentoVsTotalPedido(totalProdutos, totalPagamentosLancados)
@@ -326,9 +344,19 @@ export function PedidoDetalhesView() {
                                     Qtd
                                   </span>
                                 </div>
-                                <div className="min-w-0 flex-[4]">
+                                <div className="min-w-0 flex-[3]">
                                   <span className="text-xs font-semibold text-gray-700">
                                     Produto
+                                  </span>
+                                </div>
+                                <div className={COLUNA_NCM_DETALHE_CLASS}>
+                                  <span className="block text-center text-xs font-semibold text-gray-700">
+                                    NCM
+                                  </span>
+                                </div>
+                                <div className={COLUNA_CEST_DETALHE_CLASS}>
+                                  <span className="block text-center text-xs font-semibold text-gray-700">
+                                    CEST
                                   </span>
                                 </div>
                                 <div className="w-11 shrink-0">
@@ -365,6 +393,13 @@ export function PedidoDetalhesView() {
                                     produto.valorFinal !== null && produto.valorFinal !== undefined
                                       ? produto.valorFinal
                                       : calcularTotalProduto(produto)
+                                  const fiscal = rotulosNcmCestFiscal(
+                                    ncmCestFiscalDoMapa(
+                                      ncmCestFiscalPorProdutoId,
+                                      String(produto.produtoId ?? '')
+                                    ),
+                                    ncmCestFiscalCarregando
+                                  )
 
                                   return (
                                     <div key={index} className="space-y-0">
@@ -388,7 +423,7 @@ export function PedidoDetalhesView() {
                                           </span>
                                         </div>
                                         {/* Nome do Produto */}
-                                        <div className="min-w-0 flex-[4]">
+                                        <div className="min-w-0 flex-[3]">
                                           <span className="block truncate text-xs text-gray-900">
                                             {produto.nome}
                                           </span>
@@ -397,6 +432,20 @@ export function PedidoDetalhesView() {
                                               Obs: {produto.observacao.trim()}
                                             </span>
                                           ) : null}
+                                        </div>
+                                        <div className={COLUNA_NCM_DETALHE_CLASS}>
+                                          <PedidoDetalheColunaFiscal
+                                            texto={fiscal.ncm}
+                                            vazio={fiscal.ncmVazio}
+                                            indisponivel={fiscal.indisponivel}
+                                          />
+                                        </div>
+                                        <div className={COLUNA_CEST_DETALHE_CLASS}>
+                                          <PedidoDetalheColunaFiscal
+                                            texto={fiscal.cest}
+                                            vazio={fiscal.cestVazio}
+                                            indisponivel={fiscal.indisponivel}
+                                          />
                                         </div>
                                         {/* Unidade de medida */}
                                         <div className="w-11 shrink-0">
@@ -443,11 +492,13 @@ export function PedidoDetalhesView() {
                                               </span>
                                             </div>
                                             {/* Nome do Complemento com indentação */}
-                                            <div className="min-w-0 flex-[4] pl-4">
+                                            <div className="min-w-0 flex-[3] pl-4">
                                               <span className="block truncate text-xs leading-tight text-gray-600">
                                                 {complemento.nome}
                                               </span>
                                             </div>
+                                            <div className={COLUNA_NCM_DETALHE_CLASS} aria-hidden />
+                                            <div className={COLUNA_CEST_DETALHE_CLASS} aria-hidden />
                                             <div className="w-11 shrink-0" aria-hidden />
                                             {/* Espaço vazio para Desconto/Acréscimo (complementos não têm) */}
                                             <div className="flex-1"></div>

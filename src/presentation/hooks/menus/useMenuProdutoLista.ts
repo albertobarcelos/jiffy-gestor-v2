@@ -107,6 +107,7 @@ export function useMenuProdutoLista({
     try {
       await updateProduto.mutateAsync({ produtoId, input: { ativo } })
       setStatusConfirm(null)
+      setStatusConfirmSaving(false)
       showToast.success(
         ativo ? 'Produto disponível neste cardápio' : 'Produto pausado neste cardápio'
       )
@@ -131,7 +132,6 @@ export function useMenuProdutoLista({
       }
     } catch (err) {
       showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar status')
-    } finally {
       setStatusConfirmSaving(false)
     }
   }, [
