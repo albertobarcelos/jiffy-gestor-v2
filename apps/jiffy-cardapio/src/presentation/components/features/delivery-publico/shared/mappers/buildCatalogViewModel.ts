@@ -9,8 +9,6 @@ import {
   DELIVERY_PUBLICO_GRUPO_SUGESTOES_ICON,
   DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID,
   DELIVERY_PUBLICO_GRUPO_SUGESTOES_NOME,
-  findGrupoSugestoesDaCasaCarrier,
-  omitGrupoSugestoesDaCasaCarrier,
 } from '../constants/deliveryPublicoSugestoes'
 import type {
   DeliveryPublicoGrupoViewModel,
@@ -39,9 +37,9 @@ function mapGrupoToViewModel(
   }
 }
 
+/** Carrossel sintético com favoritos do menu; null se não houver nenhum. */
 function buildGrupoSugestoes(
-  grupos: CatalogoPublicoGrupoProdutoDTO[],
-  imagemUrl: string | null
+  grupos: CatalogoPublicoGrupoProdutoDTO[]
 ): DeliveryPublicoGrupoViewModel | null {
   const favoritos = listarProdutosFavoritos(grupos)
   if (favoritos.length === 0) return null
@@ -51,7 +49,7 @@ function buildGrupoSugestoes(
     nome: DELIVERY_PUBLICO_GRUPO_SUGESTOES_NOME,
     iconName: DELIVERY_PUBLICO_GRUPO_SUGESTOES_ICON,
     cor: null,
-    imagemUrl,
+    imagemUrl: null,
     produtos: favoritos.map(produto => ({
       id: produto.id,
       nome: produto.nome,
@@ -66,20 +64,15 @@ function buildGrupoSugestoes(
 
 /**
  * Monta o view-model do cardápio público.
- * Sugestões só entra se existir o grupo real "Sugestões da Casa" e houver favoritos.
- * O grupo real não aparece como seção normal — só como fonte da imagem.
+ * Sugestões = carrossel dos favoritos do menu; omitido quando não há favoritos.
  */
 export function buildCatalogViewModel(
   grupos: CatalogoPublicoGrupoProdutoDTO[],
   overrides: Partial<DeliveryPublicoViewModel> = {},
   funcionamento?: FuncionamentoPublicoDTO | null
 ): DeliveryPublicoViewModel {
-  const carrier = findGrupoSugestoesDaCasaCarrier(grupos)
-  const gruposVisiveis = omitGrupoSugestoesDaCasaCarrier(grupos)
-  const gruposMapeados = gruposVisiveis.map(mapGrupoToViewModel)
-  const sugestoes = carrier
-    ? buildGrupoSugestoes(grupos, carrier.imagemUrl?.trim() || null)
-    : null
+  const gruposMapeados = grupos.map(mapGrupoToViewModel)
+  const sugestoes = buildGrupoSugestoes(grupos)
 
   const status = funcionamento
     ? formatarStatusLojaPublica(funcionamento)

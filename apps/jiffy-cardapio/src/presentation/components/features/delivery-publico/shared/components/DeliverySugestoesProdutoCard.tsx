@@ -28,11 +28,19 @@ export function DeliverySugestoesProdutoCard({
   onAddRapido,
   onAbrirCarrinho,
 }: DeliverySugestoesProdutoCardProps) {
-  const podeAddRapido = interactive && !produto.temComplementos && Boolean(onAddRapido)
   const handleOpen = () => onClick?.(produto.id)
+  const mostrarBotaoAdd =
+    interactive && (produto.temComplementos ? Boolean(onClick) : Boolean(onAddRapido))
+  const handleAddClick = () => {
+    if (produto.temComplementos) {
+      onClick?.(produto.id)
+      return
+    }
+    onAddRapido?.(produto.id)
+  }
 
   return (
-    <article className="w-[7.25rem] shrink-0 snap-start @sm:w-32 @lg:w-[8.5rem]">
+    <article className="w-[9.25rem] shrink-0 snap-start @sm:w-[10.125rem] @lg:w-[10.75rem]">
       <div
         className="relative aspect-square w-full overflow-hidden rounded-lg border"
         style={{ backgroundColor: '#ffffff', borderColor: '#e5e7eb' }}
@@ -72,28 +80,32 @@ export function DeliverySugestoesProdutoCard({
               onAbrirCarrinho?.()
             }}
             aria-label={`${quantidadeNoCarrinho} no carrinho — editar ${produto.nome}`}
-            className="absolute bottom-1.5 left-1.5 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white shadow-sm"
+            className="absolute bottom-1.5 left-1.5 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold leading-none text-white shadow-sm @lg:h-6 @lg:min-w-6 @lg:text-xs"
           >
             {quantidadeNoCarrinho > 99 ? '99+' : quantidadeNoCarrinho}
           </button>
         ) : null}
 
-        {podeAddRapido ? (
+        {mostrarBotaoAdd ? (
           <button
             type="button"
             onClick={e => {
               e.stopPropagation()
-              onAddRapido?.(produto.id)
+              handleAddClick()
             }}
-            aria-label={`Adicionar ${produto.nome} ao carrinho`}
-            className="absolute bottom-1.5 right-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border shadow-sm transition-transform active:scale-95"
+            aria-label={
+              produto.temComplementos
+                ? `Escolher opções de ${produto.nome}`
+                : `Adicionar ${produto.nome} ao carrinho`
+            }
+            className="absolute bottom-1.5 right-1.5 z-10 flex h-8 w-8 items-center justify-center rounded-full border shadow-sm transition-transform active:scale-95"
             style={{
               backgroundColor: 'rgba(255, 255, 255, 0.92)',
               borderColor: '#4b5563',
             }}
           >
             <Plus
-              className="h-4 w-4"
+              className="h-5 w-5"
               strokeWidth={2.5}
               style={{ color: 'var(--delivery-primary)' }}
               aria-hidden

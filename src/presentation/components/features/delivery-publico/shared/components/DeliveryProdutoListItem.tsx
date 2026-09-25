@@ -10,7 +10,7 @@ type DeliveryProdutoListItemProps = {
   /** Unidades deste produto já no carrinho (soma de linhas). */
   quantidadeNoCarrinho?: number
   onClick?: (produtoId: string) => void
-  /** Atalho: adiciona direto ao carrinho (só produtos sem complemento). */
+  /** Atalho +: sem complemento adiciona ao carrinho; com complemento abre o detalhe. */
   onAddRapido?: (produtoId: string) => void
   /** Clique na bolinha de quantidade → abre o carrinho. */
   onAbrirCarrinho?: () => void
@@ -28,12 +28,14 @@ function ProdutoThumb({
   interactive,
   onOpenClick,
   onAddClick,
+  addAriaLabel,
 }: {
   imagemUrl: string | null
   produtoNome: string
   interactive: boolean
   onOpenClick?: () => void
   onAddClick?: () => void
+  addAriaLabel?: string
 }) {
   const media = imagemUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
@@ -50,7 +52,7 @@ function ProdutoThumb({
 
   return (
     <div
-      className="relative w-28 min-h-28 shrink-0 self-stretch border-l @lg:w-36 @lg:min-h-36 @xl:w-40 @xl:min-h-40"
+      className="relative w-24 min-h-24 shrink-0 self-stretch border-l @lg:w-36 @lg:min-h-36 @xl:w-40 @xl:min-h-40"
       style={{ backgroundColor: '#ffffff', borderColor: '#e5e7eb' }}
     >
       {interactive && onOpenClick ? (
@@ -73,7 +75,7 @@ function ProdutoThumb({
             e.stopPropagation()
             onAddClick()
           }}
-          aria-label={`Adicionar ${produtoNome} ao carrinho`}
+          aria-label={addAriaLabel ?? `Adicionar ${produtoNome} ao carrinho`}
           className="absolute bottom-2 right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full shadow-sm transition-transform active:scale-95 @lg:h-9 @lg:w-9"
           style={{ backgroundColor: 'rgba(255, 255, 255, 0.8)' }}
         >
@@ -145,7 +147,15 @@ export function DeliveryProdutoListItem({
     onClick?.(produto.id)
   }
 
-  const podeAddRapido = interactive && !produto.temComplementos && Boolean(onAddRapido)
+  const mostrarBotaoAdd =
+    interactive && (produto.temComplementos ? Boolean(onClick) : Boolean(onAddRapido))
+  const handleAddClick = () => {
+    if (produto.temComplementos) {
+      handleOpenProduto()
+      return
+    }
+    onAddRapido?.(produto.id)
+  }
 
   if (interactive && onClick) {
     return (
@@ -159,7 +169,7 @@ export function DeliveryProdutoListItem({
           className={`${textClassName} text-left${quantidadeNoCarrinho > 0 ? ' pb-9 @lg:pb-10' : ''}`}
         >
           <p
-            className="text-base font-medium leading-snug @lg:text-lg"
+            className="text-sm font-medium leading-snug @lg:text-lg"
             style={{
               color: 'var(--delivery-text)',
               fontFamily: 'var(--delivery-font-title)',
@@ -192,7 +202,12 @@ export function DeliveryProdutoListItem({
           produtoNome={produto.nome}
           interactive
           onOpenClick={handleOpenProduto}
-          onAddClick={podeAddRapido ? () => onAddRapido?.(produto.id) : undefined}
+          onAddClick={mostrarBotaoAdd ? handleAddClick : undefined}
+          addAriaLabel={
+            produto.temComplementos
+              ? `Escolher opções de ${produto.nome}`
+              : `Adicionar ${produto.nome} ao carrinho`
+          }
         />
       </div>
     )
@@ -202,7 +217,7 @@ export function DeliveryProdutoListItem({
     <div className={`relative ${cardClassName}`} style={cardStyle}>
       <div className={textClassName}>
         <p
-          className="text-base font-semibold leading-snug @lg:text-lg"
+          className="text-sm font-semibold leading-snug @lg:text-lg"
           style={{
             color: 'var(--delivery-text)',
             fontFamily: 'var(--delivery-font-title)',

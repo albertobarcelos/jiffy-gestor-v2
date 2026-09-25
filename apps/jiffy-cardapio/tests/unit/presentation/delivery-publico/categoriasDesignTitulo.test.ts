@@ -28,7 +28,6 @@ describe('mergeCategoriasDesignConfig', () => {
       corBarraTitulo: '#112233',
       corTextoTitulo: null,
       mostrarNomeTitulo: true,
-      mostrarSugestoesDaCasa: true,
       sugestoesDaCasaImagemUrl: null,
     })
   })
