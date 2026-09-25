@@ -5,12 +5,14 @@ import { DeliverySecaoSugestoes } from '../../../../shared/components/DeliverySe
 import { DeliveryVitrineProdutoCard } from './DeliveryVitrineProdutoCard'
 import type { DeliveryPublicoDesignConfig } from '../../../../shared/types/deliveryPublicoDesignConfig'
 import type { DeliveryPublicoGrupoViewModel } from '../../../../shared/types/deliveryPublicoViewModel'
+import { devePriorizarImagemProduto } from '../../../../shared/media/deliveryPublicoImageHosts'
 
 type DeliveryVitrineSecaoGrupoProps = {
   config: DeliveryPublicoDesignConfig
   grupo: DeliveryPublicoGrupoViewModel
   interactive?: boolean
   denseTop?: boolean
+  primeirasImagensPriority?: boolean
   onProdutoClick?: (produtoId: string) => void
 }
 
@@ -19,6 +21,7 @@ export function DeliveryVitrineSecaoGrupo({
   grupo,
   interactive = false,
   denseTop = false,
+  primeirasImagensPriority = false,
   onProdutoClick,
 }: DeliveryVitrineSecaoGrupoProps) {
   if (grupo.produtos.length === 0) return null
@@ -29,6 +32,7 @@ export function DeliveryVitrineSecaoGrupo({
         config={config}
         grupo={grupo}
         interactive={interactive}
+        primeirasImagensPriority={primeirasImagensPriority}
         onProdutoClick={onProdutoClick}
       />
     )
@@ -46,11 +50,12 @@ export function DeliveryVitrineSecaoGrupo({
         {grupo.nome}
       </h2>
       <div className="flex flex-col gap-4">
-        {grupo.produtos.map(produto => (
+        {grupo.produtos.map((produto, index) => (
           <DeliveryVitrineProdutoCard
             key={produto.id}
             produto={produto}
             interactive={interactive}
+            priority={devePriorizarImagemProduto(primeirasImagensPriority, index)}
             onClick={onProdutoClick}
           />
         ))}

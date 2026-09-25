@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 import type { Viewport } from 'next'
+import { Analytics } from '@vercel/analytics/next'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import './globals.css'
 import '@/src/presentation/components/features/delivery-publico/shared/theme/delivery-publico-theme.css'
 import { DeliveryPublicoShell } from '@/src/presentation/components/features/delivery-publico/public/components/DeliveryPublicoShell'
@@ -28,6 +30,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <QueryProvider>
           <DeliveryPublicoShell>{children}</DeliveryPublicoShell>
         </QueryProvider>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )

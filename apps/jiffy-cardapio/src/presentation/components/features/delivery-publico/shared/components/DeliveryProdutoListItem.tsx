@@ -3,6 +3,8 @@
 import { Camera, Plus } from 'lucide-react'
 import { formatDeliveryCurrency } from '../utils/formatDeliveryCurrency'
 import type { DeliveryPublicoProdutoViewModel } from '../types/deliveryPublicoViewModel'
+import { DeliveryPublicoMidiaImagem } from '../media/DeliveryPublicoMidiaImagem'
+import { DELIVERY_IMAGEM_SIZES } from '../media/deliveryPublicoImageHosts'
 
 type DeliveryProdutoListItemProps = {
   produto: DeliveryPublicoProdutoViewModel
@@ -14,6 +16,7 @@ type DeliveryProdutoListItemProps = {
   onAddRapido?: (produtoId: string) => void
   /** Clique na bolinha de quantidade → abre o carrinho. */
   onAbrirCarrinho?: () => void
+  priority?: boolean
 }
 
 const cardClassName =
@@ -29,6 +32,7 @@ function ProdutoThumb({
   interactive,
   onOpenClick,
   onAddClick,
+  priority,
 }: {
   imagemUrl: string | null
   produtoId: string
@@ -36,16 +40,15 @@ function ProdutoThumb({
   interactive: boolean
   onOpenClick?: () => void
   onAddClick?: () => void
+  priority?: boolean
 }) {
   const media = imagemUrl ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
+    <DeliveryPublicoMidiaImagem
       src={imagemUrl}
-      alt=""
-      loading="lazy"
-      decoding="async"
-      data-delivery-produto-img={produtoId}
-      className="absolute inset-0 h-full w-full object-cover"
+      sizes={DELIVERY_IMAGEM_SIZES.listThumb}
+      priority={priority}
+      produtoId={produtoId}
+      className="object-cover"
     />
   ) : (
     <div className="absolute inset-0 flex items-center justify-center">
@@ -147,6 +150,7 @@ export function DeliveryProdutoListItem({
   onClick,
   onAddRapido,
   onAbrirCarrinho,
+  priority = false,
 }: DeliveryProdutoListItemProps) {
   const cardStyle = {
     backgroundColor: 'var(--delivery-surface)',
@@ -204,6 +208,7 @@ export function DeliveryProdutoListItem({
           produtoId={produto.id}
           produtoNome={produto.nome}
           interactive
+          priority={priority}
           onOpenClick={handleOpenProduto}
           onAddClick={podeAddRapido ? () => onAddRapido?.(produto.id) : undefined}
         />
@@ -244,6 +249,7 @@ export function DeliveryProdutoListItem({
         produtoId={produto.id}
         produtoNome={produto.nome}
         interactive={false}
+        priority={priority}
       />
     </div>
   )

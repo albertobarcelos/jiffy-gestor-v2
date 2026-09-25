@@ -3,11 +3,14 @@
 import { Camera, Plus } from 'lucide-react'
 import { formatDeliveryCurrency } from '../utils/formatDeliveryCurrency'
 import type { DeliveryPublicoProdutoViewModel } from '../types/deliveryPublicoViewModel'
+import { DeliveryPublicoMidiaImagem } from '../media/DeliveryPublicoMidiaImagem'
+import { DELIVERY_IMAGEM_SIZES } from '../media/deliveryPublicoImageHosts'
 
 type DeliverySugestoesProdutoCardProps = {
   produto: DeliveryPublicoProdutoViewModel
   interactive?: boolean
   quantidadeNoCarrinho?: number
+  priority?: boolean
   onClick?: (produtoId: string) => void
   onAddRapido?: (produtoId: string) => void
   onAbrirCarrinho?: () => void
@@ -20,6 +23,7 @@ export function DeliverySugestoesProdutoCard({
   produto,
   interactive = false,
   quantidadeNoCarrinho = 0,
+  priority = false,
   onClick,
   onAddRapido,
   onAbrirCarrinho,
@@ -34,14 +38,12 @@ export function DeliverySugestoesProdutoCard({
         style={{ backgroundColor: '#ffffff', borderColor: '#e5e7eb' }}
       >
         {produto.imagemUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <DeliveryPublicoMidiaImagem
             src={produto.imagemUrl}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            data-delivery-produto-img={produto.id}
-            className="absolute inset-0 h-full w-full object-cover"
+            sizes={DELIVERY_IMAGEM_SIZES.sugestao}
+            priority={priority}
+            produtoId={produto.id}
+            className="object-cover"
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
