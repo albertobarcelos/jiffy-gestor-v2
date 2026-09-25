@@ -11,6 +11,7 @@ import {
   comporTelefoneApi,
   telefoneNacionalValido,
 } from '@/src/shared/utils/deliveryTelefonePais'
+import { validarPagamentosPedidoPublico } from '@/src/domain/policies/PagamentoObrigatorioPedidoPublico'
 
 export type MontarPedidoPublicoParams = {
   slug: string
@@ -49,6 +50,9 @@ export function validarCpfPedidoPublico(
 ): { ok: true; cpf: string | null } | { ok: false; error: string } {
   return extrairCpfPedido(cpfMascarado, exigeCpfVenda)
 }
+
+/** Reexport da policy de domínio — consumidores application/presentation. */
+export { validarPagamentosPedidoPublico } from '@/src/domain/policies/PagamentoObrigatorioPedidoPublico'
 
 function extrairCpfPedido(
   cpfMascarado: string,
@@ -164,6 +168,9 @@ export function montarPedidoPublico(
   const composicao = montarComposicaoPedidoPublico(params)
   if (!composicao.ok) return composicao
 
+  const pagamentosGate = validarPagamentosPedidoPublico(params.form.pagamentos, params.total)
+  if (!pagamentosGate.ok) return pagamentosGate
+
   const payload: CreatePedidoPublicoInput = {
     slug: params.slug,
     origem: 'JIFFY_DELIVERY',
@@ -171,18 +178,15 @@ export function montarPedidoPublico(
     tipoEntrega: composicao.composicao.tipoEntrega,
     cliente: composicao.composicao.cliente,
     produtos: composicao.composicao.produtos,
+    cobrancas: params.form.pagamentos.map(p => ({
+      meioPagamentoId: p.meioPagamentoId,
+      valor: p.valor,
+      momentoCobranca: 'na_entrega',
+    })),
   }
 
   if (composicao.composicao.cpfDocumento) {
     payload.documentoCpfCnpj = composicao.composicao.cpfDocumento
-  }
-
-  if (params.form.pagamentos.length > 0) {
-    payload.cobrancas = params.form.pagamentos.map(p => ({
-      meioPagamentoId: p.meioPagamentoId,
-      valor: p.valor,
-      momentoCobranca: 'na_entrega',
-    }))
   }
 
   const obsPedido = params.form.observacaoPedido.trim()

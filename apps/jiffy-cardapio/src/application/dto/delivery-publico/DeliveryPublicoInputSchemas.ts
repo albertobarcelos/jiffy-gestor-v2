@@ -94,7 +94,7 @@ export const CreatePedidoPublicoInputSchema = z.object({
     .nullable()
     .optional(),
   produtos: z.array(ProdutoPedidoPublicoInputSchema).min(1),
-  cobrancas: z.array(CobrancaPedidoPublicoInputSchema).optional(),
+  cobrancas: z.array(CobrancaPedidoPublicoInputSchema).min(1),
   observacoes: z.array(z.string()).optional(),
 })
 

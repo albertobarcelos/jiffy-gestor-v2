@@ -11,6 +11,7 @@ import {
   usePublicDeliveryComplementosStore,
 } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import { showToast } from '@/src/shared/utils/toast'
+import { validarPagamentosPedidoPublico } from '@/src/domain/policies/PagamentoObrigatorioPedidoPublico'
 import { clienteAtingiuMaxEnderecosDelivery } from '@/src/shared/constants/deliveryClienteEnderecos'
 import { DeliveryCarrinhoItemCard } from '../../shared/components/DeliveryCarrinhoItemCard'
 import { DeliveryCarrinhoSwipeableItem } from '../../shared/components/DeliveryCarrinhoSwipeableItem'
@@ -346,6 +347,7 @@ export function DeliveryPublicoCarrinhoScreen({
     usarNovoEndereco,
     selecionarEnderecoExistente,
     limparCotacao,
+    temPagamento: form.pagamentos.length > 0,
   })
 
   const {
@@ -468,6 +470,13 @@ export function DeliveryPublicoCarrinhoScreen({
   const handleEnviarPedido = async () => {
     if (!lojaAberta) {
       showToast.error('A loja está fechada no momento. Não é possível finalizar pedidos.')
+      return
+    }
+
+    const pagamentosGate = validarPagamentosPedidoPublico(form.pagamentos, totalCheckout)
+    if (!pagamentosGate.ok) {
+      showToast.error(pagamentosGate.error)
+      abrirStepDaRevisao('pagamento')
       return
     }
 

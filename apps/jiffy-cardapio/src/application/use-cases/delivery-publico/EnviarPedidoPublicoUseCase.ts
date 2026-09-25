@@ -18,6 +18,7 @@ import {
   montarPedidoPublico,
   validarCpfPedidoPublico,
 } from '@/src/application/mappers/MontarPedidoPublicoMapper'
+import { validarPagamentosPedidoPublico } from '@/src/domain/policies/PagamentoObrigatorioPedidoPublico'
 import type {
   IClienteDeliveryPublicoPort,
   IPedidoPublicoPort,
@@ -89,6 +90,11 @@ export class EnviarPedidoPublicoUseCase {
     )
     if (!cpfGate.ok) {
       return cpfGate
+    }
+
+    const pagamentosGate = validarPagamentosPedidoPublico(input.form.pagamentos, input.total)
+    if (!pagamentosGate.ok) {
+      return pagamentosGate
     }
 
     let enderecoIdEntrega: string | null = null

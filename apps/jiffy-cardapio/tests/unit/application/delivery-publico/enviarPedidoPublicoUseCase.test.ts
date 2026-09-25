@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
 import type { ClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { EnviarPedidoPublicoUseCase } from '@/src/application/use-cases/delivery-publico/EnviarPedidoPublicoUseCase'
+import { MSG_PAGAMENTO_OBRIGATORIO_PEDIDO_PUBLICO } from '@/src/domain/policies/PagamentoObrigatorioPedidoPublico'
 import { GarantirClienteDeliveryPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirClienteDeliveryPublicoUseCase'
 import { GarantirEnderecoEntregaPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirEnderecoEntregaPublicoUseCase'
 import {
@@ -267,6 +268,26 @@ describe('EnviarPedidoPublicoUseCase', () => {
     })
     expect(result).toEqual({ ok: false, error: 'Informe um telefone válido' })
     expect(publicDeliveryApi.criarPedidoPublico).not.toHaveBeenCalled()
+  })
+
+  it('bloqueia envio sem pagamento', async () => {
+    const useCase = criarEnviarUseCase()
+    const result = await useCase.execute({
+      slug: 'loja',
+      telefoneApi: '11999999999',
+      nomeEfetivo: 'Cliente',
+      itens: [item],
+      total: 20,
+      form: formBase({ pagamentos: [] }),
+      clienteLookup: null,
+      tokenCotacao,
+    })
+    expect(result).toEqual({
+      ok: false,
+      error: MSG_PAGAMENTO_OBRIGATORIO_PEDIDO_PUBLICO,
+    })
+    expect(publicDeliveryApi.criarPedidoPublico).not.toHaveBeenCalled()
+    expect(publicDeliveryApi.criarClienteDeliveryPublico).not.toHaveBeenCalled()
   })
 
   it('bloqueia envio sem CPF quando exigeCpfVenda é true', async () => {

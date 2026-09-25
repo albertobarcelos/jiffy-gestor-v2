@@ -36,6 +36,7 @@ type UseDeliveryCheckoutFlowParams = {
   usarNovoEndereco: () => void
   selecionarEnderecoExistente: (id: string) => void
   limparCotacao: () => void
+  temPagamento: boolean
 }
 
 export function useDeliveryCheckoutFlow({
@@ -53,6 +54,7 @@ export function useDeliveryCheckoutFlow({
   usarNovoEndereco,
   selecionarEnderecoExistente,
   limparCotacao,
+  temPagamento,
 }: UseDeliveryCheckoutFlowParams) {
   const [checkoutStep, setCheckoutStep] = useState<DeliveryCheckoutStep>(null)
   const [checkoutDirection, setCheckoutDirection] = useState<1 | -1>(1)
@@ -150,6 +152,7 @@ export function useDeliveryCheckoutFlow({
       voltarParaRevisao,
       voltarParaIdentificacao,
       cotacaoValidaParaPagamento,
+      temPagamento,
     })
     if (resolved.action === 'go') {
       if (resolved.step === 'telefone') setVoltarParaIdentificacao(false)
@@ -167,6 +170,7 @@ export function useDeliveryCheckoutFlow({
     voltarParaRevisao,
     voltarParaIdentificacao,
     cotacaoValidaParaPagamento,
+    temPagamento,
     goToCheckoutStep,
     recotarPedido,
   ])
@@ -191,6 +195,7 @@ export function useDeliveryCheckoutFlow({
       tipoEntrega,
       enderecoSelecionado,
       voltarParaRevisao,
+      temPagamento,
     })
     if (resolved.action === 'abrir_fluxo_endereco') {
       setVoltarParaIdentificacao(false)
@@ -207,6 +212,7 @@ export function useDeliveryCheckoutFlow({
     tipoEntrega,
     enderecoSelecionado,
     voltarParaRevisao,
+    temPagamento,
     abrirFluxoEndereco,
     goToCheckoutStep,
     irParaPagamentoComCotacao,
@@ -227,6 +233,7 @@ export function useDeliveryCheckoutFlow({
       checkoutStep,
       voltarParaRevisao,
       voltarParaIdentificacao,
+      temPagamento,
     })
 
     if (resolved.action === 'fechar_checkout' || resolved.action === 'fechar_checkout_apos_restore') {
@@ -241,6 +248,7 @@ export function useDeliveryCheckoutFlow({
     checkoutStep,
     voltarParaRevisao,
     voltarParaIdentificacao,
+    temPagamento,
     restaurarEnderecoSelecaoCancelada,
     fecharCheckout,
     goToCheckoutStep,
@@ -348,6 +356,7 @@ export function useDeliveryCheckoutFlow({
       voltarParaIdentificacao,
       voltarParaRevisao,
       quantidadeEnderecos,
+      temPagamento,
     })
     if (resolved.limparOrigem) setOrigemFormEndereco(null)
     if (resolved.limparVoltarIdentificacao) setVoltarParaIdentificacao(false)
@@ -359,6 +368,7 @@ export function useDeliveryCheckoutFlow({
     voltarParaIdentificacao,
     voltarParaRevisao,
     quantidadeEnderecos,
+    temPagamento,
     goToCheckoutStep,
   ])
 

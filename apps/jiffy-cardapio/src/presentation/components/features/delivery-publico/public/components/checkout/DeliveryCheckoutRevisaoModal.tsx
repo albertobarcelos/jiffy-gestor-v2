@@ -17,6 +17,10 @@ import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPrefere
 import { observacaoItemCarrinho } from '../../../shared/utils/deliveryCarrinhoItemUtils'
 import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurrency'
 import { etiquetaEnderecoPublicoLabel } from '../../../shared/utils/etiquetaEnderecoPublicoLabel'
+import { showToast } from '@/src/shared/utils/toast'
+import {
+  validarPagamentosPedidoPublico,
+} from '@/src/domain/policies/PagamentoObrigatorioPedidoPublico'
 import {
   calcularDistanciaAproximadaDaLoja,
   pontoClienteParaDistancia,
@@ -218,6 +222,11 @@ export function DeliveryCheckoutRevisaoModal({
   const observacaoTrim = observacaoPedido.trim()
   const cpfTrim = cpfNotaFiscal.replace(/\D/g, '')
   const cpfObrigatorioIncompleto = exigeCpfVenda && cpfTrim.length !== 11
+  const pagamentosGate = validarPagamentosPedidoPublico(
+    pagamentos.map(p => ({ meioPagamentoId: p.meioPagamentoId, valor: p.valor })),
+    totalExibicao
+  )
+  const pagamentoIncompleto = !pagamentosGate.ok
 
   const handleToggleObservacao = (checked: boolean) => {
     if (somenteLeitura || !onChangeObservacaoPedido) return
@@ -266,7 +275,14 @@ export function DeliveryCheckoutRevisaoModal({
         ) : (
           <DeliveryCheckoutFooterActions
             onVoltar={onVoltar}
-            onContinuar={() => onEnviar?.()}
+            onContinuar={() => {
+              if (!pagamentosGate.ok) {
+                showToast.error(pagamentosGate.error)
+                onEditarPagamento?.()
+                return
+              }
+              onEnviar?.()
+            }}
             continuarDisabled={
               enviando || !cotacaoPronta || cpfObrigatorioIncompleto
             }
@@ -281,7 +297,9 @@ export function DeliveryCheckoutRevisaoModal({
                       ? 'Atualizando valores...'
                       : cpfObrigatorioIncompleto
                         ? 'Informe o CPF'
-                        : 'Enviar pedido'
+                        : pagamentoIncompleto
+                          ? 'Escolha o pagamento'
+                          : 'Enviar pedido'
             }
           />
         )}
