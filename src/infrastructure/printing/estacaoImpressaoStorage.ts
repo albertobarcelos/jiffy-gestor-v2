@@ -4,8 +4,7 @@ const ESTACAO_IMPRESSAO_ID_STORAGE_KEY = 'gestor-estacao-impressao-id'
 export const EVENTO_ABRIR_CONFIG_ESTACAO_IMPRESSAO =
   'jiffy:abrir-configuracoes-estacao-impressao'
 
-export const MSG_ESTACAO_OBRIGATORIA_CRIAR_PEDIDO =
-  'Configure a estação deste computador antes de criar o pedido. Selecione ou cadastre a estação em Configurações → Estação deste PC.'
+export { MSG_ESTACAO_OBRIGATORIA_CRIAR_PEDIDO } from '@/src/domain/policies/pedido/estacaoCriarVendaGestor'
 
 export function getEstacaoImpressaoId(): string | null {
   if (typeof window === 'undefined') return null

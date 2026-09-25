@@ -3,24 +3,24 @@
 import { useCallback, useMemo, useRef } from 'react'
 import type { CriarVendaGestorInputDTO } from '@/src/application/dto/CriarVendaGestorDTO'
 import { extrairIdPedidoDeliveryCriado } from '@/src/application/use-cases/delivery/CriarPedidoDeliveryUseCase'
-import { criarPedidoDeliveryUseCase } from '@/src/infrastructure/composition/pedidoUseCases'
+import {
+  criarPedidoDeliveryUseCase,
+  resolverEstacaoIdParaCriarVendaGestorUseCase,
+} from '@/src/infrastructure/composition/pedidoUseCases'
 import {
   CriarVendaGestorUseCase,
   extrairIdVendaCriada,
   validarCriarVendaGestor,
   validarInformacoesPedido,
 } from '@/src/application/use-cases/vendas/CriarVendaGestorUseCase'
+import { MSG_ESTACAO_OBRIGATORIA_CRIAR_PEDIDO } from '@/src/domain/policies/pedido/estacaoCriarVendaGestor'
 import type { CriarPedidoDeliveryApiRequest } from '@/src/application/dto/api/pedidoDeliveryApi'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
 import { notificarEnderecoForaDaCobertura, useHrefCoberturaEntregaPedido } from '../utils/coberturaEntregaPedidoUi'
 import { validarObservacoesPedido } from '@/src/shared/helpers/observacaoPedido'
 import { salvarRascunhoInformacoesAdicionais } from '@/src/shared/helpers/informacoesAdicionaisNota'
-import { resolverEstacaoIdParaCriarVendaGestor } from '@/src/infrastructure/api/estacoesImpressaoApi'
-import {
-  MSG_ESTACAO_OBRIGATORIA_CRIAR_PEDIDO,
-  solicitarAbrirConfigEstacaoImpressao,
-} from '@/src/infrastructure/printing/estacaoImpressaoStorage'
+import { solicitarAbrirConfigEstacaoImpressao } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
 
 export { validarInformacoesPedido }
 
@@ -200,22 +200,15 @@ export function useNovoPedidoSubmit({
     let estacaoIdCriacao = ''
 
     if (!isPedidoDelivery) {
-      try {
-        estacaoIdCriacao =
-          (await resolverEstacaoIdParaCriarVendaGestor(accessToken))?.trim() ?? ''
-      } catch (error) {
-        console.error('Falha ao resolver estação para create:', error)
-        showToast.error(
-          'Não foi possível validar a estação deste computador. Tente novamente.'
-        )
+      const estacao = await resolverEstacaoIdParaCriarVendaGestorUseCase.execute(accessToken)
+      if (!estacao.ok) {
+        showToast.error(estacao.mensagem)
+        if (estacao.codigo === 'AUSENTE') {
+          solicitarAbrirConfigEstacaoImpressao()
+        }
         return
       }
-
-      if (!estacaoIdCriacao) {
-        showToast.error(MSG_ESTACAO_OBRIGATORIA_CRIAR_PEDIDO)
-        solicitarAbrirConfigEstacaoImpressao()
-        return
-      }
+      estacaoIdCriacao = estacao.estacaoId
     }
 
     if (!iniciarSubmit()) return
