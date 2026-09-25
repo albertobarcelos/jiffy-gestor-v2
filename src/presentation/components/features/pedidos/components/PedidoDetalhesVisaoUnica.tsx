@@ -26,6 +26,8 @@ import { useNovoPedidoDetalheContext } from '../context/NovoPedidoDetalheContext
 import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
 import { useNovoPedidoUIContext } from '../context/NovoPedidoUIContext'
 import {
+  pedidoDetalheEhEntrega,
+  pedidoDetalheEhRetirada,
   resolverColunaDetalhePedido,
   rotuloEtapaDetalhePedido,
   rotuloTipoAtendimento,
@@ -101,12 +103,14 @@ export function PedidoDetalhesVisaoUnica() {
 
   const numero = detalhesPedidoMeta?.numeroVenda
   const codigo = detalhesPedidoMeta?.codigoVenda?.trim()
-  const tipoVenda = detalhesPedidoMeta?.tipoVenda
+  const tipoEntrega = detalhesPedidoMeta?.tipoEntrega
+  const pedidoEntrega = pedidoDetalheEhEntrega(tipoEntrega)
+  const pedidoRetirada = pedidoDetalheEhRetirada(tipoEntrega)
   const coluna = resolverColunaDetalhePedido({
     statusEtapaOperacional: detalhesPedidoMeta?.statusEtapaOperacional,
     detalhesEntrega: detalhesEntregaPedido,
   })
-  const etapa = rotuloEtapaDetalhePedido(coluna, tipoVenda)
+  const etapa = rotuloEtapaDetalhePedido(coluna, tipoEntrega)
   const horaCriacao = formatarHoraDetalhePedido(detalhesPedidoMeta?.dataCriacao)
   const previsao = formatarHoraPrevisaoEntrega(
     detalhesEntregaPedido?.previsaoEntrega,
@@ -114,9 +118,9 @@ export function PedidoDetalhesVisaoUnica() {
   )
   const celularCliente = detalhesEntregaPedido?.clienteCelular
   const celularExibicao = formatarCelularExibicao(celularCliente)
-  const enderecoLinhas = formatarEnderecoEntregaMultilinha(
-    detalhesEntregaPedido?.enderecoEntrega
-  )
+  const enderecoLinhas = pedidoEntrega
+    ? formatarEnderecoEntregaMultilinha(detalhesEntregaPedido?.enderecoEntrega)
+    : []
   const produtosAtivos = produtos.filter(p => !p.removido)
   const produtoIdsDetalhe = useMemo(
     () => produtos.filter(p => !p.removido).map(produto => produto.produtoId),
@@ -146,9 +150,8 @@ export function PedidoDetalhesVisaoUnica() {
     detalhesEntregaPedido?.observacaoPedido ||
     ''
   ).trim()
-  const tipoAtendimento = String(tipoVenda ?? '').trim().toLowerCase()
-  const pedidoEntrega = tipoAtendimento === 'entrega' || tipoAtendimento === 'delivery'
-  const tipoWhatsapp = tipoAtendimento === 'retirada' ? 'retirada' : 'entrega'
+  const tipoWhatsapp = pedidoRetirada ? 'retirada' : 'entrega'
+  const rotuloModalidade = rotuloTipoAtendimento(tipoEntrega)
 
   const entregadorDaLista = entregadores?.find(
     e => e.id === detalhesEntregaPedido?.entregadorId
@@ -220,19 +223,28 @@ export function PedidoDetalhesVisaoUnica() {
     <div className="space-y-3 bg-gray-50 py-2" role="tabpanel" aria-labelledby="tab-detalhes-info-pedido">
       <Cartao>
         <div className="flex flex-wrap items-center justify-between gap-3 pr-5">
-          {pedidoEntrega ? null : (
-            <div className="rounded-lg border-2 border-gray-800 px-3 py-1 text-2xl font-bold tabular-nums text-gray-900">
-              {numero != null ? String(numero).padStart(4, '0') : '—'}
-            </div>
-          )}
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-lg font-bold leading-tight text-gray-900">
                 {clienteNome?.trim() || 'SEM CLIENTE'}
               </p>
-              {pedidoEntrega ? (
-                <span className="rounded-md border-2 border-gray-800 px-2 py-0.5 text-base font-bold tabular-nums leading-none text-gray-900">
-                  {numero != null ? String(numero).padStart(4, '0') : '—'}
+              <span className="rounded-md border-2 border-gray-800 px-2 py-0.5 text-base font-bold tabular-nums leading-none text-gray-900">
+                {numero != null ? String(numero).padStart(4, '0') : '—'}
+              </span>
+              {codigo ? (
+                <span className="rounded-md border-2 border-gray-800 px-2 py-0.5 text-base font-bold leading-none text-gray-900">
+                  #{codigo}
+                </span>
+              ) : null}
+              {pedidoRetirada || pedidoEntrega ? (
+                <span
+                  className={
+                    pedidoRetirada
+                      ? 'rounded-md border-2 border-amber-700 bg-amber-50 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-amber-900'
+                      : 'rounded-md border-2 border-sky-700 bg-sky-50 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-sky-900'
+                  }
+                >
+                  {rotuloModalidade}
                 </span>
               ) : null}
               {celularExibicao !== '—' ? (
@@ -245,15 +257,13 @@ export function PedidoDetalhesVisaoUnica() {
             </div>
             <p className="mt-1 inline-flex flex-wrap items-center gap-x-1.5 text-sm text-gray-600">
               <span>Feito às {horaCriacao}</span>
-              {codigo ? <span>· #{codigo}</span> : null}
               {temSeloCanalMarketplace(origem) ? (
                 <OrigemCanalMark origem={origem} size={24} />
               ) : origem ? (
                 <span>· {rotuloOrigemExibicao(origem)}</span>
               ) : null}
-              <span>· {rotuloTipoAtendimento(tipoVenda)}</span>
             </p>
-            {previsao !== '—' ? (
+            {pedidoEntrega && previsao !== '—' ? (
               <span className="mt-2 inline-flex items-center gap-1 text-sm text-gray-700">
                 <MdAccessTime className="h-4 w-4 text-primary" aria-hidden />
                 Entrega prevista: {previsao}
@@ -294,7 +304,7 @@ export function PedidoDetalhesVisaoUnica() {
         </div>
       </Cartao>
 
-      {enderecoLinhas.length > 0 && enderecoLinhas[0] !== '—' ? (
+      {pedidoEntrega && enderecoLinhas.length > 0 && enderecoLinhas[0] !== '—' ? (
         <Cartao>
           <div className="flex items-start gap-2">
             <MdLocationOn className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden />
@@ -377,7 +387,7 @@ export function PedidoDetalhesVisaoUnica() {
         ) : null}
 
         <div className="mt-3 space-y-1 border-t border-gray-100 pt-2 text-sm">
-          {taxa != null && taxa > 0 ? (
+          {pedidoEntrega && taxa != null && taxa > 0 ? (
             <div className="flex justify-between text-gray-700">
               <span>Taxa de entrega</span>
               <span className="tabular-nums">{transformarParaReal(taxa)}</span>

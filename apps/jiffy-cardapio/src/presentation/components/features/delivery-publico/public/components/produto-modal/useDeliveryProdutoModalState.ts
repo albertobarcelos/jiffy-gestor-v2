@@ -2,6 +2,9 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CatalogoPublicoProdutoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import { calcularTotalProduto } from '@/src/domain/services/pedido/CalculadoraPedido'
+import { sincronizarComplementosQuantidadeProduto } from '@/src/domain/policies/pedido/SincronizarComplementosQuantidadeProduto'
+import { itemCarrinhoParaProdutoSelecionado } from '@/src/application/mappers/CarrinhoDeliveryMapper'
 import { showToast } from '@/src/shared/utils/toast'
 import { useProdutoComplementos } from '../../../shared/hooks/useProdutoComplementos'
 import {
@@ -78,6 +81,13 @@ export function useDeliveryProdutoModalState({
     requestClose()
   }
 
+  const complementosIniciaisModal = (itemEdicao?.complementos ?? []).map(c => {
+    const qtdProd = Math.max(1, Math.floor(itemEdicao?.quantidade ?? 1))
+    const qtdComp = Math.max(1, Math.floor(c.quantidade))
+    const quantidadePorUnidade = qtdProd > 1 && qtdComp === qtdProd ? 1 : qtdComp
+    return { ...c, quantidade: quantidadePorUnidade }
+  })
+
   const {
     grupos,
     precisaComplementos,
@@ -88,10 +98,26 @@ export function useDeliveryProdutoModalState({
     ajustarQuantidadeComplemento,
     getQuantidadeComplemento,
     obterGruposPendentes,
-  } = useProdutoComplementos(slug, produto, itemEdicao?.complementos)
+  } = useProdutoComplementos(slug, produto, complementosIniciaisModal)
 
-  const valorUnitario = produto.valor + valorComplementosUnitario
-  const valorTotal = valorUnitario * quantidade
+  const complementosParaLinha = sincronizarComplementosQuantidadeProduto(
+    complementosSelecionados,
+    quantidade
+  )
+  const valorUnitario = produto.valor
+  const valorTotal = calcularTotalProduto(
+    itemCarrinhoParaProdutoSelecionado(
+      {
+        produtoId: produto.id,
+        produtoNome: produto.nome,
+        quantidade,
+        valorUnitario,
+        observacoes: [],
+        complementos: complementosParaLinha,
+      },
+      { quantidade, valorUnitario }
+    )
+  )
   const painelAmplo = precisaComplementos
   const carregandoOpcoes =
     precisaComplementos && carregandoComplementos && !cacheComplementos
@@ -160,7 +186,7 @@ export function useDeliveryProdutoModalState({
         valorUnitario,
         valorTotal,
         observacoes,
-        complementos: complementosSelecionados,
+        complementos: complementosParaLinha,
       }
 
       if (itemEdicao) {

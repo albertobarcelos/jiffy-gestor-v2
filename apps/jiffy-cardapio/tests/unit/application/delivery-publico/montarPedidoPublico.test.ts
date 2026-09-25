@@ -97,6 +97,32 @@ describe('montarPedidoPublico + CreatePedidoPublicoInputSchema', () => {
     expect(result.payload.documentoCpfCnpj).toBeUndefined()
   })
 
+  it('sincroniza quantidade de complemento com a do produto no payload', () => {
+    const result = montarPedidoPublico({
+      slug: 'loja',
+      itens: [
+        {
+          produtoId: 'p1',
+          quantidade: 2,
+          observacoes: [],
+          complementos: [
+            {
+              complementoId: 'c-farinha',
+              grupoComplementoId: 'g1',
+              quantidade: 1,
+            },
+          ],
+        },
+      ],
+      total: 59.8,
+      form: formBase({ pagamentos: [{ meioPagamentoId: 'meio-pix', valor: 59.8 }] }),
+      tokenCotacao: 'token-teste',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.payload.produtos[0].complementos[0].quantidade).toBe(2)
+  })
+
   it('rejeita pedido sem pagamento', () => {
     const result = montarPedidoPublico({
       slug: 'loja',

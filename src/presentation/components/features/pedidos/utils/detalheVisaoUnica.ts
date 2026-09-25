@@ -80,6 +80,28 @@ export function rotuloTipoAtendimento(tipo?: string | null): string {
   return valor ? valor : '—'
 }
 
+/**
+ * Modalidade logística do pedido delivery (`tipoEntrega`), não o canal (`tipoVenda=delivery`).
+ * Retirada não usa endereço nem entregador no resumo.
+ */
+export function modalidadeLogisticaDetalhePedido(
+  tipoEntrega?: string | null
+): 'entrega' | 'retirada' | null {
+  const valor = String(tipoEntrega ?? '')
+    .trim()
+    .toLowerCase()
+  if (valor === 'entrega' || valor === 'retirada') return valor
+  return null
+}
+
+export function pedidoDetalheEhEntrega(tipoEntrega?: string | null): boolean {
+  return modalidadeLogisticaDetalhePedido(tipoEntrega) === 'entrega'
+}
+
+export function pedidoDetalheEhRetirada(tipoEntrega?: string | null): boolean {
+  return modalidadeLogisticaDetalhePedido(tipoEntrega) === 'retirada'
+}
+
 /** Resumo estilo delivery (trilha Preparo/Rota) só para `tipoVenda=delivery`. */
 export function deveUsarVisaoUnicaDetalhePedido(params: {
   tipoInicioPedido?: 'balcao' | 'delivery' | null
