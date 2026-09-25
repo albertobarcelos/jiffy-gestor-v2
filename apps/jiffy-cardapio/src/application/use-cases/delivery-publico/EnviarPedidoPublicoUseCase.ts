@@ -19,6 +19,7 @@ import type {
   IClienteDeliveryPublicoPort,
   IPedidoPublicoPort,
 } from '@/src/application/ports/delivery-publico'
+import { GarantirClienteDeliveryPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirClienteDeliveryPublicoUseCase'
 import {
   GarantirEnderecoEntregaPublicoUseCase,
   resolverEnderecoIdEntregaSeJaGarantido,
@@ -57,13 +58,14 @@ export type EnviarPedidoPublicoResult =
 
 /**
  * Orquestra envio do pedido público:
- * garante endereço (se entrega) → monta payload → PATCH CPF se necessário → create.
+ * garante cliente (retirada) ou endereço (entrega) → monta payload → PATCH CPF se necessário → create.
  */
 export class EnviarPedidoPublicoUseCase {
   constructor(
     private readonly pedidoPort: IPedidoPublicoPort,
     private readonly clientePort: IClienteDeliveryPublicoPort,
-    private readonly garantirEndereco: GarantirEnderecoEntregaPublicoUseCase
+    private readonly garantirEndereco: GarantirEnderecoEntregaPublicoUseCase,
+    private readonly garantirCliente: GarantirClienteDeliveryPublicoUseCase
   ) {}
 
   async execute(input: EnviarPedidoPublicoInput): Promise<EnviarPedidoPublicoResult> {
@@ -79,9 +81,25 @@ export class EnviarPedidoPublicoUseCase {
     }
 
     let enderecoIdEntrega: string | null = null
+    let clienteLookup = input.clienteLookup
     const formComNome: CheckoutFormData = {
       ...input.form,
       nome: input.nomeEfetivo ?? input.form.nome,
+    }
+
+    if (formComNome.tipoEntrega === 'retirada') {
+      try {
+        clienteLookup = await this.garantirCliente.execute({
+          telefone: tel,
+          nome: input.nomeEfetivo,
+          clienteLookup,
+        })
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : 'Erro ao cadastrar cliente',
+        }
+      }
     }
 
     if (formComNome.tipoEntrega === 'entrega') {
@@ -114,6 +132,7 @@ export class EnviarPedidoPublicoUseCase {
             },
           })
           enderecoIdEntrega = garantido.enderecoId
+          clienteLookup = garantido.cliente ?? clienteLookup
         }
       } catch (error) {
         return {
@@ -159,7 +178,7 @@ export class EnviarPedidoPublicoUseCase {
     try {
       input.onEtapa?.('enviando_pedido')
       const pedido = await this.pedidoPort.criar(payload)
-      return { ok: true, clienteAtualizado, pedido }
+      return { ok: true, clienteAtualizado: clienteAtualizado ?? clienteLookup, pedido }
     } catch (error) {
       if (isCotacaoDesatualizadaError(error)) {
         return {
