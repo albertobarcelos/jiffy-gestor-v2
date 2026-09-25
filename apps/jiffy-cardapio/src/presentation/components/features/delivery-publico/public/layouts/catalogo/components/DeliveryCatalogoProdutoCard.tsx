@@ -1,10 +1,10 @@
 'use client'
 
 import { Camera } from 'lucide-react'
-import { formatDeliveryCurrency } from '../../../../shared/utils/formatDeliveryCurrency'
 import type { DeliveryPublicoProdutoViewModel } from '../../../../shared/types/deliveryPublicoViewModel'
 import { DeliveryPublicoMidiaImagem } from '../../../../shared/media/DeliveryPublicoMidiaImagem'
 import { DELIVERY_IMAGEM_SIZES } from '../../../../shared/media/deliveryPublicoImageHosts'
+import { DeliveryProdutoPreco } from '../../../../shared/components/DeliveryProdutoPreco'
 
 type DeliveryCatalogoProdutoCardProps = {
   produto: DeliveryPublicoProdutoViewModel
@@ -51,15 +51,7 @@ export function DeliveryCatalogoProdutoCard({
       >
         {produto.nome}
       </p>
-      <p
-        className="mt-0.5 text-sm font-semibold"
-        style={{
-          color: 'var(--delivery-primary)',
-          fontFamily: 'var(--delivery-font-body)',
-        }}
-      >
-        {formatDeliveryCurrency(produto.preco)}
-      </p>
+      <DeliveryProdutoPreco produto={produto} className="mt-0.5" />
     </>
   )
 

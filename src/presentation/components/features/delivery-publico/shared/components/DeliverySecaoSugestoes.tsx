@@ -37,7 +37,7 @@ export function DeliverySecaoSugestoes({
     handleMouseMove,
     handleMouseUp,
     handleMouseLeave,
-  } = useHorizontalDragScroll<HTMLDivElement>()
+  } = useHorizontalDragScroll<HTMLDivElement>({ mapVerticalWheel: false })
 
   if (grupo.produtos.length === 0) return null
 
@@ -69,7 +69,7 @@ export function DeliverySecaoSugestoes({
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
         onWheel={handleWheel}
-        className={`flex items-start gap-3 overflow-x-auto px-4 pb-0 pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+        className={`flex items-start gap-3 overflow-x-auto overscroll-x-contain px-4 pb-0 pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
           isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'
         }`}
         style={{ WebkitOverflowScrolling: 'touch' }}

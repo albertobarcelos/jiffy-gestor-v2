@@ -36,63 +36,49 @@ const baseViewModel: DeliveryPublicoViewModel = {
   carrinho: { total: 0, quantidadeItens: 0 },
 }
 
-const viewModelComGrupoReal: DeliveryPublicoViewModel = {
-  ...baseViewModel,
-  grupos: [
-    {
-      id: 'grp-sugestoes',
-      nome: DELIVERY_PUBLICO_GRUPO_SUGESTOES_NOME,
-      imagemUrl: 'https://cdn.example/sugestoes.jpg',
-      produtos: [],
-    },
-    ...baseViewModel.grupos,
-  ],
-}
-
 describe('applySugestoesDaCasaVisibility', () => {
-  it('não injeta Sugestões no preview sem grupo real, mesmo com switch ON', () => {
+  it('injeta Sugestões no preview sem exigir grupo portador', () => {
     const config = createDefaultDesignConfig()
     const result = applySugestoesDaCasaVisibility(baseViewModel, config, {
       injectPreviewFallback: true,
     })
+    expect(result.grupos[0]?.id).toBe(DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID)
+    expect(result.grupos[0]?.nome).toBe(DELIVERY_PUBLICO_GRUPO_SUGESTOES_NOME)
+    expect(result.grupos).toHaveLength(2)
+  })
+
+  it('não injeta Sugestões no público sem sintético e sem preview fallback', () => {
+    const config = createDefaultDesignConfig()
+    const result = applySugestoesDaCasaVisibility(baseViewModel, config)
     expect(result.grupos.every(g => g.id !== DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID)).toBe(true)
     expect(result.grupos).toHaveLength(1)
   })
 
-  it('injeta Sugestões no preview quando existe grupo real e switch ON', () => {
+  it('oculta sintético sem produtos', () => {
     const config = createDefaultDesignConfig()
-    const result = applySugestoesDaCasaVisibility(viewModelComGrupoReal, config, {
-      injectPreviewFallback: true,
-    })
-    expect(result.grupos[0]?.id).toBe(DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID)
-    expect(result.grupos[0]?.nome).toBe(DELIVERY_PUBLICO_GRUPO_SUGESTOES_NOME)
-    expect(result.grupos[0]?.imagemUrl).toBe('https://cdn.example/sugestoes.jpg')
-    expect(result.grupos.some(g => g.id === 'grp-sugestoes')).toBe(false)
-    expect(result.grupos).toHaveLength(2)
-  })
-
-  it('remove Sugestões quando desabilitado', () => {
-    const config = createDefaultDesignConfig()
-    config.categorias.mostrarSugestoesDaCasa = false
-    const comSugestoes = {
+    const comVazio: DeliveryPublicoViewModel = {
       ...baseViewModel,
-      grupos: [buildPreviewGrupoSugestoes(baseViewModel.grupos), ...baseViewModel.grupos],
+      grupos: [
+        {
+          id: DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID,
+          nome: DELIVERY_PUBLICO_GRUPO_SUGESTOES_NOME,
+          produtos: [],
+        },
+        ...baseViewModel.grupos,
+      ],
     }
-    const result = applySugestoesDaCasaVisibility(comSugestoes, config)
+    const result = applySugestoesDaCasaVisibility(comVazio, config)
     expect(result.grupos.every(g => g.id !== DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID)).toBe(true)
   })
 
-  it('usa imagem do grupo real no sintético já existente', () => {
+  it('usa imagem legada do design no sintético existente', () => {
     const config = createDefaultDesignConfig()
+    config.categorias.sugestoesDaCasaImagemUrl = 'https://cdn.example/sugestoes.jpg'
     const comSintetico: DeliveryPublicoViewModel = {
-      ...viewModelComGrupoReal,
-      grupos: [
-        buildPreviewGrupoSugestoes(baseViewModel.grupos, null),
-        ...viewModelComGrupoReal.grupos,
-      ],
+      ...baseViewModel,
+      grupos: [buildPreviewGrupoSugestoes(baseViewModel.grupos, null), ...baseViewModel.grupos],
     }
     const result = applySugestoesDaCasaVisibility(comSintetico, config)
     expect(result.grupos[0]?.imagemUrl).toBe('https://cdn.example/sugestoes.jpg')
-    expect(result.grupos.some(g => g.id === 'grp-sugestoes')).toBe(false)
   })
 })

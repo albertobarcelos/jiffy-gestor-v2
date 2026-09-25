@@ -2,8 +2,6 @@ import {
   DELIVERY_PUBLICO_GRUPO_SUGESTOES_ICON,
   DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID,
   DELIVERY_PUBLICO_GRUPO_SUGESTOES_NOME,
-  findGrupoSugestoesDaCasaCarrier,
-  omitGrupoSugestoesDaCasaCarrier,
 } from '../constants/deliveryPublicoSugestoes'
 import type { DeliveryPublicoDesignConfig } from '../types/deliveryPublicoDesignConfig'
 import type {
@@ -15,18 +13,11 @@ function isGrupoSugestoesSintetico(grupo: DeliveryPublicoGrupoViewModel): boolea
   return grupo.id === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID
 }
 
-/** Remove o grupo sintético e o grupo real portador da lista. */
+/** Remove o carrossel sintético da lista. */
 export function omitGrupoSugestoes(
   grupos: DeliveryPublicoGrupoViewModel[]
 ): DeliveryPublicoGrupoViewModel[] {
-  return omitGrupoSugestoesDaCasaCarrier(grupos).filter(grupo => !isGrupoSugestoesSintetico(grupo))
-}
-
-function grupoSugestoesDisponivel(grupos: DeliveryPublicoGrupoViewModel[]): boolean {
-  return (
-    Boolean(findGrupoSugestoesDaCasaCarrier(grupos)) ||
-    grupos.some(isGrupoSugestoesSintetico)
-  )
+  return grupos.filter(grupo => !isGrupoSugestoesSintetico(grupo))
 }
 
 /**
@@ -65,28 +56,19 @@ export function buildPreviewGrupoSugestoes(
 }
 
 /**
- * Garante Sugestões no início da lista ou remove conforme o design.
- * Exige grupo real "Sugestões da Casa" no cardápio (além do switch).
- * A imagem da barra vem do `imagemUrl` desse grupo real (CDN).
+ * Mantém o carrossel de favoritos no início ou remove se estiver vazio/ausente.
+ * No preview do Design, pode injetar amostra quando ainda não há sintético.
  */
 export function applySugestoesDaCasaVisibility(
   viewModel: DeliveryPublicoViewModel,
   config: DeliveryPublicoDesignConfig,
   options?: { injectPreviewFallback?: boolean }
 ): DeliveryPublicoViewModel {
-  const carrier = findGrupoSugestoesDaCasaCarrier(viewModel.grupos)
-  const disponivel = grupoSugestoesDisponivel(viewModel.grupos)
   const semSugestoes = omitGrupoSugestoes(viewModel.grupos)
-  const imagemUrl = carrier?.imagemUrl?.trim() || null
-
-  const mostrar = config.categorias.mostrarSugestoesDaCasa !== false && disponivel
-
-  if (!mostrar) {
-    return { ...viewModel, grupos: semSugestoes }
-  }
+  const imagemUrl = config.categorias.sugestoesDaCasaImagemUrl?.trim() || null
 
   const existente = viewModel.grupos.find(isGrupoSugestoesSintetico)
-  if (existente) {
+  if (existente && existente.produtos.length > 0) {
     return {
       ...viewModel,
       grupos: [
@@ -99,12 +81,12 @@ export function applySugestoesDaCasaVisibility(
     }
   }
 
-  if (!options?.injectPreviewFallback || !carrier) {
-    return { ...viewModel, grupos: semSugestoes }
+  if (options?.injectPreviewFallback) {
+    return {
+      ...viewModel,
+      grupos: [buildPreviewGrupoSugestoes(semSugestoes, imagemUrl), ...semSugestoes],
+    }
   }
 
-  return {
-    ...viewModel,
-    grupos: [buildPreviewGrupoSugestoes(semSugestoes, imagemUrl), ...semSugestoes],
-  }
+  return { ...viewModel, grupos: semSugestoes }
 }

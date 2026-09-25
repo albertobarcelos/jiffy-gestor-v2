@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { parseBRLToNumber, formatBRLFromMaskedInput } from '@/src/shared/utils/formatters'
+import { cn } from '@/src/shared/utils/cn'
 
 export type ProdutoValorCommitResult = void | boolean | Promise<void | boolean>
 
 interface ProdutoValorInputProps {
   valor: number
   disabled?: boolean
+  className?: string
   /**
    * Retorne `false` (ou Promise de `false`) para indicar cancelamento —
    * o input volta ao `valor` prop sem recarregar a página.
@@ -15,7 +17,12 @@ interface ProdutoValorInputProps {
   onCommit: (novoValor: number) => ProdutoValorCommitResult
 }
 
-export function ProdutoValorInput({ valor, disabled = false, onCommit }: ProdutoValorInputProps) {
+export function ProdutoValorInput({
+  valor,
+  disabled = false,
+  className,
+  onCommit,
+}: ProdutoValorInputProps) {
   const [inputValue, setInputValue] = useState(() => formatBRLFromMaskedInput(valor))
   const committingRef = useRef(false)
   const onCommitRef = useRef(onCommit)
@@ -76,7 +83,10 @@ export function ProdutoValorInput({ valor, disabled = false, onCommit }: Produto
         if (e.key === 'Enter') e.currentTarget.blur()
       }}
       disabled={disabled}
-      className="w-24 rounded-lg border border-primary/50 bg-info p-2 text-center text-xs font-normal text-primary-text focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 md:text-sm"
+      className={cn(
+        'w-24 rounded-lg border border-primary/50 bg-info p-2 text-center text-xs font-normal text-primary-text focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 md:text-sm',
+        className
+      )}
     />
   )
 }

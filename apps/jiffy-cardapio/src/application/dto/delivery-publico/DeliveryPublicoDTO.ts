@@ -27,6 +27,9 @@ export type CatalogoPublicoProdutoDTO = {
   id: string
   nome: string
   valor: number
+  valorPromocional?: number
+  valorVigente?: number
+  promocaoAtiva?: boolean
   descricao: string | null
   imagemUrl: string | null
   ordem: number

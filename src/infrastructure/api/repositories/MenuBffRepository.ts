@@ -14,6 +14,7 @@ import type {
   UpdateMenuProdutosBatchInput,
 } from '@/src/shared/types/menus'
 import type { MenuProdutoCatalogTipoFiltro } from '@/src/infrastructure/api/repositories/menuCatalogFetch'
+import { normalizeMenuProduto } from '@/src/application/mappers/MenuProdutoCatalogMapper'
 
 type ListarMenusParams = {
   q?: string
@@ -139,7 +140,7 @@ export class MenuBffRepository {
       token
     )
     return {
-      items: (data.items ?? []) as MenuProduto[],
+      items: (data.items ?? []).map(normalizeMenuProduto),
       count: data.count ?? 0,
     }
   }

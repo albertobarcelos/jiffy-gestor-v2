@@ -51,6 +51,8 @@ function MenuProdutoCatalogRowInner({
       id={produto.produtoId}
       nome={produto.nome}
       valor={Number(produto.valor)}
+      valorPromocional={Number(produto.valorPromocional ?? 0)}
+      promocaoAtiva={produto.promocaoAtiva === true}
       ativo={produto.ativo}
       imagemUrl={resolverImagemMenuProduto(produto, imagemCadastro)}
       codigo={codigo}

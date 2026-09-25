@@ -56,6 +56,9 @@ export interface CatalogProductRowProps {
   id: string
   nome: string
   valor: number
+  /** Preço promocional do snapshot (menu). Exibido à esquerda quando vigente. */
+  valorPromocional?: number | null
+  promocaoAtiva?: boolean
   ativo: boolean
   imagemUrl?: string | null
   codigo?: string
@@ -83,6 +86,8 @@ function CatalogProductRowInner({
   id,
   nome,
   valor,
+  valorPromocional = null,
+  promocaoAtiva = false,
   ativo,
   imagemUrl,
   codigo,
@@ -113,6 +118,13 @@ function CatalogProductRowInner({
   const podeTrocarImagem = Boolean(onChangeImage)
   const podeEditarNome = Boolean(onNomeChange)
   const podeEditarValor = Boolean(onValorChange)
+  const promoNum = Number(valorPromocional ?? 0)
+  const mostrarPrecoPromocional =
+    isMenu &&
+    promocaoAtiva &&
+    Number.isFinite(promoNum) &&
+    promoNum > 0 &&
+    promoNum < Number(valor)
 
   const renderPauseMenu = () =>
     hidePauseAndPrice ? null : (
@@ -325,16 +337,46 @@ function CatalogProductRowInner({
               'flex items-center justify-end gap-1 md:mr-4 md:w-auto md:flex-row md:gap-4'
             )}
           >
-            {hidePauseAndPrice ? null : podeEditarValor && onValorChange ? (
-              <ProdutoValorInput
-                valor={valor}
-                disabled={isSavingValor}
-                onCommit={novoValor => onValorChange(id, novoValor)}
-              />
-            ) : hidePauseAndPrice ? null : (
-              <span className="inline-flex w-24 items-center justify-center rounded-lg border border-primary/50 bg-info p-2 text-center text-xs font-normal text-primary-text md:text-sm">
-                {formatBRLFromMaskedInput(valor)}
-              </span>
+            {hidePauseAndPrice ? null : (
+              <div
+                className={cn(
+                  'flex shrink-0 items-center justify-end gap-1.5',
+                  // Reserva espaço do badge promo + preço para a coluna de ações
+                  // não mudar de posição entre linhas com/sem promoção.
+                  'min-w-[calc(4.5rem+0.375rem+6rem)]'
+                )}
+              >
+                {mostrarPrecoPromocional ? (
+                  <span
+                    className="inline-flex min-w-[4.5rem] items-center justify-center rounded-lg border border-emerald-600/40 bg-emerald-50 px-2 py-2 text-center text-xs font-semibold tabular-nums text-emerald-700 md:text-sm"
+                    title="Preço promocional"
+                  >
+                    {formatBRLFromMaskedInput(promoNum)}
+                  </span>
+                ) : null}
+                {podeEditarValor && onValorChange ? (
+                  <ProdutoValorInput
+                    valor={valor}
+                    disabled={isSavingValor}
+                    className={
+                      mostrarPrecoPromocional
+                        ? 'text-secondary-text line-through decoration-primary/60'
+                        : undefined
+                    }
+                    onCommit={novoValor => onValorChange(id, novoValor)}
+                  />
+                ) : (
+                  <span
+                    className={cn(
+                      'inline-flex w-24 items-center justify-center rounded-lg border border-primary/50 bg-info p-2 text-center text-xs font-normal text-primary-text md:text-sm',
+                      mostrarPrecoPromocional &&
+                        'text-secondary-text line-through decoration-primary/60'
+                    )}
+                  >
+                    {formatBRLFromMaskedInput(valor)}
+                  </span>
+                )}
+              </div>
             )}
             {hidePauseAndPrice || !isMenu ? null : (
               <span className="hidden shrink-0 md:inline-flex">{renderPauseMenu()}</span>
@@ -387,6 +429,8 @@ function arePropsEqual(prev: CatalogProductRowProps, next: CatalogProductRowProp
     prev.id === next.id &&
     prev.nome === next.nome &&
     prev.valor === next.valor &&
+    prev.valorPromocional === next.valorPromocional &&
+    prev.promocaoAtiva === next.promocaoAtiva &&
     prev.ativo === next.ativo &&
     prev.imagemUrl === next.imagemUrl &&
     prev.codigo === next.codigo &&

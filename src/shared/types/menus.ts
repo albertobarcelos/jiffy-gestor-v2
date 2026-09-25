@@ -79,6 +79,10 @@ export interface MenuProduto {
   nome: string
   descricao: string | null
   valor: number
+  /** Preço promocional neste cardápio (≥ 0). */
+  valorPromocional: number
+  /** Quando true e valorPromocional > 0, o preço vigente é o promocional. */
+  promocaoAtiva: boolean
   ordem: number
   favorito: boolean
   ativo: boolean
@@ -132,6 +136,8 @@ export interface UpdateMenuProdutoInput {
   nome?: string
   descricao?: string | null
   valor?: number
+  valorPromocional?: number
+  promocaoAtiva?: boolean
   ordem?: number
   favorito?: boolean
   ativo?: boolean
