@@ -10,7 +10,6 @@ import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { usePedirSaidaCobertura } from '@/src/presentation/components/features/configuracoes/coberturaSairGuard'
 import { EMPRESA_DELIVERY_PENDENCIA_TYPES } from '@/src/shared/constants/empresaDeliveryPendencias'
 import {
-  DELIVERY_HUB_PATH,
   getDeliveryEtapaById,
   type DeliveryEtapaId,
 } from './deliveryHubEtapas'
@@ -65,11 +64,16 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
   )
 
   useEffect(() => {
-    if (etapaId === 'delivery-loja') {
-      router.replace(toGestao(DELIVERY_HUB_PATH))
-    }
     if (etapaId === 'delivery-nome-cardapio') {
       router.replace(toGestao(deliveryHubDesignSectionPath('cardapio')))
+      return
+    }
+    /** Hub sem etapa (ou legado /loja): abre Personalizar Loja direto. */
+    if (etapaId == null || etapaId === 'delivery-loja') {
+      const design = getDeliveryEtapaById('delivery-design')
+      if (design) {
+        router.replace(toGestao(design.path))
+      }
     }
   }, [etapaId, router, toGestao])
 
@@ -106,7 +110,11 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
     [activeEtapaId, pedirSaida, router, toGestao]
   )
 
-  if (etapaId === 'delivery-loja' || etapaId === 'delivery-nome-cardapio') {
+  if (
+    etapaId == null ||
+    etapaId === 'delivery-loja' ||
+    etapaId === 'delivery-nome-cardapio'
+  ) {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
         <JiffyLoading />

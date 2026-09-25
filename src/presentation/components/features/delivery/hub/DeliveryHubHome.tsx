@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, type ReactNode } from 'react'
-import { MdCheck, MdCheckCircle, MdChevronLeft, MdChevronRight } from 'react-icons/md'
+import { MdCheck, MdChevronLeft, MdChevronRight } from 'react-icons/md'
 import { cn } from '@/src/shared/utils/cn'
 import type { DeliveryEtapaId } from '@/src/shared/constants/configuracoesRoutes'
 import type { DeliveryHubProgresso } from './deliveryHubProgresso'
@@ -118,42 +118,6 @@ function MenuGroup({
   )
 }
 
-function HubOverview({ progresso }: { progresso: DeliveryHubProgresso }) {
-  const pronto =
-    progresso.totalObrigatorios > 0 &&
-    progresso.concluidosObrigatorios === progresso.totalObrigatorios
-
-  return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 sm:p-6">
-      <div className="mb-6 max-w-lg">
-        <div className="flex items-center gap-2 text-sm font-semibold text-primary-text">
-          {pronto ? (
-            <MdCheckCircle className="h-5 w-5 text-emerald-500" />
-          ) : (
-            <span className="h-5 w-5 rounded-full border-2 border-amber-400" />
-          )}
-          <span>
-            {pronto ? 'Seu delivery está pronto' : 'Falta concluir etapas obrigatórias'}
-          </span>
-        </div>
-        <p className="mt-1 text-xs text-secondary-text">
-          {progresso.concluidosObrigatorios} de {progresso.totalObrigatorios} configurações
-          obrigatórias concluídas
-        </p>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-200">
-          <div
-            className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-            style={{ width: `${progresso.porcentagemObrigatorias}%` }}
-          />
-        </div>
-      </div>
-      <p className="max-w-md text-sm text-secondary-text">
-        Escolha uma opção no menu à esquerda para configurar. O conteúdo abre neste painel.
-      </p>
-    </div>
-  )
-}
-
 /**
  * Shell Configurações Delivery: menu esquerdo + painel direito (sem TabBar do hub).
  */
@@ -227,7 +191,7 @@ export function DeliveryHubHome({
       </aside>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white">
-        {panel ?? <HubOverview progresso={progresso} />}
+        {panel}
       </div>
     </div>
   )

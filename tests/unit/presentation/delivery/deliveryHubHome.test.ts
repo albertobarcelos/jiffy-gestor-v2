@@ -157,9 +157,9 @@ describe('DELIVERY_HUB_ETAPAS', () => {
     expect(getDeliveryEtapaById('delivery-loja')?.label).toBe('Delivery')
     expect(DELIVERY_HUB_ETAPAS.some(e => e.id === 'delivery-loja')).toBe(false)
     expect(DELIVERY_LOJA_CARD_IDS).toEqual([
+      'delivery-design',
       'delivery-cobertura',
       'delivery-agenda',
-      'delivery-design',
       'delivery-notificacoes',
     ])
     expect(DELIVERY_OPERACAO_ETAPA_IDS).toEqual([
@@ -191,9 +191,9 @@ describe('montarPassosLojaHub e operação', () => {
     })
     expect(cards.map(c => c.id)).toEqual([...DELIVERY_LOJA_CARD_IDS])
     expect(cards.map(c => c.titulo)).toEqual([
-      'Áreas de entrega',
-      'Agenda e funcionamento',
       'Personalizar Loja',
+      'Áreas de entrega',
+      'Horário Funcionamento',
       'Notificações WhatsApp',
     ])
     expect(cards.filter(c => c.obrigatoria).map(c => c.id)).toEqual([

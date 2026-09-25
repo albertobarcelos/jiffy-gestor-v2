@@ -63,9 +63,9 @@ export interface DeliveryEtapaConfig {
 
 /** Itens do grupo Loja no menu do hub (sem Empresa/endereço). */
 export const DELIVERY_LOJA_CARD_IDS: DeliveryEtapaId[] = [
+  'delivery-design',
   'delivery-cobertura',
   'delivery-agenda',
-  'delivery-design',
   'delivery-notificacoes',
 ]
 
