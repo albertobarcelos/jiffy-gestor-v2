@@ -68,14 +68,14 @@ export function DeliveryBasicoTopNav({
 
   return (
     <header
-      className="delivery-basico-topnav relative z-50 flex items-center gap-2 px-3 py-2.5 @sm:gap-2.5 @sm:px-4 @sm:py-3"
+      className="delivery-basico-topnav relative z-50 flex items-center gap-2 px-3 py-1 @sm:gap-2.5 @sm:px-4 @sm:py-3"
       style={{
         backgroundColor: 'var(--delivery-primary-dark, #171717)',
         color: 'var(--delivery-btn-text, #ffffff)',
       }}
     >
       <div
-        className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden bg-white @sm:h-16 @sm:w-16"
+        className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden bg-white @sm:h-16 @sm:w-16"
         style={{ borderRadius: logoRadius }}
       >
         {config.cabecalho.logoUrl ? (
@@ -96,7 +96,7 @@ export function DeliveryBasicoTopNav({
 
       <div className="flex min-w-0 flex-1 flex-col justify-center gap-0 leading-none">
         <h1
-          className="truncate text-sm font-semibold leading-tight tracking-wide @sm:text-base"
+          className="truncate text-xs font-semibold leading-tight tracking-wide @sm:text-base"
           style={{ fontFamily: 'var(--delivery-font-title)' }}
         >
           {nomeLoja}
