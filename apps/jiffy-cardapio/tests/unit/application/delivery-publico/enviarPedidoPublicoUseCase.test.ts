@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
 import type { ClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { EnviarPedidoPublicoUseCase } from '@/src/application/use-cases/delivery-publico/EnviarPedidoPublicoUseCase'
+import { GarantirClienteDeliveryPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirClienteDeliveryPublicoUseCase'
 import { GarantirEnderecoEntregaPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirEnderecoEntregaPublicoUseCase'
 import {
   publicDeliveryClienteAdapter,
@@ -55,11 +56,19 @@ function criarGarantirUseCase() {
   return new GarantirEnderecoEntregaPublicoUseCase(publicDeliveryClienteAdapter)
 }
 
-function criarEnviarUseCase(garantir = criarGarantirUseCase()) {
+function criarGarantirClienteUseCase() {
+  return new GarantirClienteDeliveryPublicoUseCase(publicDeliveryClienteAdapter)
+}
+
+function criarEnviarUseCase(
+  garantir = criarGarantirUseCase(),
+  garantirCliente = criarGarantirClienteUseCase()
+) {
   return new EnviarPedidoPublicoUseCase(
     publicDeliveryPedidoAdapter,
     publicDeliveryClienteAdapter,
-    garantir
+    garantir,
+    garantirCliente
   )
 }
 
@@ -68,6 +77,7 @@ describe('EnviarPedidoPublicoUseCase', () => {
     vi.mocked(publicDeliveryApi.criarPedidoPublico).mockReset()
     vi.mocked(publicDeliveryApi.buscarClienteDeliveryPublico).mockReset()
     vi.mocked(publicDeliveryApi.atualizarClienteDeliveryPublico).mockReset()
+    vi.mocked(publicDeliveryApi.criarClienteDeliveryPublico).mockReset()
     vi.mocked(publicDeliveryApi.criarPedidoPublico).mockResolvedValue({ id: 'pedido-1' })
   })
 
@@ -76,6 +86,13 @@ describe('EnviarPedidoPublicoUseCase', () => {
   })
 
   it('cria pedido de retirada sem PATCH de CPF', async () => {
+    vi.mocked(publicDeliveryApi.buscarClienteDeliveryPublico).mockResolvedValue({
+      telefone: '11999999999',
+      nome: 'Cliente',
+      cpf: null,
+      clienteIdVinculado: null,
+      enderecos: [],
+    })
     const useCase = criarEnviarUseCase()
     const result = await useCase.execute({
       slug: 'loja',
@@ -91,6 +108,32 @@ describe('EnviarPedidoPublicoUseCase', () => {
     expect(result.ok).toBe(true)
     expect(publicDeliveryApi.criarPedidoPublico).toHaveBeenCalledOnce()
     expect(publicDeliveryApi.atualizarClienteDeliveryPublico).not.toHaveBeenCalled()
+  })
+
+  it('cadastra cliente delivery antes de criar pedido de retirada sem cadastro', async () => {
+    vi.mocked(publicDeliveryApi.buscarClienteDeliveryPublico).mockResolvedValue(null)
+    vi.mocked(publicDeliveryApi.criarClienteDeliveryPublico).mockResolvedValue({
+      telefone: '11999999999',
+      nome: 'Cliente',
+      cpf: null,
+      clienteIdVinculado: null,
+      enderecos: [],
+    })
+    const useCase = criarEnviarUseCase()
+    const result = await useCase.execute({
+      slug: 'loja',
+      telefoneApi: '11999999999',
+      nomeEfetivo: 'Cliente',
+      itens: [item],
+      total: 20,
+      form: formBase(),
+      clienteLookup: null,
+      tokenCotacao,
+    })
+
+    expect(result.ok).toBe(true)
+    expect(publicDeliveryApi.criarClienteDeliveryPublico).toHaveBeenCalledOnce()
+    expect(publicDeliveryApi.criarPedidoPublico).toHaveBeenCalledOnce()
   })
 
   it('avisa a etapa de endereço e a de envio', async () => {

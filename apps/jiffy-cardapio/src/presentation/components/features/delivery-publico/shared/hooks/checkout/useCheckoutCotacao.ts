@@ -33,6 +33,7 @@ type UseCheckoutCotacaoParams = {
   clienteLookupRef: MutableRefObject<{ cliente: ClienteDeliveryPublicoDTO | null }>
   resolveTelefoneApi: (formData: CheckoutFormData) => string
   telefoneDigitsRef: MutableRefObject<string>
+  onClienteGarantido?: (cliente: ClienteDeliveryPublicoDTO) => void
 }
 
 export function useCheckoutCotacao({
@@ -42,6 +43,7 @@ export function useCheckoutCotacao({
   clienteLookupRef,
   resolveTelefoneApi,
   telefoneDigitsRef,
+  onClienteGarantido,
 }: UseCheckoutCotacaoParams) {
   const queryClient = useQueryClient()
   const [cotacao, setCotacao] = useState<DeliveryCheckoutCotacaoState | null>(null)
@@ -190,6 +192,10 @@ export function useCheckoutCotacao({
         const state = mapCotacaoDtoToCheckoutState(resultado.cotacao)
         setCotacao(state)
         queryClient.setQueryData<CotacaoQueryCacheEntry>(queryKey, { state })
+        if (resultado.cliente) {
+          clienteLookupRef.current = { cliente: resultado.cliente }
+          onClienteGarantido?.(resultado.cliente)
+        }
         return { ok: true }
       } catch (error) {
         if (seq !== cotacaoSeqRef.current) return { ok: false, reason: 'bloqueado' }
@@ -224,6 +230,7 @@ export function useCheckoutCotacao({
       formRef,
       clienteLookupRef,
       telefoneDigitsRef,
+      onClienteGarantido,
     ]
   )
 

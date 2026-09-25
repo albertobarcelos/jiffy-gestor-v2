@@ -56,6 +56,9 @@ export function useDeliveryCheckout(slug: string, options?: UseDeliveryCheckoutO
   const clienteLookupBridgeRef = useRef<{ cliente: ClienteDeliveryPublicoDTO | null }>({
     cliente: null,
   })
+  const onClienteGarantidoRef = useRef<(cliente: ClienteDeliveryPublicoDTO) => void>(
+    () => undefined
+  )
   /** Total sob o qual os pagamentos atuais foram lançados / validados. */
   const totalPagamentosBaselineRef = useRef<number | null>(null)
 
@@ -73,6 +76,7 @@ export function useDeliveryCheckout(slug: string, options?: UseDeliveryCheckoutO
     clienteLookupRef: clienteLookupBridgeRef,
     resolveTelefoneApi,
     telefoneDigitsRef,
+    onClienteGarantido: cliente => onClienteGarantidoRef.current(cliente),
   })
 
   /**
@@ -130,6 +134,15 @@ export function useDeliveryCheckout(slug: string, options?: UseDeliveryCheckoutO
     clienteLookup,
     setClienteLookup,
   } = clienteApi
+
+  onClienteGarantidoRef.current = cliente => {
+    setClienteLookup({
+      status: 'encontrado',
+      telefoneConsultado: cliente.telefone,
+      cliente,
+      mensagemErro: null,
+    })
+  }
 
   clienteLookupBridgeRef.current = { cliente: clienteLookup.cliente }
 
