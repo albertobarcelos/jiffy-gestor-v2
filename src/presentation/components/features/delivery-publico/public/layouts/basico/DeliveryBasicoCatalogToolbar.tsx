@@ -14,6 +14,14 @@ function readCssPx(el: HTMLElement, varName: string): number {
   return Number.isFinite(value) ? value : 0
 }
 
+/** Topo da âncora: título sticky (md+) ou a própria seção. */
+function sectionAnchorTop(section: HTMLElement): number {
+  const title = section.querySelector(
+    '.delivery-basico-grupo-title-sticky'
+  ) as HTMLElement | null
+  return (title ?? section).getBoundingClientRect().top
+}
+
 type DeliveryBasicoCatalogToolbarProps = {
   config: DeliveryPublicoDesignConfig
   grupos: DeliveryPublicoGrupoViewModel[]
@@ -75,7 +83,7 @@ export const DeliveryBasicoCatalogToolbar = memo(function DeliveryBasicoCatalogT
 
       let nextId = sections[0].id.replace(/^grupo-/, '')
       for (const section of sections) {
-        if (section.getBoundingClientRect().top <= stickyLine) {
+        if (sectionAnchorTop(section) <= stickyLine) {
           nextId = section.id.replace(/^grupo-/, '')
         } else {
           break

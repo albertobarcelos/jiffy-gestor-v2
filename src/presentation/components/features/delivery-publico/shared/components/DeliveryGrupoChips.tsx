@@ -6,6 +6,8 @@ import type { DeliveryPublicoGrupoViewModel } from '../types/deliveryPublicoView
 
 const CHIP_GAP_PX = 8
 const SIDE_PADDING_PX = 16
+/** Folga ao trazer o chip ativo para a área visível da barra. */
+const VISIBLE_EDGE_PADDING_PX = 16
 
 type DeliveryGrupoChipsProps = {
   config: DeliveryPublicoDesignConfig
@@ -40,18 +42,21 @@ export function DeliveryGrupoChips({
     const chip = activeChipRef.current
     if (!scroller || !chip) return
 
-    // Só mexe no scrollLeft da barra — scrollIntoView no chip
-    // pode alterar o scroll vertical da página (micro-saltos).
     const scrollerRect = scroller.getBoundingClientRect()
     const chipRect = chip.getBoundingClientRect()
-    const chipOffset =
-      chipRect.left - scrollerRect.left + scroller.scrollLeft
-    const target = chipOffset - (scroller.clientWidth - chipRect.width) / 2
     const maxScroll = Math.max(0, scroller.scrollWidth - scroller.clientWidth)
-    const nextLeft = Math.max(0, Math.min(target, maxScroll))
+    const leftBound = scrollerRect.left + VISIBLE_EDGE_PADDING_PX
+    const rightBound = scrollerRect.right - VISIBLE_EDGE_PADDING_PX
+
+    if (chipRect.left >= leftBound && chipRect.right <= rightBound) return
+
+    const chipOffset = chipRect.left - scrollerRect.left + scroller.scrollLeft
+    const nextLeft = Math.max(
+      0,
+      Math.min(chipOffset - (scroller.clientWidth - chipRect.width) / 2, maxScroll)
+    )
 
     if (Math.abs(scroller.scrollLeft - nextLeft) < 1) return
-    // Instantâneo: smooth na barra durante o scroll-spy compete com o dedo.
     scroller.scrollTo({ left: nextLeft, behavior: 'auto' })
   }, [activeGrupoId])
 

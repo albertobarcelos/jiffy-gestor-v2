@@ -246,6 +246,7 @@ html.delivery-publico-ios-lock select {
   margin-inline: auto;
   min-height: 0;
   transform: translateZ(0);
+  container-type: inline-size;
 }
 
 .delivery-preview-viewport {
@@ -274,15 +275,22 @@ html.delivery-publico-ios-lock select {
   min-height: 2.35rem !important;
 }
 
-/** Capa — mobile: proporção do crop (1200×300 · 4:1). */
+/** Capa — mobile: proporção do crop (1200×300 · 4:1) + 28px extras. */
 .delivery-loja-capa {
   aspect-ratio: 4 / 1;
 }
 
-/** Preview — mesma proporção 4:1. Sem radius: preview simula mobile. */
+@media (max-width: 1023px) {
+  .delivery-loja-capa {
+    aspect-ratio: auto;
+    height: calc(25vw + 28px);
+  }
+}
+
+/** Preview — mesma proporção 4:1 + 28px (largura do frame). Sem radius: preview simula mobile. */
 .delivery-preview-shell .delivery-loja-capa {
-  height: auto !important;
-  aspect-ratio: 4 / 1;
+  aspect-ratio: auto !important;
+  height: calc(25cqw + 28px) !important;
   margin-top: 0.75rem !important;
   border-radius: 0 !important;
 }

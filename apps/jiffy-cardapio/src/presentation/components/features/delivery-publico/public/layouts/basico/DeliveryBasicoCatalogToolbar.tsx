@@ -14,6 +14,14 @@ function readCssPx(el: HTMLElement, varName: string): number {
   return Number.isFinite(value) ? value : 0
 }
 
+/** Topo da âncora: título sticky (md+) ou a própria seção. */
+function sectionAnchorTop(section: HTMLElement): number {
+  const title = section.querySelector(
+    '.delivery-basico-grupo-title-sticky'
+  ) as HTMLElement | null
+  return (title ?? section).getBoundingClientRect().top
+}
+
 type DeliveryBasicoCatalogToolbarProps = {
   config: DeliveryPublicoDesignConfig
   grupos: DeliveryPublicoGrupoViewModel[]
@@ -45,8 +53,6 @@ export const DeliveryBasicoCatalogToolbar = memo(function DeliveryBasicoCatalogT
   const [activeGrupoId, setActiveGrupoId] = useState<string | null>(
     gruposComProdutos[0]?.id ?? null
   )
-  /** Centraliza chip só após clique do usuário (não no spy). */
-  const [centerActiveChip, setCenterActiveChip] = useState(false)
   /** Enquanto navega por clique, o spy não sobrescreve o chip ativo. */
   const lockedGrupoIdRef = useRef<string | null>(null)
   const unlockTimerRef = useRef<number | null>(null)
@@ -93,15 +99,16 @@ export const DeliveryBasicoCatalogToolbar = memo(function DeliveryBasicoCatalogT
         if (sections.length === 0) return
       }
 
+      const viewportTop = scrollRoot?.getBoundingClientRect().top ?? 0
+      const stickyLine =
+        viewportTop + readCssPx(root, '--delivery-sticky-toolbar-h') + 12
+
       const lockedId = lockedGrupoIdRef.current
       if (lockedId) {
         const lockedEl = document.getElementById(`grupo-${lockedId}`)
         if (!lockedEl) return
 
-        const viewportTop = scrollRoot?.getBoundingClientRect().top ?? 0
-        const stickyLine =
-          viewportTop + readCssPx(root, '--delivery-sticky-toolbar-h') + 12
-        const lockedTop = lockedEl.getBoundingClientRect().top
+        const lockedTop = sectionAnchorTop(lockedEl)
         // Liberou quando a seção alvo chegou perto da linha sticky.
         if (Math.abs(lockedTop - stickyLine) <= 48) {
           lockedGrupoIdRef.current = null
@@ -114,20 +121,15 @@ export const DeliveryBasicoCatalogToolbar = memo(function DeliveryBasicoCatalogT
         }
       }
 
-      const viewportTop = scrollRoot?.getBoundingClientRect().top ?? 0
-      const stickyLine =
-        viewportTop + readCssPx(root, '--delivery-sticky-toolbar-h') + 12
-
       let nextId = sections[0].id.replace(/^grupo-/, '')
       for (const section of sections) {
-        if (section.getBoundingClientRect().top <= stickyLine) {
+        if (sectionAnchorTop(section) <= stickyLine) {
           nextId = section.id.replace(/^grupo-/, '')
         } else {
           break
         }
       }
 
-      setCenterActiveChip(false)
       setActiveGrupoId(prev => (prev === nextId ? prev : nextId))
     }
 
@@ -189,7 +191,6 @@ export const DeliveryBasicoCatalogToolbar = memo(function DeliveryBasicoCatalogT
         unlockTimerRef.current = null
       }, 1200)
 
-      setCenterActiveChip(true)
       setActiveGrupoId(grupoId)
       scrollToGrupo(grupoId)
       onGrupoClick?.(grupoId)
@@ -212,7 +213,6 @@ export const DeliveryBasicoCatalogToolbar = memo(function DeliveryBasicoCatalogT
           activeGrupoId={activeGrupoId}
           interactive={interactive}
           embedded
-          centerActiveChip={centerActiveChip}
           onGrupoClick={handleGrupoClick}
         />
       </div>
