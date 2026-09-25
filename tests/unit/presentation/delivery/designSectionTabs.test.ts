@@ -26,7 +26,7 @@ describe('designTabs — lobby de cards e seções', () => {
       'categorias',
     ])
     expect(DESIGN_TABS.map(tab => tab.label)).toEqual([
-      'Cardápio',
+      'Cardápio e Link da Loja',
       'Cabeçalho',
       'Modelos',
       'Cores',

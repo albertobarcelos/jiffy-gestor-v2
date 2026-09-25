@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { MdStorefront } from 'react-icons/md'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { MdLink, MdMenuBook, MdShare, MdStorefront, type IconType } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
 import {
@@ -23,7 +23,37 @@ import {
   filtrarPendenciasObrigatorias,
   lojaDeliveryDisponivel,
 } from '@/src/shared/constants/empresaDeliveryPendencias'
-import { getCardapioSlugInputPrefix } from '@/src/shared/utils/cardapioPublicUrl'
+import { getCardapioSlugInputPrefix, buildCardapioLojaUrl } from '@/src/shared/utils/cardapioPublicUrl'
+import { compartilharLinkDelivery } from '@/src/presentation/components/features/delivery-publico/shared/utils/compartilharProdutoDelivery'
+
+function CardapioOpcaoCard({
+  icon: Icon,
+  title,
+  description,
+  children,
+}: {
+  icon: IconType
+  title: string
+  description?: string
+  children: ReactNode
+}) {
+  return (
+    <section className="flex overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="flex w-24 shrink-0 items-center justify-center bg-alternate/20 text-alternate sm:w-28">
+        <Icon className="h-10 w-10 sm:h-12 sm:w-12" aria-hidden />
+      </div>
+      <div className="min-w-0 flex-1 space-y-3 p-4 md:p-5">
+        <div>
+          <h2 className="text-base font-bold text-primary-text">{title}</h2>
+          {description ? (
+            <p className="mt-0.5 text-sm text-secondary-text">{description}</p>
+          ) : null}
+        </div>
+        {children}
+      </div>
+    </section>
+  )
+}
 
 export function DeliveryNomeCardapioView({ embedded = false }: { embedded?: boolean }) {
   const slugInputPrefix = getCardapioSlugInputPrefix()
@@ -99,6 +129,32 @@ export function DeliveryNomeCardapioView({ embedded = false }: { embedded?: bool
     setSlug(normalizado)
     setSlugErro(validateDeliverySlug(normalizado))
   }, [slug])
+
+  const handleCompartilharLink = useCallback(async () => {
+    const slugNormalizado = normalizeDeliverySlug(slug)
+    const erroSlug = validateDeliverySlug(slugNormalizado)
+    if (erroSlug) {
+      setSlugErro(erroSlug)
+      showToast.error(erroSlug)
+      return
+    }
+
+    const origin = typeof window !== 'undefined' ? window.location.origin : undefined
+    const url = buildCardapioLojaUrl(slugNormalizado, origin)
+    if (!url) {
+      showToast.error('Informe o link da loja para compartilhar.')
+      return
+    }
+
+    const nomeLoja = empresa?.nomeExibicao?.trim()
+    await compartilharLinkDelivery({
+      title: nomeLoja ? `Cardápio — ${nomeLoja}` : 'Cardápio da loja',
+      text: nomeLoja
+        ? `Peça pelo cardápio da ${nomeLoja}`
+        : 'Peça pelo nosso cardápio',
+      url,
+    })
+  }, [empresa?.nomeExibicao, slug])
 
   const handleSalvar = useCallback(async () => {
     const slugNormalizado = normalizeDeliverySlug(slug)
@@ -185,27 +241,13 @@ export function DeliveryNomeCardapioView({ embedded = false }: { embedded?: bool
           <DeliveryPendenciasAlert variant="bloqueante" pendencias={pendenciasDestePasso} />
         ) : null}
 
-        <section className="space-y-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm md:p-6">
-          <MenuParametroEmpresaSelect
-            id="delivery-hub-menu"
-            label="Cardápio publicado no delivery"
-            description="Produtos, preços e fotos do app público e do delivery manual no Gestor saem deste menu."
-            value={menuDeliveryId}
-            onChange={setMenuDeliveryId}
-            disabled={carregando}
-          />
-
-          <div>
-            <label
-              htmlFor="delivery-hub-slug"
-              className="text-sm font-semibold text-primary-text"
-            >
-              Link público da loja
-            </label>
-            <p className="mt-0.5 text-xs text-secondary-text">
-              Apenas letras minúsculas, números e hífens (mínimo 3 caracteres).
-            </p>
-            <div className="mt-2 flex min-w-0 flex-1 items-center rounded-lg border border-gray-200 bg-gray-50">
+        <div className="space-y-4">
+          <CardapioOpcaoCard
+            icon={MdLink}
+            title="Link público da loja"
+            description="Apenas letras minúsculas, números e hífens (mínimo 3 caracteres)."
+          >
+            <div className="flex min-w-0 flex-1 items-center rounded-lg border border-gray-200 bg-gray-50">
               <span className="shrink-0 pl-3 text-sm text-secondary-text">
                 {slugInputPrefix}
               </span>
@@ -223,30 +265,53 @@ export function DeliveryNomeCardapioView({ embedded = false }: { embedded?: bool
                 className="h-10 min-w-0 flex-1 rounded-r-lg bg-transparent px-2 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
               />
             </div>
-            {slugErro ? <p className="mt-1 text-xs text-red-600">{slugErro}</p> : null}
-          </div>
-
-          {!configurado ? (
-            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              Escolha um slug e clique em &quot;Ativar Delivery&quot; para publicar sua loja online.
-            </p>
-          ) : null}
-
-          <div className="flex justify-end">
+            {slugErro ? <p className="text-xs text-red-600">{slugErro}</p> : null}
             <button
               type="button"
-              onClick={() => void handleSalvar()}
-              disabled={carregando}
-              className="inline-flex h-10 items-center justify-center rounded-lg bg-secondary px-6 text-sm font-semibold text-white transition-colors hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={() => void handleCompartilharLink()}
+              disabled={carregando || !normalizeDeliverySlug(slug)}
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-alternate/30 bg-alternate/10 px-4 text-sm font-semibold text-alternate transition-colors hover:bg-alternate/20 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {carregando
-                ? 'Salvando...'
-                : configurado
-                  ? 'Salvar alterações'
-                  : 'Ativar Delivery'}
+              <MdShare className="h-4 w-4" aria-hidden />
+              Compartilhar link
             </button>
-          </div>
-        </section>
+          </CardapioOpcaoCard>
+
+          <CardapioOpcaoCard
+            icon={MdMenuBook}
+            title="Cardápio publicado no delivery"
+            description="Produtos, preços e fotos do app público e do delivery manual no Gestor saem deste menu."
+          >
+            <MenuParametroEmpresaSelect
+              id="delivery-hub-menu"
+              label="Cardápio"
+              value={menuDeliveryId}
+              onChange={setMenuDeliveryId}
+              disabled={carregando}
+            />
+          </CardapioOpcaoCard>
+        </div>
+
+        {!configurado ? (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Escolha um slug e clique em &quot;Ativar Delivery&quot; para publicar sua loja online.
+          </p>
+        ) : null}
+
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => void handleSalvar()}
+            disabled={carregando}
+            className="inline-flex h-10 items-center justify-center rounded-lg bg-secondary px-6 text-sm font-semibold text-white transition-colors hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {carregando
+              ? 'Salvando...'
+              : configurado
+                ? 'Salvar alterações'
+                : 'Ativar Delivery'}
+          </button>
+        </div>
       </div>
     </div>
   )

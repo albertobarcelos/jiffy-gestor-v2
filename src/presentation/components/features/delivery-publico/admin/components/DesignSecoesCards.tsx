@@ -9,33 +9,30 @@ type DesignSecoesCardsProps = {
 
 export function DesignSecoesCards({ onAbrirSecao }: DesignSecoesCardsProps) {
   return (
-    <div className="mx-auto w-full max-w-3xl">
+    <div className="mx-auto w-full max-w-5xl">
       <h1 className="text-xl font-bold text-primary md:text-2xl">Personalizar Loja</h1>
       <p className="mt-1 text-sm text-secondary-text">
         Escolha o que deseja configurar. O preview à direita atualiza conforme você edita.
       </p>
 
-      <ul className="mt-6 grid gap-3 sm:grid-cols-2">
+      <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {DESIGN_TABS.map(tab => (
           <li key={tab.id}>
             <button
               type="button"
               onClick={() => onAbrirSecao(tab.id)}
-              className="group flex h-full w-full flex-col items-start gap-3 rounded-2xl border-2 border-gray-200 bg-white p-5 text-left shadow-sm transition-all hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              className="group flex h-full w-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-center shadow-sm transition-all hover:border-alternate/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alternate/40"
             >
-              <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-white">
-                <tab.icon className="h-6 w-6" aria-hidden />
+              <span className="flex min-h-[9rem] w-full items-center justify-center bg-alternate/20 text-alternate transition-colors group-hover:bg-alternate/30">
+                <tab.icon className="h-16 w-16" aria-hidden />
               </span>
-              <span className="min-w-0">
-                <span className="block text-base font-semibold text-primary-text group-hover:text-primary">
+              <span className="flex flex-1 flex-col justify-center gap-1.5 px-4 py-5">
+                <span className="block text-base font-bold text-primary-text group-hover:text-alternate">
                   {tab.label}
                 </span>
-                <span className="mt-1 block text-sm leading-snug text-secondary-text">
+                <span className="block text-sm leading-snug text-secondary-text">
                   {tab.descricao}
                 </span>
-              </span>
-              <span className="mt-auto text-xs font-semibold uppercase tracking-wide text-primary opacity-80">
-                {tab.cta} →
               </span>
             </button>
           </li>

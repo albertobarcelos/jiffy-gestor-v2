@@ -32,7 +32,7 @@ export type DeliveryDesignSectionTabId =
 export const DESIGN_TABS: DesignTabDefinition[] = [
   {
     id: 'cardapio',
-    label: 'Cardápio',
+    label: 'Cardápio e Link da Loja',
     descricao: 'Cardápio publicado e link público da loja.',
     icon: MdLink,
     cta: 'Abrir',
