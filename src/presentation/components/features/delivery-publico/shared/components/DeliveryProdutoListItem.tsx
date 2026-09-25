@@ -52,7 +52,7 @@ function ProdutoThumb({
 
   return (
     <div
-      className="relative w-24 min-h-24 shrink-0 self-stretch border-l @lg:w-36 @lg:min-h-36 @xl:w-40 @xl:min-h-40"
+      className="relative w-28 min-h-28 shrink-0 self-stretch border-l @lg:w-36 @lg:min-h-36 @xl:w-40 @xl:min-h-40"
       style={{ backgroundColor: '#ffffff', borderColor: '#e5e7eb' }}
     >
       {interactive && onOpenClick ? (

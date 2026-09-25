@@ -36,7 +36,7 @@ export function DeliverySugestoesProdutoCard({
   }
 
   return (
-    <article className="w-[9.25rem] shrink-0 snap-start @sm:w-[10.125rem] @lg:w-[10.75rem]">
+    <article className="w-[8.75rem] shrink-0 snap-start @lg:w-[11.25rem] @xl:w-[12.5rem]">
       <div
         className="relative aspect-square w-full overflow-hidden rounded-lg border"
         style={{ backgroundColor: '#ffffff', borderColor: '#e5e7eb' }}
