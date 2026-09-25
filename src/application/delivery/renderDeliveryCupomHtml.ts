@@ -28,6 +28,7 @@ import {
   montarModeloProducao80mm,
 } from '@/src/application/delivery/layoutProducao80mm'
 import { origemModeloProducaoDeTicket } from '@/src/application/delivery/origemModeloProducao'
+import { valorComplementoParaExibicaoCupom } from '@/src/application/delivery/valorComplementoImpressao'
 import { ESCPOS_FONT_A_FACE_CSS } from '@/src/infrastructure/printing/escposFontAFace'
 
 export interface RenderDeliveryCupomHtmlInput {
@@ -248,13 +249,16 @@ function valorItem(item: VendaGestorTicketItem): number | null {
 }
 
 function valorComplemento(comp: {
+  tipoImpactoPreco?: string | null
+  quantidade?: number | null
   impressao?: {
     valorFinal?: number | null
     valorTotal?: number | null
     valorUnitario?: number | null
+    quantidade?: number | null
   } | null
 } | null): number | null {
-  return numeroFinito(comp?.impressao?.valorFinal ?? comp?.impressao?.valorTotal ?? comp?.impressao?.valorUnitario)
+  return valorComplementoParaExibicaoCupom(comp)
 }
 
 function marcarSinalComplementoHtml(texto: string): string {
