@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { MdArrowBack } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -17,6 +17,7 @@ import {
 import {
   DESIGN_SECTION_QUERY_KEY,
   DESIGN_TABS,
+  deliveryHubDesignPath,
   deliveryHubDesignSectionPath,
   isDesignTabId,
 } from '../../shared/constants/designTabs'
@@ -25,14 +26,13 @@ import { useDesignCategoriaGrupos } from '../../shared/hooks/useDesignCategoriaG
 import type { DesignCategoriaGrupo } from '../../shared/types/designCategoriaGrupo'
 import { mergeDesignCategoriaGrupos } from '../../shared/utils/mergeDesignCategoriaGrupos'
 import { DeliveryMobilePreviewFrame } from '../components/DeliveryMobilePreviewFrame'
-import { DesignTabNav } from '../components/DesignTabNav'
+import { DesignSecoesCards } from '../components/DesignSecoesCards'
 import { DesignCabecalhoTab } from '../components/tabs/DesignCabecalhoTab'
 import { DesignModelosTab } from '../components/tabs/DesignModelosTab'
 import { DesignCoresTab } from '../components/tabs/DesignCoresTab'
 import { DesignTipografiasTab } from '../components/tabs/DesignTipografiasTab'
 import { DesignCategoriasTab } from '../components/tabs/DesignCategoriasTab'
 import { DeliveryNomeCardapioView } from '@/src/presentation/components/features/delivery/hub/DeliveryNomeCardapioView'
-import { DELIVERY_HUB_PATH } from '@/src/presentation/components/features/delivery/hub/deliveryHubEtapas'
 
 function DesignSectionForm({
   activeSection,
@@ -53,7 +53,7 @@ function DesignSectionForm({
   hasEmpresaDelivery: boolean
   updateDraft: ReturnType<typeof useDeliveryDesignDraft>['updateDraft']
   previewCategoriasGrupos: DesignCategoriaGrupo[]
-  setPreviewCategoriasGrupos: React.Dispatch<React.SetStateAction<DesignCategoriaGrupo[]>>
+  setPreviewCategoriasGrupos: Dispatch<SetStateAction<DesignCategoriaGrupo[]>>
   menuDeliveryId: string | null
   hasMenu: boolean
   categoriasGruposLoading: boolean
@@ -104,7 +104,8 @@ export function DeliveryDesignCustomizerScreen() {
   const { data: empresaDelivery, isLoading: deliveryLoading } = useEmpresaDeliveryMe()
 
   const secaoParam = searchParams.get(DESIGN_SECTION_QUERY_KEY)
-  const activeSection: DesignTabId = isDesignTabId(secaoParam) ? secaoParam : 'cabecalho'
+  const activeSection: DesignTabId | null = isDesignTabId(secaoParam) ? secaoParam : null
+  const isLobby = activeSection == null
 
   const { draft, hydrated, isDirty, updateDraft, publish } = useDeliveryDesignDraft({
     empresaId: empresa?.id,
@@ -127,14 +128,17 @@ export function DeliveryDesignCustomizerScreen() {
     )
   }, [categoriasGrupos])
 
+  /** Query inválida (ex.: ?secao=foo) → lobby de cards. */
   useEffect(() => {
-    if (!isDesignTabId(secaoParam)) {
-      router.replace(toGestao(deliveryHubDesignSectionPath('cabecalho')))
+    if (secaoParam != null && secaoParam !== '' && !isDesignTabId(secaoParam)) {
+      router.replace(toGestao(deliveryHubDesignPath()))
     }
   }, [router, secaoParam, toGestao])
 
   const canSave = canPublishDesign(draft)
-  const sectionMeta = DESIGN_TABS.find(tab => tab.id === activeSection)
+  const sectionMeta = activeSection
+    ? DESIGN_TABS.find(tab => tab.id === activeSection)
+    : undefined
 
   const handleSave = useCallback(() => {
     if (!canPublishDesign(draft)) return
@@ -142,8 +146,8 @@ export function DeliveryDesignCustomizerScreen() {
     showToast.success('Design salvo! As alterações já valem no cardápio público.')
   }, [draft, publish])
 
-  const voltarAoHubDelivery = useCallback(() => {
-    router.push(toGestao(DELIVERY_HUB_PATH))
+  const voltarAoLobbyCards = useCallback(() => {
+    router.push(toGestao(deliveryHubDesignPath()))
   }, [router, toGestao])
 
   const abrirSecao = useCallback(
@@ -164,58 +168,62 @@ export function DeliveryDesignCustomizerScreen() {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white lg:flex-row">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:border-r lg:border-gray-200">
-        <header className="shrink-0 border-b border-gray-200 px-4 pt-2 md:px-6">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <button
-              type="button"
-              onClick={voltarAoHubDelivery}
-              className="inline-flex items-center gap-1 text-sm font-semibold text-primary-text transition-colors hover:text-primary"
-            >
-              <MdArrowBack className="h-4 w-4" aria-hidden />
-              Voltar
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={!canSave || !isDirty}
-              title={
-                getPublishDisabledReason(draft) ?? 'Salva e aplica no cardápio público'
-              }
-              className={
-                activeSection === 'cardapio'
-                  ? 'hidden'
-                  : 'inline-flex h-9 items-center rounded-lg bg-secondary px-5 text-sm font-semibold text-white transition-colors hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-50'
-              }
-            >
-              Salvar
-            </button>
+        {isLobby ? (
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
+            <DesignSecoesCards onAbrirSecao={abrirSecao} />
           </div>
+        ) : (
+          <>
+            <header className="shrink-0 border-b border-gray-200 px-4 pt-2 md:px-6">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={voltarAoLobbyCards}
+                  className="inline-flex items-center gap-1 text-sm font-semibold text-primary-text transition-colors hover:text-primary"
+                >
+                  <MdArrowBack className="h-4 w-4" aria-hidden />
+                  Voltar
+                </button>
 
-          <h1 className="mt-1 text-xl font-bold text-primary">
-            {sectionMeta?.label ?? 'Personalizar Loja'}
-          </h1>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={!canSave || !isDirty}
+                  title={
+                    getPublishDisabledReason(draft) ?? 'Salva e aplica no cardápio público'
+                  }
+                  className={
+                    activeSection === 'cardapio'
+                      ? 'hidden'
+                      : 'inline-flex h-9 items-center rounded-lg bg-secondary px-5 text-sm font-semibold text-white transition-colors hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-50'
+                  }
+                >
+                  Salvar
+                </button>
+              </div>
 
-          <div className="mt-2">
-            <DesignTabNav activeTab={activeSection} onTabChange={abrirSecao} />
-          </div>
-        </header>
+              <h1 className="mt-1 pb-3 text-xl font-bold text-primary">
+                {sectionMeta?.label ?? 'Personalizar Loja'}
+              </h1>
+            </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-3 md:p-4">
-          <DesignSectionForm
-            activeSection={activeSection}
-            draft={draft}
-            slug={empresaDelivery?.slug}
-            hasEmpresaDelivery={Boolean(empresaDelivery)}
-            updateDraft={updateDraft}
-            previewCategoriasGrupos={previewCategoriasGrupos}
-            setPreviewCategoriasGrupos={setPreviewCategoriasGrupos}
-            menuDeliveryId={menuDeliveryId}
-            hasMenu={hasMenu}
-            categoriasGruposLoading={categoriasGruposLoading}
-            categoriasGruposError={categoriasGruposError}
-          />
-        </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-3 md:p-4">
+              <DesignSectionForm
+                activeSection={activeSection}
+                draft={draft}
+                slug={empresaDelivery?.slug}
+                hasEmpresaDelivery={Boolean(empresaDelivery)}
+                updateDraft={updateDraft}
+                previewCategoriasGrupos={previewCategoriasGrupos}
+                setPreviewCategoriasGrupos={setPreviewCategoriasGrupos}
+                menuDeliveryId={menuDeliveryId}
+                hasMenu={hasMenu}
+                categoriasGruposLoading={categoriasGruposLoading}
+                categoriasGruposError={categoriasGruposError}
+              />
+            </div>
+          </>
+        )}
       </div>
 
       <aside className="flex min-h-0 flex-1 flex-col overflow-hidden border-t border-gray-200 bg-gray-50 p-3 lg:w-[min(100%,26.25rem)] lg:max-w-[26.25rem] lg:flex-none lg:shrink-0 lg:border-l lg:border-t-0 lg:p-4 xl:w-[min(100%,27.5rem)] xl:max-w-[27.5rem]">

@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import React, { useCallback, useEffect, useMemo, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import { useCanalWhatsAppDelivery, useCanalWhatsAppStatus } from '@/src/presentation/hooks/useCanalWhatsAppDelivery'
@@ -13,7 +13,13 @@ import {
   getDeliveryEtapaById,
   type DeliveryEtapaId,
 } from './deliveryHubEtapas'
-import { deliveryHubDesignSectionPath } from '@/src/presentation/components/features/delivery-publico/shared/constants/designTabs'
+import {
+  DESIGN_SECTION_QUERY_KEY,
+  deliveryHubDesignPath,
+  deliveryHubDesignSectionPath,
+  isDesignTabId,
+} from '@/src/presentation/components/features/delivery-publico/shared/constants/designTabs'
+import type { DesignTabId } from '@/src/presentation/components/features/delivery-publico/shared/types/deliveryPublicoDesignConfig'
 import { calcularDeliveryHubProgresso } from './deliveryHubProgresso'
 import { DeliveryHubHome } from './DeliveryHubHome'
 
@@ -22,6 +28,7 @@ import { DeliveryHubHome } from './DeliveryHubHome'
  */
 export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId | null }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { toGestao } = useGestaoPath()
   const pedirSaida = usePedirSaidaCobertura()
   const empresaDeliveryQuery = useEmpresaDeliveryMe()
@@ -29,6 +36,10 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
 
   const activeEtapaId =
     etapaId && etapaId !== 'delivery-loja' ? etapaId : null
+
+  const secaoParam = searchParams.get(DESIGN_SECTION_QUERY_KEY)
+  const activeDesignSection: DesignTabId | null =
+    activeEtapaId === 'delivery-design' && isDesignTabId(secaoParam) ? secaoParam : null
 
   const empresaDelivery = empresaDeliveryQuery.data
   const configurado = empresaDelivery != null
@@ -100,6 +111,14 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
 
   const abrirEtapa = useCallback(
     (proximaEtapaId: DeliveryEtapaId) => {
+      /** Personalizar Loja: sempre o lobby de cards (mesmo já estando em design com seção). */
+      if (proximaEtapaId === 'delivery-design') {
+        if (activeEtapaId === 'delivery-design' && activeDesignSection == null) return
+        pedirSaida(() => {
+          router.push(toGestao(deliveryHubDesignPath()))
+        })
+        return
+      }
       if (proximaEtapaId === activeEtapaId) return
       const etapa = getDeliveryEtapaById(proximaEtapaId)
       if (!etapa || etapa.id === 'delivery-loja') return
@@ -107,7 +126,17 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
         router.push(toGestao(etapa.path))
       })
     },
-    [activeEtapaId, pedirSaida, router, toGestao]
+    [activeDesignSection, activeEtapaId, pedirSaida, router, toGestao]
+  )
+
+  const abrirDesignSecao = useCallback(
+    (section: DesignTabId) => {
+      if (activeEtapaId === 'delivery-design' && activeDesignSection === section) return
+      pedirSaida(() => {
+        router.push(toGestao(deliveryHubDesignSectionPath(section)))
+      })
+    },
+    [activeDesignSection, activeEtapaId, pedirSaida, router, toGestao]
   )
 
   if (
@@ -162,7 +191,9 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
       progresso={progresso}
       passosExtras={passosExtras}
       activeEtapaId={activeEtapaId}
+      activeDesignSection={activeDesignSection}
       onAbrirEtapa={abrirEtapa}
+      onAbrirDesignSecao={abrirDesignSecao}
       panel={panel}
     />
   )
