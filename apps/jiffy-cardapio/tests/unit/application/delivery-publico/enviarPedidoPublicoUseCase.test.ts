@@ -287,6 +287,7 @@ describe('EnviarPedidoPublicoUseCase', () => {
       error: 'Informe o CPF para finalizar o pedido',
     })
     expect(publicDeliveryApi.criarPedidoPublico).not.toHaveBeenCalled()
+    expect(publicDeliveryApi.criarClienteDeliveryPublico).not.toHaveBeenCalled()
   })
 })
 

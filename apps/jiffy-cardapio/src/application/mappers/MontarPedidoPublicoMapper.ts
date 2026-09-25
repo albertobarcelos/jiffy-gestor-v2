@@ -43,6 +43,13 @@ type ComposicaoPedidoPublico = {
   cpfDocumento: string | null
 }
 
+export function validarCpfPedidoPublico(
+  cpfMascarado: string,
+  exigeCpfVenda: boolean
+): { ok: true; cpf: string | null } | { ok: false; error: string } {
+  return extrairCpfPedido(cpfMascarado, exigeCpfVenda)
+}
+
 function extrairCpfPedido(
   cpfMascarado: string,
   exigeCpfVenda: boolean
