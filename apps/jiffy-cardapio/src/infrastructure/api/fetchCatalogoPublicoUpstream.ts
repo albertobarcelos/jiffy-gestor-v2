@@ -1,6 +1,10 @@
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 import type { GetCatalogoPublicoResponseDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { normalizarCatalogoPublicoImagens } from '@/src/application/mappers/normalizarCatalogoPublicoImagens'
+import {
+  CATALOGO_PUBLICO_REVALIDATE_SECONDS,
+  catalogoPublicoCacheTag,
+} from '@/src/infrastructure/cache/catalogoPublicoCache'
 import { CATALOGO_GRUPOS_PAGE_LIMIT } from '@/src/presentation/hooks/publicDeliveryCatalogKeys'
 
 /**
@@ -30,6 +34,10 @@ export async function fetchCatalogoPublicoUpstream(
       {
         method: 'GET',
         headers: { Accept: 'application/json' },
+        next: {
+          revalidate: CATALOGO_PUBLICO_REVALIDATE_SECONDS,
+          tags: [catalogoPublicoCacheTag(slugNormalizado)],
+        },
       }
     )
     if (!response.data) {

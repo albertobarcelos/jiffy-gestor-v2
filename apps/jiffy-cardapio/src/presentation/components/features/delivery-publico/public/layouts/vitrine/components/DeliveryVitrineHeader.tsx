@@ -2,6 +2,8 @@
 
 import { User } from 'lucide-react'
 import type { DeliveryPublicoDesignConfig } from '../../../../shared/types/deliveryPublicoDesignConfig'
+import { DeliveryPublicoMidiaImagem } from '../../../../shared/media/DeliveryPublicoMidiaImagem'
+import { DELIVERY_IMAGEM_SIZES } from '../../../../shared/media/deliveryPublicoImageHosts'
 
 type DeliveryVitrineHeaderProps = {
   config: DeliveryPublicoDesignConfig
@@ -18,22 +20,30 @@ export function DeliveryVitrineHeader({
   return (
     <header className="relative">
       <div
-        className="relative h-44 bg-cover bg-center @sm:h-48 @lg:h-52"
-        style={{
-          backgroundColor: 'var(--delivery-hero-bg)',
-          backgroundImage: config.cabecalho.capaUrl ? `url(${config.cabecalho.capaUrl})` : undefined,
-        }}
+        className="relative h-44 overflow-hidden @sm:h-48 @lg:h-52"
+        style={{ backgroundColor: 'var(--delivery-hero-bg)' }}
       >
+        {config.cabecalho.capaUrl ? (
+          <DeliveryPublicoMidiaImagem
+            src={config.cabecalho.capaUrl}
+            sizes={DELIVERY_IMAGEM_SIZES.capa}
+            priority
+            className="object-cover object-center"
+          />
+        ) : null}
         <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/10 to-black/55" />
 
         <div className="absolute left-3 top-3 z-10 @sm:left-4 @sm:top-4">
           <div
-            className="flex h-14 w-14 items-center justify-center overflow-hidden border-2 border-white bg-white shadow-md @sm:h-16 @sm:w-16"
+            className="relative flex h-14 w-14 items-center justify-center overflow-hidden border-2 border-white bg-white shadow-md @sm:h-16 @sm:w-16"
             style={{ borderRadius: logoRadius }}
           >
             {config.cabecalho.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={config.cabecalho.logoUrl} alt="" className="h-full w-full object-cover" />
+              <DeliveryPublicoMidiaImagem
+                src={config.cabecalho.logoUrl}
+                sizes={DELIVERY_IMAGEM_SIZES.logo}
+                className="object-cover"
+              />
             ) : (
               <span
                 className="text-xl font-bold @sm:text-2xl"
