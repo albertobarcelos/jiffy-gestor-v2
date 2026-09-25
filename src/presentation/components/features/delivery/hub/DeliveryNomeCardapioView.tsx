@@ -37,6 +37,7 @@ export function DeliveryNomeCardapioView() {
   const [slug, setSlug] = useState('')
   const [slugErro, setSlugErro] = useState<string | null>(null)
   const [menuDeliveryId, setMenuDeliveryId] = useState<string | null>(null)
+  const [exigeCpfVenda, setExigeCpfVenda] = useState(false)
   const formularioHidratadoRef = useRef(false)
 
   const empresaDelivery = empresaDeliveryQuery.data
@@ -58,6 +59,7 @@ export function DeliveryNomeCardapioView() {
     if (empresaDelivery) {
       formularioHidratadoRef.current = true
       setSlug(empresaDelivery.slug)
+      setExigeCpfVenda(empresaDelivery.parametroDelivery?.exigeCpfVenda === true)
       return
     }
 
@@ -111,7 +113,7 @@ export function DeliveryNomeCardapioView() {
 
     const payload = {
       slug: slugNormalizado,
-      parametroDelivery: { menuDeliveryId },
+      parametroDelivery: { menuDeliveryId, exigeCpfVenda },
     }
 
     try {
@@ -130,7 +132,7 @@ export function DeliveryNomeCardapioView() {
         error instanceof Error ? error.message : 'Não foi possível salvar as configurações.'
       showToast.error(msg)
     }
-  }, [atualizarMutation, configurado, criarMutation, menuDeliveryId, slug])
+  }, [atualizarMutation, configurado, criarMutation, exigeCpfVenda, menuDeliveryId, slug])
 
   if (empresaDeliveryQuery.isPending) {
     return (
@@ -218,6 +220,29 @@ export function DeliveryNomeCardapioView() {
               />
             </div>
             {slugErro ? <p className="mt-1 text-xs text-red-600">{slugErro}</p> : null}
+          </div>
+
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-3">
+            <div className="min-w-0">
+              <label
+                htmlFor="delivery-hub-exige-cpf"
+                className="text-sm font-semibold text-primary-text"
+              >
+                Exigir CPF na finalização do pedido
+              </label>
+              <p className="mt-0.5 text-xs text-secondary-text">
+                No cardápio público, o cliente só consegue finalizar o pedido informando um CPF
+                válido.
+              </p>
+            </div>
+            <input
+              id="delivery-hub-exige-cpf"
+              type="checkbox"
+              checked={exigeCpfVenda}
+              disabled={carregando}
+              onChange={e => setExigeCpfVenda(e.target.checked)}
+              className="h-4 w-4 shrink-0 rounded border-gray-300 accent-secondary focus:ring-secondary disabled:cursor-not-allowed disabled:opacity-60"
+            />
           </div>
 
           {!configurado ? (

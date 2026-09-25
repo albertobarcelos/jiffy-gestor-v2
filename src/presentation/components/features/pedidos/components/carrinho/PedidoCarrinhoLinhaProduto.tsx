@@ -181,7 +181,7 @@ export function PedidoCarrinhoLinhaProduto({
             }
           }}
         />
-        <div className="min-w-0">
+        <div className="min-w-0 py-0.5">
           <span
             className="block truncate text-xs text-gray-900 cursor-pointer"
             title="Duplo clique para editar o produto"

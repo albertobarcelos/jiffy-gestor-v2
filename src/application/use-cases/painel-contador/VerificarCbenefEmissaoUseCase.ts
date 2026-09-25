@@ -1,5 +1,6 @@
 import type { IFiscalPainelRepository } from '@/src/domain/repositories/IFiscalPainelRepository'
 import { FiscalPainelMapper } from '@/src/application/mappers/FiscalPainelMapper'
+import { ListarNcmCestFiscalPorProdutoIdsUseCase } from '@/src/application/use-cases/produtos/BuscarNcmCestFiscalProdutoUseCase'
 import { CarregarVendaDetalheUseCase } from '@/src/application/use-cases/vendas/CarregarVendaDetalheUseCase'
 import {
   identificarItensSemCbenef,
@@ -16,7 +17,8 @@ export interface VerificarCbenefEmissaoInput {
 export class VerificarCbenefEmissaoUseCase {
   constructor(
     private readonly fiscalRepo: IFiscalPainelRepository,
-    private readonly carregarVendaDetalhe: CarregarVendaDetalheUseCase
+    private readonly carregarVendaDetalhe: CarregarVendaDetalheUseCase,
+    private readonly listarNcmCestFiscal: ListarNcmCestFiscalPorProdutoIdsUseCase
   ) {}
 
   async execute(input: VerificarCbenefEmissaoInput): Promise<ItemVendaCbenef[]> {
@@ -45,12 +47,16 @@ export class VerificarCbenefEmissaoUseCase {
       ])
     )
 
-    const itens: ItemVendaCbenef[] = detalhe.produtos
-      .filter((produto) => !produto.removido)
-      .map((produto) => ({
-        nome: produto.nome,
-        ncm: produto.ncm ?? '',
-      }))
+    const produtosAtivos = detalhe.produtos.filter(produto => !produto.removido)
+    const fiscalPorProdutoId = await this.listarNcmCestFiscal.execute(
+      produtosAtivos.map(produto => produto.produtoId),
+      input.token
+    )
+
+    const itens: ItemVendaCbenef[] = produtosAtivos.map(produto => ({
+      nome: produto.nome,
+      ncm: fiscalPorProdutoId[produto.produtoId]?.ncm ?? '',
+    }))
 
     return identificarItensSemCbenef({
       crt: resumo.codigoRegimeTributario,

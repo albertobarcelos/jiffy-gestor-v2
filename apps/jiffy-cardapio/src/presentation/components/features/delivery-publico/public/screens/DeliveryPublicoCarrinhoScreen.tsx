@@ -209,6 +209,10 @@ export function DeliveryPublicoCarrinhoScreen({
     [removerItem, slug]
   )
 
+  const catalogQuery = usePublicDeliveryCatalogInfinite(slug)
+  const empresa = catalogQuery.data?.pages[0]?.empresa ?? null
+  const exigeCpfVenda = empresa?.exigeCpfVenda === true
+
   const {
     itens,
     total,
@@ -246,6 +250,7 @@ export function DeliveryPublicoCarrinhoScreen({
   } = useDeliveryCheckout(slug, {
     fetchMeiosPagamento: true,
     prefetchMeiosAposIdentificacao: true,
+    exigeCpfVenda,
   })
 
   const quantidadeItens = useMemo(
@@ -258,10 +263,8 @@ export function DeliveryPublicoCarrinhoScreen({
     [itens, removingIds]
   )
 
-  const catalogQuery = usePublicDeliveryCatalogInfinite(slug)
   const cacheComplementos = usePublicDeliveryComplementosStore(s => s.porSlug[slug] ?? null)
 
-  const empresa = catalogQuery.data?.pages[0]?.empresa ?? null
   const enderecoEmpresaTexto = formatEmpresaPublicaEndereco(empresa?.endereco ?? null)
   const { localizacaoEmpresa } = useLocalizacaoEmpresaPublica(
     slug,
@@ -974,6 +977,7 @@ export function DeliveryPublicoCarrinhoScreen({
             pagamentos={pagamentosRevisao}
             observacaoPedido={form.observacaoPedido}
             cpfNotaFiscal={form.cpfNotaFiscal}
+            exigeCpfVenda={exigeCpfVenda}
             enviando={enviando}
             etapaEnvio={etapaEnvio}
             onClose={fecharCheckout}

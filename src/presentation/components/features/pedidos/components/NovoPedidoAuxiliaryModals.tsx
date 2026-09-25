@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '@/src/presentation/components/ui/dialog'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Textarea } from '@/src/presentation/components/ui/textarea'
@@ -10,11 +11,21 @@ import { PainelEdicaoProdutoLinhaPedido } from './PainelEdicaoProdutoLinhaPedido
 import { ProdutosTabsModal } from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
 import { ClientesTabsModal } from '@/src/presentation/components/features/clientes/ClientesTabsModal'
 import { ComplementosTabsModal } from '@/src/presentation/components/features/complementos/ComplementosTabsModal'
+import { DeliveryConfiguracoesModal } from '@/src/presentation/components/features/delivery/configuracoes/DeliveryConfiguracoesModal'
+import { EVENTO_ABRIR_CONFIG_ESTACAO_IMPRESSAO } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
 import { useNovoPedidoDetalheContext } from '../context/NovoPedidoDetalheContext'
 import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
 import { useNovoPedidoUIContext } from '../context/NovoPedidoUIContext'
 
 export function NovoPedidoAuxiliaryModals() {
+  const [configEstacaoOpen, setConfigEstacaoOpen] = useState(false)
+
+  useEffect(() => {
+    const abrir = () => setConfigEstacaoOpen(true)
+    window.addEventListener(EVENTO_ABRIR_CONFIG_ESTACAO_IMPRESSAO, abrir)
+    return () => window.removeEventListener(EVENTO_ABRIR_CONFIG_ESTACAO_IMPRESSAO, abrir)
+  }, [])
+
   const {
     cancelarNotaFiscalVendaGestor,
     cancelarNotaFiscalVendaPdv,
@@ -89,7 +100,14 @@ export function NovoPedidoAuxiliaryModals() {
   } = useNovoPedidoFormContext()
 
   return (
-    <>        {seletorClienteOpen && (
+    <>
+      {configEstacaoOpen ? (
+        <DeliveryConfiguracoesModal
+          open
+          onClose={() => setConfigEstacaoOpen(false)}
+        />
+      ) : null}
+      {seletorClienteOpen && (
           <SeletorClienteModal
             open={seletorClienteOpen}
             onClose={() => setSeletorClienteOpen(false)}

@@ -40,7 +40,7 @@ function produtoCadastroComComplementos(): Produto {
     valor: 20,
     ativo: true,
     abreComplementos: true,
-    ncm: '21069090',
+    fiscal: { ncm: '21069090' },
     unidadeMedida: 'UN',
     gruposComplementos: [
       {

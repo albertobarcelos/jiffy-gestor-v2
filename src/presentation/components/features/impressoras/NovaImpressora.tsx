@@ -111,9 +111,9 @@ function terminaisAtivosParaNovaImpressora<T extends { bloqueado?: boolean | str
   return items.filter(t => !(t.bloqueado === true || t.bloqueado === 'true'))
 }
 
-/** Grid desktop: modo (select) + switches compactos + modelo/IP/porta sempre visíveis */
+/** Grid desktop: modo + switches compactos; Modelo/IP/Porta com a mesma largura relativa */
 const DESKTOP_TERMINAL_ROW_GRID =
-  'grid grid-cols-[auto_minmax(0,1fr)_minmax(7.25rem,8.5rem)_4.25rem_4.25rem_minmax(5.5rem,1fr)_minmax(5rem,0.85fr)_3.75rem] items-center gap-2 px-2 min-w-[50rem]'
+  'grid grid-cols-[auto_minmax(0,1fr)_minmax(7.25rem,8.5rem)_4.25rem_4.25rem_minmax(5.5rem,1fr)_minmax(5.5rem,1fr)_minmax(5.5rem,1fr)] items-center gap-2 px-2 min-w-[52rem]'
 
 /** Debounce do termo enviado ao GET `/api/terminais?q=` (nova impressora — lista via API). */
 const BUSCA_TERMINAL_DEBOUNCE_MS = 480

@@ -24,6 +24,8 @@ export type MontarPedidoPublicoParams = {
    * após encontrar o cliente.
    */
   telefoneApi?: string | null
+  /** Quando true, CPF vazio ou incompleto bloqueia o pedido. */
+  exigeCpfVenda?: boolean
 }
 
 export type MontarPedidoPublicoResult =
@@ -41,11 +43,24 @@ type ComposicaoPedidoPublico = {
   cpfDocumento: string | null
 }
 
+export function validarCpfPedidoPublico(
+  cpfMascarado: string,
+  exigeCpfVenda: boolean
+): { ok: true; cpf: string | null } | { ok: false; error: string } {
+  return extrairCpfPedido(cpfMascarado, exigeCpfVenda)
+}
+
 function extrairCpfPedido(
-  cpfMascarado: string
+  cpfMascarado: string,
+  exigeCpfVenda: boolean
 ): { ok: true; cpf: string | null } | { ok: false; error: string } {
   const digits = cpfMascarado.replace(/\D/g, '').slice(0, 11)
-  if (!digits) return { ok: true, cpf: null }
+  if (!digits) {
+    if (exigeCpfVenda) {
+      return { ok: false, error: 'Informe o CPF para finalizar o pedido' }
+    }
+    return { ok: true, cpf: null }
+  }
   if (digits.length !== 11) {
     return { ok: false, error: 'Informe um CPF completo com 11 dígitos' }
   }
@@ -57,6 +72,7 @@ function montarComposicaoPedidoPublico({
   form,
   enderecoIdEntrega,
   telefoneApi,
+  exigeCpfVenda = false,
 }: Omit<MontarPedidoPublicoParams, 'slug' | 'total'>):
   | { ok: true; composicao: ComposicaoPedidoPublico }
   | { ok: false; error: string } {
@@ -86,7 +102,7 @@ function montarComposicaoPedidoPublico({
     }
   }
 
-  const cpfResult = extrairCpfPedido(form.cpfNotaFiscal)
+  const cpfResult = extrairCpfPedido(form.cpfNotaFiscal, exigeCpfVenda)
   if (!cpfResult.ok) return cpfResult
 
   const produtos = itens.map(item => ({

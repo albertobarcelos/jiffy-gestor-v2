@@ -268,6 +268,27 @@ describe('EnviarPedidoPublicoUseCase', () => {
     expect(result).toEqual({ ok: false, error: 'Informe um telefone válido' })
     expect(publicDeliveryApi.criarPedidoPublico).not.toHaveBeenCalled()
   })
+
+  it('bloqueia envio sem CPF quando exigeCpfVenda é true', async () => {
+    const useCase = criarEnviarUseCase()
+    const result = await useCase.execute({
+      slug: 'loja',
+      telefoneApi: '11999999999',
+      nomeEfetivo: 'Cliente',
+      itens: [item],
+      total: 20,
+      form: formBase({ cpfNotaFiscal: '' }),
+      clienteLookup: null,
+      tokenCotacao,
+      exigeCpfVenda: true,
+    })
+    expect(result).toEqual({
+      ok: false,
+      error: 'Informe o CPF para finalizar o pedido',
+    })
+    expect(publicDeliveryApi.criarPedidoPublico).not.toHaveBeenCalled()
+    expect(publicDeliveryApi.criarClienteDeliveryPublico).not.toHaveBeenCalled()
+  })
 })
 
 describe('GarantirEnderecoEntregaPublicoUseCase', () => {

@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { MdKebabDining } from 'react-icons/md'
 import {
   JiffySidePanelModal,
   type JiffySidePanelFooterActions,
@@ -9,19 +10,21 @@ import { MENU_SIDE_PANEL_CLASS } from '@/src/presentation/components/features/me
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { cn } from '@/src/shared/utils/cn'
 
-export type TipoCadastroProduto = 'preparado' | 'pizza'
+export type TipoCadastroProduto = 'preparado' | 'pizza' | 'rodizio'
 
 const OPCOES: Array<{
   id: TipoCadastroProduto
   titulo: string
   descricao: string
   disponivel: boolean
-  iconName: string
+  iconName?: string
+  icon?: ReactNode
 }> = [
   {
     id: 'preparado',
-    titulo: 'Produto Preparado',
-    descricao: 'Produtos produzidos pela sua loja, como marmitas, bolos, lanches e etc.',
+    titulo: 'Produto do Cardápio',
+    descricao:
+      'Cadastre produtos variados do cardápio, industrializados ou preparados na loja.',
     disponivel: true,
     iconName: 'potMix',
   },
@@ -31,6 +34,13 @@ const OPCOES: Array<{
     descricao: 'Defina tamanho, tipos de massa, borda e sabores.',
     disponivel: false,
     iconName: 'pizza',
+  },
+  {
+    id: 'rodizio',
+    titulo: 'Rodízio',
+    descricao: 'Monte rodízios com itens à vontade, regras de consumo e cobrança por pessoa.',
+    disponivel: false,
+    icon: <MdKebabDining size={22} aria-hidden />,
   },
 ]
 
@@ -109,7 +119,9 @@ export function EscolherTipoProdutoModal({
                     : 'border-gray-200 bg-gray-50 text-secondary-text'
                 )}
               >
-                <DinamicIcon iconName={opcao.iconName} size={22} color="currentColor" />
+                {opcao.icon ?? (
+                  <DinamicIcon iconName={opcao.iconName} size={22} color="currentColor" />
+                )}
               </span>
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-2">

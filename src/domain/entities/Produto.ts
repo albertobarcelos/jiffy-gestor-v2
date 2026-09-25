@@ -62,8 +62,8 @@ function firstNonEmptyString(...candidates: unknown[]): string {
 }
 
 /**
- * Lê campos fiscais do JSON do cardápio: objeto `fiscal`, opcional `dadosFiscais`,
- * aliases comuns (`codigoCest`, `codigoNcm`, snake_case) e raiz do produto.
+ * Lê campos fiscais só do bloco `fiscal` / `dadosFiscais`.
+ * Não usa `ncm`/`cest` na raiz — esse campo será removido.
  */
 function extractFiscalStrings(data: any): {
   ncm: string
@@ -78,22 +78,12 @@ function extractFiscalStrings(data: any): {
   /** `fiscal` sobrescreve `dadosFiscais` quando ambos existem. */
   const fiscal = { ...dadosFiscais, ...fiscalNested }
 
-  const ncm = firstNonEmptyString(
-    fiscal.ncm,
-    fiscal.codigoNcm,
-    fiscal.codigo_ncm,
-    d.ncm,
-    d.codigoNcm,
-    d.codigo_ncm,
-  )
+  const ncm = firstNonEmptyString(fiscal.ncm, fiscal.codigoNcm, fiscal.codigo_ncm)
   const cest = firstNonEmptyString(
     fiscal.cest,
     fiscal.codigoCest,
     fiscal.cestCodigo,
-    fiscal.codigo_cest,
-    d.cest,
-    d.codigoCest,
-    d.codigo_cest,
+    fiscal.codigo_cest
   )
   const origemMercadoria = firstNonEmptyString(
     fiscal.origemMercadoria,
