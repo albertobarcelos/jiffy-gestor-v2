@@ -13,7 +13,6 @@ import { AtualizarPagamentoEntregaGestorUseCase } from '@/src/application/use-ca
 import { CarregarPedidoKanbanQuickViewUseCase } from '@/src/application/use-cases/vendas/CarregarPedidoKanbanQuickViewUseCase'
 import { CarregarVendaDetalheUseCase } from '@/src/application/use-cases/vendas/CarregarVendaDetalheUseCase'
 import {
-  BuscarFiscalCadastroProdutoUseCase,
   BuscarProdutoCatalogoPorIdUseCase,
   HidratarGruposComplementosCatalogoUseCase,
   ListarGruposCatalogoVendaUseCase,
@@ -64,9 +63,6 @@ export const listarGruposCatalogoVendaUseCase = new ListarGruposCatalogoVendaUse
   novoPedidoReadRepository
 )
 export const buscarProdutoCatalogoPorIdUseCase = new BuscarProdutoCatalogoPorIdUseCase(
-  novoPedidoReadRepository
-)
-export const buscarFiscalCadastroProdutoUseCase = new BuscarFiscalCadastroProdutoUseCase(
   novoPedidoReadRepository
 )
 export const hidratarGruposComplementosCatalogoUseCase =

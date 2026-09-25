@@ -17,6 +17,7 @@ import { ExportarXmlsUseCase } from '@/src/application/use-cases/painel-contador
 import { GerenciarCbenefUseCase } from '@/src/application/use-cases/painel-contador/GerenciarCbenefUseCase'
 import { VerificarCbenefEmissaoUseCase } from '@/src/application/use-cases/painel-contador/VerificarCbenefEmissaoUseCase'
 import { carregarVendaDetalheUseCase } from '@/src/infrastructure/composition/pedidoUseCases'
+import { listarNcmCestFiscalPorProdutoIdsUseCase } from '@/src/infrastructure/composition/produtoFiscalUseCases'
 
 export function createFiscalPainelRepository(token: string) {
   return new FiscalPainelApiRepository(token)
@@ -41,7 +42,11 @@ export function createPainelContadorUseCases(token: string) {
     salvarReforma: new SalvarReformaTributariaUseCase(repo),
     exportarXmls: new ExportarXmlsUseCase(repo),
     cbenef: new GerenciarCbenefUseCase(repo),
-    verificarCbenefEmissao: new VerificarCbenefEmissaoUseCase(repo, carregarVendaDetalheUseCase),
+    verificarCbenefEmissao: new VerificarCbenefEmissaoUseCase(
+      repo,
+      carregarVendaDetalheUseCase,
+      listarNcmCestFiscalPorProdutoIdsUseCase
+    ),
     repository: repo,
   }
 }

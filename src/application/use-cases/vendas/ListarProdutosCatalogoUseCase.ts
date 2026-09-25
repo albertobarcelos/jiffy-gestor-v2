@@ -34,15 +34,6 @@ export class BuscarProdutoCatalogoPorIdUseCase {
   }
 }
 
-/** GET só do cadastro base (NCM/CEST), sem snapshot do menu. */
-export class BuscarFiscalCadastroProdutoUseCase {
-  constructor(private readonly repo: INovoPedidoReadRepository) {}
-
-  execute(produtoId: string, token: string) {
-    return this.repo.buscarFiscalCadastroProdutoPorId(produtoId, token)
-  }
-}
-
 export class HidratarGruposComplementosCatalogoUseCase {
   constructor(private readonly repo: INovoPedidoReadRepository) {}
 

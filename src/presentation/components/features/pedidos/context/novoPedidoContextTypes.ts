@@ -134,11 +134,6 @@ export interface NovoPedidoEdicaoLinhaSlice {
   handleTabChangeComplementoTabsModalPainel: (tab: 'complemento') => void
   recarregarProdutoPainelAposEdicaoComplemento: () => Promise<void>
   recarregarProdutoCarrinhoAposEdicao: (produtoId?: string) => Promise<void>
-  /** Busca NCM/CEST do cadastro (menu slim não traz) e reaplica nas linhas. */
-  hidratarFiscalProdutoNasLinhas: (
-    produtoId: string,
-    produtoAnterior?: Produto | null
-  ) => Promise<void>
   produtoParaLancamentoPainel: Produto | null
   setProdutoParaLancamentoPainel: Dispatch<SetStateAction<Produto | null>>
   indiceLinhaPainelProduto: number | null

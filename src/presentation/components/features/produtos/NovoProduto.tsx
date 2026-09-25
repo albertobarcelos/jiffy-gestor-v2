@@ -46,6 +46,7 @@ import {
   menuIdsProntosParaCriacaoProduto,
   syncCadastroComMenuPrincipalAtivo,
 } from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
+import { ncmCestDoBlocoFiscal } from '@/src/domain/policies/produto/ncmCestDoBlocoFiscal'
 
 /** Snapshot serializado por `getFormSnapshot` — deve permanecer alinhado a esse método. */
 interface BaselineSnapshotProduto {
@@ -931,12 +932,15 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
         setIsLoadingProduto(!hasFormSeedRef.current)
         try {
-          const response = await fetchGestorApi(`/api/produtos/${currentEffectiveProdutoId}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          })
+          const response = await fetchGestorApi(
+            `/api/produtos/${currentEffectiveProdutoId}?include=fiscal`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            }
+          )
 
           if (response.ok) {
             const produto = unwrapProdutoApiPayloadAsRecord(await response.json())
@@ -1005,10 +1009,11 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
             // Os dados fiscais serão carregados apenas quando o usuário chegar no passo 3 (ConfiguracaoFiscalStep)
             // Armazenar dados fiscais em uma ref para uso posterior
             const dadosFiscais = asRecordUnknown(produto.fiscal)
+            const fiscalNcmCest = ncmCestDoBlocoFiscal(produto)
             const fiscalStatusRaw = produto.fiscalStatus
             fiscalDataFromProductRef.current = {
-              ncm: asStringField(dadosFiscais.ncm || produto.ncm),
-              cest: asStringField(dadosFiscais.cest),
+              ncm: asStringField(fiscalNcmCest.ncm),
+              cest: asStringField(fiscalNcmCest.cest),
               origemMercadoria: asStringField(
                 dadosFiscais.origemMercadoria ?? produto.origemMercadoria
               ),
@@ -1100,7 +1105,9 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
         const loadFiscalData = async () => {
           try {
-            const response = await fetchGestorApi(`/api/produtos/${effectiveProdutoId}`, {
+            const response = await fetchGestorApi(
+              `/api/produtos/${effectiveProdutoId}?include=fiscal`,
+              {
               headers: {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
@@ -1110,8 +1117,9 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
             if (response.ok) {
               const produto = await response.json()
               const dadosFiscais = produto.fiscal || {}
-              setNcm(dadosFiscais.ncm || produto.ncm || '')
-              setCest(dadosFiscais.cest || '')
+              const fiscalNcmCest = ncmCestDoBlocoFiscal(produto)
+              setNcm(fiscalNcmCest.ncm)
+              setCest(fiscalNcmCest.cest)
               setOrigemMercadoria(
                 dadosFiscais.origemMercadoria?.toString() ||
                   produto.origemMercadoria?.toString() ||
@@ -1460,7 +1468,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       if (!token) return
 
       setIsLoadingProduto(true)
-      fetchGestorApi(`/api/produtos/${currentEffectiveProdutoId}`, {
+      fetchGestorApi(`/api/produtos/${currentEffectiveProdutoId}?include=fiscal`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -1470,8 +1478,9 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           if (response.ok) {
             const produto = await response.json()
             const dadosFiscais = produto.fiscal || {}
-            setNcm(dadosFiscais.ncm || produto.ncm || '')
-            setCest(dadosFiscais.cest || '')
+            const fiscalNcmCest = ncmCestDoBlocoFiscal(produto)
+            setNcm(fiscalNcmCest.ncm)
+            setCest(fiscalNcmCest.cest)
             setOrigemMercadoria(
               dadosFiscais.origemMercadoria?.toString() ||
                 produto.origemMercadoria?.toString() ||

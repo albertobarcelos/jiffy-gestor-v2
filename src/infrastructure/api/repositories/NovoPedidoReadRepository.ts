@@ -253,13 +253,6 @@ export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
     return hidratarComplementosDoProdutoMenu(produto, token, base)
   }
 
-  async buscarFiscalCadastroProdutoPorId(
-    produtoId: string,
-    token: string
-  ): Promise<Produto | null> {
-    return fetchProdutoCadastroPorId(produtoId, token)
-  }
-
   async hidratarGruposComplementosDoProduto(produto: Produto, token: string): Promise<Produto> {
     return hidratarComplementosDoProdutoMenu(produto, token)
   }

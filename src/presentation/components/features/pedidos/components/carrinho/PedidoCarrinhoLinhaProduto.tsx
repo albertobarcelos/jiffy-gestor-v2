@@ -29,7 +29,6 @@ import { useNovoPedidoFormContext } from '../../context/NovoPedidoFormContext'
 import { useNovoPedidoDetalheContext } from '../../context/NovoPedidoDetalheContext'
 import { useNovoPedidoUIContext } from '../../context/NovoPedidoUIContext'
 import { criarHandlersLongPressLinha } from '../../utils/longPressLinhaPedido'
-import { PedidoCarrinhoFiscalSobNome } from './PedidoCarrinhoCamposFiscais'
 import { PedidoCarrinhoLinhaComplemento } from './PedidoCarrinhoLinhaComplemento'
 import { PedidoCarrinhoQtdStepper } from './PedidoCarrinhoQtdStepper'
 import type { ProdutoPendendoRemocao } from './PedidoCarrinhoRemoverDialog'
@@ -195,7 +194,6 @@ export function PedidoCarrinhoLinhaProduto({
           >
             {produto.nome}
           </span>
-          <PedidoCarrinhoFiscalSobNome ncm={produto.ncm} cest={produto.cest} />
         </div>
         <div>
           <span className="block text-center text-xs text-gray-600">

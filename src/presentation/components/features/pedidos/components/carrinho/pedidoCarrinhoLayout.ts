@@ -2,7 +2,6 @@
  * Grid compartilhado: Qtd | Produto | Unid. | Desc. | Val Unit. | Total | Ações.
  * Cabeçalho e cada linha são grids independentes, então as larguras precisam ser fixas
  * (não `auto`) para alinharem entre si.
- * NCM/CEST ficam sob o nome do produto (não são colunas do grid).
  */
 export const CARRINHO_PRODUTOS_GRID_CLASS =
   'grid grid-cols-[6.5rem_minmax(0,1fr)_2.75rem_4rem_5.5rem_7rem_3.5rem] gap-x-1 items-center'

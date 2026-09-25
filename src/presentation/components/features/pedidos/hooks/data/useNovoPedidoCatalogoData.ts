@@ -6,7 +6,6 @@ import {
   aplicarPermissoesCadastroNoProdutoCatalogo,
   cacheProdutoCatalogoAtendePedido,
   catalogoPermiteHidratacaoSomenteGrupos,
-  mesclarFiscalCadastroNoProdutoCatalogo,
   obterProdutoDoCatalogo,
   type CarregarProdutoCatalogoOptions,
 } from '@/src/domain/policies/pedido/CarrinhoCatalogoPolicy'
@@ -18,7 +17,6 @@ import {
 import { useProdutosCodigoPorId } from '@/src/presentation/hooks/produtos/useProdutosCodigoPorId'
 import type { CanalVendaNovoPedido } from '../../novoPedidoProdutosApi'
 import {
-  fetchFiscalCadastroProdutoPorId,
   fetchHidratacaoGruposComplementosCatalogo,
   fetchProdutoCatalogoPorId,
   limparCacheGruposComplementosCatalogoVenda,
@@ -114,8 +112,6 @@ export function useNovoPedidoCatalogoData({
   }, [permissoesPorId, aplicarPermissoesCadastro, setCatalogoProdutosPorId])
 
   const inflightProdutoPorIdRef = useRef<Map<string, Promise<Produto | null>>>(new Map())
-  /** IDs que já passaram por GET de cadastro fiscal (NCM/CEST), nesta sessão do pedido. */
-  const fiscalCadastroHidratadoIdsRef = useRef<Set<string>>(new Set())
 
   const carregarProdutoNoCatalogoSeNecessario = useCallback(
     async (
@@ -128,15 +124,8 @@ export function useNovoPedidoCatalogoData({
         produtosList
       )
 
-      const optionsComFiscal: CarregarProdutoCatalogoOptions | undefined = options
-        ? {
-            ...options,
-            fiscalCadastroHidratado: fiscalCadastroHidratadoIdsRef.current.has(produtoId),
-          }
-        : undefined
-
-      if (!optionsComFiscal?.forceRefresh) {
-        if (cacheProdutoCatalogoAtendePedido(emCache, optionsComFiscal)) {
+      if (!options?.forceRefresh) {
+        if (cacheProdutoCatalogoAtendePedido(emCache, options)) {
           setCatalogoProdutosPorId(prev =>
             prev[produtoId] ? prev : { ...prev, [emCache.getId()]: emCache }
           )
@@ -149,39 +138,17 @@ export function useNovoPedidoCatalogoData({
 
       if (!token) return null
 
-      if (optionsComFiscal?.forceRefresh) {
+      if (options?.forceRefresh) {
         limparCacheGruposComplementosCatalogoVenda()
       }
 
       const fetchProduto = (async (): Promise<Produto | null> => {
         try {
-          const soGrupos = catalogoPermiteHidratacaoSomenteGrupos(emCache, optionsComFiscal)
-
-          if (soGrupos) {
-            const entity = await fetchHidratacaoGruposComplementosCatalogo(emCache, token)
-            if (!entity) return null
-            setCatalogoProdutosPorId(prev => ({ ...prev, [entity.getId()]: entity }))
-            return entity
-          }
-
-          // Fiscal: com snapshot do menu em cache e sem precisar de complementos,
-          // só GET cadastro + merge (sem menu/grupos).
-          if (
-            optionsComFiscal?.requireFiscalCadastro &&
-            !optionsComFiscal.requireComplementos &&
-            emCache
-          ) {
-            const fiscal = await fetchFiscalCadastroProdutoPorId(produtoId, token)
-            if (!fiscal) return null
-            const entity = mesclarFiscalCadastroNoProdutoCatalogo(emCache, fiscal)
-            fiscalCadastroHidratadoIdsRef.current.add(entity.getId())
-            setCatalogoProdutosPorId(prev => ({ ...prev, [entity.getId()]: entity }))
-            return entity
-          }
-
-          const entity = await fetchProdutoCatalogoPorId(produtoId, token, menuId)
+          const entity =
+            !options?.forceRefresh && catalogoPermiteHidratacaoSomenteGrupos(emCache, options)
+              ? await fetchHidratacaoGruposComplementosCatalogo(emCache, token)
+              : await fetchProdutoCatalogoPorId(produtoId, token, menuId)
           if (!entity) return null
-          fiscalCadastroHidratadoIdsRef.current.add(entity.getId())
           setCatalogoProdutosPorId(prev => ({ ...prev, [entity.getId()]: entity }))
           return entity
         } catch {
@@ -189,7 +156,7 @@ export function useNovoPedidoCatalogoData({
         }
       })()
 
-      if (!optionsComFiscal?.forceRefresh) {
+      if (!options?.forceRefresh) {
         inflightProdutoPorIdRef.current.set(produtoId, fetchProduto)
       }
 

@@ -4,7 +4,6 @@ import {
   aplicarPermissoesCadastroNoProdutoCatalogo,
   cacheProdutoCatalogoAtendePedido,
   catalogoPermiteHidratacaoSomenteGrupos,
-  mesclarFiscalCadastroNoProdutoCatalogo,
   produtoTemComplementosCarregados,
   produtoTemIdsGruposComplementoParaHidratacao,
 } from '@/src/domain/policies/pedido/CarrinhoCatalogoPolicy'
@@ -148,61 +147,5 @@ describe('CarrinhoCatalogoPolicy — complementos da venda', () => {
     })
     expect(aplicado).toBe(completo)
     expect(aplicado.getGruposComplementos()[0]?.complementos).toHaveLength(1)
-  })
-})
-
-describe('CarrinhoCatalogoPolicy — fiscal do cadastro', () => {
-  it('não atende requireFiscalCadastro sem NCM/CEST e sem flag hidratado', () => {
-    const slim = produtoSlim()
-    expect(cacheProdutoCatalogoAtendePedido(slim, { requireFiscalCadastro: true })).toBe(false)
-  })
-
-  it('atende requireFiscalCadastro quando já hidratou o cadastro nesta sessão', () => {
-    const slim = produtoSlim()
-    expect(
-      cacheProdutoCatalogoAtendePedido(slim, {
-        requireFiscalCadastro: true,
-        fiscalCadastroHidratado: true,
-      })
-    ).toBe(true)
-  })
-
-  it('atende requireFiscalCadastro quando o cache já tem NCM ou CEST', () => {
-    const comNcm = Produto.fromJSON({
-      ...produtoSlim().toJSON(),
-      ncm: '21069090',
-    })
-    expect(cacheProdutoCatalogoAtendePedido(comNcm, { requireFiscalCadastro: true })).toBe(true)
-  })
-
-  it('mescla NCM/CEST do cadastro sem apagar grupos do menu', () => {
-    const menu = produtoComComplementos()
-    const cadastro = Produto.fromJSON({
-      id: 'p1',
-      codigoProduto: 'p1',
-      nome: 'Cadastro base',
-      valor: 99,
-      ativo: true,
-      ncm: '21069090',
-      cest: '1704900',
-      origemMercadoria: '0',
-      tipoProduto: '00',
-      gruposComplementos: [],
-    })
-    const mesclado = mesclarFiscalCadastroNoProdutoCatalogo(menu, cadastro)
-    expect(mesclado.getNcm()).toBe('21069090')
-    expect(mesclado.getCest()).toBe('1704900')
-    expect(mesclado.getNome()).toBe('X-Bacon')
-    expect(mesclado.getValor()).toBe(20)
-    expect(mesclado.getGruposComplementos()[0]?.complementos).toHaveLength(1)
-  })
-
-  it('não permite hidratação só de grupos quando requireFiscalCadastro', () => {
-    expect(
-      catalogoPermiteHidratacaoSomenteGrupos(produtoSlimComGrupos(), {
-        requireComplementos: true,
-        requireFiscalCadastro: true,
-      })
-    ).toBe(false)
   })
 })
