@@ -46,13 +46,13 @@ export function mapEnderecoEmpresaMe(
 export function formatarPrevisaoPedidoWhatsapp(
   previsao: string | null | undefined,
   dataCriacao: string | null | undefined,
-  tipoVenda: 'entrega' | 'retirada'
+  tipoEntrega: 'entrega' | 'retirada'
 ): string {
   if (previsao == null || String(previsao).trim() === '') return '—'
   const str = String(previsao).trim()
   if (!Number.isNaN(Number(str)) && /^\d+$/.test(str)) {
     const minutos = Number(str)
-    const rotulo = tipoVenda === 'retirada' ? 'retirada' : 'entrega'
+    const rotulo = tipoEntrega === 'retirada' ? 'retirada' : 'entrega'
     return `${minutos} minutos (${rotulo})`
   }
   return formatarHoraPrevisaoEntrega(previsao, dataCriacao)
@@ -79,11 +79,11 @@ export function calcularTotalPedidoWhatsapp(dados: PedidoKanbanQuickViewData): n
 }
 
 export function montarLinhasEnderecoLocalWhatsapp(args: {
-  tipoVenda: 'entrega' | 'retirada'
+  tipoEntrega: 'entrega' | 'retirada'
   enderecoEntrega: EnderecoEntregaDetalhe | null | undefined
   enderecoEmpresa: EnderecoEmpresaMe | null | undefined
 }): { rotulo: string; enderecoTexto: string } {
-  if (args.tipoVenda === 'retirada') {
+  if (args.tipoEntrega === 'retirada') {
     const endereco = mapEnderecoEmpresaMe(args.enderecoEmpresa)
     return {
       rotulo: 'Local de retirada',
@@ -126,24 +126,24 @@ export function montarLinhasFormaPagamentoWhatsapp(
 
 export function montarDetalhesPedidoClienteWhatsapp(args: {
   dados: PedidoKanbanQuickViewData
-  tipoVenda: 'entrega' | 'retirada'
+  tipoEntrega: 'entrega' | 'retirada'
   enderecoEmpresa: EnderecoEmpresaMe | null | undefined
 }): string {
-  const { dados, tipoVenda, enderecoEmpresa } = args
+  const { dados, tipoEntrega, enderecoEmpresa } = args
   const nome = resolverNomeClienteWhatsapp(dados.clienteNome)
   const numeroPedido = montarRotuloPedidoWhatsapp(dados.numeroVenda, dados.codigoVenda)
   const dataPedido = formatarDataDetalhePedido(dados.dataCriacao)
   const celular = formatarCelularExibicao(dados.detalhesEntrega.clienteCelular)
   const { rotulo: rotuloLocal, enderecoTexto } = montarLinhasEnderecoLocalWhatsapp({
-    tipoVenda,
+    tipoEntrega,
     enderecoEntrega: dados.detalhesEntrega.enderecoEntrega,
     enderecoEmpresa,
   })
-  const previsaoRotulo = tipoVenda === 'retirada' ? 'Previsão para retirada' : 'Previsão para entrega'
+  const previsaoRotulo = tipoEntrega === 'retirada' ? 'Previsão para retirada' : 'Previsão para entrega'
   const previsao = formatarPrevisaoPedidoWhatsapp(
     dados.detalhesEntrega.previsaoEntrega,
     dados.dataCriacao,
-    tipoVenda
+    tipoEntrega
   )
   const totalPedido = calcularTotalPedidoWhatsapp(dados)
   const linhasProdutos = montarLinhasProdutosWhatsapp(dados.produtos)

@@ -1,8 +1,11 @@
 'use client'
 
 import { useCallback, useRef, useState, type ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { invalidarCatalogoVendaQueries, motivoInvalidacaoDeSnapshotProduto } from '@/src/presentation/cache/catalogoVendaQueryCache'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import {
   aplicarAlteracaoProdutoNosDestinos,
   listarMenusDoProduto,
@@ -102,6 +105,8 @@ export function usePropagarAlteracaoProduto(): {
   dialog: ReactNode
 } {
   const invalidate = useInvalidateTenantQueries()
+  const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
   const [pedido, setPedido] = useState<Pedido | null>(null)
   const [passo, setPasso] = useState<'perguntar' | 'escolher'>('perguntar')
   const [menus, setMenus] = useState<MenuAlvoPropagacao[]>([])
@@ -410,8 +415,17 @@ export function usePropagarAlteracaoProduto(): {
       await invalidate(['menu-produto'])
       await invalidate(['produtos'])
       await invalidate(['produto', params.produtoId])
+      invalidarCatalogoVendaQueries(
+        queryClient,
+        empresaId,
+        motivoInvalidacaoDeSnapshotProduto({
+          produtoId: params.produtoId,
+          snapshot: params.snapshot,
+          menuIds: params.destinos.menuIds,
+        })
+      )
     },
-    [invalidate]
+    [invalidate, queryClient, empresaId]
   )
 
   const aplicarImagemNosDestinos = useCallback(
@@ -433,8 +447,13 @@ export function usePropagarAlteracaoProduto(): {
       })
       await invalidate(['menu-produtos'])
       await invalidate(['produto', params.produtoId])
+      invalidarCatalogoVendaQueries(queryClient, empresaId, {
+        tipo: 'imagem-produto',
+        produtoId: params.produtoId,
+        menuIds: params.destinos.menuIds,
+      })
     },
-    [invalidate]
+    [invalidate, queryClient, empresaId]
   )
 
   const onSim = useCallback(() => {

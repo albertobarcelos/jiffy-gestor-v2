@@ -1,6 +1,6 @@
 /** Tipos de detalhe de venda/pedido gestor (contrato domain ↔ application). */
 
-export type OrigemVenda = 'GESTOR' | 'DELIVERY' | 'IFOOD' | 'RAPPI' | 'OUTROS'
+export type OrigemVenda = 'GESTOR' | 'DELIVERY' | 'IFOOD' | 'RAPPI' | 'AIQFOME' | 'OUTROS'
 
 export type FluxoPagamentoEntrega = 'cobrar_entregador' | 'ja_pago'
 
@@ -109,7 +109,7 @@ export interface ResumoFiscalVenda {
 
 export type TabelaOrigemVenda = 'venda' | 'venda_gestor'
 
-export type CanalAberturaPedido = 'balcao' | 'entrega'
+export type CanalAberturaPedido = 'balcao' | 'delivery'
 
 /** Morada de entrega selecionada no formulário (independente do hook de UI). */
 export interface MoradaEntregaSelecionada {

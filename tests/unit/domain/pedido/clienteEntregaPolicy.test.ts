@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   clienteCadastradoNestaEmpresa,
+  deveAbrirCadastroClienteNoAvancar,
   nomePadraoMoradaEntrega,
   normalizarTipoEtiquetaMorada,
   podeExibirEnderecosClienteEntrega,
@@ -18,6 +19,18 @@ describe('ClienteEntregaPolicy', () => {
   it('exige 11 dígitos no delivery e 8 no legado', () => {
     expect(telefoneMinimoDigitosBuscaEntrega(true)).toBe(11)
     expect(telefoneMinimoDigitosBuscaEntrega(false)).toBe(8)
+  })
+
+  it('abre cadastro no avançar só com telefone completo e sem id do ERP', () => {
+    expect(
+      deveAbrirCadastroClienteNoAvancar({ clienteId: null, telefoneCompleto: true })
+    ).toBe(true)
+    expect(
+      deveAbrirCadastroClienteNoAvancar({ clienteId: 'cli-1', telefoneCompleto: true })
+    ).toBe(false)
+    expect(
+      deveAbrirCadastroClienteNoAvancar({ clienteId: null, telefoneCompleto: false })
+    ).toBe(false)
   })
 
   it('só exibe endereços após cadastro nesta empresa', () => {

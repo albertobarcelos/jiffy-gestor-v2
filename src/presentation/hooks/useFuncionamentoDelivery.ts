@@ -17,6 +17,7 @@ import type {
   SubstituirAgendaFuncionamentoDeliveryRequest,
 } from '@/src/application/dto/delivery/FuncionamentoDeliveryDTO'
 import { EMPRESA_DELIVERY_ME_QUERY_KEY } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
+import { msAteRefetchFuncionamentoDelivery } from '@/src/shared/utils/funcionamentoDelivery'
 
 export const FUNCIONAMENTO_DELIVERY_QUERY_KEY = ['delivery', 'funcionamento'] as const
 
@@ -47,7 +48,14 @@ export function useFuncionamentoDelivery(options?: { enabled?: boolean }) {
       const data = await parseJsonOrThrow(res)
       return data as FuncionamentoDeliveryDTO
     },
-    { enabled: options?.enabled ?? true }
+    {
+      enabled: options?.enabled ?? true,
+      staleTime: 0,
+      refetchOnMount: true,
+      refetchOnReconnect: true,
+      refetchOnWindowFocus: true,
+      refetchInterval: query => msAteRefetchFuncionamentoDelivery(query.state.data),
+    }
   )
 }
 

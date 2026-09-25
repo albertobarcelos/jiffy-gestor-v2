@@ -42,7 +42,7 @@ export function useKanbanModais(modoKanbanVendas: ModoKanbanVendas) {
   const handleAbrirNovoPedido = useCallback(() => {
     setNovoPedidoCriarContext({
       instanciaKey: Date.now(),
-      tipoInicioPedido: modoKanbanVendas === 'delivery' ? 'entrega' : 'balcao',
+      tipoInicioPedido: modoKanbanVendas === 'delivery' ? 'delivery' : 'balcao',
     })
     setNovoPedidoModalOpen(true)
   }, [modoKanbanVendas])

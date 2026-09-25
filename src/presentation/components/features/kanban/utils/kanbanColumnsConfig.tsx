@@ -101,9 +101,9 @@ export function getVisibleKanbanColumns(
               ...coluna,
               title: 'Entregues',
               placeholder: 'Pedidos entregues, com ou sem nota fiscal',
-              color: 'bg-emerald-100',
-              borderColor: 'border-emerald-300',
-              icon: <MdReceipt className="h-4 w-4 text-emerald-700" />,
+              color: 'bg-[#d6f2ea]',
+              borderColor: 'border-[#7ec9a8]',
+              icon: <MdReceipt className="h-4 w-4 text-accent5" />,
             }
           : coluna
       )

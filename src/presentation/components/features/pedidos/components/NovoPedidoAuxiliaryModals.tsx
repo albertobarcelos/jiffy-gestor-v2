@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '@/src/presentation/components/ui/dialog'
 import { Button } from '@/src/presentation/components/ui/button'
@@ -94,11 +94,11 @@ export function NovoPedidoAuxiliaryModals() {
             open={seletorClienteOpen}
             onClose={() => setSeletorClienteOpen(false)}
             onSelect={handleSelectCliente}
-            title={tipoInicioPedido === 'entrega' ? 'Selecionar cliente' : undefined}
-            cadastroRapido={tipoInicioPedido === 'entrega'}
-            telefoneCadastro={tipoInicioPedido === 'entrega' ? telefoneBuscaEntrega : ''}
+            title={tipoInicioPedido === 'delivery' ? 'Selecionar cliente' : undefined}
+            cadastroRapido={tipoInicioPedido === 'delivery'}
+            telefoneCadastro={tipoInicioPedido === 'delivery' ? telefoneBuscaEntrega : ''}
             onCadastrarCliente={
-              tipoInicioPedido === 'entrega'
+              tipoInicioPedido === 'delivery'
                 ? () => {
                     setSeletorClienteOpen(false)
                     setAbrirCadastroRapidoEntregaPedido(n => n + 1)

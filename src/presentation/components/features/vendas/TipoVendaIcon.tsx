@@ -6,7 +6,7 @@ import { RiBeerFill } from 'react-icons/ri'
 import { TbPaperBag } from 'react-icons/tb'
 
 interface TipoVendaIconProps {
-  tipoVenda: 'mesa' | 'balcao' | 'gestor' | 'entrega' | 'retirada'
+  tipoVenda: 'mesa' | 'balcao' | 'gestor' | 'entrega' | 'retirada' | 'delivery'
   numeroMesa?: number | string | null
   className?: string
   size?: number // Adicionado a prop size
@@ -205,7 +205,7 @@ export function TipoVendaIcon({
     )
   }
 
-  if (tipoVenda === 'entrega' || tipoVenda === 'retirada') {
+  if (tipoVenda === 'entrega' || tipoVenda === 'retirada' || tipoVenda === 'delivery') {
     return (
       <div
         className={`flex flex-col items-center justify-center ${title ? 'tooltip-hover' : ''} ${className}`}
@@ -239,7 +239,7 @@ export function TipoVendaIcon({
           className="mt-1 whitespace-nowrap font-medium"
           style={{ color: corEntrega, fontSize: `${entregaTextSize}px`, lineHeight: 1 }}
         >
-          {tipoVenda === 'retirada' ? 'Retirada' : 'Entrega'}
+          {tipoVenda === 'retirada' ? 'Retirada' : tipoVenda === 'entrega' ? 'Entrega' : 'Delivery'}
         </span>
       </div>
     )

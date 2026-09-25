@@ -63,9 +63,14 @@ export const ReorderBodySchema = z.object({
   novaPosicao: z.coerce.number().int().min(1, 'Nova posição inválida'),
 })
 
-export const UpdateMenuGrupoBodySchema = z.object({
-  nome: z.string().trim().min(1, 'Nome é obrigatório'),
-})
+export const UpdateMenuGrupoBodySchema = z
+  .object({
+    nome: z.string().trim().min(1, 'Nome é obrigatório').optional(),
+    ativo: z.boolean().optional(),
+  })
+  .refine(data => data.nome !== undefined || data.ativo !== undefined, {
+    message: 'Informe o nome ou o status da categoria neste cardápio',
+  })
 
 export const ImageUploadIntentBodySchema = z.object({
   fileName: z.string().min(1),

@@ -132,13 +132,13 @@ export async function rasterizeCupomHtmlToPngBase64(
     receipt.style.overflow = 'visible'
     await nextPaint()
     let { width, height } = measureReceipt(receipt, options.widthPx)
-    height += 8
+    height += 2
     iframe.style.height = `${height}px`
     iframe.style.width = `${width}px`
     await nextPaint()
     const again = measureReceipt(receipt, options.widthPx)
     width = Math.max(width, again.width)
-    height = Math.max(height, again.height + 8)
+    height = Math.max(height, again.height + 2)
     iframe.style.height = `${height}px`
     iframe.style.width = `${width}px`
 

@@ -6,6 +6,9 @@ import { atualizarGrupoProdutoViaBffUseCase } from '@/src/application/use-cases/
 import { useMenuMutations } from '@/src/presentation/hooks/menus/useMenuMutations'
 import { usePropagarAlteracaoProduto } from '@/src/presentation/hooks/produtos/usePropagarAlteracaoProduto'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { useQueryClient } from '@tanstack/react-query'
+import { invalidarCatalogoVendaQueries } from '@/src/presentation/cache/catalogoVendaQueryCache'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 
@@ -22,6 +25,8 @@ export function useRenomearCategoriaNesteCardapio(params: {
   const { renameGrupo } = useMenuMutations(menuId)
   const { pedirConfirmacao, dialog } = usePropagarAlteracaoProduto()
   const invalidate = useInvalidateTenantQueries()
+  const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
   const [saving, setSaving] = useState(false)
 
   const renomear = useCallback(
@@ -80,6 +85,12 @@ export function useRenomearCategoriaNesteCardapio(params: {
         if (prodId) {
           await invalidate(['menu-produto', menuId, prodId])
         }
+        invalidarCatalogoVendaQueries(queryClient, empresaId, {
+          tipo: 'categoria',
+          menuId,
+          grupoProdutoId: grupoId,
+          produtoId: prodId,
+        })
 
         if (destinos.aplicarNoCadastroBase || destinos.menuIds.length > 0) {
           showToast.success('Categoria atualizada neste cardápio e nos selecionados')
@@ -94,7 +105,7 @@ export function useRenomearCategoriaNesteCardapio(params: {
         setSaving(false)
       }
     },
-    [grupoProdutoId, produtoId, menuId, pedirConfirmacao, renameGrupo, invalidate]
+    [grupoProdutoId, produtoId, menuId, pedirConfirmacao, renameGrupo, invalidate, queryClient, empresaId]
   )
 
   return { renomear, saving, dialogPropagacao: dialog }

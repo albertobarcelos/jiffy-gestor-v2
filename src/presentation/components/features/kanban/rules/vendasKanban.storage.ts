@@ -44,6 +44,7 @@ const ORIGENS_FILTRO: readonly OrigemFiltro[] = [
   'GESTOR',
   'JIFFY_DELIVERY',
   'AIQFOME',
+  'IFOOD',
 ]
 const TIPOS_CANAL_FILTRO: readonly TipoCanalFiltro[] = ['', 'PDV', 'GESTOR', 'DELIVERY']
 const TIPOS_ENTREGA_FILTRO: readonly TipoEntregaFiltro[] = ['', 'entrega', 'retirada']

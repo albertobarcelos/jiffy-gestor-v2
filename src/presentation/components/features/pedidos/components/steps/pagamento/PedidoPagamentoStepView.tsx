@@ -12,9 +12,11 @@ import {
 import { INFORMACOES_ADICIONAIS_NOTA_MAX } from '@/src/shared/helpers/informacoesAdicionaisNota'
 import { MdCreditCard, MdDelete, MdEdit, MdPersonOutline } from 'react-icons/md'
 import { PedidoPagamentoStep } from '../../PedidoPagamentoStep'
+import { formatarTelefoneBr } from '@/src/shared/utils/telefoneBr'
 import { useNovoPedidoFormContext } from '../../../context/NovoPedidoFormContext'
 import { useNovoPedidoUIContext } from '../../../context/NovoPedidoUIContext'
 import { useNovoPedidoDetalheContext } from '../../../context/NovoPedidoDetalheContext'
+import { useFocoScrollPagamentoStep } from './useFocoScrollPagamentoStep'
 
 /** Mesmas dimensões dos cards de forma de pagamento e dos lançamentos em Detalhes. */
 const MEIO_PAGAMENTO_CARD_SIZE_CLASS = 'h-[98px] w-[150px] shrink-0'
@@ -28,6 +30,8 @@ export function PedidoPagamentoStepView() {
     calcularTotalProduto,
     clienteEntregaVinculado,
     clienteNome,
+    telefoneBuscadoEntrega,
+    telefoneBuscaEntrega,
     formatarValorRecebido,
     fluxoPagamentoEntrega,
     handleRemoveCliente,
@@ -62,9 +66,15 @@ export function PedidoPagamentoStepView() {
     moradaEntregaSelecionada,
   } = useNovoPedidoFormContext()
 
+  const { secaoPagamentoRef, lancamentosRef, marcarFocoAposLancamento } =
+    useFocoScrollPagamentoStep(pagamentos.length)
+
   const nomeClienteResumo =
-    tipoInicioPedido === 'entrega' ? (clienteEntregaVinculado?.nome ?? '') : clienteNome
+    tipoInicioPedido === 'delivery' ? (clienteEntregaVinculado?.nome ?? '') : clienteNome
   const temCliente = Boolean(nomeClienteResumo.trim())
+  const telefoneClienteResumo = formatarTelefoneBr(
+    telefoneBuscadoEntrega || telefoneBuscaEntrega || ''
+  )
   const restanteALancarExibicao = pedidoEntregaAceitaPagamentoPendente
     ? valorAPagarLancamento
     : valorAPagar
@@ -125,9 +135,9 @@ export function PedidoPagamentoStepView() {
             </table>
           </div>
         </div>
+      </div>
 
-        <hr className="border-gray-100" />
-
+      <div className="space-y-5 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <div className="space-y-2">
           <Label className="text-sm font-semibold text-gray-800">Cliente da Nota Fiscal</Label>
 
@@ -137,8 +147,13 @@ export function PedidoPagamentoStepView() {
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <MdPersonOutline size={20} />
                 </div>
-                <div className="flex flex-col">
-                  <span className="text-sm font-semibold text-gray-900">{nomeClienteResumo}</span>
+                <div className="flex min-w-0 flex-col">
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    <span className="text-sm font-semibold text-gray-900">{nomeClienteResumo}</span>
+                    {telefoneClienteResumo ? (
+                      <span className="text-sm font-medium text-gray-600">{telefoneClienteResumo}</span>
+                    ) : null}
+                  </div>
                   <span className="text-xs text-gray-500">Vinculado ao pedido</span>
                 </div>
               </div>
@@ -151,7 +166,7 @@ export function PedidoPagamentoStepView() {
                 >
                   <MdEdit size={18} />
                 </button>
-                {tipoInicioPedido !== 'entrega' && (
+                {tipoInicioPedido !== 'delivery' && (
                   <button
                     type="button"
                     onClick={handleRemoveCliente}
@@ -316,7 +331,7 @@ export function PedidoPagamentoStepView() {
               </div>
             </div>
 
-            <div className="mb-2">
+            <div ref={secaoPagamentoRef} className="mb-2 scroll-mt-3 scroll-mb-4">
               <Label className="mb-2 block text-base font-semibold">Forma de Pagamento</Label>
               <div
                 ref={meiosPagamentoScrollRef}
@@ -341,6 +356,7 @@ export function PedidoPagamentoStepView() {
                         type="button"
                         onClick={() => {
                           if (!hasMovedMeiosPagamentoRef.current && !isDraggingMeiosPagamento) {
+                            marcarFocoAposLancamento()
                             adicionarPagamentoPorCard(meio.getId())
                           }
                         }}
@@ -368,7 +384,7 @@ export function PedidoPagamentoStepView() {
             <div className="space-y-0 border-t pt-1 text-sm leading-snug">
               <div className="flex items-center justify-between px-1 py-0">
                 <span className="font-semibold text-gray-700">
-                  Total Recebido{tipoInicioPedido === 'entrega' ? ' (Efetivo)' : ''}:
+                  Total Recebido{tipoInicioPedido === 'delivery' ? ' (Efetivo)' : ''}:
                 </span>
                 <span className="font-semibold text-green-700">
                   {transformarParaReal(totalPagamentos)}
@@ -394,7 +410,7 @@ export function PedidoPagamentoStepView() {
             </div>
 
             {pagamentos.length > 0 && (
-              <div className="mt-2 border-t py-2">
+              <div ref={lancamentosRef} className="mt-2 border-t py-2">
                 <Label className="mb-2 block text-sm font-semibold">Detalhes:</Label>
                 <div className="flex flex-wrap gap-3">
                   {pagamentos.map((pagamento, index) => {

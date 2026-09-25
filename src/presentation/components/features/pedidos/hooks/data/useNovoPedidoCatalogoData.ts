@@ -5,13 +5,22 @@ import { Produto } from '@/src/domain/entities/Produto'
 import {
   aplicarPermissoesCadastroNoProdutoCatalogo,
   cacheProdutoCatalogoAtendePedido,
+  catalogoPermiteHidratacaoSomenteGrupos,
   obterProdutoDoCatalogo,
   type CarregarProdutoCatalogoOptions,
 } from '@/src/domain/policies/pedido/CarrinhoCatalogoPolicy'
 import { mesclarProdutosNoCatalogo } from '@/src/domain/policies/pedido/CatalogoVendaPolicy'
+import {
+  subscribeAvisoHidratacaoCatalogoVenda,
+  aplicarAvisoHidratacaoCatalogoVenda,
+} from '@/src/presentation/cache/catalogoVendaQueryCache'
 import { useProdutosCodigoPorId } from '@/src/presentation/hooks/produtos/useProdutosCodigoPorId'
 import type { CanalVendaNovoPedido } from '../../novoPedidoProdutosApi'
-import { fetchProdutoCatalogoPorId } from '../../novoPedidoProdutosApi'
+import {
+  fetchHidratacaoGruposComplementosCatalogo,
+  fetchProdutoCatalogoPorId,
+  limparCacheGruposComplementosCatalogoVenda,
+} from '../../novoPedidoProdutosApi'
 import { useGruposVendaQuery } from './useGruposVendaQuery'
 import { useProdutosVendaQuery } from './useProdutosVendaQuery'
 
@@ -58,6 +67,12 @@ export function useNovoPedidoCatalogoData({
     [setCatalogoProdutosPorId, aplicarPermissoesCadastro]
   )
 
+  useEffect(() => {
+    return subscribeAvisoHidratacaoCatalogoVenda(aviso => {
+      setCatalogoProdutosPorId(prev => aplicarAvisoHidratacaoCatalogoVenda(prev, aviso))
+    })
+  }, [setCatalogoProdutosPorId])
+
   const gruposQuery = useGruposVendaQuery({
     enabled: estaNoPassoProdutos,
     token,
@@ -103,12 +118,13 @@ export function useNovoPedidoCatalogoData({
       produtoId: string,
       options?: CarregarProdutoCatalogoOptions
     ): Promise<Produto | null> => {
+      const emCache = obterProdutoDoCatalogo(
+        produtoId,
+        catalogoProdutosPorId,
+        produtosList
+      )
+
       if (!options?.forceRefresh) {
-        const emCache = obterProdutoDoCatalogo(
-          produtoId,
-          catalogoProdutosPorId,
-          produtosList
-        )
         if (cacheProdutoCatalogoAtendePedido(emCache, options)) {
           setCatalogoProdutosPorId(prev =>
             prev[produtoId] ? prev : { ...prev, [emCache.getId()]: emCache }
@@ -122,9 +138,16 @@ export function useNovoPedidoCatalogoData({
 
       if (!token) return null
 
+      if (options?.forceRefresh) {
+        limparCacheGruposComplementosCatalogoVenda()
+      }
+
       const fetchProduto = (async (): Promise<Produto | null> => {
         try {
-          const entity = await fetchProdutoCatalogoPorId(produtoId, token, menuId)
+          const entity =
+            !options?.forceRefresh && catalogoPermiteHidratacaoSomenteGrupos(emCache, options)
+              ? await fetchHidratacaoGruposComplementosCatalogo(emCache, token)
+              : await fetchProdutoCatalogoPorId(produtoId, token, menuId)
           if (!entity) return null
           setCatalogoProdutosPorId(prev => ({ ...prev, [entity.getId()]: entity }))
           return entity

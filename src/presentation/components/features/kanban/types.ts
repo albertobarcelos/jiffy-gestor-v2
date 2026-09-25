@@ -34,7 +34,7 @@ export type FiltroStatusEntreguesKanban =
  * Origem real da venda (contrato GET /vendas/unificado).
  * Não existe origem `DELIVERY` — delivery é `TipoCanalFiltro`.
  */
-export type OrigemFiltro = '' | 'PDV' | 'GESTOR' | 'JIFFY_DELIVERY' | 'AIQFOME'
+export type OrigemFiltro = '' | 'PDV' | 'GESTOR' | 'JIFFY_DELIVERY' | 'AIQFOME' | 'IFOOD'
 
 /**
  * Tipo/canal de negócio unificado (`tipo` na API).

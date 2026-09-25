@@ -8,6 +8,7 @@ import { hidratarComplemento } from '@/src/application/services/cadastroImagem'
 import { complementoImagemMedia } from '@/src/infrastructure/api/deliveryMediaApi'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { invalidarCatalogoVendaQueries } from '@/src/presentation/cache/catalogoVendaQueryCache'
 
 interface ComplementosQueryParams {
   q?: string
@@ -161,6 +162,10 @@ export function useComplementoMutation() {
     {
       onSuccess: (_, variables) => {
         queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'complementos'] })
+        invalidarCatalogoVendaQueries(queryClient, empresaId, {
+          tipo: 'complemento',
+          complementoId: variables.complementoId,
+        })
         showToast.success(variables.isUpdate ? 'Complemento atualizado com sucesso!' : 'Complemento criado com sucesso!')
       },
     }

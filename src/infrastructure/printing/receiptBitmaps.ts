@@ -59,33 +59,67 @@ function renderQrSvgMarkup(
   return parts.join('')
 }
 
-/** Faixa --------- em pixels (preview e papel iguais). */
-export function renderDashSeparatorHtml(widthPx: number, double = false): string {
-  const dash = 10
-  const gap = 5
-  const thick = 3
+export type EstiloTracejado = {
+  thick?: number
+  dash?: number
+  gap?: number
+  padY?: number
+}
+
+/** Tracejado entre produtos da via de produção — médio, com folga em cima e embaixo. */
+export const TRACEJADO_PRODUCAO = { thick: 4, dash: 12, gap: 6, padY: 10 } as const
+
+function desenharTracejadoCanvas(
+  widthPx: number,
+  double: boolean,
+  estilo?: EstiloTracejado
+): HTMLCanvasElement | null {
+  if (typeof document === 'undefined') return null
+  const dash = estilo?.dash ?? 10
+  const gap = estilo?.gap ?? 5
+  const thick = estilo?.thick ?? 3
+  const padY = estilo?.padY ?? 0
   const gapY = 4
   const rows = double ? 2 : 1
   const h = rows * thick + (rows - 1) * gapY
   const w = Math.max(40, Math.floor(widthPx))
-  const text = '-'.repeat(Math.max(12, Math.floor(w / 8)))
-  if (typeof document === 'undefined') {
-    return `<div class="separator">${double ? `${text}<br/>${text}` : text}</div>`
-  }
   const canvas = document.createElement('canvas')
   canvas.width = w
-  canvas.height = h
+  canvas.height = h + padY * 2
   const ctx = canvas.getContext('2d')
-  if (!ctx) {
-    return `<div class="separator">${double ? `${text}<br/>${text}` : text}</div>`
-  }
+  if (!ctx) return null
   ctx.imageSmoothingEnabled = false
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
   ctx.fillStyle = '#000000'
   for (let row = 0; row < rows; row++) {
-    const y = row * (thick + gapY)
+    const y = padY + row * (thick + gapY)
     for (let x = 0; x < w; x += dash + gap) {
       ctx.fillRect(x, y, Math.min(dash, w - x), thick)
     }
   }
-  return `<div class="separator"><img src="${canvas.toDataURL('image/png')}" width="${w}" height="${h}" alt=""/></div>`
+  return canvas
+}
+
+/** Faixa tracejada em pixels (preview e papel iguais). */
+export function renderDashSeparatorHtml(
+  widthPx: number,
+  double = false,
+  estilo?: EstiloTracejado
+): string {
+  const w = Math.max(40, Math.floor(widthPx))
+  const text = '-'.repeat(Math.max(12, Math.floor(w / 8)))
+  const canvas = desenharTracejadoCanvas(widthPx, double, estilo)
+  if (!canvas) {
+    return `<div class="separator">${double ? `${text}<br/>${text}` : text}</div>`
+  }
+  return `<div class="separator"><img src="${canvas.toDataURL('image/png')}" width="${canvas.width}" height="${canvas.height}" alt=""/></div>`
+}
+
+export function desenharSeparadorTracejadoPng(
+  widthPx = 576,
+  estilo: EstiloTracejado = TRACEJADO_PRODUCAO
+): string {
+  const canvas = desenharTracejadoCanvas(widthPx, false, estilo)
+  return canvas?.toDataURL('image/png') ?? ''
 }

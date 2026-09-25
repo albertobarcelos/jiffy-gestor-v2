@@ -5,13 +5,16 @@ import { MdAccessTime, MdEdit } from 'react-icons/md'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
 import { StatusFiscalBadge } from '../../fiscal/StatusFiscalBadge'
 import { fiscalKanbanPodeReemitirAposCooldown } from '../rules/vendasKanban.rules'
-import type { TipoVendaExibicaoCard } from '../utils/kanbanVendaCardViewModel'
+import {
+  codigoVendaKanban,
+  rotuloNumeroVendaKanban,
+  type TipoVendaExibicaoCard,
+} from '../utils/kanbanVendaCardViewModel'
 import type { Venda } from '../types'
 
 export interface KanbanVendaCardHeaderProps {
   venda: Venda
   exibirMetaDeliveryKanban: boolean
-  linhaIdentificacaoVenda: string
   prefixoLinhaOrigemCard: string
   clienteNome: string
   valorFormatado: string
@@ -25,6 +28,7 @@ export interface KanbanVendaCardHeaderProps {
   exibirColunaTipoVenda: boolean
   exibirAcaoAlterarTipoPedido: boolean
   onAbrirAlterarTipoPedido: () => void
+  ocultarIconeTipoVenda?: boolean
 }
 
 function TipoVendaIconCard({
@@ -45,7 +49,9 @@ function TipoVendaIconCard({
 
   const icon = (
     <TipoVendaIcon
-      tipoVenda={tipoVendaExibicao as 'balcao' | 'mesa' | 'gestor' | 'entrega' | 'retirada'}
+      tipoVenda={
+        tipoVendaExibicao as 'balcao' | 'mesa' | 'gestor' | 'entrega' | 'retirada' | 'delivery'
+      }
       numeroMesa={tipoVendaExibicao === 'mesa' ? venda.numeroMesa : undefined}
       size={56}
       containerScale={0.9}
@@ -142,7 +148,6 @@ export function KanbanVendaCardHeader(props: KanbanVendaCardHeaderProps) {
   const {
     venda,
     exibirMetaDeliveryKanban,
-    linhaIdentificacaoVenda,
     prefixoLinhaOrigemCard,
     clienteNome,
     valorFormatado,
@@ -156,7 +161,11 @@ export function KanbanVendaCardHeader(props: KanbanVendaCardHeaderProps) {
     exibirColunaTipoVenda,
     exibirAcaoAlterarTipoPedido,
     onAbrirAlterarTipoPedido,
+    ocultarIconeTipoVenda = false,
   } = props
+
+  const codigoVenda = codigoVendaKanban(venda)
+  const linhaVenda = rotuloNumeroVendaKanban(venda)
 
   const tipoVendaIconEl = (
     <TipoVendaIconCard
@@ -205,11 +214,18 @@ export function KanbanVendaCardHeader(props: KanbanVendaCardHeaderProps) {
     return (
       <div className="flex gap-2 border-b border-gray-100 pb-1.5">
         <div className="min-w-0 flex-1">
-          <div className="mb-0.5 flex items-center gap-1">
-            <p className="min-w-0 truncate text-sm font-bold leading-tight text-gray-900">
-              {linhaIdentificacaoVenda}
-            </p>
-            {editarProdutosBtn}
+          <div className="mb-0.5">
+            <div className="flex items-center gap-1">
+              <p className="min-w-0 truncate text-sm font-bold leading-tight text-gray-900">
+                {linhaVenda}
+              </p>
+              {editarProdutosBtn}
+            </div>
+            {codigoVenda ? (
+              <p className="w-full text-sm font-bold leading-tight tracking-wide text-gray-900">
+                {codigoVenda}
+              </p>
+            ) : null}
           </div>
           <ClienteValorBlock
             clienteNome={clienteNome}
@@ -235,10 +251,12 @@ export function KanbanVendaCardHeader(props: KanbanVendaCardHeaderProps) {
           ) : null}
           <BlocoStatusFiscal venda={venda} />
         </div>
-        <div className="flex flex-shrink-0 flex-col items-center self-start">
-          {previsaoEntregaKanbanBadge}
-          {tipoVendaIconEl}
-        </div>
+        {previsaoEntregaKanbanBadge || !ocultarIconeTipoVenda ? (
+          <div className="flex flex-shrink-0 flex-col items-center gap-1 self-start">
+            {previsaoEntregaKanbanBadge}
+            {ocultarIconeTipoVenda ? null : tipoVendaIconEl}
+          </div>
+        ) : null}
       </div>
     )
   }
@@ -246,11 +264,18 @@ export function KanbanVendaCardHeader(props: KanbanVendaCardHeaderProps) {
   return (
     <div className="flex gap-2">
       <div className="min-w-0 flex-1 border-b border-gray-100 pb-1.5">
-        <div className="mb-0.5 flex items-center gap-1">
-          <p className="min-w-0 truncate text-sm font-bold text-gray-900">
-            {prefixoLinhaOrigemCard} | {linhaIdentificacaoVenda}
-          </p>
-          {editarProdutosBtn}
+        <div className="mb-0.5">
+          <div className="flex items-center gap-1">
+            <p className="min-w-0 truncate text-sm font-bold text-gray-900">
+              {prefixoLinhaOrigemCard} | {linhaVenda}
+            </p>
+            {editarProdutosBtn}
+          </div>
+          {codigoVenda ? (
+            <p className="w-full text-sm font-bold leading-tight tracking-wide text-gray-900">
+              {codigoVenda}
+            </p>
+          ) : null}
         </div>
         <ClienteValorBlock
           clienteNome={clienteNome}

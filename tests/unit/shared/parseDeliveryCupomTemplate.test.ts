@@ -21,8 +21,8 @@ describe('parseDeliveryCupomTemplate', () => {
     })
     expect(parsed.fontesPorModelo.expedicao.negritoPedido).toBe(true)
     expect(parsed.fontesPorModelo.expedicao.negritoCabecalho).toBe(false)
-    expect(parsed.fontesPorModelo.expedicao.negritoItens).toBe(true)
-    expect(parsed.fontesPorModelo.producao.negritoCabecalho).toBe(true)
+    expect(parsed.fontesPorModelo.expedicao.negritoItens).toBe(false)
+    expect(parsed.fontesPorModelo.producao.negritoCabecalho).toBe(false)
   })
 
   it('sem template usa o padrão gráfico compacto', () => {

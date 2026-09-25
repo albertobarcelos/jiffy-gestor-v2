@@ -17,6 +17,12 @@ export const PRODUCAO_80MM = {
   raioPilulaPx: 2,
   /** Folga até a faca. 4 linhas ≈ 12 mm para o rodapé não ser cortado. */
   linhasAntesDoCorte: 4,
+  /** Vão fino entre modificadores do mesmo tipo (ESC J, ~2 mm). */
+  dotsEntreExtras: 16,
+  /** Vão na virada * (sem ação) ↔ +/− (com ação). */
+  dotsEntreGruposExtra: 32,
+  /** Recuo do bloco produto+extras (colunas Font A 2×2) — margem esquerda da térmica. */
+  recuoBlocoItemA22: 2,
 } as const
 
 export function textoEscPosProducao(value: string): string {
@@ -41,18 +47,24 @@ export function prefixoQuantidadeItem(qtd: number): string {
   return `${quantidadeInteiraProducao(qtd)}x `
 }
 
-export function recuoComplementoEspacos(qtd: number): string {
-  const prefixo = prefixoQuantidadeItem(qtd)
-  const n = Math.max(1, Math.round((prefixo.length * 32) / 24))
-  return ' '.repeat(n)
+export function recuoBlocoItemProducao(): string {
+  return ' '.repeat(PRODUCAO_80MM.recuoBlocoItemA22)
 }
 
-export function linhaItemProducao(qtd: number, nome: string): string {
+export function recuoComplementoEspacos(qtd: number, recuoBloco = false): string {
+  const prefixo = prefixoQuantidadeItem(qtd)
+  const n = Math.max(1, Math.round((prefixo.length * 32) / 24))
+  const bloco = recuoBloco ? Math.round((PRODUCAO_80MM.recuoBlocoItemA22 * 32) / 24) : 0
+  return ' '.repeat(bloco + n)
+}
+
+export function linhaItemProducao(qtd: number, nome: string, recuoBloco = false): string {
   const nomeLimpo = textoEscPosProducao(nome).toUpperCase() || 'ITEM'
+  const recuo = recuoBloco ? recuoBlocoItemProducao() : ''
   if (quantidadeInteiraProducao(qtd) === 0) {
-    return `${prefixoQuantidadeItem(0)}${nomeLimpo} (item ja lancado)`
+    return `${recuo}${prefixoQuantidadeItem(0)}${nomeLimpo} (item ja lancado)`
   }
-  return `${prefixoQuantidadeItem(qtd)}${nomeLimpo}`
+  return `${recuo}${prefixoQuantidadeItem(qtd)}${nomeLimpo}`
 }
 
 export type ImpactoComplementoProducao = 'aumenta' | 'diminui' | 'nenhum'
@@ -80,6 +92,25 @@ export function linhaComplementoProducao(params: {
     return `${params.recuo}- ${qtd} ${nome}`
   }
   return `${params.recuo}* ${qtd} ${nome}`
+}
+
+export type GrupoModificadorProducao = 'neutro' | 'acao' | 'obs' | 'outro'
+
+export function grupoModificadorProducao(texto: string): GrupoModificadorProducao {
+  const t = texto.trimStart()
+  if (t.startsWith('Obs:')) return 'obs'
+  if (t.startsWith('* ')) return 'neutro'
+  if (t.startsWith('+ ') || t.startsWith('- ')) return 'acao'
+  return 'outro'
+}
+
+export function dotsEntreModificadoresProducao(atual: string, proximo: string): number {
+  const a = grupoModificadorProducao(atual)
+  const b = grupoModificadorProducao(proximo)
+  if ((a === 'neutro' && b === 'acao') || (a === 'acao' && b === 'neutro')) {
+    return PRODUCAO_80MM.dotsEntreGruposExtra
+  }
+  return PRODUCAO_80MM.dotsEntreExtras
 }
 
 export function linhaObservacaoItemProducao(recuo: string, texto: string): string {
@@ -222,11 +253,12 @@ export type DetalheLinhasItemPedido = {
 
 export function detalheLinhasItemPedido(
   item: OrigemLinhaItemPedido,
-  options?: { permitirQuantidadeZero?: boolean }
+  options?: { permitirQuantidadeZero?: boolean; recuoBloco?: boolean }
 ): DetalheLinhasItemPedido {
   const qtdRaw = quantidadeInteiraProducao(item.quantidade)
   const qtd = options?.permitirQuantidadeZero ? qtdRaw : qtdRaw > 0 ? qtdRaw : 1
-  const recuo = recuoComplementoEspacos(qtd)
+  const recuoBloco = Boolean(options?.recuoBloco)
+  const recuo = recuoComplementoEspacos(qtd, recuoBloco)
   const complementos: DetalheLinhasItemPedido['complementos'] = []
   for (const comp of item.complementos ?? []) {
     if (!comp) continue
@@ -241,7 +273,7 @@ export function detalheLinhasItemPedido(
   }
   const observacao = linhaObservacaoItemProducao(recuo, String(item.observacao ?? '')) || null
   return {
-    produto: linhaItemProducao(qtd, String(item.nomeProduto ?? '')),
+    produto: linhaItemProducao(qtd, String(item.nomeProduto ?? ''), recuoBloco),
     complementos,
     observacao,
   }
@@ -249,7 +281,7 @@ export function detalheLinhasItemPedido(
 
 export function montarLinhasItemPedido(
   item: OrigemLinhaItemPedido,
-  options?: { permitirQuantidadeZero?: boolean }
+  options?: { permitirQuantidadeZero?: boolean; recuoBloco?: boolean }
 ): ItemModeloProducao80mm {
   const detalhe = detalheLinhasItemPedido(item, options)
   const extras = detalhe.complementos.map(comp => comp.texto)
@@ -319,7 +351,7 @@ export function montarModeloProducao80mm(origem: OrigemModeloProducao80mm): Mode
   const itens: ItemModeloProducao80mm[] = []
   for (const item of origem.itens ?? []) {
     if (!item) continue
-    itens.push(montarLinhasItemPedido(item, { permitirQuantidadeZero: true }))
+    itens.push(montarLinhasItemPedido(item, { permitirQuantidadeZero: true, recuoBloco: true }))
   }
 
   const qtdResumo = (origem.itens ?? []).reduce(

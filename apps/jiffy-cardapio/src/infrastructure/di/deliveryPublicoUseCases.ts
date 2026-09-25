@@ -2,6 +2,7 @@ import { AtualizarNomeClienteDeliveryPublicoUseCase } from '@/src/application/us
 import { BuscarClienteDeliveryPublicoUseCase } from '@/src/application/use-cases/delivery-publico/BuscarClienteDeliveryPublicoUseCase'
 import { CotarPedidoPublicoUseCase } from '@/src/application/use-cases/delivery-publico/CotarPedidoPublicoUseCase'
 import { EnviarPedidoPublicoUseCase } from '@/src/application/use-cases/delivery-publico/EnviarPedidoPublicoUseCase'
+import { GarantirClienteDeliveryPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirClienteDeliveryPublicoUseCase'
 import { GarantirEnderecoEntregaPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirEnderecoEntregaPublicoUseCase'
 import { ListarMeiosPagamentoPublicoUseCase } from '@/src/application/use-cases/delivery-publico/ListarMeiosPagamentoPublicoUseCase'
 import { ObterCatalogoPublicoUseCase } from '@/src/application/use-cases/delivery-publico/ObterCatalogoPublicoUseCase'
@@ -19,15 +20,20 @@ import {
 export const garantirEnderecoEntregaPublicoUseCase =
   new GarantirEnderecoEntregaPublicoUseCase(publicDeliveryClienteAdapter)
 
+export const garantirClienteDeliveryPublicoUseCase =
+  new GarantirClienteDeliveryPublicoUseCase(publicDeliveryClienteAdapter)
+
 export const cotarPedidoPublicoUseCase = new CotarPedidoPublicoUseCase(
   publicDeliveryCotacaoAdapter,
-  garantirEnderecoEntregaPublicoUseCase
+  garantirEnderecoEntregaPublicoUseCase,
+  garantirClienteDeliveryPublicoUseCase
 )
 
 export const enviarPedidoPublicoUseCase = new EnviarPedidoPublicoUseCase(
   publicDeliveryPedidoAdapter,
   publicDeliveryClienteAdapter,
-  garantirEnderecoEntregaPublicoUseCase
+  garantirEnderecoEntregaPublicoUseCase,
+  garantirClienteDeliveryPublicoUseCase
 )
 
 export const buscarClienteDeliveryPublicoUseCase =

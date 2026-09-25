@@ -31,11 +31,18 @@ export interface MenuGrupoProduto {
   id: string
   nome: string
   ordem: number
+  /** Status do snapshot neste menu. Independente de `grupoBase.ativo`. */
+  ativo?: boolean
   menuId: string
   grupoBase: MenuGrupoBase
   image?: MenuProdutoImage | null
   dataCriacao: string
   dataAtualizacao: string
+}
+
+export interface UpdateMenuGrupoInput {
+  nome?: string
+  ativo?: boolean
 }
 
 export interface MenuProdutoGrupoResumo {
@@ -59,6 +66,10 @@ export interface MenuProdutoComplementoItemResumo {
 export interface MenuProdutoComplementoResumo {
   id: string
   nome: string
+  /** Cadastro do grupo. Ausente no snapshot slim (só id/nome). */
+  qtdMinima?: number
+  /** Cadastro do grupo. 0 = sem teto. Ausente no snapshot slim. */
+  qtdMaxima?: number
   /** Presente só em alguns GETs; a listagem do menu costuma mandar só id/nome. */
   complementos?: MenuProdutoComplementoItemResumo[]
 }

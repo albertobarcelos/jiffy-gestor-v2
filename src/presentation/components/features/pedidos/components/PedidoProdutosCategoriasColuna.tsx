@@ -17,7 +17,7 @@ export function PedidoProdutosCategoriasColuna() {
 
   const emBusca = buscaProdutoTexto.length >= 2
   const mensagemMenuIndisponivel =
-    tipoInicioPedido === 'entrega'
+    tipoInicioPedido === 'delivery'
       ? 'Escolha o cardápio na engrenagem do quadro Delivery.'
       : 'Escolha o cardápio na engrenagem do quadro Balcão.'
 

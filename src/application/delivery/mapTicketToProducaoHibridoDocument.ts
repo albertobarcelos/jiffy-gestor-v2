@@ -1,4 +1,5 @@
 import {
+  dotsEntreModificadoresProducao,
   identidadePrimariaEhTipoAvulso,
   montarModeloProducao80mm,
   PRODUCAO_80MM,
@@ -18,8 +19,11 @@ import type {
 } from '@/src/application/ports/printDocument'
 import type { VendaGestorTicket, VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
 
+export type DesenharSeparadorProducao = () => string | null
+
 export type MapTicketToProducaoHibridoOptions = OrigemModeloProducaoDeTicketOptions & {
   desenharPilula?: DesenharPilulaProducao
+  desenharSeparador?: DesenharSeparadorProducao
 }
 
 const SIZE_COMPLEMENTO: PrintSize = 'double-b'
@@ -39,6 +43,18 @@ function pushTexto(
   })
 }
 
+function pushSeparador(
+  content: PrintContentBlock[],
+  desenharSeparador?: DesenharSeparadorProducao
+): void {
+  const png = desenharSeparador?.()
+  if (png) {
+    content.push({ type: 'image', data: png, align: 'center' })
+    return
+  }
+  content.push({ type: 'divider' })
+}
+
 function pushPilula(
   content: PrintContentBlock[],
   texto: string,
@@ -55,7 +71,8 @@ function pushPilula(
 
 export function modeloToProducaoHibridoContent(
   modelo: ModeloProducao80mm,
-  desenharPilula?: DesenharPilulaProducao
+  desenharPilula?: DesenharPilulaProducao,
+  desenharSeparador?: DesenharSeparadorProducao
 ): PrintContentBlock[] {
   const content: PrintContentBlock[] = []
   if (modelo.reimpressao) {
@@ -77,15 +94,20 @@ export function modeloToProducaoHibridoContent(
   if (modelo.identidade.secundaria) {
     pushPilula(content, modelo.identidade.secundaria, 'identidade', desenharPilula)
   }
-  content.push({ type: 'divider' })
   for (const item of modelo.itens) {
     pushTexto(content, item.produto, { align: 'left', bold: true, size: 'double' })
-    for (const extra of item.extras) {
+    item.extras.forEach((extra, i) => {
       content.push({ type: 'text', text: extra, align: 'left', bold: true, size: SIZE_COMPLEMENTO })
-    }
-    content.push({ type: 'divider' })
+      if (i < item.extras.length - 1) {
+        content.push({
+          type: 'feed',
+          dots: dotsEntreModificadoresProducao(extra, item.extras[i + 1] ?? ''),
+        })
+      }
+    })
+    pushSeparador(content, desenharSeparador)
   }
-  if (modelo.itens.length === 0) content.push({ type: 'divider' })
+  if (modelo.itens.length === 0) pushSeparador(content, desenharSeparador)
   if (modelo.observacaoPedido) {
     pushTexto(content, 'OBSERVACAO DO PEDIDO', { align: 'center', bold: true, size: 'normal' })
     pushTexto(content, modelo.observacaoPedido, {
@@ -93,7 +115,7 @@ export function modeloToProducaoHibridoContent(
       bold: true,
       size: SIZE_COMPLEMENTO,
     })
-    content.push({ type: 'divider' })
+    pushSeparador(content, desenharSeparador)
   }
   pushTexto(content, textoEscPosProducao(modelo.resumo), {
     align: 'center',
@@ -117,6 +139,10 @@ export function mapTicketToProducaoHibridoDocument(
   return {
     type: 'ORDER',
     columns: PRODUCAO_80MM.colunasFonteA,
-    content: modeloToProducaoHibridoContent(modelo, options?.desenharPilula),
+    content: modeloToProducaoHibridoContent(
+      modelo,
+      options?.desenharPilula,
+      options?.desenharSeparador
+    ),
   }
 }

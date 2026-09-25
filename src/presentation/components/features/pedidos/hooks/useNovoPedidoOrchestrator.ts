@@ -263,9 +263,9 @@ export function useNovoPedidoOrchestrator({
     tabelaOrigemVenda,
     tipoVendaHint,
   })
-  const pedidoBalcao = tipoInicioPedido !== 'entrega'
+  const pedidoBalcao = tipoInicioPedido !== 'delivery'
   const canalVendaNovoPedido: CanalVendaNovoPedido =
-    tipoInicioPedido === 'entrega' ? 'entrega' : 'balcao'
+    tipoInicioPedido === 'delivery' ? 'entrega' : 'balcao'
   const menuCatalogoId = resolverMenuCatalogoNovoPedido(
     canalVendaNovoPedido,
     menuDeliveryId,
@@ -417,7 +417,7 @@ export function useNovoPedidoOrchestrator({
 
   useEffect(() => {
     if (!open || vendaId || modoVisualizacao) return
-    if (tipoInicioPedido !== 'entrega') return
+    if (tipoInicioPedido !== 'delivery') return
 
     const telCampo = telefoneWhatsAppParaCampoPedido(telefoneInicial)
     const digitos = digitosTelefonePedidoWhatsApp(telefoneInicial)
@@ -453,7 +453,8 @@ export function useNovoPedidoOrchestrator({
     isFetching: isFetchingMeiosPagamento,
   } = useMeiosPagamentoInfinite({
     limit: 100,
-    ativo: true,
+    // POS filtra por ativo; delivery filtra só por ativoDelivery (independente do POS).
+    ...(pedidoDeliveryGestor ? { ativoDelivery: true } : { ativo: true }),
     // Step 3 usa meios de pagamento; em visualizacao/edicao pode ser usado para resolver nomes.
     enabled: open && (currentStep >= 3 || modoVisualizacao || !!vendaId),
     refetchOnWindowFocus: false,
@@ -623,7 +624,7 @@ export function useNovoPedidoOrchestrator({
 
   const tipoVendaParaDetalhe =
     tipoVendaGestor ??
-    (tipoInicioPedido === 'entrega' ? 'entrega' : null)
+    (tipoInicioPedido === 'delivery' ? 'delivery' : null)
 
   const { carregarVendaExistente, isLoadingVenda, setIsLoadingVenda, vendaDataUpdatedAt } =
     useCarregarVenda({
@@ -731,7 +732,7 @@ export function useNovoPedidoOrchestrator({
     setCurrentStep,
     pedidoDeliveryGestor,
     clienteEntregaVinculadoId: clienteEntregaVinculado?.id,
-    telefoneClienteDelivery: telefoneBuscadoEntrega,
+    telefoneClienteDelivery: telefoneBuscadoEntrega || telefoneBuscaEntrega,
     pedidoComEntrega,
     temEnderecoEntrega: Boolean(moradaEntregaSelecionada?.endereco),
     enderecoEntregaTemGeo: Boolean(
@@ -745,6 +746,7 @@ export function useNovoPedidoOrchestrator({
     edicaoProdutosPermaneceNoPainel: editandoItensNoDetalhe,
     ajustandoPagamentoAposEdicaoItens,
     preservarRascunhoAoFechar,
+    onAbrirCadastroRapidoCliente: () => setAbrirCadastroRapidoEntregaPedido(n => n + 1),
   })
 
   const handleConfirmarSaidaDescartando = useCallback(() => {

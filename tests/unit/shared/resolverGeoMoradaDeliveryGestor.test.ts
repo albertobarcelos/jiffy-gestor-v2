@@ -1,6 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resolverGeoMoradaDeliveryGestor } from '@/src/shared/utils/resolverGeoMoradaDeliveryGestor'
 
+vi.mock('@/src/shared/utils/geolocalizacaoEnderecoShared', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/src/shared/utils/geolocalizacaoEnderecoShared')>()
+  return {
+    ...actual,
+    geocodificarEnderecoViaGoogle: vi.fn(),
+  }
+})
+
+import { geocodificarEnderecoViaGoogle } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
+
 const pontoGoogle = {
   type: 'Point' as const,
   coordinates: [-54.61, -20.45] as [number, number],
@@ -22,22 +32,19 @@ const endereco = {
 
 describe('resolverGeoMoradaDeliveryGestor', () => {
   beforeEach(() => {
-    vi.stubGlobal('fetch', vi.fn())
+    vi.mocked(geocodificarEnderecoViaGoogle).mockReset()
   })
 
   afterEach(() => {
-    vi.unstubAllGlobals()
+    vi.clearAllMocks()
   })
 
   it('devolve o ponto do Google sem reescrever o texto do endereço', async () => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        enderecoLocalizacao: pontoGoogle,
-        providerEnderecoId: 'ChIJxxx',
-        enderecoFormatado: 'Rua que o Google inventou, Piquete - SP',
-      }),
-    } as Response)
+    vi.mocked(geocodificarEnderecoViaGoogle).mockResolvedValue({
+      enderecoLocalizacao: pontoGoogle,
+      providerEnderecoId: 'ChIJxxx',
+      enderecoFormatado: 'Rua que o Google inventou, Piquete - SP',
+    })
 
     const result = await resolverGeoMoradaDeliveryGestor({ endereco })
 
@@ -48,11 +55,9 @@ describe('resolverGeoMoradaDeliveryGestor', () => {
   })
 
   it('usa a geo da empresa quando o Google não encontra o endereço', async () => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: false,
-      status: 404,
-      json: async () => ({ error: 'Endereço não encontrado.' }),
-    } as Response)
+    vi.mocked(geocodificarEnderecoViaGoogle).mockRejectedValue(
+      new Error('Endereço não encontrado.')
+    )
 
     const result = await resolverGeoMoradaDeliveryGestor({
       endereco,
@@ -65,11 +70,9 @@ describe('resolverGeoMoradaDeliveryGestor', () => {
   })
 
   it('falha só quando Google e empresa não têm ponto', async () => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: false,
-      status: 404,
-      json: async () => ({ error: 'Endereço não encontrado.' }),
-    } as Response)
+    vi.mocked(geocodificarEnderecoViaGoogle).mockRejectedValue(
+      new Error('Endereço não encontrado.')
+    )
 
     await expect(resolverGeoMoradaDeliveryGestor({ endereco })).rejects.toThrow(
       /empresa não tem geolocalização/i

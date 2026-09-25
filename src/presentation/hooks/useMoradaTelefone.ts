@@ -21,7 +21,7 @@ export interface MoradaTelefoneHookOptions {
   usarModuloDelivery?: boolean
 }
 
-function moradasTelefoneQueryKey(
+export function moradasTelefoneQueryKey(
   telefone: string | null,
   usarModuloDelivery: boolean,
   empresaId: string | null

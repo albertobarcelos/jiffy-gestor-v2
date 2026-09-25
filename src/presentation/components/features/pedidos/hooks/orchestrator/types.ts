@@ -23,7 +23,7 @@ export type NovoPedidoShellProps = {
   bloquearAbasDetalhe?: boolean
   podeExibirAbaNotaFiscal: boolean
   podeExibirAbaDadosEntrega: boolean
-  tipoInicioPedido: 'balcao' | 'entrega'
+  tipoInicioPedido: 'balcao' | 'delivery'
   createPending: boolean
   canSubmit: () => boolean
   onSubmit: () => void | Promise<void>

@@ -14,10 +14,16 @@ import { CarregarPedidoKanbanQuickViewUseCase } from '@/src/application/use-case
 import { CarregarVendaDetalheUseCase } from '@/src/application/use-cases/vendas/CarregarVendaDetalheUseCase'
 import {
   BuscarProdutoCatalogoPorIdUseCase,
+  HidratarGruposComplementosCatalogoUseCase,
   ListarGruposCatalogoVendaUseCase,
   ListarProdutosCatalogoVendaPaginaUseCase,
 } from '@/src/application/use-cases/vendas/ListarProdutosCatalogoUseCase'
+import {
+  InvalidarCatalogoVendaUseCase,
+  LimparCacheGruposComplementosCatalogoUseCase,
+} from '@/src/application/use-cases/vendas/InvalidarCatalogoVendaUseCase'
 import { novoPedidoReadRepository } from '@/src/infrastructure/api/repositories/NovoPedidoReadRepository'
+import { grupoComplementoCatalogoCache } from '@/src/infrastructure/api/repositories/grupoComplementoCatalogoCache'
 import { vendaDetalheReadRepository } from '@/src/infrastructure/api/repositories/VendaDetalheReadRepository'
 
 export const atualizarCobrancasPedidoDeliveryUseCase =
@@ -58,6 +64,13 @@ export const listarGruposCatalogoVendaUseCase = new ListarGruposCatalogoVendaUse
 )
 export const buscarProdutoCatalogoPorIdUseCase = new BuscarProdutoCatalogoPorIdUseCase(
   novoPedidoReadRepository
+)
+export const hidratarGruposComplementosCatalogoUseCase =
+  new HidratarGruposComplementosCatalogoUseCase(novoPedidoReadRepository)
+export const limparCacheGruposComplementosCatalogoUseCase =
+  new LimparCacheGruposComplementosCatalogoUseCase(grupoComplementoCatalogoCache)
+export const invalidarCatalogoVendaUseCase = new InvalidarCatalogoVendaUseCase(
+  grupoComplementoCatalogoCache
 )
 export const carregarVendaDetalheUseCase = new CarregarVendaDetalheUseCase(
   vendaDetalheReadRepository

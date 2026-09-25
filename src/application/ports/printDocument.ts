@@ -8,7 +8,7 @@ export type PrintContentBlock =
   | { type: 'item'; quantity: number; name: string; bold?: boolean; size?: PrintSize }
   | { type: 'row'; left?: string; right?: string; bold?: boolean; size?: PrintSize }
   | { type: 'divider'; style?: 'single' | 'double' }
-  | { type: 'feed'; lines: number }
+  | { type: 'feed'; lines?: number; dots?: number }
   | { type: 'cut' }
   | { type: 'qrcode'; data: string; moduleSize?: number }
   | { type: 'image'; data: string; align?: PrintAlign }

@@ -1,3 +1,4 @@
+import { temSeloCanalMarketplace } from '@/src/domain/policies/pedido/origemCanalMarketplace'
 import type { Venda } from '../types'
 
 export type TipoVendaExibicaoCard =
@@ -26,7 +27,7 @@ export function derivarTipoVendaCardKanban(venda: Venda): KanbanVendaCardTipoVen
   const tipoVendaExibicao: TipoVendaExibicaoCard =
     venda.tabelaOrigem === 'venda_gestor'
       ? isDeliveryOuRetirada
-        ? tipoEntrega ?? 'entrega'
+        ? tipoEntrega ?? 'delivery'
         : 'gestor'
       : (venda.tipoVenda ?? '')
 
@@ -34,7 +35,9 @@ export function derivarTipoVendaCardKanban(venda: Venda): KanbanVendaCardTipoVen
     venda.tabelaOrigem === 'venda_gestor' && isDeliveryOuRetirada
       ? tipoEntrega === 'retirada'
         ? 'Retirada'
-        : 'Entrega'
+        : tipoEntrega === 'entrega'
+          ? 'Entrega'
+          : 'Delivery'
       : isPedidoBalcaoGestor
         ? 'Balcão'
         : (venda.origem ?? '')
@@ -45,7 +48,8 @@ export function derivarTipoVendaCardKanban(venda: Venda): KanbanVendaCardTipoVen
         tipoVendaExibicao === 'mesa' ||
         tipoVendaExibicao === 'gestor' ||
         tipoVendaExibicao === 'entrega' ||
-        tipoVendaExibicao === 'retirada')
+        tipoVendaExibicao === 'retirada' ||
+        tipoVendaExibicao === 'delivery')
   )
 
   return {
@@ -58,6 +62,20 @@ export function derivarTipoVendaCardKanban(venda: Venda): KanbanVendaCardTipoVen
   }
 }
 
+export function codigoVendaKanban(venda: Venda): string | null {
+  const codigo = String(venda.codigoVenda ?? '').trim()
+  return codigo ? `#${codigo}` : null
+}
+
+export function rotuloNumeroVendaKanban(venda: Venda): string {
+  return `Pedido ${venda.numeroVenda}`
+}
+
+export function exibirSeloCanalMarketplace(origem: string | null | undefined): boolean {
+  return temSeloCanalMarketplace(origem)
+}
+
 export function linhaIdentificacaoVendaKanban(venda: Venda): string {
-  return `Venda ${venda.numeroVenda}${venda.codigoVenda ? ` - #${venda.codigoVenda}` : ''}`
+  const codigo = codigoVendaKanban(venda)
+  return codigo ? `${rotuloNumeroVendaKanban(venda)} - ${codigo}` : rotuloNumeroVendaKanban(venda)
 }

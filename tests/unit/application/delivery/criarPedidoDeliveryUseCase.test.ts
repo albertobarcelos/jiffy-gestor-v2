@@ -9,7 +9,7 @@ function baseInput(
   overrides: Partial<CriarPedidoDeliveryInputDTO> = {}
 ): CriarPedidoDeliveryInputDTO {
   return {
-    tipoInicioPedido: 'entrega',
+    tipoInicioPedido: 'delivery',
     origem: 'GESTOR',
     status: 'ABERTA',
     produtos: [
@@ -53,6 +53,7 @@ function repoMock(overrides: Partial<INovoPedidoReadRepository> = {}): INovoPedi
     listarProdutosCatalogoPagina: vi.fn(),
     listarGrupoIdsComProdutosAtivos: vi.fn(),
     buscarProdutoPorId: vi.fn(),
+    hidratarGruposComplementosDoProduto: vi.fn(),
     buscarProdutosPorNome: vi.fn(),
     buscarClienteJson: vi.fn(),
     atualizarPagamentosVendaGestor: vi.fn(),

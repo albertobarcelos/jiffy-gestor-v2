@@ -12,6 +12,7 @@ import {
 import type { IMoradaEntregaRepository } from '@/src/domain/repositories/IMoradaEntregaRepository'
 import type {
   AtualizarMoradaTelefoneDTO,
+  ClienteDeliveryIdentificacao,
   CriarMoradaTelefoneDTO,
   MoradaTelefone,
 } from '@/src/domain/types/moradaEntrega'
@@ -214,6 +215,19 @@ export class MoradaEntregaRepository implements IMoradaEntregaRepository {
         ? data.endereco
         : null
     return lerEnderecoLocalizacaoDoPayloadEmpresa(endereco)
+  }
+
+  async identificarClienteDeliveryPorTelefone(
+    telefone: string,
+    token: string
+  ): Promise<ClienteDeliveryIdentificacao | null> {
+    const cliente = await this.buscarClienteDeliveryPorTelefone(telefone, token)
+    if (!cliente) return null
+    return {
+      nome: cliente.nome ?? null,
+      clienteIdVinculado: cliente.clienteIdVinculado ?? null,
+      moradas: clienteDeliveryParaMoradas(cliente),
+    }
   }
 
   async buscarClienteDeliveryPorTelefone(

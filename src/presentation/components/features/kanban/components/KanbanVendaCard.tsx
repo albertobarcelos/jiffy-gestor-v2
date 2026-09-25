@@ -12,9 +12,11 @@ import {
   formatarPrevisaoEntregaKanbanCard,
   rotuloFormaCobrancaKanbanCard,
 } from '../utils/kanbanDeliveryCardDisplay'
+import { OrigemCanalMark } from '@/src/presentation/components/features/origem/OrigemCanalMark'
+import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
 import {
   derivarTipoVendaCardKanban,
-  linhaIdentificacaoVendaKanban,
+  exibirSeloCanalMarketplace,
 } from '../utils/kanbanVendaCardViewModel'
 import { useKanbanVendaCardState } from '../hooks/useKanbanVendaCardState'
 import { PedidoEntregaQuickViewPopover } from '../../delivery/kanban-panels/PedidoEntregaQuickViewPopover'
@@ -86,6 +88,7 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
 
   const colunaAtual = column.id as ColunaKanbanId
   const tipoVendaView = derivarTipoVendaCardKanban(venda)
+  const seloCanal = exibirSeloCanalMarketplace(venda.origem)
   const etapaKanbanCard = venda.getEtapaKanban() as ColunaKanbanId
   const colunaIdParaEstiloCard = colunaParaEstiloCardKanban(
     colunaAtual,
@@ -166,15 +169,66 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
       dragDisabled={arrastarDesabilitado || cardState.bloquearDragCard}
     >
       <div
-        className={`relative rounded-lg border-l-4 ${cardBorderClass} ${cardBgClass} cursor-pointer border border-gray-200/80 ${arrastarDesabilitado ? 'p-2.5 shadow-sm' : 'p-3'} transition-all hover:shadow-md`}
+        className={`relative rounded-lg border-l-4 ${cardBorderClass} ${cardBgClass} cursor-pointer border border-gray-200/80 ${arrastarDesabilitado ? 'p-2.5 shadow-sm' : 'p-3'} transition-all hover:shadow-md ${seloCanal ? 'pr-12' : ''}`}
         onClick={() => onViewDetails(venda)}
         onDoubleClick={() => onViewDetails(venda)}
       >
+        {seloCanal ? (
+          <div className="absolute top-0 right-0 z-10 flex flex-col items-end gap-1.5">
+            <OrigemCanalMark
+              origem={venda.origem}
+              size={28}
+              width={56}
+              className="rounded-none rounded-tr-lg rounded-bl-md border-gray-300"
+            />
+            {exibirMetaDeliveryKanban && tipoVendaView.exibirColunaTipoVenda ? (
+              <span
+                className={
+                  exibirAcaoAlterarTipoPedido ? 'cursor-pointer select-none pb-0.5' : 'pb-0.5'
+                }
+                role={exibirAcaoAlterarTipoPedido ? 'button' : undefined}
+                tabIndex={exibirAcaoAlterarTipoPedido ? 0 : undefined}
+                title={
+                  exibirAcaoAlterarTipoPedido
+                    ? 'Clique duas vezes para alterar o tipo do pedido (entrega/retirada)'
+                    : undefined
+                }
+                onClick={e => e.stopPropagation()}
+                onDoubleClick={e => {
+                  e.stopPropagation()
+                  if (exibirAcaoAlterarTipoPedido) cardState.setEnderecoEntregaOpen(true)
+                }}
+              >
+                <TipoVendaIcon
+                  tipoVenda={
+                    tipoVendaView.tipoVendaExibicao as
+                      | 'balcao'
+                      | 'mesa'
+                      | 'gestor'
+                      | 'entrega'
+                      | 'retirada'
+                      | 'delivery'
+                  }
+                  numeroMesa={
+                    tipoVendaView.tipoVendaExibicao === 'mesa' ? venda.numeroMesa : undefined
+                  }
+                  size={56}
+                  containerScale={0.9}
+                  corPrincipal="var(--color-primary)"
+                  corTexto="var(--color-info)"
+                  corBalcao="var(--color-primary)"
+                  corGestor="var(--color-primary)"
+                  corEntrega="var(--color-primary)"
+                  corBorda="var(--color-primary)"
+                />
+              </span>
+            ) : null}
+          </div>
+        ) : null}
         <div className={`mb-2 ${exibirBotaoEditarProdutos ? 'pr-1' : ''}`}>
           <KanbanVendaCardHeader
             venda={venda}
             exibirMetaDeliveryKanban={exibirMetaDeliveryKanban}
-            linhaIdentificacaoVenda={linhaIdentificacaoVendaKanban(venda)}
             prefixoLinhaOrigemCard={tipoVendaView.prefixoLinhaOrigemCard}
             clienteNome={clienteNome}
             valorFormatado={valorFormatado}
@@ -188,6 +242,7 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
             exibirColunaTipoVenda={tipoVendaView.exibirColunaTipoVenda}
             exibirAcaoAlterarTipoPedido={exibirAcaoAlterarTipoPedido}
             onAbrirAlterarTipoPedido={() => cardState.setEnderecoEntregaOpen(true)}
+            ocultarIconeTipoVenda={seloCanal}
           />
         </div>
 
@@ -257,7 +312,8 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
           vendaId={venda.id}
           tabelaOrigem={tabelaOrigemQuickView}
           colunaAtual={colunaAtual}
-          tipoVenda={tipoEntregaQuickView}
+          tipoVenda={venda.tipoVenda}
+          tipoEntrega={tipoEntregaQuickView}
           observacaoPedidoHint={observacaoPedidoTexto || null}
           anchorEl={cardState.entregaQuickViewAnchor}
           open={Boolean(cardState.entregaQuickViewAnchor)}

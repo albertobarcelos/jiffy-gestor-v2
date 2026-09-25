@@ -1,9 +1,10 @@
 import { Produto } from '@/src/domain/entities/Produto'
 import { statusPadraoNovoPedido } from '@/src/domain/services/pedido/RegrasStatusPedido'
+import { limparCacheGruposComplementosCatalogoVenda } from '../../novoPedidoProdutosApi'
 import type { NovoPedidoFormState } from './useNovoPedidoFormState'
 
 export type CreateNovoPedidoResetFormParams = {
-  tipoInicioPedido: 'balcao' | 'entrega'
+  tipoInicioPedido: 'balcao' | 'delivery'
   form: NovoPedidoFormState
   limparLongPressTimeouts: () => void
   resetEdicaoLinha: () => void
@@ -106,6 +107,7 @@ export function createNovoPedidoResetForm({
     form.setDataVenda('')
     form.setNomeUsuario('')
     form.setCatalogoProdutosPorId({})
+    limparCacheGruposComplementosCatalogoVenda()
     setIsLoadingVenda(false)
   }
 }

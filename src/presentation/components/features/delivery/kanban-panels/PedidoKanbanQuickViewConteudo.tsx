@@ -19,7 +19,7 @@ interface PedidoKanbanQuickViewConteudoProps {
   nomeEmpresa: string
   enderecoEmpresa: EnderecoEmpresaMe | null | undefined
   colunaAtual: ColunaKanbanId
-  tipoVenda: 'entrega' | 'retirada'
+  tipoEntrega: 'entrega' | 'retirada'
 }
 
 function Separador() {
@@ -92,7 +92,7 @@ export function PedidoKanbanQuickViewConteudo({
   nomeEmpresa,
   enderecoEmpresa,
   colunaAtual,
-  tipoVenda,
+  tipoEntrega,
 }: PedidoKanbanQuickViewConteudoProps) {
   const { ref: scrollRef, isDragging, dragScrollProps } = useDragScroll()
   const cpfCnpj = formatarCpfCnpjExibicao(dados.detalhesEntrega.clienteCpfCnpj)
@@ -243,7 +243,7 @@ export function PedidoKanbanQuickViewConteudo({
           nomeEmpresa={nomeEmpresa}
           enderecoEmpresa={enderecoEmpresa}
           colunaAtual={colunaAtual}
-          tipoVenda={tipoVenda}
+          tipoEntrega={tipoEntrega}
         />
       </div>
     </div>

@@ -11,7 +11,7 @@ import type {
 } from '@/src/domain/types/vendaDetalhe'
 
 export interface CriarVendaGestorInputDTO {
-  tipoInicioPedido: 'balcao' | 'entrega'
+  tipoInicioPedido: 'balcao' | 'delivery'
   origem: OrigemVenda
   status: StatusVenda
   produtos: ProdutoSelecionado[]

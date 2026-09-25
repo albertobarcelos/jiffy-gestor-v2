@@ -4,10 +4,11 @@ import { Produto } from '@/src/domain/entities/Produto'
 import type { INovoPedidoReadRepository } from '@/src/domain/repositories/INovoPedidoReadRepository'
 import {
   gruposComplementosPrecisamHidratacao,
+  gruposProdutoParaCatalogo,
+  hidratarGruposComplementosComFontes,
   mapGrupoComplementoJsonToProdutoGrupo,
   menuGrupoProdutoToGrupoProduto,
   menuProdutoToProduto,
-  substituirGruposComplementosDoProduto,
 } from '@/src/application/mappers/MenuProdutoCatalogMapper'
 import type { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { normalizarListaEntregadoresDelivery } from '@/src/application/mappers/EntregadorDeliveryNormalizer'
@@ -18,6 +19,10 @@ import {
   fetchMenuProdutoSnapshot,
   fetchMenuProdutosPagina,
 } from '@/src/infrastructure/api/repositories/menuCatalogFetch'
+import {
+  gravarGruposComplementosNoCache,
+  snapshotCacheGruposComplementosCatalogo,
+} from '@/src/infrastructure/api/repositories/grupoComplementoCatalogoCache'
 import { salvarPedidoDeliveryDetalheCache } from '@/src/infrastructure/api/pedidoDeliveryDetalheCache'
 import { anexarInformacoesAdicionaisEmitirNota } from '@/src/shared/helpers/informacoesAdicionaisNota'
 import { montarBodyReemitirNotaDelivery } from '@/src/domain/services/pedido/RegrasEmissaoFiscalDelivery'
@@ -75,37 +80,40 @@ async function fetchProdutoCadastroPorId(produtoId: string, token: string): Prom
 
 async function hidratarComplementosDoProdutoMenu(
   produto: Produto,
-  token: string
+  token: string,
+  cadastro?: Produto | null
 ): Promise<Produto> {
-  const grupos = produto.getGruposComplementos()
+  const grupos = gruposProdutoParaCatalogo(produto)
   if (grupos.length === 0 || !gruposComplementosPrecisamHidratacao(grupos)) {
+    gravarGruposComplementosNoCache(grupos)
     return produto
   }
 
-  const hidratados = await Promise.all(
-    grupos.map(async grupo => {
-      if ((grupo.complementos?.length ?? 0) > 0) {
-        return { id: grupo.id, nome: grupo.nome, complementos: [...grupo.complementos] }
-      }
-      try {
-        const raw = await fetchJson<unknown>(
-          `/api/grupos-complementos/${encodeURIComponent(grupo.id)}`,
-          token
-        )
-        return (
-          mapGrupoComplementoJsonToProdutoGrupo(raw) ?? {
-            id: grupo.id,
-            nome: grupo.nome,
-            complementos: [],
-          }
-        )
-      } catch {
-        return { id: grupo.id, nome: grupo.nome, complementos: [] }
-      }
-    })
+  const cadastroPorId = new Map(
+    (cadastro ? gruposProdutoParaCatalogo(cadastro) : []).map(grupo => [grupo.id, grupo])
   )
 
-  return substituirGruposComplementosDoProduto(produto, hidratados)
+  const { produto: hidratado, gruposCompletos } = await hidratarGruposComplementosComFontes(
+    produto,
+    {
+      cadastroPorId,
+      cachePorId: snapshotCacheGruposComplementosCatalogo(),
+    },
+    async id => {
+      try {
+        const raw = await fetchJson<unknown>(
+          `/api/grupos-complementos/${encodeURIComponent(id)}`,
+          token
+        )
+        return mapGrupoComplementoJsonToProdutoGrupo(raw)
+      } catch {
+        return null
+      }
+    }
+  )
+
+  gravarGruposComplementosNoCache(gruposCompletos)
+  return hidratado
 }
 
 export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
@@ -257,6 +265,10 @@ export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
     }
 
     const produto = menuProdutoToProduto(snapshot, base)
+    return hidratarComplementosDoProdutoMenu(produto, token, base)
+  }
+
+  async hidratarGruposComplementosDoProduto(produto: Produto, token: string): Promise<Produto> {
     return hidratarComplementosDoProdutoMenu(produto, token)
   }
 

@@ -15,7 +15,7 @@ import type {
 import { useNovoPedidoCatalogo } from '../useNovoPedidoCatalogo'
 import { useNovoPedidoDetalhe } from '../useNovoPedidoDetalhe'
 
-export function useNovoPedidoFormState(tipoInicioPedido: 'balcao' | 'entrega') {
+export function useNovoPedidoFormState(tipoInicioPedido: 'balcao' | 'delivery') {
   const [origem, setOrigem] = useState<OrigemVenda>('GESTOR')
   const [status, setStatus] = useState<StatusVenda>(() => statusPadraoNovoPedido(tipoInicioPedido))
   const [clienteId, setClienteId] = useState<string>('')

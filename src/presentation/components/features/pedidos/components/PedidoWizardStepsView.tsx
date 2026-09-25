@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { PedidoProdutosStep } from './PedidoProdutosStep'
 import { PedidoProdutosStepLayout } from './PedidoProdutosStepLayout'
@@ -15,7 +15,7 @@ export function PedidoWizardStepsView() {
 
   return (
     <>
-      {!modoVisualizacao && tipoInicioPedido === 'entrega' && currentStep === 2 && (
+      {!modoVisualizacao && tipoInicioPedido === 'delivery' && currentStep === 2 && (
         <PedidoInformacoesStepView />
       )}
 

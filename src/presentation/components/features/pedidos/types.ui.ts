@@ -40,7 +40,7 @@ export interface NovoPedidoModalProps {
    * Canal escolhido no EscolhaTipoPedidoModal.
    * balcao: step inicial = Informações; entrega: step inicial = Produtos.
    */
-  tipoInicioPedido?: 'balcao' | 'entrega'
+  tipoInicioPedido?: 'balcao' | 'delivery'
   /** Cliente já escolhido no Flow — preenche telefone e vínculo na etapa Informações. */
   clienteInicial?: Cliente | null
   /** Telefone da conversa quando ainda não há cadastro. */

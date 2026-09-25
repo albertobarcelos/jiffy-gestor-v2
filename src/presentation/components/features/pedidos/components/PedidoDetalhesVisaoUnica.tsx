@@ -2,7 +2,9 @@
 
 import { MdAccessTime, MdLocationOn, MdSportsMotorsports } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
-import { transformarParaReal } from '@/src/shared/utils/formatters'
+import { temSeloCanalMarketplace } from '@/src/domain/policies/pedido/origemCanalMarketplace'
+import { montarMensagemWhatsappClienteKanban } from '@/src/application/delivery/montarMensagemWhatsappClienteKanban'
+import { montarMensagemWhatsappEntregadorKanban } from '@/src/application/delivery/montarMensagemWhatsappEntregadorKanban'
 import {
   formatarCelularExibicao,
   formatarEnderecoEntregaMultilinha,
@@ -13,12 +15,12 @@ import {
   totalCobrarNaEntregaPagamentos,
   rotuloOrigemExibicao,
 } from '@/src/application/mappers/PedidoDisplayMapper'
-import { montarMensagemWhatsappClienteKanban } from '@/src/application/delivery/montarMensagemWhatsappClienteKanban'
-import { montarMensagemWhatsappEntregadorKanban } from '@/src/application/delivery/montarMensagemWhatsappEntregadorKanban'
 import { PedidoKanbanProgressoEntrega } from '@/src/presentation/components/features/delivery/kanban-panels/PedidoKanbanProgressoEntrega'
 import type { PedidoKanbanQuickViewData } from '@/src/presentation/components/features/delivery/kanban-panels/carregarPedidoKanbanQuickView'
-import { abrirWhatsapp, telefoneValidoParaWhatsapp } from '@/src/shared/utils/whatsappLink'
+import { OrigemCanalMark } from '@/src/presentation/components/features/origem/OrigemCanalMark'
+import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
+import { abrirWhatsapp, telefoneValidoParaWhatsapp } from '@/src/shared/utils/whatsappLink'
 import { useNovoPedidoDetalheContext } from '../context/NovoPedidoDetalheContext'
 import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
 import { useNovoPedidoUIContext } from '../context/NovoPedidoUIContext'
@@ -185,7 +187,7 @@ export function PedidoDetalhesVisaoUnica() {
     const mensagem = montarMensagemWhatsappClienteKanban({
       clienteNome: dadosWhatsapp.clienteNome,
       colunaAtual: coluna,
-      tipoVenda: tipoWhatsapp,
+      tipoEntrega: tipoWhatsapp,
       dados: dadosWhatsapp,
       enderecoEmpresa: empresa?.endereco,
       nomeEmpresa: empresa?.nomeExibicao ?? '',
@@ -228,12 +230,15 @@ export function PedidoDetalhesVisaoUnica() {
                 />
               ) : null}
             </div>
-            <p className="mt-1 text-sm text-gray-600">
-              Feito às {horaCriacao}
-              {codigo ? ` · #${codigo}` : ''}
-              {origem ? ` · ${rotuloOrigemExibicao(origem)}` : ''}
-              {' · '}
-              {rotuloTipoAtendimento(tipoVenda)}
+            <p className="mt-1 inline-flex flex-wrap items-center gap-x-1.5 text-sm text-gray-600">
+              <span>Feito às {horaCriacao}</span>
+              {codigo ? <span>· #{codigo}</span> : null}
+              {temSeloCanalMarketplace(origem) ? (
+                <OrigemCanalMark origem={origem} size={24} />
+              ) : origem ? (
+                <span>· {rotuloOrigemExibicao(origem)}</span>
+              ) : null}
+              <span>· {rotuloTipoAtendimento(tipoVenda)}</span>
             </p>
             {previsao !== '—' ? (
               <span className="mt-2 inline-flex items-center gap-1 text-sm text-gray-700">

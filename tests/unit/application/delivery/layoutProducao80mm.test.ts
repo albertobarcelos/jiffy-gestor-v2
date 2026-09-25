@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  dotsEntreModificadoresProducao,
   identidadePrimariaEhTipoAvulso,
   linhaComplementoProducao,
   linhaItemProducao,
@@ -13,11 +14,13 @@ describe('layoutProducao80mm', () => {
   it('formata item em maiúsculas com quantidade inteira', () => {
     expect(linhaItemProducao(2.0, 'X-Búrger')).toBe('2x X-BURGER')
     expect(linhaItemProducao(0, 'X-Burger')).toBe('0x X-BURGER (item ja lancado)')
+    expect(linhaItemProducao(2.0, 'X-Búrger', true)).toBe('  2x X-BURGER')
   })
 
   it('recua complemento na proporção 32/24', () => {
     expect(recuoComplementoEspacos(2)).toBe('    ')
     expect(recuoComplementoEspacos(10)).toBe('     ')
+    expect(recuoComplementoEspacos(2, true)).toBe('       ')
     expect(
       linhaComplementoProducao({
         recuo: recuoComplementoEspacos(2),
@@ -34,6 +37,11 @@ describe('layoutProducao80mm', () => {
         impacto: 'nenhum',
       })
     ).toBe('    * 1 MOLHO')
+  })
+
+  it('abre mais o vão na virada de modificador sem ação para com ação', () => {
+    expect(dotsEntreModificadoresProducao('    * 1 ALFACE', '    + 1 QUEIJO')).toBe(32)
+    expect(dotsEntreModificadoresProducao('    + 1 QUEIJO', '    + 1 BACON')).toBe(16)
   })
 
   it('parte identidade longa em duas pílulas', () => {
@@ -117,9 +125,9 @@ describe('layoutProducao80mm', () => {
       ],
     })
     expect(modelo.identidade.primaria).toBe('ENTREGA #1842 | JOAO')
-    expect(modelo.itens[0]?.produto).toBe('2x X-BURGER')
-    expect(modelo.itens[0]?.extras[0]).toBe('    + 1 QUEIJO')
-    expect(modelo.itens[0]?.extras[2]).toBe('    Obs: sem cebola')
+    expect(modelo.itens[0]?.produto).toBe('  2x X-BURGER')
+    expect(modelo.itens[0]?.extras[0]).toBe('       + 1 QUEIJO')
+    expect(modelo.itens[0]?.extras[2]).toBe('       Obs: sem cebola')
     expect(modelo.observacaoPedido).toBe('Manda canudo')
     expect(modelo.resumo).toContain('3 ITENS')
     expect(modelo.resumo).toContain('Cozinha')

@@ -235,7 +235,7 @@ function mapPagamento(root: VendaGestorTicketsResponse, size: PrintSize, bold: b
   const p = root.pagamento
   const trocoCalculado = numeroFinito(p?.trocoParaLevar) ?? 0
   const aviso = avisoCobrancaEntregadorCupom(p, fmtBrl)
-  const blocks: PrintContentBlock[] = [{ type: 'divider', style: 'double' }]
+  const blocks: PrintContentBlock[] = [{ type: 'divider' }]
 
   if (aviso) {
     for (const linha of aviso.linhas) {

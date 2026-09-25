@@ -295,3 +295,46 @@ export function formatarHorarioFuncionamentoHoje(
     agendaSemanal: agendaSemanal ?? [],
   })
 }
+
+/** Espera o servidor aplicar a transição automática antes do refetch. */
+export const BUFFER_MS_REFETCH_FUNCIONAMENTO = 2_000
+
+/** Sem horário anunciado: segurança contra mudança em outro dispositivo. */
+export const INTERVALO_FALLBACK_REFETCH_FUNCIONAMENTO_MS = 60_000
+
+/** Teto do intervalo — setTimeout/RQ não devem esperar horas demais. */
+export const INTERVALO_MAX_REFETCH_FUNCIONAMENTO_MS = 60 * 60 * 1000
+
+export type SinalTransicaoFuncionamento = {
+  proximaTransicaoEm?: string | null
+  alteracaoAtual?: { expiraEm?: string | null } | null
+}
+
+function parseIsoMs(iso: string | null | undefined): number | null {
+  if (!iso) return null
+  const ms = Date.parse(iso)
+  return Number.isNaN(ms) ? null : ms
+}
+
+/**
+ * Quanto esperar até buscar de novo o status da loja.
+ * Usa o horário que o servidor já calcula (`proximaTransicaoEm` / `expiraEm`).
+ */
+export function msAteRefetchFuncionamentoDelivery(
+  sinal: SinalTransicaoFuncionamento | null | undefined,
+  agora: Date = new Date()
+): number {
+  const candidatos = [parseIsoMs(sinal?.proximaTransicaoEm), parseIsoMs(sinal?.alteracaoAtual?.expiraEm)]
+  const timestamps = candidatos.filter((ms): ms is number => ms != null)
+
+  if (timestamps.length === 0) {
+    return INTERVALO_FALLBACK_REFETCH_FUNCIONAMENTO_MS
+  }
+
+  const alvo = Math.min(...timestamps)
+  const restante = alvo - agora.getTime() + BUFFER_MS_REFETCH_FUNCIONAMENTO
+  if (restante <= 0) {
+    return BUFFER_MS_REFETCH_FUNCIONAMENTO
+  }
+  return Math.min(restante, INTERVALO_MAX_REFETCH_FUNCIONAMENTO_MS)
+}

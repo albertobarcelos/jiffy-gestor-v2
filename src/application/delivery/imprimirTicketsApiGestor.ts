@@ -73,6 +73,7 @@ export function notificarWarningsTickets(
 
 export type ImprimirTicketsApiGestorDeps = {
   desenharPilula: DesenharPilulaProducao
+  desenharSeparador?: () => string | null
   enviarCupom: EnviarCupomPrintJob
   gerarJobId: GerarPrintJobId
 }
@@ -176,6 +177,7 @@ export function criarImprimirTicketsApiGestor(
           document = mapTicketToProducaoHibridoDocument(response, ticket, {
             reimpressao,
             desenharPilula: deps.desenharPilula,
+            desenharSeparador: deps.desenharSeparador,
           })
         } else if (cupomTemplate?.modoPapel === 'grafico') {
           document = await mapTicketToGraphicPrintDocument(response, ticket, {

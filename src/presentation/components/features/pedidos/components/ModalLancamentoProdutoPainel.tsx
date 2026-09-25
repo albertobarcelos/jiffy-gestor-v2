@@ -35,8 +35,21 @@ import {
   calcularTotalComplementos,
 } from '@/src/domain/services/pedido/CalculadoraPedido'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
+import {
+  grupoComplementoAtingiuMaximo,
+  limiteMaximoEfetivoGrupo,
+  mensagemMaximoGrupoComplemento,
+  podeIncrementarComplementoNoGrupo,
+  somarQuantidadeComplementosNoGrupo,
+  validarLimitesGruposComplementosLancamento,
+} from '@/src/domain/policies/pedido/GrupoComplementoLimitesPolicy'
 
 const PANEL_MS = { enter: 420, exit: 380 } as const
+
+function rotuloLimitesGrupoComplemento(grupo: { qtdMinima: number; qtdMaxima: number }): string {
+  const maximo = limiteMaximoEfetivoGrupo(grupo.qtdMaxima)
+  return `Mín: ${grupo.qtdMinima} · Máx: ${maximo ?? '∞'}`
+}
 
 /** Label na borda (outlined), alinhado a NovoMeioPagamento / filtros da lista */
 const sxValorPainelOutlined = {
@@ -323,14 +336,43 @@ export function ModalLancamentoProdutoPainel({
       ? montarComplementosSelecionados(produto, quantidadesComplementos)
       : []
 
+    if (mostrarComplementos) {
+      const gruposComItens = produto
+        .getGruposComplementos()
+        .filter(grupo => (grupo.complementos?.length ?? 0) > 0)
+      const limites = validarLimitesGruposComplementosLancamento(
+        gruposComItens,
+        quantidadesComplementos
+      )
+      if (!limites.valido) {
+        showToast.error(limites.mensagem ?? 'Complementos fora dos limites do grupo.')
+        return
+      }
+    }
+
     onConfirm({ valorUnitario, complementos })
     onOpenChange(false)
   }
 
-  const ajustarQuantidadeComplemento = (chave: string, delta: number) => {
+  const ajustarQuantidadeComplemento = (
+    chave: string,
+    delta: number,
+    grupo: { id: string; nome: string; qtdMaxima: number }
+  ) => {
     setQuantidadesComplementos(prev => {
       const atual = Math.max(0, Math.floor(prev[chave] ?? 0))
-      return { ...prev, [chave]: Math.max(0, atual + delta) }
+      const nova = Math.max(0, atual + delta)
+      if (delta > 0) {
+        const totalNoGrupo = somarQuantidadeComplementosNoGrupo(prev, grupo.id, {
+          key: chave,
+          quantidade: nova,
+        })
+        if (!podeIncrementarComplementoNoGrupo(grupo, totalNoGrupo)) {
+          showToast.error(mensagemMaximoGrupoComplemento(grupo))
+          return prev
+        }
+      }
+      return { ...prev, [chave]: nova }
     })
   }
 
@@ -431,9 +473,22 @@ export function ModalLancamentoProdutoPainel({
                   <p className="text-sm text-secondary-text">Carregando complementos...</p>
                 ) : produtoTemComplementosVinculados(produto) ? (
                   <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-                    {produto.getGruposComplementos().map(grupo => (
+                    {produto.getGruposComplementos().map(grupo => {
+                      const totalNoGrupo = somarQuantidadeComplementosNoGrupo(
+                        quantidadesComplementos,
+                        grupo.id
+                      )
+                      const atingiuMaximo = grupoComplementoAtingiuMaximo(grupo, totalNoGrupo)
+                      return (
                       <div key={grupo.id} className="rounded-md border border-gray-100 px-2 py-1.5">
-                        <h4 className="mb-1 text-sm font-semibold text-gray-800">{grupo.nome}</h4>
+                        <div className="mb-1 flex items-baseline justify-between gap-2">
+                          <h4 className="min-w-0 truncate text-sm font-semibold text-gray-800">
+                            {grupo.nome}
+                          </h4>
+                          <span className="shrink-0 text-[11px] font-medium tabular-nums text-secondary-text">
+                            {rotuloLimitesGrupoComplemento(grupo)}
+                          </span>
+                        </div>
                         {grupo.complementos && grupo.complementos.length > 0 ? (
                           <div className="space-y-0.5">
                             {grupo.complementos.map(comp => {
@@ -470,7 +525,9 @@ export function ModalLancamentoProdutoPainel({
                                       type="button"
                                       aria-label="Diminuir quantidade do complemento"
                                       disabled={quantidade <= 0}
-                                      onClick={() => ajustarQuantidadeComplemento(chaveUnica, -1)}
+                                      onClick={() =>
+                                        ajustarQuantidadeComplemento(chaveUnica, -1, grupo)
+                                      }
                                       className="flex h-7 w-7 items-center justify-center bg-primary/10 font-normal text-gray-600 transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-40"
                                     >
                                       <MdRemove className="h-4 w-4" />
@@ -484,8 +541,11 @@ export function ModalLancamentoProdutoPainel({
                                     <button
                                       type="button"
                                       aria-label="Aumentar quantidade do complemento"
-                                      onClick={() => ajustarQuantidadeComplemento(chaveUnica, 1)}
-                                      className="flex h-7 w-7 items-center justify-center bg-primary/10 font-normal text-gray-600 transition-colors hover:bg-primary/20"
+                                      disabled={atingiuMaximo}
+                                      onClick={() =>
+                                        ajustarQuantidadeComplemento(chaveUnica, 1, grupo)
+                                      }
+                                      className="flex h-7 w-7 items-center justify-center bg-primary/10 font-normal text-gray-600 transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-40"
                                     >
                                       <MdAdd className="h-4 w-4" />
                                     </button>
@@ -498,7 +558,8 @@ export function ModalLancamentoProdutoPainel({
                           <p className="text-sm text-gray-500">Nenhum item neste grupo.</p>
                         )}
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 ) : (
                   <p className="py-4 text-center text-sm text-gray-500">

@@ -10,7 +10,11 @@ import {
   type DeliveryCupomModeloFonteConfig,
   type DeliveryCupomTemplateConfig,
 } from '@/src/shared/types/deliveryCupomTemplate'
-import { renderDashSeparatorHtml, renderQrSvg } from '@/src/infrastructure/printing/receiptBitmaps'
+import {
+  renderDashSeparatorHtml,
+  renderQrSvg,
+  TRACEJADO_PRODUCAO,
+} from '@/src/infrastructure/printing/receiptBitmaps'
 import {
   avisoCobrancaEntregadorCupom,
   deveCobrarNaEntregaCupom,
@@ -19,6 +23,7 @@ import {
 import { fonteProdutoEscPosA22Px } from '@/src/application/delivery/cupomPrintLayout'
 import {
   detalheLinhasItemPedido,
+  grupoModificadorProducao,
   identidadePrimariaEhTipoAvulso,
   montarModeloProducao80mm,
 } from '@/src/application/delivery/layoutProducao80mm'
@@ -36,6 +41,10 @@ let cupomInnerWidthPx = 280
 
 function htmlSeparator(double = false): string {
   return renderDashSeparatorHtml(cupomInnerWidthPx, double)
+}
+
+function htmlSeparatorProducao(): string {
+  return renderDashSeparatorHtml(cupomInnerWidthPx, false, TRACEJADO_PRODUCAO)
 }
 
 function renderObsPedido(root: VendaGestorTicketsResponse, template: DeliveryCupomTemplateConfig): string {
@@ -375,13 +384,13 @@ function renderProducao(
   const itens = modelo.itens
     .map(item => {
       const extras = item.extras
-        .map(linha => `<div class="prod-extra">${escapeHtml(linha)}</div>`)
+        .map(linha => `<div class="prod-extra" data-grupo="${grupoModificadorProducao(linha)}">${escapeHtml(linha)}</div>`)
         .join('')
       return `<div class="prod-item-block">
         <div class="prod-item">${escapeHtml(item.produto)}</div>
         ${extras}
       </div>
-      ${htmlSeparator()}`
+      ${htmlSeparatorProducao()}`
     })
     .join('')
 
@@ -401,7 +410,6 @@ function renderProducao(
         : ''
     }
     ${modelo.identidade.secundaria ? htmlPilulaProducao(modelo.identidade.secundaria, 'prod-pill-id') : ''}
-    ${htmlSeparator()}
     ${itens}
     ${
       modelo.observacaoPedido
@@ -409,7 +417,7 @@ function renderProducao(
       <div class="prod-obs-title">OBSERVACAO DO PEDIDO</div>
       <div class="prod-obs-text">${escapeHtml(modelo.observacaoPedido)}</div>
     </div>
-    ${htmlSeparator()}`
+    ${htmlSeparatorProducao()}`
         : ''
     }
     <div class="prod-resumo">${escapeHtml(modelo.resumo)}</div>
@@ -483,7 +491,7 @@ function renderPagamento(root: VendaGestorTicketsResponse): string {
           `<div class="charge-linha"><strong>${escapeHtml(linha.left)}:</strong> ${escapeHtml(linha.right)}</div>`
       )
       .join('')
-    return `${htmlSeparator(true)}
+    return `${htmlSeparator()}
     <div class="payment-section charge-box">
       ${linhas}
       ${trocoHtml}
@@ -491,14 +499,14 @@ function renderPagamento(root: VendaGestorTicketsResponse): string {
   }
 
   if (deveCobrarNaEntregaCupom(p)) {
-    return `${htmlSeparator(true)}
+    return `${htmlSeparator()}
     <div class="payment-section charge-box">
       <div class="charge-linha"><strong>COBRAR NA ENTREGA</strong></div>
       ${trocoHtml}
     </div>`
   }
 
-  return `${htmlSeparator(true)}
+  return `${htmlSeparator()}
   <div class="payment-section">
     <div class="paid">PEDIDO PAGO</div>
     ${trocoHtml}
@@ -599,12 +607,14 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
     Math.max(8, fonteBase - 2)
   )
   const dFontes = DEFAULT_DELIVERY_CUPOM_TEMPLATE
-  const peso = (on: boolean) => (on ? '800' : '400')
-  const negritoCabecalho = fontesModelo.negritoCabecalho ?? dFontes.negritoCabecalho
+  const ehProducao = ticket.tipoCupom === 'producao'
+  const pesoCorpo = ehProducao ? '400' : '500'
+  const peso = (on: boolean) => (on ? '600' : pesoCorpo)
+  const negritoCabecalho = ehProducao && (fontesModelo.negritoCabecalho ?? dFontes.negritoCabecalho)
   const negritoPedido = fontesModelo.negritoPedido ?? dFontes.negritoPedido
-  const negritoCliente = fontesModelo.negritoClienteEndereco ?? dFontes.negritoClienteEndereco
-  const negritoItens = fontesModelo.negritoItens ?? dFontes.negritoItens
-  const negritoResumo = fontesModelo.negritoResumo ?? dFontes.negritoResumo
+  const negritoCliente = ehProducao && (fontesModelo.negritoClienteEndereco ?? dFontes.negritoClienteEndereco)
+  const negritoItens = ehProducao && (fontesModelo.negritoItens ?? dFontes.negritoItens)
+  const negritoResumo = ehProducao && (fontesModelo.negritoResumo ?? dFontes.negritoResumo)
   const negritoPagamento = fontesModelo.negritoPagamento ?? dFontes.negritoPagamento
   const negritoRodape = fontesModelo.negritoRodape ?? dFontes.negritoRodape
 
@@ -620,16 +630,18 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
 <style>
   ${ESCPOS_FONT_A_FACE_CSS}
   html, body { margin:0; overflow-x:hidden; }
-  body { width:${w}px; max-width:100%; margin-left:auto; margin-right:auto; font-family: "Segoe UI", Tahoma, Arial, sans-serif; color:#000; -webkit-font-smoothing:antialiased; }
+  body { width:${w}px; max-width:100%; margin-left:auto; margin-right:auto; font-family: Arial, Tahoma, sans-serif; color:#000; -webkit-font-smoothing:none; text-rendering:geometricPrecision; }
   .receipt { box-sizing:border-box; width:100%; max-width:100%; margin:0; padding:${template.densidade === 'compacto' ? 0 : 2}px ${paddingLateral}px ${padding}px ${paddingLateral}px; font-size:${template.tamanhoFonteBase}px; line-height:${lineHeight}; overflow-x:hidden; }
+  .receipt[data-tipo="expedicao"] { -webkit-text-stroke:0.35px #000; }
   .header { text-align:center; padding-bottom:${headerGap}px; margin-bottom:${headerGap}px; font-size:${fonteCabecalho}px; font-weight:${peso(negritoCabecalho)}; }
   .header strong { font-weight:inherit; }
   .brand { font-weight:inherit; font-size:${fonteCabecalho + 1}px; letter-spacing:.02em; }
-  .method { display:inline-block; margin-top:${methodMt}px; padding:5px 12px 7px; font-weight:${negritoCabecalho ? 900 : 400}; font-size:${Math.max(fonteCabecalho + 8, 17)}px; border:2px solid #000; border-radius:4px; line-height:1.05; }
-  .codigo-destaque { box-sizing:border-box; display:block; width:100%; margin-top:6px; padding:10px 4px 12px; background:#000; color:#fff; border:3px solid #000; border-radius:4px; font-weight:900; font-size:${Math.max(fonteCabecalho + 14, 26)}px; letter-spacing:.16em; line-height:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .method { display:inline-block; margin-top:${methodMt}px; padding:5px 12px 7px; font-weight:${negritoCabecalho ? 700 : pesoCorpo}; font-size:${Math.max(fonteCabecalho + 8, 17)}px; border:2px solid #000; border-radius:4px; line-height:1.05; }
+  .codigo-destaque { box-sizing:border-box; display:block; width:100%; margin-top:6px; padding:10px 4px 12px; background:#fff; color:#000; border:3px dashed #000; border-radius:4px; font-weight:700; font-size:${Math.max(fonteCabecalho + 14, 26)}px; letter-spacing:.16em; line-height:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .section { margin:${padding}px 0; }
   .meta-section, .meta-section strong { font-size:${fontePedido}px; font-weight:${peso(negritoPedido)}; }
-  .customer-section, .address-section, .customer-section strong, .address-section strong { font-size:${fonteClienteEndereco}px; font-weight:${peso(negritoCliente)}; }
+  .customer-section, .address-section { font-size:${fonteClienteEndereco}px; font-weight:${pesoCorpo}; }
+  .customer-section strong, .address-section strong { font-size:${fonteClienteEndereco}px; font-weight:600; }
   .address-section { padding-bottom:8px; overflow:visible; }
   .whatsapp-qr { margin:${qrGapTop}px 0 ${qrGapBottom}px 0; display:flex; align-items:center; justify-content:flex-start; gap:6px; font-size:10px; font-weight:${peso(negritoCliente)}; line-height:1.15; }
   .whatsapp-qr + .separator { margin-top:${separatorAfterQr}px; }
@@ -638,43 +650,47 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
   .separator { width:100%; margin:${separatorPy}px 0; padding:0; border:0; line-height:0; }
   .separator img { display:block; width:100%; height:auto; image-rendering:pixelated; image-rendering:crisp-edges; }
   .items-title { margin:${padding}px 0 ${template.densidade === 'compacto' ? 1 : 3}px; font-weight:${peso(negritoItens)}; font-size:${fonteItens}px; }
-  .items-title-inline { font-weight:400; white-space:nowrap; width:max-content; max-width:100%; }
-  .items-title-label { display:inline-block; vertical-align:middle; font-weight:400; font-size:${Math.max(8, fonteItens - 3)}px; margin-right:6px; line-height:1.2; }
+  .items-title-inline { font-weight:${pesoCorpo}; white-space:nowrap; width:max-content; max-width:100%; }
+  .items-title-label { display:inline-block; vertical-align:middle; font-weight:${pesoCorpo}; font-size:${Math.max(8, fonteItens - 3)}px; margin-right:6px; line-height:1.2; }
   .items-qty { display:inline-block; vertical-align:middle; box-sizing:border-box; min-width:1.15em; padding:1px 5px 4px; border:2px solid #000; border-radius:3px; line-height:1; text-align:center; overflow:visible; }
-  .items-qty-n { display:inline-block; transform:translateY(-2px); font-weight:800; font-size:${Math.max(8, fonteItens - 2)}px; line-height:1; white-space:nowrap; }
+  .items-qty-n { display:inline-block; transform:translateY(-2px); font-weight:600; font-size:${Math.max(8, fonteItens - 2)}px; line-height:1; white-space:nowrap; }
   .item-row { padding:${itemRowPy}px 0; font-size:${fonteItens}px; }
   .item-title, .item-title .label, .item-title .value { font-weight:${peso(negritoItens)}; font-size:${fonteItens}px; line-height:1.15; }
   .row-line { display:flex; justify-content:space-between; align-items:baseline; gap:8px; width:100%; max-width:100%; box-sizing:border-box; overflow:hidden; }
   .row-line .label { flex:1 1 0; min-width:0; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .row-line .value { flex:0 0 auto; text-align:right; white-space:nowrap; }
-  .item-comps, .item-comps .label, .item-comps .value { padding-left:0; font-size:${fonteItens}px; font-weight:800; color:#000; -webkit-font-smoothing:none; }
+  .item-comps, .item-comps .label, .item-comps .value { padding-left:0; font-size:${fonteItens}px; font-weight:${pesoCorpo}; color:#000; -webkit-font-smoothing:none; }
   .item-comps { padding-left:12px; }
-  .item-comp-sign { display:inline-block; min-width:0.7em; font-weight:900; font-size:1.2em; line-height:1; }
-  .item-note { padding-left:12px; font-size:${fonteItens}px; font-weight:800; color:#000; }
+  .item-comp-sign { display:inline-block; min-width:0.7em; font-weight:600; font-size:1.2em; line-height:1; }
+  .item-note { padding-left:12px; font-size:${fonteItens}px; font-weight:${pesoCorpo}; color:#000; }
   .obs-box { margin:${Math.max(6, padding + 2)}px 0; padding:3px 8px 7px; border:2px solid #000; border-radius:4px; text-align:center; line-height:1.15; }
-  .obs-title { font-weight:800; font-size:${fontePedido}px; letter-spacing:.02em; line-height:1.1; }
-  .obs-text { margin-top:1px; font-weight:800; font-size:${fonteItens + 1}px; line-height:1.15; overflow-wrap:anywhere; word-break:break-word; }
+  .obs-title { font-weight:600; font-size:${fontePedido}px; letter-spacing:.02em; line-height:1.1; }
+  .obs-text { margin-top:1px; font-weight:${pesoCorpo}; font-size:${fonteItens + 1}px; line-height:1.15; overflow-wrap:anywhere; word-break:break-word; }
   .summary-section, .summary-section strong { font-size:${fonteResumo}px; font-weight:${peso(negritoResumo)}; }
   .summary-section .items-title { font-size:${fonteResumo}px; font-weight:${peso(negritoResumo)}; }
   .payment-section, .payment-section strong { font-size:${fontePagamento}px; font-weight:${peso(negritoPagamento)}; }
-  .charge, .paid { text-align:center; font-weight:${negritoPagamento ? 900 : 400}; }
-  .charge-box { box-sizing:border-box; padding:4px 8px 10px; border:2px solid #000; border-radius:4px; line-height:1; text-align:center; }
-  .charge-linha { display:block; margin:0; padding:0; font-size:${fontePagamento}px; font-weight:700; line-height:1; }
-  .charge-linha strong { font-size:inherit; font-weight:800; line-height:1; }
-  .charge-troco { margin-top:4px; font-weight:700; }
+  .charge, .paid { text-align:center; font-weight:${negritoPagamento ? 700 : pesoCorpo}; }
+  .charge-box { box-sizing:border-box; padding:4px 8px 10px; background:#fff; color:#000; border:3px dashed #000; border-radius:4px; line-height:1; text-align:center; }
+  .charge-linha { display:block; margin:0; padding:0; font-size:${fontePagamento}px; font-weight:${pesoCorpo}; line-height:1; }
+  .charge-linha strong { font-size:inherit; font-weight:700; line-height:1; }
+  .charge-troco { margin-top:4px; font-weight:${pesoCorpo}; }
   .extra-header { margin-top:${extraMt}px; font-size:${Math.max(8, fonteRodape)}px; white-space:normal; font-weight:${peso(negritoCabecalho)}; }
   .extra-footer { margin-top:${extraMt}px; font-size:${Math.max(8, fonteRodape)}px; white-space:normal; font-weight:${peso(negritoRodape)}; }
   .footer { margin-top:${footerMt}px; font-size:${fonteRodape}px; text-align:center; font-weight:${peso(negritoRodape)}; }
   .printed-at { color:#000; }
   .prod-80 { font-family:'EscPosFontA', ui-monospace, monospace; padding-bottom:48px; }
+  .prod-80 .separator { margin:6px 0; }
   .prod-banner { text-align:center; font-weight:800; font-size:${fontePedido}px; line-height:1.1; }
-  .prod-pill { background:#000; color:#fff; border-radius:2px; text-align:center; font-weight:800; margin:0 4px 6px; line-height:1.1; }
-  .prod-pill-senha { font-size:${Math.max(16, Math.round((40 * w) / 576))}px; padding:2px 16px; letter-spacing:.12em; }
-  .prod-pill-id { font-size:${Math.max(14, Math.round((30 * w) / 576))}px; padding:3px 12px; }
-  .prod-pill-codigo { font-size:${Math.max(22, Math.round((46 * w) / 576))}px; padding:6px 8px 8px; letter-spacing:.1em; }
+  .prod-pill { background:#fff; color:#000; border:3px dashed #000; border-radius:2px; text-align:center; font-family:Arial, Tahoma, sans-serif; font-weight:800; margin:0 4px 6px; line-height:1.1; -webkit-font-smoothing:none; }
+  .prod-pill-senha { font-size:${Math.max(16, Math.round((40 * w) / 576))}px; padding:2px 16px; letter-spacing:.08em; }
+  .prod-pill-id { font-size:${Math.max(16, Math.round((34 * w) / 576))}px; padding:3px 12px; }
+  .prod-pill-codigo { font-size:${Math.max(24, Math.round((46 * w) / 576))}px; padding:6px 8px 8px; letter-spacing:.04em; }
   .prod-meta { text-align:center; font-weight:800; font-size:${Math.max(9, fonteRodape)}px; letter-spacing:.08em; }
   .prod-80 .prod-item { font-family:'EscPosFontA', ui-monospace, monospace; font-weight:800; font-size:${fonteProduto}px; line-height:1; white-space:pre-wrap; -webkit-font-smoothing:none; }
   .prod-80 .prod-extra { font-family:'EscPosFontA', ui-monospace, monospace; font-weight:800; font-size:${Math.max(12, Math.round(fonteProduto * 0.72))}px; line-height:1.05; white-space:pre; margin-top:2px; }
+  .prod-80 .prod-extra + .prod-extra { margin-top:8px; }
+  .prod-80 .prod-extra[data-grupo="neutro"] + .prod-extra[data-grupo="acao"],
+  .prod-80 .prod-extra[data-grupo="acao"] + .prod-extra[data-grupo="neutro"] { margin-top:16px; }
   .prod-obs { margin:6px 4px; padding:4px 8px 8px; border:2px solid #000; border-radius:4px; text-align:center; }
   .prod-obs-title { font-weight:800; font-size:${Math.max(10, fontePedido)}px; letter-spacing:.04em; }
   .prod-obs-text { margin-top:2px; font-weight:800; font-size:${Math.max(12, fonteItens + 1)}px; overflow-wrap:anywhere; }
@@ -683,7 +699,7 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
   .prod-rodape { margin-top:8px; padding-bottom:8px; }
 </style>
 </head><body>
-<div class="receipt" data-densidade="${template.densidade}">
+<div class="receipt" data-densidade="${template.densidade}" data-tipo="${ticket.tipoCupom}">
   ${
     ticket.tipoCupom === 'producao'
       ? renderProducao(input, template, cabecalhoExtra, rodapeExtra)
