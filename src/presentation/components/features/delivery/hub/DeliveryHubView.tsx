@@ -38,8 +38,13 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
     etapaId && etapaId !== 'delivery-loja' ? etapaId : null
 
   const secaoParam = searchParams.get(DESIGN_SECTION_QUERY_KEY)
-  const activeDesignSection: DesignTabId | null =
+  const rawDesignSection: DesignTabId | null =
     activeEtapaId === 'delivery-design' && isDesignTabId(secaoParam) ? secaoParam : null
+  /** Cores/Tipografias legadas destacam Modelos no submenu. */
+  const activeDesignSection: DesignTabId | null =
+    rawDesignSection === 'cores' || rawDesignSection === 'tipografias'
+      ? 'modelos'
+      : rawDesignSection
 
   const empresaDelivery = empresaDeliveryQuery.data
   const configurado = empresaDelivery != null

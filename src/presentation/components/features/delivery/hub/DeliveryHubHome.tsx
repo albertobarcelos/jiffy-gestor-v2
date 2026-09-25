@@ -192,7 +192,7 @@ function DesignMenuItem({
                   )}
                 >
                   <tab.icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  <span className="truncate">{tab.label}</span>
+                  <span className="truncate">{tab.labelMenu ?? tab.label}</span>
                 </button>
               </li>
             )

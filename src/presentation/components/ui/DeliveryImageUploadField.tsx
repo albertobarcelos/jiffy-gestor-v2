@@ -21,6 +21,10 @@ interface DeliveryImageUploadFieldProps {
   emptyHint?: string
   /** Se informado, abre o modal de crop antes de chamar onFileSelected. */
   cropPreset?: ImageCropPreset
+  /** Preview menor (útil quando logo fica ao lado da capa). */
+  compact?: boolean
+  /** Altura fixa do dropzone (alinha logo e capa na mesma linha). */
+  dropzoneHeight?: number
   onFileSelected: (file: File) => void | Promise<void>
   onClearPreview?: () => void
 }
@@ -59,14 +63,27 @@ const CROP_FIELD_STYLES = {
 
 const CROP_DROPZONE_MAX_W = 360
 const CROP_DROPZONE_MAX_H = 280
+const CROP_DROPZONE_COMPACT_MAX = 112
 
 function isWideCropPreset(preset: ImageCropPreset): boolean {
   return preset.maxOutputWidth / Math.max(1, preset.maxOutputHeight) >= 3
 }
 
-function getCropDropzoneStyle(preset: ImageCropPreset): CSSProperties {
-  // Banners panorâmicos: ocupam toda a largura útil da área.
+function getCropDropzoneStyle(
+  preset: ImageCropPreset,
+  options: { compact?: boolean; dropzoneHeight?: number } = {}
+): CSSProperties {
+  const { compact = false, dropzoneHeight } = options
+
+  // Banners panorâmicos: largura total; altura fixa quando alinhados à logo.
   if (isWideCropPreset(preset)) {
+    if (dropzoneHeight != null) {
+      return {
+        width: '100%',
+        height: dropzoneHeight,
+        minHeight: dropzoneHeight,
+      }
+    }
     return {
       width: '100%',
       height: 'auto',
@@ -74,9 +91,11 @@ function getCropDropzoneStyle(preset: ImageCropPreset): CSSProperties {
     }
   }
 
+  const maxW = dropzoneHeight ?? (compact ? CROP_DROPZONE_COMPACT_MAX : CROP_DROPZONE_MAX_W)
+  const maxH = dropzoneHeight ?? (compact ? CROP_DROPZONE_COMPACT_MAX : CROP_DROPZONE_MAX_H)
   let w = preset.displayFrameWidth
   let h = preset.displayFrameHeight
-  const scale = Math.min(CROP_DROPZONE_MAX_W / w, CROP_DROPZONE_MAX_H / h, 1)
+  const scale = Math.min(maxW / w, maxH / h, 1)
   w = Math.max(1, Math.round(w * scale))
   h = Math.max(1, Math.round(h * scale))
   return {
@@ -95,6 +114,8 @@ export function DeliveryImageUploadField({
   helperText,
   emptyHint = 'Arraste uma imagem ou clique para selecionar',
   cropPreset,
+  compact = false,
+  dropzoneHeight,
   onFileSelected,
   onClearPreview,
 }: DeliveryImageUploadFieldProps) {
@@ -106,7 +127,11 @@ export function DeliveryImageUploadField({
     hasCrop &&
     cropPreset != null &&
     cropPreset.maxOutputWidth === cropPreset.maxOutputHeight
-  const cropDropzoneStyle = cropPreset ? getCropDropzoneStyle(cropPreset) : undefined
+  const cropDropzoneStyle = cropPreset
+    ? getCropDropzoneStyle(cropPreset, { compact, dropzoneHeight })
+    : undefined
+  const squareHintMax =
+    dropzoneHeight ?? (compact ? CROP_DROPZONE_COMPACT_MAX : 280)
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragActive, setDragActive] = useState(false)
   const onFileSelectedRef = useRef(onFileSelected)
@@ -291,9 +316,15 @@ export function DeliveryImageUploadField({
             'text-xs text-neutral-500',
             busy && 'font-medium text-primary',
             hasCrop && 'w-full text-center',
-            hasCrop && isCropSquare && 'max-w-[280px]',
-            hasCrop && !isCropSquare && 'max-w-[360px]'
+            hasCrop && !isCropSquare && !dropzoneHeight && 'max-w-[360px]'
           )}
+          style={
+            hasCrop && isCropSquare
+              ? { maxWidth: squareHintMax }
+              : hasCrop && isWideCrop && dropzoneHeight != null
+                ? { maxWidth: '100%' }
+                : undefined
+          }
         >
           {hint}
         </p>

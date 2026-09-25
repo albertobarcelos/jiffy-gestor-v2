@@ -2,9 +2,7 @@ import type { IconType } from 'react-icons'
 import {
   MdCategory,
   MdImage,
-  MdLink,
-  MdPalette,
-  MdTextFields,
+  MdMenuBook,
   MdViewModule,
 } from 'react-icons/md'
 import { deliveryHubEtapaPath } from '@/src/shared/constants/configuracoesRoutes'
@@ -12,7 +10,10 @@ import type { DesignTabId } from '../types/deliveryPublicoDesignConfig'
 
 export type DesignTabDefinition = {
   id: DesignTabId
+  /** Título na tela (lobby/seção). */
   label: string
+  /** Texto do submenu lateral; se omitido, usa `label`. */
+  labelMenu?: string
   descricao: string
   icon: IconType
   cta: string
@@ -20,6 +21,17 @@ export type DesignTabDefinition = {
 
 /** Query `?secao=` nas rotas do shell Design (mantém a etapa `/design` montada). */
 export const DESIGN_SECTION_QUERY_KEY = 'secao'
+
+/** Query `?aba=` dentro de Modelos (Layout / Cores / Tipografias). */
+export const DESIGN_MODELOS_ABA_QUERY_KEY = 'aba'
+
+export type DesignModelosAbaId = 'layout' | 'cores' | 'tipografias'
+
+export const DESIGN_MODELOS_ABAS: { id: DesignModelosAbaId; label: string }[] = [
+  { id: 'layout', label: 'Layout' },
+  { id: 'cores', label: 'Cores' },
+  { id: 'tipografias', label: 'Tipografias' },
+]
 
 export type DeliveryDesignSectionTabId =
   | 'delivery-design-cardapio'
@@ -29,40 +41,29 @@ export type DeliveryDesignSectionTabId =
   | 'delivery-design-tipografias'
   | 'delivery-design-categorias'
 
+/** Seções do lobby/submenu (Cores e Tipografias ficam como abas em Modelos). */
 export const DESIGN_TABS: DesignTabDefinition[] = [
   {
     id: 'cardapio',
-    label: 'Cardápio e Link da Loja',
-    descricao: 'Cardápio publicado e link público da loja.',
-    icon: MdLink,
+    label: 'Cardápio',
+    descricao: 'Cardápio publicado na loja online e no delivery do Gestor.',
+    icon: MdMenuBook,
     cta: 'Abrir',
   },
   {
     id: 'cabecalho',
-    label: 'Cabeçalho',
-    descricao: 'Nome, logo e capa do cardápio.',
+    label: 'Link e Cabeçalho da Loja',
+    labelMenu: 'Link e Cabeçalho',
+    descricao: 'Link, nome, logo e capa do cardápio.',
     icon: MdImage,
     cta: 'Abrir',
   },
   {
     id: 'modelos',
-    label: 'Modelos',
-    descricao: 'Layout visual da loja pública.',
+    label: 'Modelos de Layout do App Delivery',
+    labelMenu: 'Modelos de Layout',
+    descricao: 'Layout, cores e tipografias da loja pública.',
     icon: MdViewModule,
-    cta: 'Abrir',
-  },
-  {
-    id: 'cores',
-    label: 'Cores',
-    descricao: 'Paleta e identidade visual.',
-    icon: MdPalette,
-    cta: 'Abrir',
-  },
-  {
-    id: 'tipografias',
-    label: 'Tipografias',
-    descricao: 'Estilo das fontes do cardápio.',
-    icon: MdTextFields,
     cta: 'Abrir',
   },
   {
@@ -74,7 +75,21 @@ export const DESIGN_TABS: DesignTabDefinition[] = [
   },
 ]
 
-const DESIGN_TAB_IDS: ReadonlySet<string> = new Set(DESIGN_TABS.map(tab => tab.id))
+/** Seções legadas ainda aceitas em `?secao=` (redirecionam para Modelos + aba). */
+export const DESIGN_LEGACY_SECTIONS_TO_MODELOS_ABA: Record<
+  'cores' | 'tipografias',
+  DesignModelosAbaId
+> = {
+  cores: 'cores',
+  tipografias: 'tipografias',
+}
+
+const DESIGN_NAV_IDS: ReadonlySet<string> = new Set(DESIGN_TABS.map(tab => tab.id))
+const DESIGN_ALL_SECTION_IDS: ReadonlySet<string> = new Set([
+  ...DESIGN_NAV_IDS,
+  'cores',
+  'tipografias',
+])
 
 const SECTION_TO_TAB_ID: Record<DesignTabId, DeliveryDesignSectionTabId> = {
   cardapio: 'delivery-design-cardapio',
@@ -89,8 +104,21 @@ const TAB_ID_TO_SECTION = Object.fromEntries(
   Object.entries(SECTION_TO_TAB_ID).map(([section, tabId]) => [tabId, section])
 ) as Record<DeliveryDesignSectionTabId, DesignTabId>
 
+export function isDesignNavSectionId(
+  value: string | null | undefined
+): value is DesignTabId {
+  return Boolean(value && DESIGN_NAV_IDS.has(value))
+}
+
+/** Aceita seções do lobby e legadas (`cores` / `tipografias`). */
 export function isDesignTabId(value: string | null | undefined): value is DesignTabId {
-  return Boolean(value && DESIGN_TAB_IDS.has(value))
+  return Boolean(value && DESIGN_ALL_SECTION_IDS.has(value))
+}
+
+export function isDesignModelosAbaId(
+  value: string | null | undefined
+): value is DesignModelosAbaId {
+  return value === 'layout' || value === 'cores' || value === 'tipografias'
 }
 
 export function isDeliveryDesignSectionTabId(
@@ -117,5 +145,15 @@ export function deliveryHubDesignPath(): string {
 
 /** Path da seção no shell Design (`/config/delivery/design?secao=...`). */
 export function deliveryHubDesignSectionPath(section: DesignTabId): string {
+  if (section === 'cores' || section === 'tipografias') {
+    return deliveryHubDesignModelosPath(DESIGN_LEGACY_SECTIONS_TO_MODELOS_ABA[section])
+  }
   return `${deliveryHubDesignPath()}?${DESIGN_SECTION_QUERY_KEY}=${section}`
+}
+
+/** Path de Modelos com aba opcional (`layout` omitido na URL). */
+export function deliveryHubDesignModelosPath(aba: DesignModelosAbaId = 'layout'): string {
+  const base = `${deliveryHubDesignPath()}?${DESIGN_SECTION_QUERY_KEY}=modelos`
+  if (aba === 'layout') return base
+  return `${base}&${DESIGN_MODELOS_ABA_QUERY_KEY}=${aba}`
 }

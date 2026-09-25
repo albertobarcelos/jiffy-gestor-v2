@@ -15,9 +15,11 @@ import {
   getPublishDisabledReason,
 } from '../../shared/constants/designPublishRules'
 import {
+  DESIGN_LEGACY_SECTIONS_TO_MODELOS_ABA,
   DESIGN_SECTION_QUERY_KEY,
   DESIGN_TABS,
   deliveryHubDesignPath,
+  deliveryHubDesignModelosPath,
   deliveryHubDesignSectionPath,
   isDesignTabId,
 } from '../../shared/constants/designTabs'
@@ -29,8 +31,6 @@ import { DeliveryMobilePreviewFrame } from '../components/DeliveryMobilePreviewF
 import { DesignSecoesCards } from '../components/DesignSecoesCards'
 import { DesignCabecalhoTab } from '../components/tabs/DesignCabecalhoTab'
 import { DesignModelosTab } from '../components/tabs/DesignModelosTab'
-import { DesignCoresTab } from '../components/tabs/DesignCoresTab'
-import { DesignTipografiasTab } from '../components/tabs/DesignTipografiasTab'
 import { DesignCategoriasTab } from '../components/tabs/DesignCategoriasTab'
 import { DeliveryNomeCardapioView } from '@/src/presentation/components/features/delivery/hub/DeliveryNomeCardapioView'
 
@@ -72,14 +72,8 @@ function DesignSectionForm({
       />
     )
   }
-  if (activeSection === 'modelos') {
+  if (activeSection === 'modelos' || activeSection === 'cores' || activeSection === 'tipografias') {
     return <DesignModelosTab config={draft} onChange={updateDraft} />
-  }
-  if (activeSection === 'cores') {
-    return <DesignCoresTab config={draft} onChange={updateDraft} />
-  }
-  if (activeSection === 'tipografias') {
-    return <DesignTipografiasTab config={draft} onChange={updateDraft} />
   }
   return (
     <DesignCategoriasTab
@@ -106,6 +100,10 @@ export function DeliveryDesignCustomizerScreen() {
   const secaoParam = searchParams.get(DESIGN_SECTION_QUERY_KEY)
   const activeSection: DesignTabId | null = isDesignTabId(secaoParam) ? secaoParam : null
   const isLobby = activeSection == null
+  const resolvedSectionId: DesignTabId | null =
+    activeSection === 'cores' || activeSection === 'tipografias'
+      ? 'modelos'
+      : activeSection
 
   const { draft, hydrated, isDirty, updateDraft, publish } = useDeliveryDesignDraft({
     empresaId: empresa?.id,
@@ -128,6 +126,17 @@ export function DeliveryDesignCustomizerScreen() {
     )
   }, [categoriasGrupos])
 
+  /** Legado ?secao=cores|tipografias → Modelos com aba correspondente. */
+  useEffect(() => {
+    if (secaoParam === 'cores' || secaoParam === 'tipografias') {
+      router.replace(
+        toGestao(
+          deliveryHubDesignModelosPath(DESIGN_LEGACY_SECTIONS_TO_MODELOS_ABA[secaoParam])
+        )
+      )
+    }
+  }, [router, secaoParam, toGestao])
+
   /** Query inválida (ex.: ?secao=foo) → lobby de cards. */
   useEffect(() => {
     if (secaoParam != null && secaoParam !== '' && !isDesignTabId(secaoParam)) {
@@ -136,8 +145,8 @@ export function DeliveryDesignCustomizerScreen() {
   }, [router, secaoParam, toGestao])
 
   const canSave = canPublishDesign(draft)
-  const sectionMeta = activeSection
-    ? DESIGN_TABS.find(tab => tab.id === activeSection)
+  const sectionMeta = resolvedSectionId
+    ? DESIGN_TABS.find(tab => tab.id === resolvedSectionId)
     : undefined
 
   const handleSave = useCallback(() => {

@@ -1,6 +1,7 @@
 import { deliveryHubEtapaPath } from '@/src/shared/constants/configuracoesRoutes'
 
-const PATH_CARDAPIO_E_LINK = `${deliveryHubEtapaPath('delivery-design')}?secao=cardapio`
+const PATH_CARDAPIO = `${deliveryHubEtapaPath('delivery-design')}?secao=cardapio`
+const PATH_CABECALHO = `${deliveryHubEtapaPath('delivery-design')}?secao=cabecalho`
 
 export const EMPRESA_DELIVERY_PENDENCIA_TYPES = {
   EMPRESA_DELIVERY_NAO_CONFIGURADA: 'EMPRESA_DELIVERY_NAO_CONFIGURADA',
@@ -33,12 +34,12 @@ export type PendenciaAcao = {
 
 const ACAO_POR_TIPO: Partial<Record<EmpresaDeliveryPendenciaType, PendenciaAcao>> = {
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.EMPRESA_DELIVERY_NAO_CONFIGURADA]: {
-    label: 'Configurar nome e cardápio',
-    href: PATH_CARDAPIO_E_LINK,
+    label: 'Definir link da loja',
+    href: PATH_CABECALHO,
   },
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.CARDAPIO_DELIVERY_NAO_CONFIGURADO]: {
     label: 'Selecionar cardápio',
-    href: PATH_CARDAPIO_E_LINK,
+    href: PATH_CARDAPIO,
   },
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.GEOLOCALIZACAO_NAO_CONFIGURADA]: {
     label: 'Definir pin na cobertura de entrega',
