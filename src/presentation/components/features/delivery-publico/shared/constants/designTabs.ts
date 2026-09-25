@@ -1,6 +1,5 @@
 import type { IconType } from 'react-icons'
 import {
-  MdCategory,
   MdImage,
   MdMenuBook,
   MdViewModule,
@@ -22,15 +21,16 @@ export type DesignTabDefinition = {
 /** Query `?secao=` nas rotas do shell Design (mantém a etapa `/design` montada). */
 export const DESIGN_SECTION_QUERY_KEY = 'secao'
 
-/** Query `?aba=` dentro de Modelos (Layout / Cores / Tipografias). */
+/** Query `?aba=` dentro de Modelos (Layout / Cores / Tipografias / Categorias). */
 export const DESIGN_MODELOS_ABA_QUERY_KEY = 'aba'
 
-export type DesignModelosAbaId = 'layout' | 'cores' | 'tipografias'
+export type DesignModelosAbaId = 'layout' | 'cores' | 'tipografias' | 'categorias'
 
 export const DESIGN_MODELOS_ABAS: { id: DesignModelosAbaId; label: string }[] = [
   { id: 'layout', label: 'Layout' },
   { id: 'cores', label: 'Cores' },
   { id: 'tipografias', label: 'Tipografias' },
+  { id: 'categorias', label: 'Categorias' },
 ]
 
 export type DeliveryDesignSectionTabId =
@@ -41,7 +41,7 @@ export type DeliveryDesignSectionTabId =
   | 'delivery-design-tipografias'
   | 'delivery-design-categorias'
 
-/** Seções do lobby/submenu (Cores e Tipografias ficam como abas em Modelos). */
+/** Seções do lobby/submenu (Cores, Tipografias e Categorias ficam como abas em Modelos). */
 export const DESIGN_TABS: DesignTabDefinition[] = [
   {
     id: 'cardapio',
@@ -62,26 +62,20 @@ export const DESIGN_TABS: DesignTabDefinition[] = [
     id: 'modelos',
     label: 'Modelos de Layout do App Delivery',
     labelMenu: 'Modelos de Layout',
-    descricao: 'Layout, cores e tipografias da loja pública.',
+    descricao: 'Layout, cores, tipografias e categorias da loja pública.',
     icon: MdViewModule,
-    cta: 'Abrir',
-  },
-  {
-    id: 'categorias',
-    label: 'Categorias',
-    descricao: 'Títulos, banners e ordem dos grupos.',
-    icon: MdCategory,
     cta: 'Abrir',
   },
 ]
 
 /** Seções legadas ainda aceitas em `?secao=` (redirecionam para Modelos + aba). */
 export const DESIGN_LEGACY_SECTIONS_TO_MODELOS_ABA: Record<
-  'cores' | 'tipografias',
+  'cores' | 'tipografias' | 'categorias',
   DesignModelosAbaId
 > = {
   cores: 'cores',
   tipografias: 'tipografias',
+  categorias: 'categorias',
 }
 
 const DESIGN_NAV_IDS: ReadonlySet<string> = new Set(DESIGN_TABS.map(tab => tab.id))
@@ -89,6 +83,7 @@ const DESIGN_ALL_SECTION_IDS: ReadonlySet<string> = new Set([
   ...DESIGN_NAV_IDS,
   'cores',
   'tipografias',
+  'categorias',
 ])
 
 const SECTION_TO_TAB_ID: Record<DesignTabId, DeliveryDesignSectionTabId> = {
@@ -110,7 +105,7 @@ export function isDesignNavSectionId(
   return Boolean(value && DESIGN_NAV_IDS.has(value))
 }
 
-/** Aceita seções do lobby e legadas (`cores` / `tipografias`). */
+/** Aceita seções do lobby e legadas (`cores` / `tipografias` / `categorias`). */
 export function isDesignTabId(value: string | null | undefined): value is DesignTabId {
   return Boolean(value && DESIGN_ALL_SECTION_IDS.has(value))
 }
@@ -118,7 +113,12 @@ export function isDesignTabId(value: string | null | undefined): value is Design
 export function isDesignModelosAbaId(
   value: string | null | undefined
 ): value is DesignModelosAbaId {
-  return value === 'layout' || value === 'cores' || value === 'tipografias'
+  return (
+    value === 'layout' ||
+    value === 'cores' ||
+    value === 'tipografias' ||
+    value === 'categorias'
+  )
 }
 
 export function isDeliveryDesignSectionTabId(
@@ -145,7 +145,7 @@ export function deliveryHubDesignPath(): string {
 
 /** Path da seção no shell Design (`/config/delivery/design?secao=...`). */
 export function deliveryHubDesignSectionPath(section: DesignTabId): string {
-  if (section === 'cores' || section === 'tipografias') {
+  if (section === 'cores' || section === 'tipografias' || section === 'categorias') {
     return deliveryHubDesignModelosPath(DESIGN_LEGACY_SECTIONS_TO_MODELOS_ABA[section])
   }
   return `${deliveryHubDesignPath()}?${DESIGN_SECTION_QUERY_KEY}=${section}`

@@ -1,8 +1,9 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, type Dispatch, type SetStateAction } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { DeliveryPublicoDesignConfig } from '../../../shared/types/deliveryPublicoDesignConfig'
+import type { DesignCategoriaGrupo } from '../../../shared/types/designCategoriaGrupo'
 import {
   DESIGN_MODELOS_ABA_QUERY_KEY,
   DESIGN_MODELOS_ABAS,
@@ -17,20 +18,28 @@ import { DesignSelectableCard } from '../DesignSelectableCard'
 import { LayoutModelWireframe } from '../LayoutModelWireframe'
 import { DesignCoresTab } from './DesignCoresTab'
 import { DesignTipografiasTab } from './DesignTipografiasTab'
+import { DesignCategoriasTab } from './DesignCategoriasTab'
 
 type DesignModelosTabProps = {
   config: DeliveryPublicoDesignConfig
   onChange: (updater: (current: DeliveryPublicoDesignConfig) => DeliveryPublicoDesignConfig) => void
+  previewCategoriasGrupos: DesignCategoriaGrupo[]
+  setPreviewCategoriasGrupos: Dispatch<SetStateAction<DesignCategoriaGrupo[]>>
+  menuDeliveryId: string | null
+  hasMenu: boolean
+  categoriasGruposLoading: boolean
+  categoriasGruposError: boolean
 }
 
 function LayoutModelosPanel({
   config,
   onChange,
-}: DesignModelosTabProps) {
+}: Pick<DesignModelosTabProps, 'config' | 'onChange'>) {
   return (
     <div className="space-y-3">
       <p className="text-sm text-secondary-text">
-        Escolha a estrutura do catálogo. Cores e tipografias aplicam em qualquer modelo.
+        Escolha a estrutura do catálogo. Cores, tipografias e categorias aplicam em qualquer
+        modelo.
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
         {LAYOUT_MODELS.map(modelo => (
@@ -50,7 +59,16 @@ function LayoutModelosPanel({
   )
 }
 
-export function DesignModelosTab({ config, onChange }: DesignModelosTabProps) {
+export function DesignModelosTab({
+  config,
+  onChange,
+  previewCategoriasGrupos,
+  setPreviewCategoriasGrupos,
+  menuDeliveryId,
+  hasMenu,
+  categoriasGruposLoading,
+  categoriasGruposError,
+}: DesignModelosTabProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toGestao } = useGestaoPath()
@@ -72,7 +90,7 @@ export function DesignModelosTab({ config, onChange }: DesignModelosTabProps) {
       <div
         role="tablist"
         aria-label="Opções de modelos"
-        className="flex gap-1 border-b border-gray-200"
+        className="flex flex-wrap gap-1 border-b border-gray-200"
       >
         {DESIGN_MODELOS_ABAS.map(aba => {
           const selected = activeAba === aba.id
@@ -105,6 +123,18 @@ export function DesignModelosTab({ config, onChange }: DesignModelosTabProps) {
         ) : null}
         {activeAba === 'tipografias' ? (
           <DesignTipografiasTab config={config} onChange={onChange} />
+        ) : null}
+        {activeAba === 'categorias' ? (
+          <DesignCategoriasTab
+            config={config}
+            grupos={previewCategoriasGrupos}
+            menuId={menuDeliveryId}
+            hasMenu={hasMenu}
+            isLoading={categoriasGruposLoading}
+            isError={categoriasGruposError}
+            onChange={onChange}
+            onGruposChange={setPreviewCategoriasGrupos}
+          />
         ) : null}
       </div>
     </div>

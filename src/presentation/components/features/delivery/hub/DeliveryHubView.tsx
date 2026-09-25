@@ -42,7 +42,9 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
     activeEtapaId === 'delivery-design' && isDesignTabId(secaoParam) ? secaoParam : null
   /** Cores/Tipografias legadas destacam Modelos no submenu. */
   const activeDesignSection: DesignTabId | null =
-    rawDesignSection === 'cores' || rawDesignSection === 'tipografias'
+    rawDesignSection === 'cores' ||
+    rawDesignSection === 'tipografias' ||
+    rawDesignSection === 'categorias'
       ? 'modelos'
       : rawDesignSection
 

@@ -31,7 +31,6 @@ import { DeliveryMobilePreviewFrame } from '../components/DeliveryMobilePreviewF
 import { DesignSecoesCards } from '../components/DesignSecoesCards'
 import { DesignCabecalhoTab } from '../components/tabs/DesignCabecalhoTab'
 import { DesignModelosTab } from '../components/tabs/DesignModelosTab'
-import { DesignCategoriasTab } from '../components/tabs/DesignCategoriasTab'
 import { DeliveryNomeCardapioView } from '@/src/presentation/components/features/delivery/hub/DeliveryNomeCardapioView'
 
 function DesignSectionForm({
@@ -72,19 +71,16 @@ function DesignSectionForm({
       />
     )
   }
-  if (activeSection === 'modelos' || activeSection === 'cores' || activeSection === 'tipografias') {
-    return <DesignModelosTab config={draft} onChange={updateDraft} />
-  }
   return (
-    <DesignCategoriasTab
+    <DesignModelosTab
       config={draft}
-      grupos={previewCategoriasGrupos}
-      menuId={menuDeliveryId}
-      hasMenu={hasMenu}
-      isLoading={categoriasGruposLoading}
-      isError={categoriasGruposError}
       onChange={updateDraft}
-      onGruposChange={setPreviewCategoriasGrupos}
+      previewCategoriasGrupos={previewCategoriasGrupos}
+      setPreviewCategoriasGrupos={setPreviewCategoriasGrupos}
+      menuDeliveryId={menuDeliveryId}
+      hasMenu={hasMenu}
+      categoriasGruposLoading={categoriasGruposLoading}
+      categoriasGruposError={categoriasGruposError}
     />
   )
 }
@@ -101,7 +97,9 @@ export function DeliveryDesignCustomizerScreen() {
   const activeSection: DesignTabId | null = isDesignTabId(secaoParam) ? secaoParam : null
   const isLobby = activeSection == null
   const resolvedSectionId: DesignTabId | null =
-    activeSection === 'cores' || activeSection === 'tipografias'
+    activeSection === 'cores' ||
+    activeSection === 'tipografias' ||
+    activeSection === 'categorias'
       ? 'modelos'
       : activeSection
 
@@ -126,9 +124,13 @@ export function DeliveryDesignCustomizerScreen() {
     )
   }, [categoriasGrupos])
 
-  /** Legado ?secao=cores|tipografias → Modelos com aba correspondente. */
+  /** Legado ?secao=cores|tipografias|categorias → Modelos com aba correspondente. */
   useEffect(() => {
-    if (secaoParam === 'cores' || secaoParam === 'tipografias') {
+    if (
+      secaoParam === 'cores' ||
+      secaoParam === 'tipografias' ||
+      secaoParam === 'categorias'
+    ) {
       router.replace(
         toGestao(
           deliveryHubDesignModelosPath(DESIGN_LEGACY_SECTIONS_TO_MODELOS_ABA[secaoParam])
