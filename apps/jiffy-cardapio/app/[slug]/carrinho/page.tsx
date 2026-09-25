@@ -1,9 +1,13 @@
 import { Suspense } from 'react'
+import type { Metadata } from 'next'
 import { HydrationBoundary } from '@tanstack/react-query'
 import { DeliveryPublicoHomeScreen } from '@/src/presentation/components/features/delivery-publico/public/screens/DeliveryPublicoHomeScreen'
 import { dehydrateCatalogoPrimeiraPagina } from '@/src/infrastructure/api/dehydrateCatalogoPrimeiraPagina'
+import { metadataCardapioNaoIndexavel } from '@/src/infrastructure/seo/cardapioSlugMetadata'
 
 export { generateStaticParams } from '../catalogoSlugCache'
+
+export const metadata: Metadata = metadataCardapioNaoIndexavel
 
 /** Precisa ser literal neste arquivo — o Next não lê re-export. */
 export const revalidate = 30
