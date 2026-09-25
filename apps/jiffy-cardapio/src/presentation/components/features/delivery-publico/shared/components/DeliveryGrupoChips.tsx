@@ -8,6 +8,8 @@ const CHIP_GAP_PX = 8
 const SIDE_PADDING_PX = 16
 /** Distância mínima para tratar o gesto como arraste (evita engolir clique). */
 const DRAG_THRESHOLD_PX = 10
+/** Folga ao trazer o chip ativo para a área visível da barra. */
+const VISIBLE_EDGE_PADDING_PX = 16
 
 type DeliveryGrupoChipsProps = {
   config: DeliveryPublicoDesignConfig
@@ -15,23 +17,27 @@ type DeliveryGrupoChipsProps = {
   activeGrupoId?: string | null
   interactive?: boolean
   embedded?: boolean
-  /**
-   * Quando true, centraliza o chip ativo na barra.
-   * Deve ser true só em clique do usuário — não no scroll-spy
-   * (com muitas categorias o auto-scroll compete com o dedo/clique).
-   */
-  centerActiveChip?: boolean
   onGrupoClick?: (grupoId: string) => void
 }
 
-function centralizarChipNaBarra(scroller: HTMLElement, chip: HTMLElement) {
+/** Mantém o chip ativo visível; centraliza quando ele está fora da área visível. */
+function ensureChipVisible(scroller: HTMLElement, chip: HTMLElement) {
   const scrollerRect = scroller.getBoundingClientRect()
   const chipRect = chip.getBoundingClientRect()
-  const chipOffset = chipRect.left - scrollerRect.left + scroller.scrollLeft
-  const target = chipOffset - (scroller.clientWidth - chipRect.width) / 2
   const maxScroll = Math.max(0, scroller.scrollWidth - scroller.clientWidth)
-  const nextLeft = Math.max(0, Math.min(target, maxScroll))
 
+  const leftBound = scrollerRect.left + VISIBLE_EDGE_PADDING_PX
+  const rightBound = scrollerRect.right - VISIBLE_EDGE_PADDING_PX
+
+  let nextLeft = scroller.scrollLeft
+  if (chipRect.left < leftBound || chipRect.right > rightBound) {
+    const chipOffset = chipRect.left - scrollerRect.left + scroller.scrollLeft
+    nextLeft = chipOffset - (scroller.clientWidth - chipRect.width) / 2
+  } else {
+    return
+  }
+
+  nextLeft = Math.max(0, Math.min(nextLeft, maxScroll))
   if (Math.abs(scroller.scrollLeft - nextLeft) < 1) return
   scroller.scrollTo({ left: nextLeft, behavior: 'auto' })
 }
@@ -42,7 +48,6 @@ export function DeliveryGrupoChips({
   activeGrupoId = null,
   interactive = false,
   embedded = false,
-  centerActiveChip = false,
   onGrupoClick,
 }: DeliveryGrupoChipsProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -56,12 +61,12 @@ export function DeliveryGrupoChips({
   const suppressClickRef = useRef(false)
 
   useEffect(() => {
-    if (!centerActiveChip || !activeGrupoId) return
+    if (!activeGrupoId) return
     const scroller = scrollRef.current
     const chip = activeChipRef.current
     if (!scroller || !chip) return
-    centralizarChipNaBarra(scroller, chip)
-  }, [activeGrupoId, centerActiveChip])
+    ensureChipVisible(scroller, chip)
+  }, [activeGrupoId])
 
   if (grupos.length === 0) return null
 

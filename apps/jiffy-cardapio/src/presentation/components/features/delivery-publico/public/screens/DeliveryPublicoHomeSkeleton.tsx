@@ -41,12 +41,12 @@ export function DeliveryPublicoHomeSkeleton() {
     >
       {/* Topnav */}
       <div
-        className="flex items-center gap-2 px-3 py-2.5 @sm:gap-2.5 @sm:px-4 @sm:py-3"
+        className="flex items-center gap-2 px-3 py-1 @sm:gap-2.5 @sm:px-4 @sm:py-3"
         style={{ backgroundColor: 'var(--delivery-primary-dark, #171717)' }}
       >
-        <div className="h-14 w-14 shrink-0 animate-pulse rounded-full bg-white/20 @sm:h-16 @sm:w-16" />
+        <div className="h-10 w-10 shrink-0 animate-pulse rounded-full bg-white/20 @sm:h-16 @sm:w-16" />
         <div className="min-w-0 flex-1 space-y-1.5">
-          <div className="h-4 w-40 max-w-[70%] animate-pulse rounded bg-white/25" />
+          <div className="h-3 w-40 max-w-[70%] animate-pulse rounded bg-white/25" />
           <div className="h-3 w-52 max-w-[85%] animate-pulse rounded bg-white/20" />
           <div className="h-2.5 w-24 animate-pulse rounded bg-white/15" />
         </div>
