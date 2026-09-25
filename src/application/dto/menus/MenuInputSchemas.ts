@@ -43,6 +43,8 @@ export const UpdateMenuProdutoInputSchema = z.object({
   nome: z.string().optional(),
   descricao: z.string().nullable().optional(),
   valor: z.number().optional(),
+  valorPromocional: z.number().min(0).optional(),
+  promocaoAtiva: z.boolean().optional(),
   ordem: z.number().int().optional(),
   favorito: z.boolean().optional(),
   ativo: z.boolean().optional(),

@@ -16,6 +16,7 @@ import { getProdutoImageSourceRect } from '../../../shared/utils/getProdutoImage
 import type { FlySourceRect } from '../../../shared/components/FlyingProduct'
 import { observacaoItemCarrinho } from '../../../shared/utils/deliveryCarrinhoItemUtils'
 import type { GrupoComplementoPendente } from '../../../shared/utils/produtoComplementosUtils'
+import { resolverPrecosDeliveryProduto } from '../../../shared/utils/resolverPrecosDeliveryProduto'
 
 export type DeliveryProdutoModalProps = {
   slug: string
@@ -90,7 +91,8 @@ export function useDeliveryProdutoModalState({
     obterGruposPendentes,
   } = useProdutoComplementos(slug, produto, itemEdicao?.complementos)
 
-  const valorUnitario = produto.valor + valorComplementosUnitario
+  const valorBaseProduto = resolverPrecosDeliveryProduto(produto).preco
+  const valorUnitario = valorBaseProduto + valorComplementosUnitario
   const valorTotal = valorUnitario * quantidade
   const painelAmplo = precisaComplementos
   const carregandoOpcoes =

@@ -1,8 +1,8 @@
 'use client'
 
 import { Camera, Plus } from 'lucide-react'
-import { formatDeliveryCurrency } from '../utils/formatDeliveryCurrency'
 import type { DeliveryPublicoProdutoViewModel } from '../types/deliveryPublicoViewModel'
+import { DeliveryProdutoPreco } from './DeliveryProdutoPreco'
 
 type DeliveryProdutoListItemProps = {
   produto: DeliveryPublicoProdutoViewModel
@@ -182,15 +182,11 @@ export function DeliveryProdutoListItem({
               {produto.descricao}
             </p>
           ) : null}
-          <p
-            className="mt-1 text-sm font-medium @lg:mt-1.5 @lg:text-base"
-            style={{
-              color: 'var(--delivery-text)',
-              fontFamily: 'var(--delivery-font-body)',
-            }}
-          >
-            {formatDeliveryCurrency(produto.preco)}
-          </p>
+          <DeliveryProdutoPreco
+            produto={produto}
+            accentColor="var(--delivery-text)"
+            className="mt-1 @lg:mt-1.5"
+          />
         </button>
         <QuantidadeCarrinhoBadge
           quantidade={quantidadeNoCarrinho}
@@ -230,15 +226,7 @@ export function DeliveryProdutoListItem({
             {produto.descricao}
           </p>
         ) : null}
-        <p
-          className="mt-1 text-sm font-medium @lg:mt-1.5 @lg:text-base"
-          style={{
-            color: 'var(--delivery-primary)',
-            fontFamily: 'var(--delivery-font-body)',
-          }}
-        >
-          {formatDeliveryCurrency(produto.preco)}
-        </p>
+        <DeliveryProdutoPreco produto={produto} className="mt-1 @lg:mt-1.5" />
       </div>
       <QuantidadeCarrinhoBadge quantidade={quantidadeNoCarrinho} produtoNome={produto.nome} />
       <ProdutoThumb

@@ -20,6 +20,7 @@ import {
   type GrupoComplementoPendente,
   type GrupoComplementoResolvido,
 } from '../utils/produtoComplementosUtils'
+import { resolverPrecosDeliveryProduto } from '../utils/resolverPrecosDeliveryProduto'
 
 function buildInitialQuantidades(
   complementos?: DeliveryCarrinhoComplemento[]
@@ -77,11 +78,12 @@ export function useProdutoComplementos(
 
   const valorComplementosUnitario = useMemo(() => {
     if (complementosSelecionados.length === 0) return 0
+    const valorBase = resolverPrecosDeliveryProduto(produto).preco
     return calcularTotalComplementos({
       produtoId: produto.id,
       nome: produto.nome,
       quantidade: 1,
-      valorUnitario: produto.valor,
+      valorUnitario: valorBase,
       complementos: complementosSelecionados.map(c => ({
         id: c.complementoId,
         grupoId: c.grupoComplementoId,
@@ -91,7 +93,15 @@ export function useProdutoComplementos(
         tipoImpactoPreco: normalizeTipoImpactoPreco(c.tipoImpactoPreco),
       })),
     })
-  }, [complementosSelecionados, produto.id, produto.nome, produto.valor])
+  }, [
+    complementosSelecionados,
+    produto.id,
+    produto.nome,
+    produto.valor,
+    produto.valorPromocional,
+    produto.valorVigente,
+    produto.promocaoAtiva,
+  ])
 
   const ajustarQuantidadeComplemento = useCallback(
     (grupo: GrupoComplementoResolvido, complementoId: string, delta: number) => {

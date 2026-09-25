@@ -33,6 +33,10 @@ function patchMenuProduto(snapshot: SnapshotProdutoPropagavel): UpdateMenuProdut
   if (compartilhado.valor !== undefined) out.valor = compartilhado.valor
   if (compartilhado.ativo !== undefined) out.ativo = compartilhado.ativo
   if (compartilhado.favorito !== undefined) out.favorito = compartilhado.favorito
+  if (typeof snapshot.valorPromocional === 'number' && Number.isFinite(snapshot.valorPromocional)) {
+    out.valorPromocional = Math.max(0, snapshot.valorPromocional)
+  }
+  if (typeof snapshot.promocaoAtiva === 'boolean') out.promocaoAtiva = snapshot.promocaoAtiva
   if (snapshot.grupoProdutoId) out.grupoProdutoId = snapshot.grupoProdutoId
   if (snapshot.gruposComplementosIds !== undefined) {
     out.gruposComplementosIds = snapshot.gruposComplementosIds
@@ -77,7 +81,9 @@ export class PropagarAlteracaoProdutoUseCase {
     if (
       Object.keys(compartilhado).length === 0 &&
       !params.snapshot.grupoProdutoId &&
-      params.snapshot.gruposComplementosIds === undefined
+      params.snapshot.gruposComplementosIds === undefined &&
+      params.snapshot.valorPromocional === undefined &&
+      params.snapshot.promocaoAtiva === undefined
     ) {
       return
     }

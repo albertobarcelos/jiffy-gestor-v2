@@ -12,9 +12,35 @@ import {
 } from '../constants/deliveryPublicoSugestoes'
 import type {
   DeliveryPublicoGrupoViewModel,
+  DeliveryPublicoProdutoViewModel,
   DeliveryPublicoViewModel,
 } from '../types/deliveryPublicoViewModel'
 import { produtoTemComplementosAtivos } from '../utils/produtoComplementosUtils'
+import { resolverPrecosDeliveryProduto } from '../utils/resolverPrecosDeliveryProduto'
+
+function mapProdutoToViewModel(
+  produto: CatalogoPublicoGrupoProdutoDTO['produtos'][number],
+  grupoId: string
+): DeliveryPublicoProdutoViewModel {
+  const precos = resolverPrecosDeliveryProduto({
+    valor: produto.valor,
+    valorPromocional: produto.valorPromocional,
+    valorVigente: produto.valorVigente,
+    promocaoAtiva: produto.promocaoAtiva,
+  })
+
+  return {
+    id: produto.id,
+    nome: produto.nome,
+    descricao: produto.descricao,
+    preco: precos.preco,
+    precoRegular: precos.precoRegular,
+    descontoPercentual: precos.descontoPercentual,
+    imagemUrl: produto.imagemUrl,
+    grupoId,
+    temComplementos: produtoTemComplementosAtivos(produto),
+  }
+}
 
 function mapGrupoToViewModel(
   grupo: CatalogoPublicoGrupoProdutoDTO
@@ -25,15 +51,7 @@ function mapGrupoToViewModel(
     iconName: grupo.icone,
     cor: grupo.cor,
     imagemUrl: grupo.imagemUrl,
-    produtos: grupo.produtos.map(produto => ({
-      id: produto.id,
-      nome: produto.nome,
-      descricao: produto.descricao,
-      preco: produto.valor,
-      imagemUrl: produto.imagemUrl,
-      grupoId: grupo.id,
-      temComplementos: produtoTemComplementosAtivos(produto),
-    })),
+    produtos: grupo.produtos.map(produto => mapProdutoToViewModel(produto, grupo.id)),
   }
 }
 
@@ -50,15 +68,7 @@ function buildGrupoSugestoes(
     iconName: DELIVERY_PUBLICO_GRUPO_SUGESTOES_ICON,
     cor: null,
     imagemUrl: null,
-    produtos: favoritos.map(produto => ({
-      id: produto.id,
-      nome: produto.nome,
-      descricao: produto.descricao,
-      preco: produto.valor,
-      imagemUrl: produto.imagemUrl,
-      grupoId: produto.grupoId,
-      temComplementos: produtoTemComplementosAtivos(produto),
-    })),
+    produtos: favoritos.map(produto => mapProdutoToViewModel(produto, produto.grupoId)),
   }
 }
 

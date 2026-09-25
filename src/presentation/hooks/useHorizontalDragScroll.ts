@@ -2,8 +2,19 @@
 
 import { useCallback, useRef, useState } from 'react'
 
+type UseHorizontalDragScrollOptions = {
+  /**
+   * Se true (padrão), a roda vertical move a faixa no eixo X.
+   * Desative em carrosséis embutidos na página para não roubar o scroll vertical.
+   */
+  mapVerticalWheel?: boolean
+}
+
 /** Drag horizontal + wheel para faixas com overflow-x (checkout, wizard, etc.). */
-export function useHorizontalDragScroll<T extends HTMLElement>() {
+export function useHorizontalDragScroll<T extends HTMLElement>(
+  options: UseHorizontalDragScrollOptions = {}
+) {
+  const mapVerticalWheel = options.mapVerticalWheel !== false
   const scrollRef = useRef<T>(null)
   const [isDragging, setIsDragging] = useState(false)
   const startXRef = useRef(0)
@@ -59,14 +70,28 @@ export function useHorizontalDragScroll<T extends HTMLElement>() {
     // O movimento real é tratado pelos listeners globais.
   }, [])
 
-  /** Roda do mouse (eixo Y) desloca a faixa horizontal quando há overflow. */
-  const handleWheel = useCallback((event: React.WheelEvent<T>) => {
-    const el = scrollRef.current
-    if (!el || el.scrollWidth <= el.clientWidth) return
-    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return
-    el.scrollLeft += event.deltaY
-    event.preventDefault()
-  }, [])
+  /**
+   * Shift+roda ou (opcional) roda Y → scroll X.
+   * Sem mapVerticalWheel, a roda vertical não mexe na faixa (a página rola).
+   */
+  const handleWheel = useCallback(
+    (event: React.WheelEvent<T>) => {
+      const el = scrollRef.current
+      if (!el || el.scrollWidth <= el.clientWidth) return
+
+      if (event.shiftKey) {
+        el.scrollLeft += event.deltaY !== 0 ? event.deltaY : event.deltaX
+        event.preventDefault()
+        return
+      }
+
+      if (!mapVerticalWheel) return
+      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return
+      el.scrollLeft += event.deltaY
+      event.preventDefault()
+    },
+    [mapVerticalWheel]
+  )
 
   return {
     scrollRef,

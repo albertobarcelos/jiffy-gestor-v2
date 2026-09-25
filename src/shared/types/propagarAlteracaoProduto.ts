@@ -3,6 +3,10 @@ export type SnapshotProdutoPropagavel = {
   nome?: string
   descricao?: string | null
   valor?: number
+  /** Só no snapshot do menu (não existe no cadastro base). */
+  valorPromocional?: number
+  /** Só no snapshot do menu. */
+  promocaoAtiva?: boolean
   ativo?: boolean
   favorito?: boolean
   grupoProdutoId?: string
@@ -43,6 +47,10 @@ export function snapshotPropagavelDePatch(
   if (typeof patch.valor === 'number' && Number.isFinite(patch.valor)) {
     out.valor = patch.valor
   }
+  if (typeof patch.valorPromocional === 'number' && Number.isFinite(patch.valorPromocional)) {
+    out.valorPromocional = Math.max(0, patch.valorPromocional)
+  }
+  if (typeof patch.promocaoAtiva === 'boolean') out.promocaoAtiva = patch.promocaoAtiva
   if (typeof patch.ativo === 'boolean') out.ativo = patch.ativo
   if (typeof patch.favorito === 'boolean') out.favorito = patch.favorito
   if (typeof patch.grupoId === 'string' && patch.grupoId.trim() !== '') {

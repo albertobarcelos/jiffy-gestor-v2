@@ -1,8 +1,8 @@
 'use client'
 
 import { Camera, Plus } from 'lucide-react'
-import { formatDeliveryCurrency } from '../utils/formatDeliveryCurrency'
 import type { DeliveryPublicoProdutoViewModel } from '../types/deliveryPublicoViewModel'
+import { DeliveryProdutoPreco } from './DeliveryProdutoPreco'
 
 type DeliverySugestoesProdutoCardProps = {
   produto: DeliveryPublicoProdutoViewModel
@@ -112,15 +112,11 @@ export function DeliverySugestoesProdutoCard({
         onClick={handleOpen}
         className="mt-1.5 w-full text-left disabled:pointer-events-none"
       >
-        <p
-          className="text-sm font-medium leading-snug"
-          style={{
-            color: 'var(--delivery-text)',
-            fontFamily: 'var(--delivery-font-body)',
-          }}
-        >
-          {formatDeliveryCurrency(produto.preco)}
-        </p>
+        <DeliveryProdutoPreco
+          produto={produto}
+          accentColor="var(--delivery-text)"
+          className="mt-0"
+        />
         <p
           className="mt-0.5 line-clamp-2 text-sm font-medium leading-snug"
           style={{

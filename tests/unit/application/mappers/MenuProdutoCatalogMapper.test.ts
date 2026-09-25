@@ -18,6 +18,8 @@ function snapshotMenu(over: Partial<MenuProduto> = {}): MenuProduto {
     nome: 'X-Bacon do cardápio',
     descricao: null,
     valor: 25,
+    valorPromocional: 0,
+    promocaoAtiva: false,
     ordem: 1,
     favorito: false,
     ativo: true,
