@@ -4,6 +4,8 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { ClipboardList, Info, Menu, ShoppingCart, X } from 'lucide-react'
 import { DeliveryStatusHorario } from '../../../shared/components/DeliveryStatusHorario'
 import type { DeliveryPublicoDesignConfig } from '../../../shared/types/deliveryPublicoDesignConfig'
+import { DeliveryPublicoMidiaImagem } from '../../../shared/media/DeliveryPublicoMidiaImagem'
+import { DELIVERY_IMAGEM_SIZES } from '../../../shared/media/deliveryPublicoImageHosts'
 
 type DeliveryBasicoTopNavProps = {
   config: DeliveryPublicoDesignConfig
@@ -73,12 +75,15 @@ export function DeliveryBasicoTopNav({
       }}
     >
       <div
-        className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden bg-white @sm:h-16 @sm:w-16"
+        className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden bg-white @sm:h-16 @sm:w-16"
         style={{ borderRadius: logoRadius }}
       >
         {config.cabecalho.logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={config.cabecalho.logoUrl} alt="" className="h-full w-full object-cover" />
+          <DeliveryPublicoMidiaImagem
+            src={config.cabecalho.logoUrl}
+            sizes={DELIVERY_IMAGEM_SIZES.logo}
+            className="object-cover"
+          />
         ) : (
           <span
             className="text-base font-bold @sm:text-lg"

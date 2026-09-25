@@ -2,6 +2,8 @@
 
 import { ChevronRight, ShoppingCart, User } from 'lucide-react'
 import type { DeliveryPublicoDesignConfig } from '../../../../shared/types/deliveryPublicoDesignConfig'
+import { DeliveryPublicoMidiaImagem } from '../../../../shared/media/DeliveryPublicoMidiaImagem'
+import { DELIVERY_IMAGEM_SIZES } from '../../../../shared/media/deliveryPublicoImageHosts'
 
 type DeliveryCatalogoHeaderProps = {
   config: DeliveryPublicoDesignConfig
@@ -24,21 +26,30 @@ export function DeliveryCatalogoHeader({
   return (
     <header>
       <div
-        className="h-36 bg-cover bg-center @sm:h-40"
-        style={{
-          backgroundColor: 'var(--delivery-hero-bg)',
-          backgroundImage: config.cabecalho.capaUrl ? `url(${config.cabecalho.capaUrl})` : undefined,
-        }}
-      />
+        className="relative h-36 overflow-hidden @sm:h-40"
+        style={{ backgroundColor: 'var(--delivery-hero-bg)' }}
+      >
+        {config.cabecalho.capaUrl ? (
+          <DeliveryPublicoMidiaImagem
+            src={config.cabecalho.capaUrl}
+            sizes={DELIVERY_IMAGEM_SIZES.capa}
+            priority
+            className="object-cover object-center"
+          />
+        ) : null}
+      </div>
 
       <div className="flex items-center gap-3 px-4 py-3">
         <div
-          className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden border border-gray-100 bg-white shadow-sm"
+          className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden border border-gray-100 bg-white shadow-sm"
           style={{ borderRadius: logoRadius }}
         >
           {config.cabecalho.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={config.cabecalho.logoUrl} alt="" className="h-full w-full object-cover" />
+            <DeliveryPublicoMidiaImagem
+              src={config.cabecalho.logoUrl}
+              sizes={DELIVERY_IMAGEM_SIZES.logo}
+              className="object-cover"
+            />
           ) : (
             <span className="text-base font-bold" style={{ color: 'var(--delivery-primary)' }}>
               {(nomeLoja[0] ?? '?').toUpperCase()}
