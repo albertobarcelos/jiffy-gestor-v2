@@ -15,6 +15,7 @@ export function useKanbanModais(modoKanbanVendas: ModoKanbanVendas) {
 
   const [novoPedidoModalOpen, setNovoPedidoModalOpen] = useState(false)
   const [deliveryConfiguracoesOpen, setDeliveryConfiguracoesOpen] = useState(false)
+  const [caixaEstacaoOpen, setCaixaEstacaoOpen] = useState(false)
   const [novoPedidoCriarContext, setNovoPedidoCriarContext] = useState<{
     instanciaKey: number
     tipoInicioPedido: TipoPedido
@@ -82,8 +83,26 @@ export function useKanbanModais(modoKanbanVendas: ModoKanbanVendas) {
     setNovoPedidoModalVisualizacaoOpen(true)
   }, [])
 
+  const [configuracaoEstacaoCaixa, setConfiguracaoEstacaoCaixa] = useState(false)
+
   const abrirConfigImpressoraExpedicao = useCallback(() => {
+    setConfiguracaoEstacaoCaixa(false)
     setDeliveryConfiguracoesOpen(true)
+  }, [])
+
+  const fecharConfiguracoesDelivery = useCallback(() => {
+    setDeliveryConfiguracoesOpen(false)
+    setConfiguracaoEstacaoCaixa(false)
+  }, [])
+
+  const abrirConfiguracaoEstacaoCaixa = useCallback(() => {
+    setCaixaEstacaoOpen(false)
+    setConfiguracaoEstacaoCaixa(true)
+    setDeliveryConfiguracoesOpen(true)
+  }, [])
+
+  const abrirCaixaEstacao = useCallback(() => {
+    setCaixaEstacaoOpen(true)
   }, [])
 
   const [despachoPendenteEntregador, setDespachoPendenteEntregador] = useState<{
@@ -106,6 +125,12 @@ export function useKanbanModais(modoKanbanVendas: ModoKanbanVendas) {
     setNovoPedidoModalOpen,
     deliveryConfiguracoesOpen,
     setDeliveryConfiguracoesOpen,
+    configuracaoEstacaoCaixa,
+    fecharConfiguracoesDelivery,
+    abrirConfiguracaoEstacaoCaixa,
+    caixaEstacaoOpen,
+    setCaixaEstacaoOpen,
+    abrirCaixaEstacao,
     novoPedidoCriarContext,
     setNovoPedidoCriarContext,
     novoPedidoModalVisualizacaoOpen,

@@ -14,6 +14,7 @@ import {
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { invalidateCaixaEstacaoAtualQueries } from '@/src/presentation/hooks/caixa-estacao/caixaEstacaoCache'
 import { invalidateVendaDetalheCarregadaCache } from '../../pedidos/hooks/data/useVendaDetalheCarregadaQuery'
 import { useEntregaTransicoesKanban } from '../../delivery/kanban-panels/useEntregaTransicoesKanban'
 import { definirEntregadorKanbanCache } from '../../delivery/kanban-panels/entregadorKanbanStore'
@@ -210,6 +211,8 @@ export function useKanbanOrchestrator() {
     modoKanbanVendas,
   ])
 
+  const handleAbrirCaixaEstacao = modais.abrirCaixaEstacao
+
   const preTransicao = useKanbanPreTransicao({
     isModoDeliveryKanban: data.isModoDeliveryKanban,
     infiniteQueryKey: data.infiniteQueryKey,
@@ -248,6 +251,9 @@ export function useKanbanOrchestrator() {
       void preTransicao.processarAposTransicoes(venda, acoesExecutadas, ticketsPreload, {
         omitirAvisoSemVinculoPc: true,
       })
+      if (acoesExecutadas.includes('finalizar') && empresaId) {
+        void invalidateCaixaEstacaoAtualQueries(queryClient, empresaId)
+      }
     },
     verificarImpressaoAntesTransicoes: preTransicao.verificarImpressaoAntesTransicoes,
     verificarEntregadorAntesDespachar: preTransicao.verificarEntregadorAntesDespachar,
@@ -447,6 +453,7 @@ export function useKanbanOrchestrator() {
     modoVisualizacao,
     onModoVisualizacaoChange: setModoVisualizacaoLivre,
     onAbrirConfiguracoesDelivery: modais.abrirConfigImpressoraExpedicao,
+    onAbrirCaixaEstacao: handleAbrirCaixaEstacao,
     onAbrirNovoPedido: handleAbrirNovoPedido,
     colunasDoModo,
     colunasOcultas,
@@ -518,7 +525,11 @@ export function useKanbanOrchestrator() {
     },
     onAplicarPeriodoDatas: aplicarPeriodoDatas,
     deliveryConfiguracoesOpen: modais.deliveryConfiguracoesOpen,
-    onCloseDeliveryConfiguracoes: () => modais.setDeliveryConfiguracoesOpen(false),
+    onCloseDeliveryConfiguracoes: modais.fecharConfiguracoesDelivery,
+    configuracaoEstacaoCaixa: modais.configuracaoEstacaoCaixa,
+    onAbrirConfiguracaoEstacaoCaixa: modais.abrirConfiguracaoEstacaoCaixa,
+    caixaEstacaoOpen: modais.caixaEstacaoOpen,
+    onCloseCaixaEstacao: () => modais.setCaixaEstacaoOpen(false),
     vendaSelecionadaParaEmissao: modais.vendaSelecionadaParaEmissao,
     emitirNfeModalOpen: modais.emitirNfeModalOpen,
     onCloseEmitirNfe: () => {

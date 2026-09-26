@@ -112,4 +112,21 @@ describe('CriarVendaPayloadMapper (contrato PR #115)', () => {
     )
     expect(payload.tipoVenda).toBe('delivery')
   })
+
+  it('envia estacaoId no create de balcão quando informado', () => {
+    const payload = buildCriarVendaGestorPayload(baseInput({ estacaoId: 'est-1' }))
+    expect(payload.estacaoId).toBe('est-1')
+  })
+
+  it('não envia estacaoId vazio', () => {
+    const payload = buildCriarVendaGestorPayload(baseInput({ estacaoId: '  ' }))
+    expect(payload.estacaoId).toBeUndefined()
+  })
+
+  it('não envia estacaoId no payload de delivery', () => {
+    const payload = buildCriarVendaGestorPayload(
+      baseInput({ tipoInicioPedido: 'delivery', status: 'ABERTA', estacaoId: 'est-1' })
+    )
+    expect(payload.estacaoId).toBeUndefined()
+  })
 })

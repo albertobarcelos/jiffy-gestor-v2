@@ -37,7 +37,7 @@ export function KanbanColunasMenu({
         onClick={e => setAnchor(e.currentTarget)}
         className={
           discreto
-            ? 'relative flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-white/70 hover:text-gray-700'
+            ? 'relative flex h-[2.2rem] w-[2.2rem] shrink-0 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-white/70 hover:text-gray-700'
             : 'flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-700 shadow-sm transition-colors hover:bg-gray-50 hover:text-primary'
         }
         title="Mostrar ou esconder colunas"

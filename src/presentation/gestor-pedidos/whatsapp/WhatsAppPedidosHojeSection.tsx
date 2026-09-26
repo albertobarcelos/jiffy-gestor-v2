@@ -27,6 +27,7 @@ import {
   usePedidosDeliveryInfinite,
 } from '@/src/presentation/components/features/kanban/hooks/usePedidosDeliveryInfinite'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { invalidateCaixaEstacaoAtualQueries } from '@/src/presentation/hooks/caixa-estacao/caixaEstacaoCache'
 import { intervaloPresetKanbanFiltroData } from '@/src/presentation/components/features/kanban/utils/kanbanFiltroDataPresets'
 import { KANBAN_DELIVERY_DELTA_POLL_INTERVAL_MS } from '@/src/presentation/components/features/kanban/utils/kanbanVendasListagem'
 import { getKanbanColumnsConfig } from '@/src/presentation/components/features/kanban/utils/kanbanColumnsConfig'
@@ -168,6 +169,9 @@ export function WhatsAppPedidosHojeSection({ telefone, clienteNome, onOverlayAbe
       void preTransicao.processarAposTransicoes(venda, acoesExecutadas, ticketsPreload, {
         omitirAvisoSemVinculoPc: true,
       })
+      if (acoesExecutadas.includes('finalizar') && empresaId) {
+        void invalidateCaixaEstacaoAtualQueries(queryClient, empresaId)
+      }
       void query.refetch()
     },
     verificarImpressaoAntesTransicoes: preTransicao.verificarImpressaoAntesTransicoes,

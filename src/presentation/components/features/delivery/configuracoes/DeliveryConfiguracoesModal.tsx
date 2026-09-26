@@ -43,6 +43,7 @@ import {
   limparEstacaoImpressaoId,
   salvarEstacaoImpressaoId,
 } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
+import { resolverEstacaoReceptoraDelivery } from '@/src/domain/caixa-estacao/estacaoReceptoraDelivery'
 import { DeliveryVinculoImpressorasFisicas } from './DeliveryVinculoImpressorasFisicas'
 import { DeliveryEstacaoDestePcCampos } from './DeliveryEstacaoDestePcCampos'
 import { CupomCampoInfo } from './DeliveryModoPapelToggle'
@@ -124,8 +125,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
   const [modosImpressaoEstacao, setModosImpressaoEstacao] = useState<
     Record<string, ModoImpressaoImpressora>
   >({})
-  const [gestorDelivery, setGestorDelivery] = useState(false)
-  const [salvandoGestorDelivery, setSalvandoGestorDelivery] = useState(false)
+  const [receptoraEstacaoIdPendente, setReceptoraEstacaoIdPendente] = useState<string | null>(null)
   const [ocupadoEstacao, setOcupadoEstacao] = useState(false)
   const [estacaoIdLocal, setEstacaoIdLocal] = useState('')
   const [cupomTemplate, setCupomTemplate] = useState<DeliveryCupomTemplateConfig>(
@@ -137,6 +137,8 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
   const [formularioHidratado, setFormularioHidratado] = useState(false)
 
   const estacaoErroToastRef = useRef(false)
+  const receptoraSalvaRef = useRef<string | null>(null)
+  const receptoraHidratadaRef = useRef(false)
   const modosHidratadosEstacaoRef = useRef('')
   const modosImpressaoEstacaoRef = useRef(modosImpressaoEstacao)
   modosImpressaoEstacaoRef.current = modosImpressaoEstacao
@@ -150,6 +152,8 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
   const estacoes = estacoesQuery.data ?? []
   const estacaoIdSelecionada =
     estacaoIdLocal || estacaoImpressaoQuery.data?.estacaoId?.trim() || ''
+  const estacaoSelecionadaNome =
+    estacoes.find(e => e.id === estacaoIdSelecionada)?.nome?.trim() || ''
 
   const handleChangeModosEstacao = useCallback(
     (modos: Record<string, ModoImpressaoImpressora>) => {
@@ -244,47 +248,28 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
       if (id && fisica) next[id] = fisica
     }
     setVinculosFisicos(next)
-    setGestorDelivery(data.gestorDelivery === true)
     if (modosHidratadosEstacaoRef.current === data.estacaoId) return
     modosHidratadosEstacaoRef.current = data.estacaoId
     setModosImpressaoEstacao(modosImpressaoPorImpressoraIdDeMapeamentos(data.mapeamentos))
   }, [open, estacaoImpressaoQuery.data])
 
-  const handleGestorDeliveryChange = useCallback(
-    async (next: boolean) => {
-      const estacaoId = estacaoImpressaoQuery.data?.estacaoId?.trim()
-      const accessToken = useAuthStore.getState().tenantAuth?.getAccessToken()
-      if (!accessToken || !estacaoId) {
-        showToast.error('Selecione ou crie uma estação neste computador.')
-        return
-      }
-      setGestorDelivery(next)
-      setSalvandoGestorDelivery(true)
-      try {
-        const atualizada = await atualizarEstacaoImpressao(accessToken, estacaoId, {
-          gestorDelivery: next,
-        })
-        setGestorDelivery(atualizada.gestorDelivery === true)
-        invalidateDeliveryConfigQueries()
-        window.dispatchEvent(new Event('jiffy:estacao-impressao-changed'))
-        showToast.success(
-          next
-            ? 'Este computador passou a receber comandos de impressão delivery.'
-            : 'Este computador deixou de ser gestor de impressão delivery.'
-        )
-      } catch (error) {
-        setGestorDelivery(!next)
-        showToast.error(
-          error instanceof Error
-            ? error.message
-            : 'Não foi possível atualizar o gestor de impressão delivery.'
-        )
-      } finally {
-        setSalvandoGestorDelivery(false)
-      }
-    },
-    [estacaoImpressaoQuery.data?.estacaoId, invalidateDeliveryConfigQueries]
-  )
+  useEffect(() => {
+    if (!open) {
+      receptoraHidratadaRef.current = false
+      receptoraSalvaRef.current = null
+      setReceptoraEstacaoIdPendente(null)
+      return
+    }
+    if (receptoraHidratadaRef.current || estacoes.length === 0) return
+    const id = resolverEstacaoReceptoraDelivery(estacoes)?.id ?? null
+    setReceptoraEstacaoIdPendente(id)
+    receptoraSalvaRef.current = id
+    receptoraHidratadaRef.current = true
+  }, [open, estacoes])
+
+  const handleReceptoraChange = useCallback((estacaoId: string | null) => {
+    setReceptoraEstacaoIdPendente(estacaoId?.trim() || null)
+  }, [])
 
   const handleSelecionarEstacao = useCallback(
     (id: string) => {
@@ -294,7 +279,6 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
         limparEstacaoImpressaoId()
         setVinculosFisicos({})
         setModosImpressaoEstacao({})
-        setGestorDelivery(false)
         modosHidratadosEstacaoRef.current = ''
       } else {
         salvarEstacaoImpressaoId(next)
@@ -318,7 +302,6 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
         const criada = await criarEstacaoImpressao(accessToken, nome)
         salvarEstacaoImpressaoId(criada.id)
         setEstacaoIdLocal(criada.id)
-        setGestorDelivery(criada.gestorDelivery === true)
         setVinculosFisicos({})
         setModosImpressaoEstacao({})
         modosHidratadosEstacaoRef.current = criada.id
@@ -339,7 +322,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
   const handleRenomearEstacao = useCallback(
     async (nome: string) => {
       const accessToken = useAuthStore.getState().tenantAuth?.getAccessToken()
-      const estacaoId = estacaoImpressaoQuery.data?.estacaoId?.trim()
+      const estacaoId = estacaoIdSelecionada.trim()
       if (!accessToken || !estacaoId) {
         showToast.error('Selecione uma estação para renomear.')
         return
@@ -358,7 +341,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
         setOcupadoEstacao(false)
       }
     },
-    [estacaoImpressaoQuery.data?.estacaoId, invalidateDeliveryConfigQueries]
+    [estacaoIdSelecionada, invalidateDeliveryConfigQueries]
   )
 
   useEffect(() => {
@@ -391,16 +374,31 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
     try {
       await atualizarEmpresaDelivery.mutateAsync({ parametroDelivery })
       salvarDeliveryCupomTemplateLocal(empresaId, cupomTemplate)
-      const estacaoId = estacaoImpressaoQuery.data?.estacaoId?.trim()
+      const estacaoId = estacaoIdSelecionada.trim()
       if (estacaoId) {
         const modos = modosImpressaoEstacaoRef.current
         const mapeamentos = montarMapeamentosEstacaoParaSalvar(vinculosFisicos, modos)
         await salvarMapeamentosEstacao(token, estacaoId, mapeamentos)
       }
+
+      const receptoraPendente = receptoraEstacaoIdPendente
+      const receptoraSalva = receptoraSalvaRef.current
+      if (receptoraPendente !== receptoraSalva) {
+        if (receptoraSalva && receptoraSalva !== receptoraPendente) {
+          await atualizarEstacaoImpressao(token, receptoraSalva, { gestorDelivery: false })
+        }
+        if (receptoraPendente) {
+          await atualizarEstacaoImpressao(token, receptoraPendente, { gestorDelivery: true })
+        }
+        receptoraSalvaRef.current = receptoraPendente
+      }
+
       invalidateDeliveryConfigQueries()
+      window.dispatchEvent(new Event('jiffy:estacao-impressao-changed'))
       window.dispatchEvent(new Event('jiffy:empresa-me-updated'))
       showToast.success('Configurações de delivery salvas.')
       setConfirmSalvarSemImpressoraOpen(false)
+      onClose()
     } catch (error) {
       const raw =
         error instanceof Error ? error.message : 'Não foi possível salvar as configurações de delivery.'
@@ -431,7 +429,9 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
     invalidateDeliveryConfigQueries,
     token,
     vinculosFisicos,
-    estacaoImpressaoQuery.data?.estacaoId,
+    estacaoIdSelecionada,
+    receptoraEstacaoIdPendente,
+    onClose,
   ])
 
   const handleSalvar = useCallback(() => {
@@ -503,25 +503,13 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
             <DeliveryEstacaoDestePcCampos
               estacoes={estacoes}
               estacaoId={estacaoIdSelecionada}
+              receptoraEstacaoId={receptoraEstacaoIdPendente}
               disabled={carregando || salvando}
               ocupado={ocupadoEstacao}
+              onReceptoraChange={handleReceptoraChange}
               onSelecionar={handleSelecionarEstacao}
               onCriar={handleCriarEstacao}
               onRenomear={handleRenomearEstacao}
-            />
-            <DeliveryToggleRow
-              id="delivery-gestor-impressao"
-              checked={gestorDelivery}
-              disabled={
-                carregando ||
-                salvando ||
-                salvandoGestorDelivery ||
-                ocupadoEstacao ||
-                !estacaoIdSelecionada
-              }
-              onChecked={v => void handleGestorDeliveryChange(v)}
-              titulo="Este computador imprime pedidos delivery"
-              info="Marque só nos PCs que devem receber o comando de impressão em tempo real. É preciso ter uma estação selecionada e vínculos de impressora. Vários PCs marcados imprimem o mesmo pedido."
             />
           </DeliveryConfigCollapsibleSection>
 
@@ -706,6 +694,13 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
           <DeliveryConfigCollapsibleSection
             icon={<MdPrint className="h-5 w-5" aria-hidden />}
             title="Vínculo com impressoras deste PC"
+            description={
+              estacaoIdSelecionada && estacaoSelecionadaNome ? (
+                <span className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full border border-secondary/25 bg-secondary/[0.08] px-2.5 py-1 text-xs font-semibold text-secondary">
+                  <span className="truncate">Estação ativa: {estacaoSelecionadaNome}</span>
+                </span>
+              ) : null
+            }
             info="Para cada nome do Gestor, escolha a impressora deste PC. A via de produção vale no cupom separado, na reimpressão da cozinha (ícone da impressora) e ao iniciar o preparo — não ao marcar pronto (aí sai a expedição)."
             resetExpandedWhen={open}
           >

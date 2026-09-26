@@ -1,211 +1,231 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { useRouter } from 'next/navigation'
-import { FechamentoCaixa } from '@/src/domain/entities/FechamentoCaixa'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useState } from 'react'
+import {
+  MdChevronRight,
+  MdHistory,
+  MdLock,
+  MdLogin,
+  MdPersonOutline,
+} from 'react-icons/md'
+import type { OperacaoCaixaEstacaoListaItemDTO } from '@/src/application/dto/caixa-estacao/OperacaoCaixaEstacaoDTO'
+import { calcularDuracaoOperacaoCaixa } from '@/src/application/caixa-estacao/fechamentoCaixaEstacaoRelatorio'
+import { useEstacaoDestePc } from '@/src/presentation/hooks/caixa-estacao/useEstacaoDestePc'
+import { useHistoricoCaixaEstacao } from '@/src/presentation/hooks/caixa-estacao/useFecharCaixaEstacao'
+import { DetalhesFechamentoEstacao } from './DetalhesFechamentoEstacao'
+import { CaixaEstacaoNaoVinculada } from './CaixaEstacaoNaoVinculada'
+import { cn } from '@/src/shared/utils/cn'
 
-/**
- * Lista de fechamentos de caixa
- * Replica o design e funcionalidades do Flutter
- */
-export function FechamentosList() {
-  const router = useRouter()  const [fechamentos, setFechamentos] = useState<FechamentoCaixa[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [hasNextPage, setHasNextPage] = useState(true)
-  const [offset, setOffset] = useState(0)
-  const [filtroPeriodo, setFiltroPeriodo] = useState<'Semana' | '15 Dias' | '30 Dias' | '60 Dias' | 'Todos'>('Semana')
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const hasLoadedInitialRef = useRef(false)
+type DataHoraCard = {
+  data: string
+  hora: string
+}
 
-  // Refs para evitar dependências desnecessárias
-  const isLoadingRef = useRef(false)
-  const hasNextPageRef = useRef(true)
-  const offsetRef = useRef(0)
-
-  useEffect(() => {
-    isLoadingRef.current = isLoading
-  }, [isLoading])
-
-  useEffect(() => {
-    hasNextPageRef.current = hasNextPage
-  }, [hasNextPage])
-
-  useEffect(() => {
-    offsetRef.current = offset
-  }, [offset])
-
-  const loadFechamentos = useCallback(
-    async (reset: boolean = false) => {
-      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-      if (!token) return
-
-      if (isLoadingRef.current || (!hasNextPageRef.current && !reset)) return
-
-      setIsLoading(true)
-      isLoadingRef.current = true
-
-      if (reset) {
-        setOffset(0)
-        offsetRef.current = 0
-        setFechamentos([])
-        setHasNextPage(true)
-        hasNextPageRef.current = true
-      }
-
-      const currentOffset = reset ? 0 : offsetRef.current
-
-      try {
-        // TODO: Implementar chamada à API quando disponível
-        // Por enquanto, dados mockados
-        const mockFechamentos: FechamentoCaixa[] = []
-        
-        setFechamentos((prev) => (reset ? mockFechamentos : [...prev, ...mockFechamentos]))
-        const newOffset = reset ? mockFechamentos.length : offsetRef.current + mockFechamentos.length
-        setOffset(newOffset)
-        offsetRef.current = newOffset
-        setHasNextPage(mockFechamentos.length === 10)
-        hasNextPageRef.current = mockFechamentos.length === 10
-      } catch (error) {
-        console.error('Erro ao carregar fechamentos:', error)
-        setHasNextPage(false)
-        hasNextPageRef.current = false
-      } finally {
-        setIsLoading(false)
-        isLoadingRef.current = false
-      }
-    },
-    [ filtroPeriodo]
-  )
-
-  // Scroll infinito
-  useEffect(() => {
-    const container = scrollContainerRef.current
-    if (!container) return
-
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = container
-      if (
-        scrollTop + clientHeight >= scrollHeight - 200 &&
-        !isLoadingRef.current &&
-        hasNextPageRef.current
-      ) {
-        loadFechamentos()
-      }
-    }
-
-    container.addEventListener('scroll', handleScroll)
-    return () => container.removeEventListener('scroll', handleScroll)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, hasNextPage])
-
-  // Carrega fechamentos quando o filtro muda
-  useEffect(() => {
-    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-    if (!token) return
-    loadFechamentos(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtroPeriodo])
-
-  const formatarMoeda = (valor: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(valor)
-  }
-
-  const formatarData = (data: Date) => {
-    return data.toLocaleDateString('pt-BR', {
+function formatarDataHoraClara(iso: string | null | undefined): DataHoraCard {
+  if (!iso?.trim()) return { data: '—', hora: '—' }
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return { data: '—', hora: '—' }
+  return {
+    data: d.toLocaleDateString('pt-BR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
+    }),
+    hora: d.toLocaleTimeString('pt-BR', {
       hour: '2-digit',
       minute: '2-digit',
-    })
+    }),
   }
+}
+
+
+function LinhaEventoCaixa({
+  tipo,
+  dataHora,
+  usuario,
+}: {
+  tipo: 'abertura' | 'fechamento'
+  dataHora: DataHoraCard
+  usuario: string
+}) {
+  const abertura = tipo === 'abertura'
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-[30px] pt-[30px]">
-        {/* Header com filtro */}
-        <div className="mb-6">
-          <div className="h-[42px] bg-white/20 flex items-center justify-between px-4">
-            <p className="text-primary text-sm font-semibold ">
-              Fechamentos | {filtroPeriodo}
-            </p>
-            <select
-              value={filtroPeriodo}
-              onChange={(e) => setFiltroPeriodo(e.target.value as any)}
-              className="h-9 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text text-sm focus:outline-none focus:border-primary"
-            >
-              <option value="Semana">Semana</option>
-              <option value="15 Dias">15 Dias</option>
-              <option value="30 Dias">30 Dias</option>
-              <option value="60 Dias">60 Dias</option>
-              <option value="Todos">Todos</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Lista de fechamentos */}
-        <div
-          ref={scrollContainerRef}
-          className="max-h-[calc(100vh-200px)] overflow-y-auto"
-        >
-          {fechamentos.length === 0 && !isLoading && (
-            <div className="flex items-center justify-center py-12">
-              <p className="text-secondary-text">Nenhum fechamento encontrado.</p>
-            </div>
-          )}
-
-          {fechamentos.map((fechamento) => (
-            <button
-              key={fechamento.getId()}
-              onClick={() => router.push(`/meu-caixa/${fechamento.getCaixaId()}`)}
-              className="w-full mb-4 p-4 bg-info rounded-lg hover:bg-info/80 transition-colors text-left"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <p className="text-sm font-semibold text-primary-text">
-                      Fechado por: {fechamento.getFechadoPorNome()}
-                    </p>
-                    <span
-                      className={`px-2 py-1 rounded text-xs font-medium ${
-                        fechamento.temDiferenca()
-                          ? 'bg-warning/20 text-warning'
-                          : 'bg-success/20 text-success'
-                      }`}
-                    >
-                      {fechamento.temDiferenca() ? 'Com Diferença' : 'OK'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-secondary-text">
-                    {formatarData(fechamento.getDataFechamento())}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-primary-text mb-1">
-                    {formatarMoeda(fechamento.getValorTotal())}
-                  </p>
-                  {fechamento.temDiferenca() && (
-                    <p className="text-xs text-warning">
-                      Diferença: {formatarMoeda(fechamento.getDiferenca())}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </button>
-          ))}
-
-          {isLoading && (
-            <div className="flex justify-center py-4">
-              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-            </div>
-          )}
-        </div>
+    <div className="flex gap-2.5">
+      <div
+        className={cn(
+          'mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg',
+          abertura ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-600'
+        )}
+      >
+        {abertura ? (
+          <MdLogin className="h-4 w-4" aria-hidden />
+        ) : (
+          <MdLock className="h-3.5 w-3.5" aria-hidden />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-secondary-text">
+          {abertura ? 'Abertura' : 'Fechamento'}
+        </p>
+        <p className="mt-0.5 text-sm font-bold tabular-nums leading-snug text-primary-text">
+          {dataHora.data}
+          <span className="mx-1.5 font-normal text-secondary-text/70">·</span>
+          {dataHora.hora}
+        </p>
+        <p className="mt-0.5 flex items-center gap-1 text-xs text-secondary-text">
+          <MdPersonOutline className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          <span className="truncate">{usuario}</span>
+        </p>
       </div>
     </div>
   )
 }
 
+function FechamentoHistoricoCard({
+  item,
+  embedded,
+  onClick,
+}: {
+  item: OperacaoCaixaEstacaoListaItemDTO
+  embedded: boolean
+  onClick: () => void
+}) {
+  const abertura = formatarDataHoraClara(item.dataAbertura)
+  const fechamento = formatarDataHoraClara(item.dataFechamento)
+  const duracao = calcularDuracaoOperacaoCaixa(item.dataAbertura, item.dataFechamento)
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'group w-full rounded-2xl border border-gray-200 bg-white text-left shadow-sm transition-all hover:border-primary/35 hover:shadow-md',
+        embedded ? 'p-3' : 'p-4'
+      )}
+    >
+      <div className="flex items-stretch gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center self-start rounded-xl bg-slate-100 text-slate-500 transition-colors group-hover:bg-primary/10 group-hover:text-primary">
+          <MdLock className="h-5 w-5" aria-hidden />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600">
+              Fechado
+            </span>
+            {duracao ? (
+              <span className="text-xs font-medium text-secondary-text">{duracao} de operação</span>
+            ) : null}
+          </div>
+
+          <div className="mt-3 space-y-3 border-t border-dashed border-gray-200/80 pt-3">
+            <LinhaEventoCaixa
+              tipo="abertura"
+              dataHora={abertura}
+              usuario={item.abertoPorAtor.nome?.trim() || '—'}
+            />
+            <LinhaEventoCaixa
+              tipo="fechamento"
+              dataHora={fechamento}
+              usuario={item.fechadoPorAtor?.nome?.trim() || '—'}
+            />
+          </div>
+        </div>
+
+        <MdChevronRight
+          className="my-auto h-5 w-5 shrink-0 text-gray-300 transition-colors group-hover:text-primary"
+          aria-hidden
+        />
+      </div>
+    </button>
+  )
+}
+
+export function FechamentosList({
+  limit,
+  embedded = false,
+  onAbrirConfiguracaoEstacao,
+}: {
+  limit?: number
+  embedded?: boolean
+  onAbrirConfiguracaoEstacao?: () => void
+} = {}) {
+  const { estacaoId } = useEstacaoDestePc()
+  const historico = useHistoricoCaixaEstacao(estacaoId)
+  const [idDetalhe, setIdDetalhe] = useState<string | null>(null)
+
+  if (!estacaoId) {
+    if (embedded || !onAbrirConfiguracaoEstacao) return null
+    return <CaixaEstacaoNaoVinculada onAbrirConfiguracao={onAbrirConfiguracaoEstacao} />
+  }
+
+  if (historico.isLoading) {
+    return (
+      <div
+        className={cn(
+          'text-center text-sm text-secondary-text',
+          embedded ? 'py-6' : 'rounded-2xl border border-gray-200 bg-white px-4 py-10'
+        )}
+      >
+        Carregando caixas recentes…
+      </div>
+    )
+  }
+
+  const items = (historico.data?.items ?? []).slice(0, limit)
+
+  if (historico.isError) {
+    return (
+      <div
+        className={cn(
+          'text-sm text-error',
+          embedded ? 'py-2' : 'rounded-2xl border border-red-200 bg-red-50 px-4 py-4'
+        )}
+      >
+        {historico.error instanceof Error ? historico.error.message : 'Erro ao listar caixas recentes.'}
+      </div>
+    )
+  }
+
+  if (items.length === 0) {
+    return (
+      <div
+        className={cn(
+          embedded
+            ? 'rounded-xl border border-dashed border-gray-200 bg-white px-4 py-8 text-center'
+            : 'rounded-2xl border border-dashed border-gray-200 bg-white px-4 py-12 text-center'
+        )}
+      >
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+          <MdHistory className="h-7 w-7" aria-hidden />
+        </div>
+        <p className="text-sm font-semibold text-primary-text">Nenhum caixa fechado ainda</p>
+        <p className="mx-auto mt-1.5 max-w-[16rem] text-xs leading-relaxed text-secondary-text">
+          Os fechamentos aparecem aqui depois do primeiro fechamento.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-2.5">
+      {items.map(item => (
+        <FechamentoHistoricoCard
+          key={item.id}
+          item={item}
+          embedded={embedded}
+          onClick={() => setIdDetalhe(item.id)}
+        />
+      ))}
+
+      {idDetalhe ? (
+        <DetalhesFechamentoEstacao
+          idOperacaoCaixa={idDetalhe}
+          open
+          onClose={() => setIdDetalhe(null)}
+        />
+      ) : null}
+    </div>
+  )
+}

@@ -15,6 +15,7 @@ import type { Venda } from '../types'
 import type { DateRange } from 'react-day-picker'
 import { AtribuirEntregadorKanbanPainel } from '../../delivery/kanban-panels/AtribuirEntregadorKanbanPainel'
 import { EmpresaDeliveryPendenteGestorModal } from '../../delivery/EmpresaDeliveryPendenteGestorModal'
+import { MeuCaixaSidePanel } from '../../meu-caixa/MeuCaixaSidePanel'
 
 export interface KanbanModaisRendererProps {
   timezoneAgregacao: string
@@ -30,6 +31,10 @@ export interface KanbanModaisRendererProps {
   onAplicarPeriodoDatas: () => void
   deliveryConfiguracoesOpen: boolean
   onCloseDeliveryConfiguracoes: () => void
+  configuracaoEstacaoCaixa: boolean
+  onAbrirConfiguracaoEstacaoCaixa: () => void
+  caixaEstacaoOpen: boolean
+  onCloseCaixaEstacao: () => void
   vendaSelecionadaParaEmissao: VendaSelecionadaParaEmissao | null
   emitirNfeModalOpen: boolean
   onCloseEmitirNfe: () => void
@@ -91,6 +96,10 @@ export function KanbanModaisRenderer({
   onAplicarPeriodoDatas,
   deliveryConfiguracoesOpen,
   onCloseDeliveryConfiguracoes,
+  configuracaoEstacaoCaixa,
+  onAbrirConfiguracaoEstacaoCaixa,
+  caixaEstacaoOpen,
+  onCloseCaixaEstacao,
   vendaSelecionadaParaEmissao,
   emitirNfeModalOpen,
   onCloseEmitirNfe,
@@ -127,12 +136,18 @@ export function KanbanModaisRenderer({
   return (
     <>
       {deliveryConfiguracoesOpen ? (
-        modoKanbanVendas === 'balcao' ? (
-          <KanbanBalcaoConfiguracoesModal open onClose={onCloseDeliveryConfiguracoes} />
-        ) : (
+        configuracaoEstacaoCaixa || modoKanbanVendas === 'delivery' ? (
           <DeliveryConfiguracoesModal open onClose={onCloseDeliveryConfiguracoes} />
+        ) : (
+          <KanbanBalcaoConfiguracoesModal open onClose={onCloseDeliveryConfiguracoes} />
         )
       ) : null}
+
+      <MeuCaixaSidePanel
+        open={caixaEstacaoOpen}
+        onClose={onCloseCaixaEstacao}
+        onAbrirConfiguracaoEstacao={onAbrirConfiguracaoEstacaoCaixa}
+      />
 
       <JiffySidePanelModal
         open={modalPeriodoDatasAberto}

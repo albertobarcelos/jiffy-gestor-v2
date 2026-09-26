@@ -11,6 +11,7 @@ import {
   useCancelarNotaFiscalVendaGestor,
   useTransicaoPedidoDelivery,
 } from '@/src/presentation/hooks/useVendas'
+import { getEstacaoImpressaoId } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { useMenuDeliveryId } from '@/src/presentation/hooks/useMenuDeliveryId'
@@ -856,6 +857,7 @@ export function useNovoPedidoOrchestrator({
       meiosPagamento,
       nomesMeiosPagamentoPedido,
       telefoneCliente: telefoneBuscadoEntrega ?? undefined,
+      estacaoId: getEstacaoImpressaoId() ?? undefined,
     },
     validacao: {
       pedidoDeliveryGestor,

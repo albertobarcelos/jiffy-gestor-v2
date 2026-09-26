@@ -22,7 +22,6 @@ export const ERP_ROUTE_PREFIXES = [
   '/perfis-usuarios-pdv',
   '/meios-pagamentos',
   '/estoque',
-  '/meu-caixa',
   '/pedidos',
   '/vendas',
   '/relatorios',
