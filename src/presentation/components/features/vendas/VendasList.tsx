@@ -18,12 +18,10 @@ import {
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { DetalhesVendas } from './DetalhesVendas'
-import { GraficoVendasPorUsuarioModal } from './GraficoVendasPorUsuarioModal'
+import { GraficoFormasPagamentoModal } from './GraficoFormasPagamentoModal'
 import { FormControl, InputAdornment, InputLabel, MenuItem, Select, TextField } from '@mui/material'
 import { sxEntradaCompactaProdutoSelect } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { TipoVendaIcon } from './TipoVendaIcon'
-import { calculatePeriodo } from '@/src/shared/utils/dateFilters' // Importar calculatePeriodo
-import { calcularPeriodoNoFusoEmpresa } from '@/src/shared/utils/periodoNoFusoEmpresa'
 import { startOfDay } from 'date-fns'
 import type { DateRange } from 'react-day-picker'
 import {
@@ -40,38 +38,28 @@ import { FaturamentoRangeCalendar } from '@/src/presentation/components/ui/Fatur
 import { useDashboardFaturamentoPorDiaQuery } from '@/src/presentation/hooks/useDashboardFaturamentoPorDiaQuery'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { useExportarRelatorioVendas } from '@/src/presentation/hooks/useExportarRelatorioVendas'
+import {
+  carregarMapaTipoEntregaDelivery,
+  fetchPaginaRelatorioVendas,
+  filtroTipoVendaEhEntregaOuRetirada,
+} from '@/src/presentation/utils/vendas/fetchPaginaRelatorioVendas'
+import {
+  agregarMetricasVendasLista,
+  endpointDetalheVendaRelatorio,
+  mapearEFiltrarVendasUnificadas,
+} from '@/src/presentation/utils/vendas/vendasListQuery'
+import { agregarMetricasVendasUnificadas } from '@/src/presentation/utils/vendas/agregarMetricasVendasUnificadas'
+import {
+  codigoTerminalCelulaRelatorio,
+  nomeLancadorRelatorio,
+  tipoVendaIconeRelatorio,
+} from '@/src/presentation/utils/vendas/vendasListCalculos'
 import type {
+  MetricasVendas,
   MetricasVendas as MetricasVendasExport,
+  VendaListItem as Venda,
   VendasFiltrosQuerySnapshot as VendasFiltrosQuerySnapshotExport,
 } from '@/src/presentation/utils/vendas/vendasListTypes'
-// Tipos
-interface Venda {
-  id: string
-  numeroVenda: number
-  codigoVenda: string
-  numeroMesa?: number
-  valorFinal: number
-  tipoVenda: 'balcao' | 'mesa' | 'gestor'
-  abertoPorId: string
-  canceladoPorId?: string
-  codigoTerminal: string
-  terminalId: string
-  dataCriacao: string
-  dataUltimoProdutoLancado?: string
-  dataUltimaMovimentacao?: string
-  dataCancelamento?: string
-  dataFinalizacao?: string
-  metodoPagamento?: string
-  status?: string
-  totalValorProdutosRemovidos?: number
-}
-
-interface MetricasVendas {
-  totalFaturado: number
-  countVendasEfetivadas: number
-  countVendasCanceladas: number
-  countProdutosVendidos: number
-}
 
 interface UsuarioPDV {
   id: string
@@ -188,72 +176,7 @@ function formatarHoraParaInputCalendar(d: Date | null | undefined): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-function getTimeZoneOffsetMinutes(date: Date, timeZone: string): number {
-  const dtf = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  })
-  const parts = dtf.formatToParts(date)
-  const map: Partial<Record<Intl.DateTimeFormatPartTypes, string>> = {}
-  for (const p of parts) {
-    if (p.type !== 'literal') map[p.type] = p.value
-  }
-  const year = Number(map.year)
-  const month = Number(map.month)
-  const day = Number(map.day)
-  let hour = Number(map.hour)
-  const minute = Number(map.minute)
-  const second = Number(map.second)
-  if (hour === 24) hour = 0
-  const asUTC = Date.UTC(year, month - 1, day, hour, minute, second)
-  return Math.round((asUTC - date.getTime()) / 60000)
-}
-
-function zonedLocalPartsToUtcDate(
-  dateParts: {
-    year: number
-    month: number
-    day: number
-    hour: number
-    minute: number
-    second: number
-    millisecond: number
-  },
-  timeZone: string
-): Date {
-  const { year, month, day, hour, minute, second, millisecond } = dateParts
-  const guess = Date.UTC(year, month - 1, day, hour, minute, second, millisecond)
-  const off1 = getTimeZoneOffsetMinutes(new Date(guess), timeZone)
-  const utc1 = guess - off1 * 60_000
-  const off2 = getTimeZoneOffsetMinutes(new Date(utc1), timeZone)
-  const utc2 = guess - off2 * 60_000
-  return new Date(utc2)
-}
-
-function toISOStringNoFusoEmpresa(date: Date, timeZoneEmpresa: string): string {
-  const tz = timeZoneEmpresa.trim()
-  if (!tz) return date.toISOString()
-  return zonedLocalPartsToUtcDate(
-    {
-      year: date.getFullYear(),
-      month: date.getMonth() + 1,
-      day: date.getDate(),
-      hour: date.getHours(),
-      minute: date.getMinutes(),
-      second: date.getSeconds(),
-      millisecond: date.getMilliseconds(),
-    },
-    tz
-  ).toISOString()
-}
-
-/** Snapshot dos filtros para montar a query da listagem (GET /api/vendas). */
+/** Snapshot dos filtros para montar a query da listagem (GET /api/vendas/unificado). */
 interface VendasFiltrosQuerySnapshot {
   searchQuery: string
   valorMinimo: string
@@ -267,170 +190,6 @@ interface VendasFiltrosQuerySnapshot {
   usuarioCancelouFilter: string
   periodoInicial: Date | null
   periodoFinal: Date | null
-}
-
-/** Normaliza string de moeda do filtro para número (mesma regra do input de valor). */
-function normalizarMoedaFiltroVLista(value: string): number | null {
-  if (!value || value.trim() === '') return null
-
-  let clean = value.replace(/[^\d,.]/g, '').trim()
-
-  if (!clean) return null
-
-  if (clean.includes(',')) {
-    clean = clean.replace(/\./g, '').replace(',', '.')
-  } else if (clean.includes('.')) {
-    if ((clean.match(/\./g) || []).length > 1) {
-      clean = clean.replace(/\./g, '')
-    }
-    const parts = clean.split('.')
-    if (parts.length === 2 && parts[1].length === 3) {
-      clean = clean.replace('.', '')
-    }
-  }
-
-  const num = parseFloat(clean)
-  return isNaN(num) ? null : num
-}
-
-/** Monta query string da listagem (sem limit/offset). */
-function buildVendasListQueryParams(
-  filters: VendasFiltrosQuerySnapshot,
-  args?: { timeZoneEmpresa?: string }
-): URLSearchParams {
-  const baseParams = new URLSearchParams()
-
-  if (filters.searchQuery) {
-    baseParams.append('q', filters.searchQuery)
-  }
-
-  if (filters.tipoVendaFilter) {
-    baseParams.append('tipoVenda', filters.tipoVendaFilter.toLowerCase())
-  }
-
-  const normalizedStatus = filters.statusFilter?.toUpperCase()
-  if (normalizedStatus && normalizedStatus !== 'ABERTA') {
-    baseParams.append('status', normalizedStatus)
-  } else {
-    baseParams.append('status', 'FINALIZADA')
-    baseParams.append('status', 'CANCELADA')
-  }
-
-  if (filters.usuarioAbertoPorFilter) {
-    baseParams.append('abertoPorId', filters.usuarioAbertoPorFilter)
-  }
-
-  if (filters.usuarioCancelouFilter) {
-    baseParams.append('canceladoPorId', filters.usuarioCancelouFilter)
-  }
-
-  const valorMin = normalizarMoedaFiltroVLista(filters.valorMinimo)
-  if (valorMin !== null && valorMin > 0) {
-    baseParams.append('valorFinalMinimo', valorMin.toString())
-  }
-
-  const valorMax = normalizarMoedaFiltroVLista(filters.valorMaximo)
-  if (valorMax !== null && valorMax > 0) {
-    baseParams.append('valorFinalMaximo', valorMax.toString())
-  }
-
-  if (filters.meioPagamentoFilter) {
-    baseParams.append('meioPagamentoId', filters.meioPagamentoFilter)
-  }
-
-  if (filters.terminalFilter) {
-    baseParams.append('terminalId', filters.terminalFilter)
-  }
-
-  let inicioFiltro: Date | null = null
-  let fimFiltro: Date | null = null
-  /** Presets (Hoje, Últimos N dias, Mês atual): mesma regra do dashboard/BFF — `calcularPeriodoNoFusoEmpresa`. */
-  let intervaloUtcJaNoFusoApi = false
-  if (filters.periodoInicial && filters.periodoFinal) {
-    inicioFiltro = filters.periodoInicial
-    fimFiltro = filters.periodoFinal
-  } else if (filters.periodo !== 'Todos') {
-    const tzParaPresets = args?.timeZoneEmpresa?.trim() || 'America/Sao_Paulo'
-    const noFuso = calcularPeriodoNoFusoEmpresa(filters.periodo, tzParaPresets)
-    if (noFuso.inicio != null && noFuso.fim != null) {
-      inicioFiltro = noFuso.inicio
-      fimFiltro = noFuso.fim
-      intervaloUtcJaNoFusoApi = true
-    } else {
-      const { inicio, fim } = calculatePeriodo(filters.periodo)
-      inicioFiltro = inicio
-      fimFiltro = fim
-    }
-  }
-  /**
-   * Backend: período por data de finalização (`dataFinalizacaoInicial`/`dataFinalizacaoFinal`).
-   * Com status apenas ABERTA não é permitido filtrar por finalização — usa-se data de criação.
-   */
-  const usarDatasCriacao = normalizedStatus === 'ABERTA'
-  const tzEmpresa = args?.timeZoneEmpresa?.trim() || ''
-  const isoInicioFiltroVendas = (): string => {
-    if (usarDatasCriacao) return inicioFiltro!.toISOString()
-    if (intervaloUtcJaNoFusoApi || !tzEmpresa) return inicioFiltro!.toISOString()
-    return toISOStringNoFusoEmpresa(inicioFiltro!, tzEmpresa)
-  }
-  const isoFimFiltroVendas = (): string => {
-    if (usarDatasCriacao) return fimFiltro!.toISOString()
-    if (intervaloUtcJaNoFusoApi || !tzEmpresa) return fimFiltro!.toISOString()
-    return toISOStringNoFusoEmpresa(fimFiltro!, tzEmpresa)
-  }
-  if (inicioFiltro) {
-    baseParams.append(
-      usarDatasCriacao ? 'dataCriacaoInicial' : 'dataFinalizacaoInicial',
-      isoInicioFiltroVendas()
-    )
-  }
-  if (fimFiltro) {
-    baseParams.append(
-      usarDatasCriacao ? 'dataCriacaoFinal' : 'dataFinalizacaoFinal',
-      isoFimFiltroVendas()
-    )
-  }
-
-  return baseParams
-}
-
-/** Mapeia linha da API para o tipo usado na lista. */
-function mapearVendaApiRow(item: any): Venda {
-  return {
-    ...item,
-    totalValorProdutosRemovidos:
-      item.totalValorProdutosRemovidos ||
-      item.totalValorProdutosRemovido ||
-      item.valorProdutosRemovidos ||
-      item.valorProdutosRemovido ||
-      0,
-  }
-}
-
-/**
- * Refina por status usando datas (quando a API retorna mistura ou caso "Aberta").
- */
-function filtrarVendasPorStatusCliente(itens: Venda[], statusFilter: string | null): Venda[] {
-  return itens.filter((v: Venda) => {
-    const normalizedStatus = statusFilter?.toUpperCase()
-
-    if (!normalizedStatus || normalizedStatus === 'ABERTA') {
-      if (normalizedStatus === 'ABERTA') {
-        return !v.dataCancelamento && !v.dataFinalizacao
-      }
-      return !!(v.dataCancelamento || v.dataFinalizacao)
-    }
-
-    if (normalizedStatus === 'CANCELADA') {
-      return !!v.dataCancelamento
-    }
-
-    if (normalizedStatus === 'FINALIZADA') {
-      return !!v.dataFinalizacao && !v.dataCancelamento
-    }
-
-    return !!(v.dataCancelamento || v.dataFinalizacao)
-  })
 }
 
 /** Borda do `Select` outlined sempre visível (o MUI deixa o repouso tão claro que parece sumir). */
@@ -575,6 +334,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   const [usuarioCancelouFilter, setUsuarioCancelouFilter] = useState<string>('')
   const [vendas, setVendas] = useState<Venda[]>([])
   const [metricas, setMetricas] = useState<MetricasVendas | null>(null)
+  const [metricasProntas, setMetricasProntas] = useState(false)
   const [usuariosPDV, setUsuariosPDV] = useState<UsuarioPDV[]>([])
   const [meiosPagamento, setMeiosPagamento] = useState<MeioPagamento[]>([])
   const [terminais, setTerminais] = useState<Terminal[]>([])
@@ -582,6 +342,12 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   // Estados de UI
   const [isLoading, setIsLoading] = useState(false)
   const [selectedVendaId, setSelectedVendaId] = useState<string | null>(null)
+  const [selectedTabelaOrigem, setSelectedTabelaOrigem] = useState<'venda' | 'venda_gestor'>('venda')
+  const [selectedTipoVenda, setSelectedTipoVenda] = useState<string>('')
+  const [selectedTipoEntrega, setSelectedTipoEntrega] = useState<'entrega' | 'retirada' | null>(
+    null
+  )
+  const [selectedNumeroMesa, setSelectedNumeroMesa] = useState<number | undefined>(undefined)
   /** `open` do painel de detalhes — separado do id para permitir animação de saída antes de limpar a venda. */
   const [detalhesVendaAberta, setDetalhesVendaAberta] = useState(false)
   const [isLoadingMeiosPagamento, setIsLoadingMeiosPagamento] = useState(false)
@@ -598,8 +364,12 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   const [rascunhoHoraFim, setRascunhoHoraFim] = useState('23:59')
   const [filtrosVisiveisMobile, setFiltrosVisiveisMobile] = useState(false)
   const [isMobileViewport, setIsMobileViewport] = useState(false)
-  const [isGraficoVendasPorUsuarioOpen, setIsGraficoVendasPorUsuarioOpen] = useState(false)
-  const [isGraficoVendasCanceladasOpen, setIsGraficoVendasCanceladasOpen] = useState(false)
+  const [isGraficoFormasPagamentoOpen, setIsGraficoFormasPagamentoOpen] = useState(false)
+  const [formasPagamentoContexto, setFormasPagamentoContexto] = useState<{
+    filters: VendasFiltrosQuerySnapshot
+    vendas: Venda[]
+    listaCompleta: boolean
+  } | null>(null)
   const [isAbrindoNfce, setIsAbrindoNfce] = useState<Record<string, boolean>>({})
   /** Há mais páginas na API para os filtros atuais (scroll / “Carregar mais”). */
   const [hasMoreVendas, setHasMoreVendas] = useState(false)
@@ -614,6 +384,8 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   const nextApiOffsetRef = useRef(0)
   /** Incrementado a cada reset de lista — descarta respostas atrasadas após troca de filtro. */
   const vendasFetchSeqRef = useRef(0)
+  const metricasAbortRef = useRef<AbortController | null>(null)
+  const mapaTipoEntregaRef = useRef<Map<string, 'entrega' | 'retirada'>>(new Map())
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const hasMoreVendasRef = useRef(false)
   const isLoadingMoreRef = useRef(false)
@@ -690,6 +462,11 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   const periodoFaturamentoCalendarioModal = useMemo(
     () => periodoFetchFaturamentoCalendarioDoisMeses(mesCalendarioIntervalo),
     [mesCalendarioIntervalo]
+  )
+
+  const usuariosLojaPorId = useMemo(
+    () => new Map(usuariosPDV.map(usuario => [usuario.id, usuario.nome])),
+    [usuariosPDV]
   )
 
   const {
@@ -940,35 +717,21 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
    */
   const buscarPaginaVendas = useCallback(
     async (offset: number, filters: VendasFiltrosQuerySnapshot, token: string) => {
-      const baseParams = buildVendasListQueryParams(filters, { timeZoneEmpresa: timezoneAgregacao })
-      const params = new URLSearchParams(baseParams.toString())
-      params.append('limit', String(pageSize))
-      params.append('offset', String(offset))
-
-      const response = await fetchGestorApi(`/api/vendas?${params.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+      const page = await fetchPaginaRelatorioVendas(filters, offset, pageSize, token, {
+        timeZoneEmpresa: timezoneAgregacao,
       })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error((errorData as { error?: string }).error || 'Erro ao buscar vendas')
-      }
-
-      const data = await response.json()
-      const rawItems: unknown[] = data.items || []
-      const mappedItems = rawItems.map((item: any) => mapearVendaApiRow(item))
-      const filteredItems = filtrarVendasPorStatusCliente(mappedItems, filters.statusFilter)
+      const filteredItems = mapearEFiltrarVendasUnificadas(
+        page.items,
+        filters,
+        mapaTipoEntregaRef.current
+      )
 
       return {
         filteredItems,
-        rawLength: rawItems.length,
-        metricas: (data.metricas || null) as MetricasVendas | null,
-        count: typeof data.count === 'number' ? data.count : undefined,
-        totalPages: typeof data.totalPages === 'number' ? data.totalPages : undefined,
-        limit: typeof data.limit === 'number' ? data.limit : undefined,
+        rawLength: page.items.length,
+        count: typeof page.count === 'number' ? page.count : undefined,
+        totalPages: typeof page.totalPages === 'number' ? page.totalPages : undefined,
+        limit: typeof page.limit === 'number' ? page.limit : undefined,
       }
     },
     [pageSize, timezoneAgregacao]
@@ -982,22 +745,57 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     if (!token) return
 
     const seq = ++vendasFetchSeqRef.current
+    metricasAbortRef.current?.abort()
+    const metricasAbort = new AbortController()
+    metricasAbortRef.current = metricasAbort
     setIsLoading(true)
     setIsLoadingMore(false)
     setVendas([])
     setHasMoreVendas(false)
     setTotalListaCount(null)
+    setMetricas(null)
+    setMetricasProntas(false)
     nextApiOffsetRef.current = 0
 
     try {
       const filters = filtersRef.current as VendasFiltrosQuerySnapshot
       const offset = 0
-      const page = await buscarPaginaVendas(offset, filters, token)
+      const precisaMapaTipoEntrega = filtroTipoVendaEhEntregaOuRetirada(filters.tipoVendaFilter) == null
+      const [pageRaw, mapaTipoEntrega] = await Promise.all([
+        fetchPaginaRelatorioVendas(filters, offset, pageSize, token, {
+          timeZoneEmpresa: timezoneAgregacao,
+          signal: metricasAbort.signal,
+        }),
+        precisaMapaTipoEntrega
+          ? carregarMapaTipoEntregaDelivery({
+              filters,
+              token,
+              timeZoneEmpresa: timezoneAgregacao,
+              signal: metricasAbort.signal,
+            }).catch(error => {
+              if (error instanceof Error && error.name === 'AbortError') throw error
+              console.error('Erro ao carregar tipo de entrega do delivery:', error)
+              return new Map<string, 'entrega' | 'retirada'>()
+            })
+          : Promise.resolve(new Map<string, 'entrega' | 'retirada'>()),
+      ])
+      mapaTipoEntregaRef.current = mapaTipoEntrega
+      const filteredItems = mapearEFiltrarVendasUnificadas(
+        pageRaw.items,
+        filters,
+        mapaTipoEntrega
+      )
+      const page = {
+        filteredItems,
+        rawLength: pageRaw.items.length,
+        count: typeof pageRaw.count === 'number' ? pageRaw.count : undefined,
+        totalPages: pageRaw.totalPages,
+        limit: pageRaw.limit,
+      }
 
       if (vendasFetchSeqRef.current !== seq) return
 
       setVendas(page.filteredItems)
-      setMetricas(page.metricas)
       if (page.count !== undefined) {
         setTotalListaCount(page.count)
       } else {
@@ -1005,7 +803,36 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
       }
 
       nextApiOffsetRef.current = offset + page.rawLength
-      setHasMoreVendas(inferirHasMoreApi(page.rawLength, offset, page))
+      const hasMore = inferirHasMoreApi(page.rawLength, offset, page)
+      setHasMoreVendas(hasMore)
+
+      if (!hasMore) {
+        setMetricas(agregarMetricasVendasLista(page.filteredItems))
+        setMetricasProntas(true)
+      } else {
+        void agregarMetricasVendasUnificadas({
+          filters,
+          token,
+          timeZoneEmpresa: timezoneAgregacao,
+          paginaInicial: {
+            items: page.filteredItems,
+            rawLength: page.rawLength,
+            count: page.count ?? null,
+          },
+          signal: metricasAbort.signal,
+        })
+          .then(metricasCompletas => {
+            if (vendasFetchSeqRef.current !== seq) return
+            setMetricas(metricasCompletas)
+            setMetricasProntas(true)
+          })
+          .catch(error => {
+            if (vendasFetchSeqRef.current !== seq) return
+            if (error instanceof Error && error.name === 'AbortError') return
+            console.error('Erro ao agregar métricas de vendas:', error)
+            showToast.error('Não foi possível calcular os totais do período')
+          })
+      }
     } catch (error) {
       console.error('Erro ao buscar vendas:', error)
       showToast.error('Erro ao buscar vendas')
@@ -1014,7 +841,13 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         setIsLoading(false)
       }
     }
-  }, [ buscarPaginaVendas, inferirHasMoreApi])
+  }, [buscarPaginaVendas, inferirHasMoreApi, pageSize, timezoneAgregacao])
+
+  useEffect(() => {
+    return () => {
+      metricasAbortRef.current?.abort()
+    }
+  }, [])
 
   /**
    * Próximas páginas (scroll infinito / botão).
@@ -1046,30 +879,19 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     }
   }, [ buscarPaginaVendas, inferirHasMoreApi])
 
-  /** Soma “Total cancelado” apenas sobre as vendas já carregadas na lista (métricas globais vêm de `metricas`). */
-  const totalCanceladoSomenteLista = useMemo(() => {
-    return vendas.reduce((total, v) => {
-      const totalRemovidos = Number(v.totalValorProdutosRemovidos) || 0
-      const valorFinal = Number(v.valorFinal) || 0
+  const meiosPagamentoPorId = useMemo(
+    () => new Map(meiosPagamento.map(meio => [meio.id, meio.nome])),
+    [meiosPagamento]
+  )
 
-      if (v.dataCancelamento) {
-        return total + totalRemovidos + valorFinal
-      }
-
-      if (v.dataFinalizacao && !v.dataCancelamento && totalRemovidos > 0) {
-        return total + totalRemovidos
-      }
-
-      return total
-    }, 0)
-  }, [vendas])
-
-  const avisoGraficoListaParcial =
-    hasMoreVendas && totalListaCount != null && vendas.length < totalListaCount
-      ? 'Gráfico baseado apenas nas vendas já carregadas na lista. Role a lista ou use “Carregar mais” para aproximar o total.'
-      : hasMoreVendas && totalListaCount == null
-        ? 'Podem existir mais vendas: carregue o restante da lista para o gráfico refletir todos os registros.'
-        : undefined
+  const abrirFormasPagamento = useCallback(() => {
+    setFormasPagamentoContexto({
+      filters: { ...(filtersRef.current as VendasFiltrosQuerySnapshot) },
+      vendas: [...vendas],
+      listaCompleta: !hasMoreVendas,
+    })
+    setIsGraficoFormasPagamentoOpen(true)
+  }, [hasMoreVendas, vendas])
 
   // Debounce para busca / troca de filtros (primeira execução sem espera)
   useEffect(() => {
@@ -1284,7 +1106,8 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   }
 
   const handleVerNfce = useCallback(
-    async (vendaId: string) => {
+    async (venda: Venda) => {
+      const vendaId = venda.id
       const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
@@ -1294,7 +1117,8 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
       setIsAbrindoNfce(prev => ({ ...prev, [vendaId]: true }))
       try {
         const queryFiscal = new URLSearchParams({ incluirFiscal: 'true' }).toString()
-        const response = await fetchGestorApi(`/api/vendas/${encodeURIComponent(vendaId)}?${queryFiscal}`, {
+        const endpointBase = endpointDetalheVendaRelatorio(vendaId, venda.tabelaOrigem)
+        const response = await fetchGestorApi(`${endpointBase}?${queryFiscal}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -1339,7 +1163,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex w-full flex-col py-1">
-        <p className="px-[30px] text-lg font-semibold text-primary">Todas as Vendas do PDV</p>
+        <p className="px-[30px] text-lg font-semibold text-primary">Relatório de Vendas Detalhado</p>
       </div>
       <div className="h-[1px] flex-shrink-0 border-t-2 border-primary/70"></div>
       {/* Container principal */}
@@ -1639,11 +1463,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         {/* Cards de Métricas */}
         <div className="scrollbar-thin m-1 flex gap-2 overflow-x-auto pb-2">
           {/* Vendas Finalizadas/Em Aberto */}
-          <div
-            className="flex flex-1 cursor-pointer items-center gap-3 rounded-lg border-2 p-1 transition-colors hover:bg-primary/5"
-            onClick={() => setIsGraficoVendasPorUsuarioOpen(true)}
-            title="Clique para ver gráfico de vendas por usuário"
-          >
+          <div className="flex flex-1 items-center gap-3 rounded-lg border-2 p-1">
             <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-alternate">
               <span className="text-xl text-info">🛒</span>
             </div>
@@ -1651,25 +1471,29 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               <span className="text-xs text-secondary-text">
                 {statusFilter === 'Aberta' ? 'Vendas em Aberto' : 'Vendas Finalizadas'}
               </span>
-              <span className="text-[22px] text-primary">
-                {metricas?.countVendasEfetivadas || 0}
+              <span
+                className={
+                  metricasProntas ? 'text-[22px] text-primary' : 'text-sm text-secondary-text'
+                }
+              >
+                {metricasProntas ? metricas?.countVendasEfetivadas || 0 : 'Calculando…'}
               </span>
             </div>
           </div>
 
           {/* Vendas Canceladas */}
-          <div
-            className="flex flex-1 cursor-pointer items-center gap-3 rounded-lg border-2 p-1 transition-colors hover:bg-primary/5"
-            onClick={() => setIsGraficoVendasCanceladasOpen(true)}
-            title="Clique para ver gráfico de vendas canceladas por usuário"
-          >
+          <div className="flex flex-1 items-center gap-3 rounded-lg border-2 p-1">
             <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-error">
               <span className="text-xl text-info">✕</span>
             </div>
             <div className="flex flex-1 flex-col items-end">
               <span className="text-xs text-secondary-text">Vendas Canceladas</span>
-              <span className="text-[22px] text-primary">
-                {metricas?.countVendasCanceladas || 0}
+              <span
+                className={
+                  metricasProntas ? 'text-[22px] text-primary' : 'text-sm text-secondary-text'
+                }
+              >
+                {metricasProntas ? metricas?.countVendasCanceladas || 0 : 'Calculando…'}
               </span>
             </div>
           </div>
@@ -1684,7 +1508,10 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             <div className="flex flex-1 flex-col items-end">
               <span className="text-xs text-secondary-text">Produtos Vendidos</span>
               <span className="text-[22px] text-primary">
-                {metricas?.countProdutosVendidos || 0}
+                {metricas?.countProdutosVendidos == null ? '—' : metricas.countProdutosVendidos}
+              </span>
+              <span className="max-w-[10rem] text-right text-[10px] leading-tight text-secondary-text">
+                Disponível na exportação.
               </span>
             </div>
           </div>
@@ -1698,19 +1525,24 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             </div>
             <div className="flex flex-1 flex-col items-end">
               <span className="text-xs text-secondary-text">Total Cancelado</span>
-              <span className="text-[22px] text-primary">
-                {formatCurrency(totalCanceladoSomenteLista)}
+              <span
+                className={
+                  metricasProntas ? 'text-[22px] text-primary' : 'text-sm text-secondary-text'
+                }
+              >
+                {metricasProntas
+                  ? formatCurrency(metricas?.totalCancelado ?? 0)
+                  : 'Calculando…'}
               </span>
-              {hasMoreVendas ? (
-                <span className="max-w-[10rem] text-right text-[10px] leading-tight text-secondary-text">
-                  Parcial: Vendas carregadas na lista.
-                </span>
-              ) : null}
             </div>
           </div>
 
           {/* Total Faturado */}
-          <div className="flex flex-1 items-center gap-3 rounded-lg border-2 p-1">
+          <div
+            className="flex flex-1 cursor-pointer items-center gap-3 rounded-lg border-2 p-1 transition-colors hover:bg-primary/5"
+            onClick={abrirFormasPagamento}
+            title="Clique para ver o total por forma de pagamento"
+          >
             <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-accent1">
               <span className="text-xl text-info">
                 <MdAttachMoney />
@@ -1718,8 +1550,16 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             </div>
             <div className="flex flex-1 flex-col items-end">
               <span className="text-xs text-secondary-text">Total Faturado</span>
-              <span className="text-[22px] text-primary">
-                {metricas?.totalFaturado ? formatCurrency(metricas.totalFaturado) : 'R$ 0,00'}
+              <span
+                className={
+                  metricasProntas ? 'text-[22px] text-primary' : 'text-sm text-secondary-text'
+                }
+              >
+                {metricasProntas
+                  ? metricas?.totalFaturado
+                    ? formatCurrency(metricas.totalFaturado)
+                    : 'R$ 0,00'
+                  : 'Calculando…'}
               </span>
             </div>
           </div>
@@ -1736,7 +1576,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             </div>
             <div className="flex-1 text-center text-xs md:text-sm">Tipo Venda</div>
             <div className="hidden flex-1 justify-center md:flex">Cód. Terminal</div>
-            <div className="flex-[2] text-center text-xs md:text-sm">Usuário PDV</div>
+            <div className="flex-[2] text-center text-xs md:text-sm">Usuário</div>
             <div className="hidden flex-1 justify-end text-xs md:flex md:text-sm">
               VL. Cancelado
             </div>
@@ -1766,8 +1606,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               const { date: dateFinalizacao, time: timeFinalizacao } = formatDateList(
                 venda.dataFinalizacao || venda.dataCriacao
               )
-              const usuarioNome =
-                usuariosPDV.find(u => u.id === venda.abertoPorId)?.nome || venda.abertoPorId
+              const usuarioNome = nomeLancadorRelatorio(venda, usuariosLojaPorId)
               const isZebraEven = index % 2 === 0
 
               return (
@@ -1775,6 +1614,10 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                   key={venda.id}
                   onClick={() => {
                     setSelectedVendaId(venda.id)
+                    setSelectedTabelaOrigem(venda.tabelaOrigem ?? 'venda')
+                    setSelectedTipoVenda(String(venda.tipoVenda ?? ''))
+                    setSelectedTipoEntrega(venda.tipoEntrega ?? null)
+                    setSelectedNumeroMesa(venda.numeroMesa)
                     setDetalhesVendaAberta(true)
                   }}
                   className={`flex cursor-pointer items-center rounded-lg py-1 transition-all hover:bg-primary/10 md:px-2 ${(() => {
@@ -1813,15 +1656,18 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                   </div>
                   <div className="flex flex-1 flex-col items-center justify-center">
                     <TipoVendaIcon
-                      tipoVenda={venda.tipoVenda}
+                      tipoVenda={tipoVendaIconeRelatorio(venda)}
                       numeroMesa={venda.numeroMesa}
-                      corTexto="var(--color-info)" // Garante que o número da mesa seja visível
+                      corTexto="var(--color-info)"
                       containerScale={0.9}
                       size={isMobileViewport ? 45 : 55}
+                      compactLabel
                     />
                   </div>
                   <div className="hidden flex-1 text-center md:block">
-                    <span className="text-sm text-primary-text">#{venda.codigoTerminal}</span>
+                    <span className="text-sm text-primary-text">
+                      {codigoTerminalCelulaRelatorio(venda)}
+                    </span>
                   </div>
                   <div className="flex-[2] text-center">
                     <span className="text-xs text-primary-text md:text-sm">{usuarioNome}</span>
@@ -1853,7 +1699,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                     <button
                       onClick={e => {
                         e.stopPropagation() // Impede que o clique no botão acione o clique da linha
-                        void handleVerNfce(venda.id)
+                        void handleVerNfce(venda)
                       }}
                       className="flex h-10 w-10 items-center justify-center rounded text-primary transition-colors hover:bg-primary/10"
                       title="Ver NFCe"
@@ -1882,6 +1728,10 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           open={detalhesVendaAberta}
           onClose={() => setDetalhesVendaAberta(false)}
           onAfterClose={() => setSelectedVendaId(null)}
+          tabelaOrigem={selectedTabelaOrigem}
+          tipoVendaLista={selectedTipoVenda}
+          tipoEntregaLista={selectedTipoEntrega}
+          numeroMesaLista={selectedNumeroMesa}
         />
       ) : null}
 
@@ -1925,25 +1775,17 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         </div>
       </JiffySidePanelModal>
 
-      {/* Modal de Gráfico de Vendas por Usuário */}
-      <GraficoVendasPorUsuarioModal
-        open={isGraficoVendasPorUsuarioOpen}
-        onClose={() => setIsGraficoVendasPorUsuarioOpen(false)}
-        vendas={vendas}
-        usuariosPDV={usuariosPDV}
-        tipo="finalizadas"
-        avisoListaParcial={avisoGraficoListaParcial}
-      />
-
-      {/* Modal de Gráfico de Vendas Canceladas por Usuário */}
-      <GraficoVendasPorUsuarioModal
-        open={isGraficoVendasCanceladasOpen}
-        onClose={() => setIsGraficoVendasCanceladasOpen(false)}
-        vendas={vendas}
-        usuariosPDV={usuariosPDV}
-        tipo="canceladas"
-        avisoListaParcial={avisoGraficoListaParcial}
-      />
+      {formasPagamentoContexto ? (
+        <GraficoFormasPagamentoModal
+          open={isGraficoFormasPagamentoOpen}
+          onClose={() => setIsGraficoFormasPagamentoOpen(false)}
+          filters={formasPagamentoContexto.filters}
+          timeZoneEmpresa={timezoneAgregacao}
+          meiosPagamentoPorId={meiosPagamentoPorId}
+          vendasJaCarregadas={formasPagamentoContexto.vendas}
+          listaCompleta={formasPagamentoContexto.listaCompleta}
+        />
+      ) : null}
     </div>
   )
 }

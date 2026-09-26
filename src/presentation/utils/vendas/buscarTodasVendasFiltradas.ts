@@ -1,7 +1,11 @@
 import {
-  buildVendasListQueryParams,
-  filtrarVendasPorStatusCliente,
-  mapearVendaApiRow,
+  carregarMapaTipoEntregaDelivery,
+  fetchPaginaRelatorioVendas,
+  filtroTipoVendaEhEntregaOuRetirada,
+} from './fetchPaginaRelatorioVendas'
+import {
+  agregarMetricasVendasLista,
+  mapearEFiltrarVendasUnificadas,
 } from './vendasListQuery'
 import type { MetricasVendas, VendaListItem, VendasFiltrosQuerySnapshot } from './vendasListTypes'
 
@@ -15,14 +19,6 @@ interface BuscarTodasVendasResult {
   totalBackend: number | null
 }
 
-interface PaginaVendasApi {
-  items?: unknown[]
-  metricas?: MetricasVendas
-  count?: number
-  totalPages?: number
-  limit?: number
-}
-
 export async function buscarTodasVendasFiltradas(input: {
   filters: VendasFiltrosQuerySnapshot
   token: string
@@ -30,45 +26,24 @@ export async function buscarTodasVendasFiltradas(input: {
   onProgress?: (carregadas: number, total: number | null) => void
 }): Promise<BuscarTodasVendasResult> {
   const { filters, token, timeZoneEmpresa, onProgress } = input
-  const baseParams = buildVendasListQueryParams(filters, { timeZoneEmpresa })
+  const tipoEntregaPorId =
+    filtroTipoVendaEhEntregaOuRetirada(filters.tipoVendaFilter) == null
+      ? await carregarMapaTipoEntregaDelivery({ filters, token, timeZoneEmpresa })
+      : undefined
 
   let offset = 0
-  let metricas: MetricasVendas | null = null
   let totalBackend: number | null = null
   const acumulado: VendaListItem[] = []
 
   for (;;) {
-    const params = new URLSearchParams(baseParams.toString())
-    params.set('limit', String(EXPORT_VENDAS_PAGE_SIZE))
-    params.set('offset', String(offset))
-
-    const response = await fetch(`/api/vendas?${params.toString()}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+    const page = await fetchPaginaRelatorioVendas(filters, offset, EXPORT_VENDAS_PAGE_SIZE, token, {
+      timeZoneEmpresa,
     })
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(
-        (errorData as { error?: string }).error || 'Erro ao buscar vendas para exportação'
-      )
+    if (typeof page.count === 'number') {
+      totalBackend = page.count
     }
 
-    const data = (await response.json()) as PaginaVendasApi
-    if (offset === 0 && data.metricas) {
-      metricas = data.metricas
-    }
-    if (typeof data.count === 'number') {
-      totalBackend = data.count
-    }
-
-    const rawItems = data.items ?? []
-    const mapped = rawItems.map(item =>
-      mapearVendaApiRow(item as Record<string, unknown>)
-    )
-    const filtered = filtrarVendasPorStatusCliente(mapped, filters.statusFilter)
+    const filtered = mapearEFiltrarVendasUnificadas(page.items, filters, tipoEntregaPorId)
     acumulado.push(...filtered)
 
     onProgress?.(acumulado.length, totalBackend)
@@ -79,16 +54,20 @@ export async function buscarTodasVendasFiltradas(input: {
       )
     }
 
-    if (rawItems.length < EXPORT_VENDAS_PAGE_SIZE) {
+    if (page.items.length < EXPORT_VENDAS_PAGE_SIZE) {
       break
     }
 
-    offset += rawItems.length
+    offset += page.items.length
 
     if (totalBackend != null && offset >= totalBackend) {
       break
     }
   }
 
-  return { vendas: acumulado, metricas, totalBackend }
+  return {
+    vendas: acumulado,
+    metricas: agregarMetricasVendasLista(acumulado),
+    totalBackend,
+  }
 }
