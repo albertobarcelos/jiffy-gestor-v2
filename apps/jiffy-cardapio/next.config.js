@@ -34,12 +34,23 @@ const nextConfig = {
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
   },
+  experimental: {
+    externalDir: true,
+  },
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
         fs: false,
       }
+    }
+
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@jiffy/preco-vigente-snapshot': path.resolve(
+        __dirname,
+        '../../src/domain/policies/menu/precoVigenteSnapshot.ts'
+      ),
     }
 
     config.resolve.modules = [
