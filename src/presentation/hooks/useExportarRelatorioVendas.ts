@@ -4,6 +4,8 @@ import { useCallback, useState } from 'react'
 import toast from 'react-hot-toast'
 import { showToast } from '@/src/shared/utils/toast'
 import { buscarTodasVendasFiltradas } from '@/src/presentation/utils/vendas/buscarTodasVendasFiltradas'
+import { agregarMetricasVendasLista } from '@/src/presentation/utils/vendas/vendasListQuery'
+import { pagamentoValidoParaRelatorio } from '@/src/presentation/utils/vendas/vendasPagamentoExport'
 import {
   buscarMetodosPagamentoPeriodo,
   temFiltrosExtrasAlemPeriodo,
@@ -55,7 +57,7 @@ export function useExportarRelatorioVendas() {
     }
 
     try {
-      const { vendas, metricas } = await buscarTodasVendasFiltradas({
+      const { vendas } = await buscarTodasVendasFiltradas({
         filters: exportInput.filters,
         token: exportInput.token,
         timeZoneEmpresa: exportInput.timeZoneEmpresa,
@@ -118,10 +120,30 @@ export function useExportarRelatorioVendas() {
 
       toast.loading('Gerando planilha...', { id: toastId })
 
+      const meioFiltro = exportInput.filters.meioPagamentoFilter.trim()
+      const vendasExport = meioFiltro
+        ? vendas.filter(venda =>
+            (pagamentosPorVendaId.get(venda.id) ?? []).some(
+              pagamento =>
+                pagamento.meioPagamentoId === meioFiltro &&
+                pagamentoValidoParaRelatorio(pagamento)
+            )
+          )
+        : vendas
+
+      const produtosVendidos = vendasExport.reduce(
+        (total, venda) => total + (quantidadeProdutosPorVendaId.get(venda.id) ?? 0),
+        0
+      )
+      const metricasExport = {
+        ...agregarMetricasVendasLista(vendasExport),
+        countProdutosVendidos: produtosVendidos,
+      }
+
       await exportarRelatorioVendasXlsx({
         exportInput: { ...exportInput, meiosPagamentoPorId },
-        vendas,
-        metricas: exportInput.metricas ?? metricas,
+        vendas: vendasExport,
+        metricas: metricasExport,
         metodosPagamento,
         pagamentosPorVendaId,
         quantidadeProdutosPorVendaId,

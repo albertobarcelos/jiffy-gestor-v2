@@ -172,7 +172,7 @@ export function GraficoVendasPorUsuarioConteudo({
         <div className={layoutClass}>
           <div className="min-h-0 flex-1">
             <ResponsiveContainer width="100%" height={alturaGraficoPx}>
-              <PieChart>
+              <PieChart tabIndex={-1} className="outline-none [&_*]:outline-none">
                 <Pie
                   data={chartData}
                   cx="50%"
@@ -183,19 +183,17 @@ export function GraficoVendasPorUsuarioConteudo({
                   dataKey="value"
                   label={false}
                   minAngle={0}
+                  stroke="none"
+                  isAnimationActive={false}
                 >
-                  {chartData.map((entry, index) => {
-                    const percentual = (entry.value / totalGeral) * 100
-                    const strokeWidth = percentual < 0.1 ? 1 : 0
-                    return (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={COLORS[index % COLORS.length]}
-                        stroke={COLORS[index % COLORS.length]}
-                        strokeWidth={strokeWidth}
-                      />
-                    )
-                  })}
+                  {chartData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={COLORS[index % COLORS.length]}
+                      stroke="none"
+                      style={{ outline: 'none' }}
+                    />
+                  ))}
                 </Pie>
                 <Tooltip content={<CustomTooltip />} />
                 {mostrarLegenda ? (

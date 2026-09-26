@@ -1,6 +1,7 @@
 import { calculatePeriodo } from '@/src/shared/utils/dateFilters'
 import { calcularPeriodoNoFusoEmpresa } from '@/src/shared/utils/periodoNoFusoEmpresa'
-import type { VendaListItem, VendasFiltrosQuerySnapshot } from './vendasListTypes'
+import type { VendaUnificadaDTO, VendasUnificadasQueryParams } from '@/src/application/dto/VendaUnificadaDTO'
+import type { MetricasVendas, VendaListItem, VendasFiltrosQuerySnapshot } from './vendasListTypes'
 
 function getTimeZoneOffsetMinutes(date: Date, timeZone: string): number {
   const dtf = new Intl.DateTimeFormat('en-US', {
@@ -269,4 +270,193 @@ export function filtrarVendasPorStatusCliente(
 
     return !!(v.dataCancelamento || v.dataFinalizacao)
   })
+}
+
+export function mapFiltroTipoVendaParaUnificado(tipoVendaFilter: string | null): {
+  tipo?: VendasUnificadasQueryParams['tipo']
+  tipoEntrega?: VendasUnificadasQueryParams['tipoEntrega']
+  tipoVenda?: string
+} {
+  const raw = String(tipoVendaFilter ?? '')
+    .trim()
+    .toLowerCase()
+  if (!raw) return {}
+  if (raw === 'entrega' || raw === 'retirada') {
+    return { tipo: 'DELIVERY', tipoEntrega: raw }
+  }
+  if (raw === 'delivery') {
+    return { tipo: 'DELIVERY', tipoVenda: 'delivery' }
+  }
+  if (raw === 'gestor') {
+    return { tipo: 'GESTOR' }
+  }
+  if (raw === 'mesa') {
+    return { tipo: 'PDV', tipoVenda: 'mesa' }
+  }
+  if (raw === 'balcao') {
+    return { tipoVenda: 'balcao' }
+  }
+  return { tipoVenda: raw }
+}
+
+export function filtrosVendasParaParamsUnificados(
+  filters: VendasFiltrosQuerySnapshot,
+  args?: { timeZoneEmpresa?: string }
+): VendasUnificadasQueryParams {
+  const listParams = buildVendasListQueryParams(filters, args)
+  const canal = mapFiltroTipoVendaParaUnificado(filters.tipoVendaFilter)
+  return {
+    q: filters.searchQuery.trim() || undefined,
+    tipo: canal.tipo,
+    tipoEntrega: canal.tipoEntrega,
+    tipoVenda: canal.tipoVenda,
+    terminalId: filters.terminalFilter.trim() || undefined,
+    dataFinalizacaoInicio:
+      listParams.get('dataFinalizacaoInicial') ?? undefined,
+    dataFinalizacaoFim: listParams.get('dataFinalizacaoFinal') ?? undefined,
+    dataCriacaoInicial: listParams.get('dataCriacaoInicial') ?? undefined,
+    dataCriacaoFinal: listParams.get('dataCriacaoFinal') ?? undefined,
+  }
+}
+
+export function mapVendaUnificadaParaListItem(
+  venda: VendaUnificadaDTO,
+  tipoEntregaPorId?: Map<string, 'entrega' | 'retirada'>
+): VendaListItem {
+  const tipoEntrega =
+    venda.tipoAtendimento() ??
+    tipoEntregaPorId?.get(venda.id) ??
+    (venda.codigoVenda ? tipoEntregaPorId?.get(venda.codigoVenda) : undefined) ??
+    null
+  return {
+    id: venda.id,
+    numeroVenda: venda.numeroVenda,
+    codigoVenda: venda.codigoVenda,
+    numeroMesa: venda.numeroMesa != null ? Number(venda.numeroMesa) : undefined,
+    valorFinal: venda.valorFinal,
+    tipoVenda: venda.tipoVenda ?? '',
+    tipoEntrega,
+    origem: venda.origem,
+    tabelaOrigem: venda.tabelaOrigem,
+    abertoPorId: venda.abertoPor.id,
+    abertoPorNome: venda.abertoPor.nome,
+    codigoTerminal: '',
+    terminalId: '',
+    dataCriacao: venda.dataCriacao,
+    dataCancelamento: venda.dataCancelamento ?? undefined,
+    dataFinalizacao: venda.dataFinalizacao ?? undefined,
+    documentoFiscalId: venda.documentoFiscalId,
+  }
+}
+
+/** Filtros que o GET unificado não expõe (valor, usuário). */
+export function aplicarFiltrosClienteRelatorio(
+  itens: VendaListItem[],
+  filters: VendasFiltrosQuerySnapshot
+): VendaListItem[] {
+  const valorMin = normalizarMoedaFiltroVLista(filters.valorMinimo)
+  const valorMax = normalizarMoedaFiltroVLista(filters.valorMaximo)
+  const abertoPor = filters.usuarioAbertoPorFilter.trim()
+  const canceladoPor = filters.usuarioCancelouFilter.trim()
+
+  return itens.filter(item => {
+    const valor = Number(item.valorFinal) || 0
+    if (valorMin != null && valorMin > 0 && valor < valorMin) return false
+    if (valorMax != null && valorMax > 0 && valor > valorMax) return false
+    if (abertoPor && item.abertoPorId !== abertoPor) return false
+    if (canceladoPor) {
+      if (!item.canceladoPorId || item.canceladoPorId !== canceladoPor) return false
+    }
+    return true
+  })
+}
+
+export function endpointDetalheVendaRelatorio(
+  vendaId: string,
+  tabelaOrigem?: 'venda' | 'venda_gestor'
+): string {
+  const id = encodeURIComponent(vendaId)
+  return tabelaOrigem === 'venda_gestor' ? `/api/vendas/gestor/${id}` : `/api/vendas/${id}`
+}
+
+export function filtrarVendasPorTipoRelatorio(
+  itens: VendaListItem[],
+  tipoVendaFilter: string | null
+): VendaListItem[] {
+  const raw = String(tipoVendaFilter ?? '')
+    .trim()
+    .toLowerCase()
+  if (!raw) return itens
+
+  return itens.filter(item => {
+    const tipo = String(item.tipoVenda ?? '').trim().toLowerCase()
+    const entrega = item.tipoEntrega
+    if (raw === 'entrega') return entrega === 'entrega' || tipo === 'entrega'
+    if (raw === 'retirada') return entrega === 'retirada' || tipo === 'retirada'
+    if (raw === 'delivery') return tipo === 'delivery'
+    if (raw === 'gestor') return item.tabelaOrigem === 'venda_gestor' && tipo !== 'delivery'
+    if (raw === 'balcao') return tipo === 'balcao'
+    if (raw === 'mesa') return tipo === 'mesa'
+    return tipo === raw
+  })
+}
+
+export const METRICAS_VENDAS_VAZIAS: MetricasVendas = {
+  totalFaturado: 0,
+  countVendasEfetivadas: 0,
+  countVendasCanceladas: 0,
+  countProdutosVendidos: null,
+  totalCancelado: 0,
+}
+
+export function mapearEFiltrarVendasUnificadas(
+  items: VendaUnificadaDTO[],
+  filters: VendasFiltrosQuerySnapshot,
+  tipoEntregaPorId?: Map<string, 'entrega' | 'retirada'>
+): VendaListItem[] {
+  return aplicarFiltrosClienteRelatorio(
+    filtrarVendasPorTipoRelatorio(
+      filtrarVendasPorStatusCliente(
+        items.map(item => mapVendaUnificadaParaListItem(item, tipoEntregaPorId)),
+        filters.statusFilter
+      ),
+      filters.tipoVendaFilter
+    ),
+    filters
+  )
+}
+
+export function acumularMetricasVendasLista(
+  atual: MetricasVendas,
+  vendas: VendaListItem[],
+  idsContabilizados: Set<string>
+): MetricasVendas {
+  let totalFaturado = atual.totalFaturado
+  let countVendasEfetivadas = atual.countVendasEfetivadas
+  let countVendasCanceladas = atual.countVendasCanceladas
+  let totalCancelado = atual.totalCancelado
+  for (const venda of vendas) {
+    if (idsContabilizados.has(venda.id)) continue
+    idsContabilizados.add(venda.id)
+    if (venda.dataCancelamento) {
+      countVendasCanceladas += 1
+      totalCancelado += Number(venda.valorFinal) || 0
+      continue
+    }
+    if (venda.dataFinalizacao) {
+      countVendasEfetivadas += 1
+      totalFaturado += Number(venda.valorFinal) || 0
+    }
+  }
+  return {
+    totalFaturado,
+    countVendasEfetivadas,
+    countVendasCanceladas,
+    countProdutosVendidos: null,
+    totalCancelado,
+  }
+}
+
+export function agregarMetricasVendasLista(vendas: VendaListItem[]): MetricasVendas {
+  return acumularMetricasVendasLista(METRICAS_VENDAS_VAZIAS, vendas, new Set())
 }
