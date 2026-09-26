@@ -99,7 +99,6 @@ export function useProdutoComplementos(
     produto.nome,
     produto.valor,
     produto.valorPromocional,
-    produto.valorVigente,
     produto.promocaoAtiva,
   ])
 

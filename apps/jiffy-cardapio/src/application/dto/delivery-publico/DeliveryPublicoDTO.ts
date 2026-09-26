@@ -28,6 +28,7 @@ export type CatalogoPublicoProdutoDTO = {
   nome: string
   valor: number
   valorPromocional?: number
+  /** Campo opcional do backend; o preço exibido usa valor + valorPromocional + promocaoAtiva. */
   valorVigente?: number
   promocaoAtiva?: boolean
   descricao: string | null

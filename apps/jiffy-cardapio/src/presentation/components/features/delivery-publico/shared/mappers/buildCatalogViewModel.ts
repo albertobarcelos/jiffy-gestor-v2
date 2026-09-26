@@ -25,7 +25,6 @@ function mapProdutoToViewModel(
   const precos = resolverPrecosDeliveryProduto({
     valor: produto.valor,
     valorPromocional: produto.valorPromocional,
-    valorVigente: produto.valorVigente,
     promocaoAtiva: produto.promocaoAtiva,
   })
 

@@ -27,11 +27,12 @@ import {
 } from './MenuCategoriaNesteCardapioCampos'
 import { MenuProdutoPromocaoControl } from './MenuProdutoPromocaoControl'
 import {
+  VALOR_PROMOCIONAL_MINIMO,
   descontoPercentualFromPrecos,
   isValorPromocionalValido,
   produtoTemPromocaoPreenchida,
   valorPromocionalFromDesconto,
-} from './menuProdutoPromocaoCalc'
+} from '@/src/domain/policies/menu/precoVigenteSnapshot'
 import { ProdutoFormWithPreviewLayout } from '@/src/presentation/components/features/produtos/preview/ProdutoFormWithPreviewLayout'
 import { parsePrecoPreviewFromInput } from '@/src/presentation/components/features/produtos/preview/produtoPreviewModel'
 import type { ProdutoPreviewImageUpload } from '@/src/presentation/components/features/produtos/preview/ProdutoSimplePreviewCard'
@@ -313,9 +314,15 @@ export const MenuProdutoSnapshotForm = forwardRef<
       showToast.error('Informe um preço válido')
       return false
     }
-    if (modoPromocao && !isValorPromocionalValido(promoNum)) {
-      showToast.error('Informe um preço promocional maior que R$ 1,00')
-      return false
+    if (modoPromocao) {
+      if (!Number.isFinite(promoNum) || promoNum <= VALOR_PROMOCIONAL_MINIMO) {
+        showToast.error('Informe um preço promocional maior que R$ 1,00')
+        return false
+      }
+      if (promoNum >= valorNum) {
+        showToast.error('O preço promocional precisa ser menor que o preço normal')
+        return false
+      }
     }
 
     const destinos = await pedirConfirmacao({
@@ -397,9 +404,8 @@ export const MenuProdutoSnapshotForm = forwardRef<
       modoPromocao &&
       promocaoAtiva &&
       precoPromoPreview != null &&
-      isValorPromocionalValido(precoPromoPreview) &&
       precoNormalPreview != null &&
-      precoPromoPreview < precoNormalPreview
+      isValorPromocionalValido(precoPromoPreview, precoNormalPreview)
     const descontoNum = parseDescontoPct(descontoPct)
 
     return {

@@ -15,6 +15,7 @@ import { ProdutoNomeInput } from '@/src/presentation/components/features/produto
 import { MenuProdutoPauseControl } from '@/src/presentation/components/features/menus/MenuProdutoPauseControl'
 import { cn } from '@/src/shared/utils/cn'
 import { formatBRLFromMaskedInput } from '@/src/shared/utils/formatters'
+import { promocaoSnapshotVigente } from '@/src/domain/policies/menu/precoVigenteSnapshot'
 import {
   NOME_CATALOGO_LISTA_MAX_CHARS,
   truncarNomeCatalogoLista,
@@ -121,10 +122,11 @@ function CatalogProductRowInner({
   const promoNum = Number(valorPromocional ?? 0)
   const mostrarPrecoPromocional =
     isMenu &&
-    promocaoAtiva &&
-    Number.isFinite(promoNum) &&
-    promoNum > 0 &&
-    promoNum < Number(valor)
+    promocaoSnapshotVigente({
+      valor,
+      valorPromocional,
+      promocaoAtiva,
+    })
 
   const renderPauseMenu = () =>
     hidePauseAndPrice ? null : (
