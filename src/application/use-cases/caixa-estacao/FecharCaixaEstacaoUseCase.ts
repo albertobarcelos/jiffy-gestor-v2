@@ -1,18 +1,23 @@
 import type { FecharCaixaEstacaoInput } from '@/src/application/dto/caixa-estacao/OperacaoCaixaEstacaoDTO'
-import {
-  calcularDiferencaFechamento,
-  validarFechamentoCaixaEstacao,
-} from '@/src/domain/caixa-estacao/regrasCaixaEstacao'
+import type {
+  FecharCaixaEstacaoGatewayResult,
+  IOperacaoCaixaEstacaoGateway,
+} from '@/src/application/ports/IOperacaoCaixaEstacaoGateway'
+import { FecharCaixaEstacaoSchema } from '@/src/application/validators/caixa-estacao/CaixaEstacaoInputSchemas'
+import { parseCaixaEstacaoInput } from '@/src/application/validators/caixa-estacao/parseCaixaEstacaoInput'
 
-export function prepararFechamentoCaixaEstacao(input: FecharCaixaEstacaoInput) {
-  const validacao = validarFechamentoCaixaEstacao(input.valorFornecido)
-  if (!validacao.ok) throw new Error(validacao.message)
-  return { valorFornecido: Number(input.valorFornecido.toFixed(2)) }
-}
+export class FecharCaixaEstacaoUseCase {
+  constructor(private readonly gateway: IOperacaoCaixaEstacaoGateway) {}
 
-export function previewDiferencaFechamento(
-  valorFornecido: number,
-  valorLiquidoDinheiroCaixa: number
-): number {
-  return calcularDiferencaFechamento(valorFornecido, valorLiquidoDinheiroCaixa)
+  async execute(
+    estacaoGestorId: string,
+    input: FecharCaixaEstacaoInput
+  ): Promise<FecharCaixaEstacaoGatewayResult> {
+    const id = estacaoGestorId?.trim()
+    if (!id) throw new Error('Estação deste computador não está vinculada.')
+    const parsed = parseCaixaEstacaoInput(FecharCaixaEstacaoSchema, input)
+    return this.gateway.fechar(id, {
+      valorFornecido: Number(parsed.valorFornecido.toFixed(2)),
+    })
+  }
 }

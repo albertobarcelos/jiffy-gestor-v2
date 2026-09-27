@@ -1,12 +1,68 @@
 import type { QueryClient } from '@tanstack/react-query'
 import type { CaixaEstacaoAtualDTO } from '@/src/application/dto/caixa-estacao/OperacaoCaixaEstacaoDTO'
-import {
-  aplicarSangriaNoResumoCaixa,
-  aplicarSuprimentoNoResumoCaixa,
-  resumoInicialCaixaAbertoComSuprimento,
-} from '@/src/domain/caixa-estacao/regrasCaixaEstacao'
+
+type ResumoCaixaEstacao = {
+  totalSuprimento: number
+  totalSangria: number
+  valorLiquidoDinheiroCaixa: number
+}
+
+function round2(valor: number): number {
+  return Number(valor.toFixed(2))
+}
+
+function aplicarSangriaNoResumoCaixa(resumo: ResumoCaixaEstacao, valor: number): ResumoCaixaEstacao {
+  return {
+    ...resumo,
+    totalSangria: round2(resumo.totalSangria + valor),
+    valorLiquidoDinheiroCaixa: round2(resumo.valorLiquidoDinheiroCaixa - valor),
+  }
+}
+
+function aplicarSuprimentoNoResumoCaixa(resumo: ResumoCaixaEstacao, valor: number): ResumoCaixaEstacao {
+  return {
+    ...resumo,
+    totalSuprimento: round2(resumo.totalSuprimento + valor),
+    valorLiquidoDinheiroCaixa: round2(resumo.valorLiquidoDinheiroCaixa + valor),
+  }
+}
+
+function resumoInicialCaixaAbertoComSuprimento(valor: number): ResumoCaixaEstacao {
+  return {
+    totalSuprimento: round2(valor),
+    totalSangria: 0,
+    valorLiquidoDinheiroCaixa: round2(valor),
+  }
+}
 
 export type MovimentacaoCaixaEstacaoTipo = 'sangria' | 'suprimento'
+
+export function caixaEstacaoMovimentacoesQueryKey(
+  empresaId: string,
+  estacaoGestorId: string,
+  tipo: 'sangrias' | 'suprimentos'
+) {
+  return ['tenant', empresaId, 'caixa-estacao', 'movimentacoes', tipo, estacaoGestorId.trim()] as const
+}
+
+export function invalidateMovimentacoesCaixaEstacaoQueries(
+  queryClient: QueryClient,
+  empresaId: string,
+  estacaoGestorId: string,
+  tipo?: MovimentacaoCaixaEstacaoTipo
+) {
+  const id = estacaoGestorId.trim()
+  if (!id) return Promise.resolve()
+  if (tipo) {
+    const apiTipo = tipo === 'suprimento' ? 'suprimentos' : 'sangrias'
+    return queryClient.invalidateQueries({
+      queryKey: caixaEstacaoMovimentacoesQueryKey(empresaId, id, apiTipo),
+    })
+  }
+  return queryClient.invalidateQueries({
+    queryKey: ['tenant', empresaId, 'caixa-estacao', 'movimentacoes'],
+  })
+}
 
 export function caixaEstacaoCurrentQueryKey(empresaId: string, estacaoGestorId: string) {
   return ['tenant', empresaId, 'caixa-estacao', 'current', estacaoGestorId] as const

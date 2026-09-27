@@ -1,4 +1,6 @@
-export const DESCRICAO_MOVIMENTACAO_MIN = 5
+import { DESCRICAO_MOVIMENTACAO_MIN } from '@/src/shared/constants/caixaEstacao'
+
+export { DESCRICAO_MOVIMENTACAO_MIN }
 
 /** Descrição canônica do suprimento inicial que sinaliza abertura implícita. */
 export const DESCRICAO_FUNDO_TROCO = 'Fundo de troco'

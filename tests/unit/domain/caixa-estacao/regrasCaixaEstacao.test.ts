@@ -5,7 +5,7 @@ import {
   validarSangriaContraSaldo,
   validarSuprimentoCaixaEstacao,
 } from '@/src/domain/caixa-estacao/regrasCaixaEstacao'
-import { interpretarCaixaEstacaoAtual } from '@/src/application/use-cases/caixa-estacao/BuscarCaixaEstacaoAtualUseCase'
+import { interpretarCaixaEstacaoAtual } from '@/src/application/caixa-estacao/interpretarCaixaEstacaoAtual'
 
 describe('Caixa da estação — regras de negócio', () => {
   describe('quando consultamos se o caixa está aberto', () => {

@@ -12,6 +12,16 @@ import type {
   ResumoPagamentosCaixaEstacaoDTO,
   StatusCaixaEstacao,
 } from '@/src/application/dto/caixa-estacao/OperacaoCaixaEstacaoDTO'
+import {
+  OperacaoCaixaEstacao,
+  type AtorOperacaoCaixaEstacao,
+  type EstacaoOperacaoCaixaEstacao,
+  type ProdutoVendidoOperacaoCaixaEstacao,
+  type ResumoCaixaOperacaoEstacao,
+  type ResumoFechamentoOperacaoCaixaEstacao,
+  type ResumoOperacaoCaixaEstacao,
+  type ResumoPagamentosOperacaoCaixaEstacao,
+} from '@/src/domain/entities/OperacaoCaixaEstacao'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -112,7 +122,141 @@ function mapProdutos(value: unknown): ProdutoVendidoCaixaEstacaoDTO[] | undefine
   }))
 }
 
-export function mapOperacaoCaixaEstacaoListaItem(
+function mapAtorDomain(value: unknown): AtorOperacaoCaixaEstacao {
+  const dto = mapAtor(value)
+  return { ...dto }
+}
+
+function mapEstacaoDomain(value: unknown): EstacaoOperacaoCaixaEstacao {
+  const dto = mapEstacao(value)
+  return { ...dto }
+}
+
+function mapResumoOperacaoDomain(value: unknown): ResumoOperacaoCaixaEstacao | undefined {
+  const dto = mapResumoOperacao(value)
+  return dto ? { ...dto } : undefined
+}
+
+function mapResumoCaixaDomain(value: unknown): ResumoCaixaOperacaoEstacao | undefined {
+  const dto = mapResumoCaixa(value)
+  return dto ? { ...dto } : undefined
+}
+
+function mapResumoPagamentosDomain(
+  value: unknown
+): ResumoPagamentosOperacaoCaixaEstacao | undefined {
+  const dto = mapResumoPagamentos(value)
+  return dto ? { ...dto, meiosPagamento: dto.meiosPagamento.map(m => ({ ...m })) } : undefined
+}
+
+function mapResumoFechamentoDomain(
+  value: unknown
+): ResumoFechamentoOperacaoCaixaEstacao | null | undefined {
+  const dto = mapResumoFechamento(value)
+  if (dto === undefined) return undefined
+  if (dto === null) return null
+  return { ...dto, fechadoPorAtor: { ...dto.fechadoPorAtor } }
+}
+
+function mapProdutosDomain(value: unknown): ProdutoVendidoOperacaoCaixaEstacao[] | undefined {
+  const dto = mapProdutos(value)
+  return dto ? dto.map(p => ({ ...p })) : undefined
+}
+
+export function mapOperacaoCaixaEstacaoToEntity(value: unknown): OperacaoCaixaEstacao | null {
+  if (!isRecord(value) || !asString(value.id)) return null
+  try {
+    return OperacaoCaixaEstacao.create({
+      id: asString(value.id),
+      status: asStatus(value.status),
+      empresaId: asString(value.empresaId),
+      abertoPorAtor: mapAtorDomain(value.abertoPorAtor),
+      estacao: mapEstacaoDomain(value.estacao),
+      dataAbertura: asString(value.dataAbertura),
+      dataFechamento: value.dataFechamento == null ? null : asString(value.dataFechamento),
+      fechadoPorAtor: value.fechadoPorAtor == null ? null : mapAtorDomain(value.fechadoPorAtor),
+      nomeEmpresa: asString(value.nomeEmpresa) || undefined,
+      resumoOperacao: mapResumoOperacaoDomain(value.resumoOperacao),
+      resumoCaixa: mapResumoCaixaDomain(value.resumoCaixa),
+      resumoPagamentos: mapResumoPagamentosDomain(value.resumoPagamentos),
+      resumoFechamento: mapResumoFechamentoDomain(value.resumoFechamento),
+      totalProdutosVendidos: mapProdutosDomain(value.totalProdutosVendidos),
+      totalAdicionaisVendidos: mapProdutosDomain(value.totalAdicionaisVendidos),
+    })
+  } catch {
+    return null
+  }
+}
+
+export function mapOperacaoCaixaEstacaoToDTO(
+  entity: OperacaoCaixaEstacao
+): OperacaoCaixaEstacaoDTO {
+  return {
+    id: entity.id,
+    status: entity.status,
+    empresaId: entity.empresaId,
+    abertoPorAtor: { ...entity.abertoPorAtor },
+    estacao: { ...entity.estacao },
+    dataAbertura: entity.dataAbertura,
+    dataFechamento: entity.dataFechamento,
+    fechadoPorAtor: entity.fechadoPorAtor ? { ...entity.fechadoPorAtor } : null,
+    nomeEmpresa: entity.nomeEmpresa,
+    resumoOperacao: entity.resumoOperacao ? { ...entity.resumoOperacao } : undefined,
+    resumoCaixa: entity.resumoCaixa ? { ...entity.resumoCaixa } : undefined,
+    resumoPagamentos: entity.resumoPagamentos
+      ? {
+          ...entity.resumoPagamentos,
+          meiosPagamento: entity.resumoPagamentos.meiosPagamento.map(m => ({ ...m })),
+        }
+      : undefined,
+    resumoFechamento: entity.resumoFechamento
+      ? {
+          ...entity.resumoFechamento,
+          fechadoPorAtor: { ...entity.resumoFechamento.fechadoPorAtor },
+        }
+      : entity.resumoFechamento,
+    totalProdutosVendidos: entity.totalProdutosVendidos?.map(p => ({ ...p })),
+    totalAdicionaisVendidos: entity.totalAdicionaisVendidos?.map(p => ({ ...p })),
+  }
+}
+
+export function mapOperacaoCaixaEstacaoListaItemToDTO(
+  entity: OperacaoCaixaEstacao
+): OperacaoCaixaEstacaoListaItemDTO {
+  return {
+    id: entity.id,
+    status: entity.status,
+    empresaId: entity.empresaId,
+    abertoPorAtor: { ...entity.abertoPorAtor },
+    estacao: { ...entity.estacao },
+    dataAbertura: entity.dataAbertura,
+    dataFechamento: entity.dataFechamento,
+    fechadoPorAtor: entity.fechadoPorAtor ? { ...entity.fechadoPorAtor } : null,
+  }
+}
+
+function mapOperacaoCaixaEstacaoDtoFromApi(value: unknown): OperacaoCaixaEstacaoDTO | null {
+  if (!isRecord(value) || !asString(value.id)) return null
+  return {
+    id: asString(value.id),
+    status: asStatus(value.status),
+    empresaId: asString(value.empresaId),
+    abertoPorAtor: mapAtor(value.abertoPorAtor),
+    estacao: mapEstacao(value.estacao),
+    dataAbertura: asString(value.dataAbertura),
+    dataFechamento: value.dataFechamento == null ? null : asString(value.dataFechamento),
+    fechadoPorAtor: value.fechadoPorAtor == null ? null : mapAtor(value.fechadoPorAtor),
+    nomeEmpresa: asString(value.nomeEmpresa) || undefined,
+    resumoOperacao: mapResumoOperacao(value.resumoOperacao),
+    resumoCaixa: mapResumoCaixa(value.resumoCaixa),
+    resumoPagamentos: mapResumoPagamentos(value.resumoPagamentos),
+    resumoFechamento: mapResumoFechamento(value.resumoFechamento),
+    totalProdutosVendidos: mapProdutos(value.totalProdutosVendidos),
+    totalAdicionaisVendidos: mapProdutos(value.totalAdicionaisVendidos),
+  }
+}
+
+function mapOperacaoCaixaEstacaoListaItemDtoFromApi(
   value: unknown
 ): OperacaoCaixaEstacaoListaItemDTO | null {
   if (!isRecord(value) || !asString(value.id)) return null
@@ -128,19 +272,14 @@ export function mapOperacaoCaixaEstacaoListaItem(
   }
 }
 
+export function mapOperacaoCaixaEstacaoListaItem(
+  value: unknown
+): OperacaoCaixaEstacaoListaItemDTO | null {
+  return mapOperacaoCaixaEstacaoListaItemDtoFromApi(value)
+}
+
 export function mapOperacaoCaixaEstacao(value: unknown): OperacaoCaixaEstacaoDTO | null {
-  const base = mapOperacaoCaixaEstacaoListaItem(value)
-  if (!base || !isRecord(value)) return null
-  return {
-    ...base,
-    nomeEmpresa: asString(value.nomeEmpresa) || undefined,
-    resumoOperacao: mapResumoOperacao(value.resumoOperacao),
-    resumoCaixa: mapResumoCaixa(value.resumoCaixa),
-    resumoPagamentos: mapResumoPagamentos(value.resumoPagamentos),
-    resumoFechamento: mapResumoFechamento(value.resumoFechamento),
-    totalProdutosVendidos: mapProdutos(value.totalProdutosVendidos),
-    totalAdicionaisVendidos: mapProdutos(value.totalAdicionaisVendidos),
-  }
+  return mapOperacaoCaixaEstacaoDtoFromApi(value)
 }
 
 export function mapPaginationOperacaoCaixaEstacao(
