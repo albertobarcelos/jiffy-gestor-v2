@@ -9,6 +9,7 @@ import { pathQuadroDaSessaoAtual, pathWhatsAppKiosk } from '../sessao/pathsGesto
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { disconnectHubTab } from '@/src/presentation/utils/disconnectHubTab'
+import { FredySomPedidosToggle } from '@/src/presentation/gestor-pedidos/som/FredySomPedidosToggle'
 import { cn } from '@/src/shared/utils/cn'
 
 type Aba = 'pedidos' | 'whatsapp'
@@ -60,6 +61,7 @@ export function JiffyWhatsAppToolbar({ aba }: { aba: Aba }) {
       <div className="relative z-50 flex shrink-0 items-center gap-2 border-b border-primary/10 bg-white px-2 py-1.5">
         <GestorEmpresaSelectKiosk />
         <div className="ml-auto flex items-center gap-1">
+          <FredySomPedidosToggle disabled={aTrocar} />
           <button
             type="button"
             disabled={aTrocar}

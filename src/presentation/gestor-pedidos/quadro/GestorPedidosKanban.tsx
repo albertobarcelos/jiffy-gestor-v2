@@ -1,10 +1,11 @@
 'use client'
 
-import { useLayoutEffect } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
+import { usePathname } from 'next/navigation'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useSuperficieQuadroPedidos } from '@/src/presentation/gestor-pedidos/kiosk/useSuperficieQuadroPedidos'
-import { isQuadroKioskAtual } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
+import { isQuadroKioskAtual, isRotaPedidos } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 import { pathEscolherEmpresaKiosk } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
 import { getTabTenantToken } from '@/src/shared/utils/tabSession'
 import { parseEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
@@ -37,8 +38,15 @@ function kioskSemEmpresaAberta(): boolean {
 }
 
 export function GestorPedidosKanban() {
+  const pathname = usePathname()
   const superficie = useSuperficieQuadroPedidos()
+  const rotaPedidos = isRotaPedidos(pathname ?? '')
+  const [clientePronto, setClientePronto] = useState(false)
   const irALista = kioskSemEmpresaAberta()
+
+  useEffect(() => {
+    setClientePronto(true)
+  }, [])
 
   useLayoutEffect(() => {
     if (!irALista) return
@@ -53,13 +61,15 @@ export function GestorPedidosKanban() {
     )
   }
 
+  const mostrarToolbarFredy = clientePronto && superficie === 'fredy'
+
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {superficie === 'fredy' ? (
+      {mostrarToolbarFredy ? (
         <JiffyWhatsAppToolbar aba="pedidos" />
-      ) : (
-        <div className="hidden" hidden aria-hidden />
-      )}
+      ) : !clientePronto && rotaPedidos ? (
+        <div className="h-11 shrink-0 border-b border-transparent" aria-hidden />
+      ) : null}
       <Kanban />
     </div>
   )

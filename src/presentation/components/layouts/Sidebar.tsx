@@ -129,7 +129,6 @@ export function Sidebar() {
         ],
       },
       { name: 'Estoque', path: '/estoque', icon: '📦' },
-      { name: 'Meu Caixa', path: '/meu-caixa', icon: '💼' },
       { name: 'Pedidos e Clientes', path: '/pedidos', icon: '📄' },
       { name: 'Portal do Contador', path: '/portal-contador', icon: '📊' },
       {

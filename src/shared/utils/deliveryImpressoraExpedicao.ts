@@ -5,6 +5,12 @@ import type { ModoImpressaoDelivery } from '@/src/shared/types/deliveryImpressao
 export const TOAST_IMPRESSORA_EXPEDICAO_NECESSARIA =
   'É necessário escolher uma impressora de expedição.'
 
+export const TOAST_CAIXA_FECHAMENTO_SEM_IMPRESSORA =
+  'Escolha a impressora de expedição em Configurações de impressão.'
+
+export const TOAST_CAIXA_FECHAMENTO_SEM_VINCULO_PC =
+  'Vincule a impressora de expedição a uma impressora deste PC em Configurações de impressão.'
+
 export const TOAST_IMPRESSORA_EXPEDICAO_MAPEAMENTO_WINDOWS =
   'Vincule a impressora de expedição a uma impressora Windows neste terminal.'
 

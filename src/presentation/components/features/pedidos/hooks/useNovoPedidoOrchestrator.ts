@@ -11,6 +11,7 @@ import {
   useCancelarNotaFiscalVendaGestor,
   useTransicaoPedidoDelivery,
 } from '@/src/presentation/hooks/useVendas'
+import { getEstacaoImpressaoId } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { useMenuDeliveryId } from '@/src/presentation/hooks/useMenuDeliveryId'
@@ -19,6 +20,7 @@ import { useImpressaoDelivery } from '@/features/delivery/hooks/useImpressaoDeli
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { useQueryClient } from '@tanstack/react-query'
 import { invalidateKanbanVendasListagens } from '@/features/kanban/hooks/kanbanListagemQueryCache'
+import { invalidateCaixaEstacaoAtualQueries } from '@/src/presentation/components/features/meu-caixa/hooks/caixaEstacaoCache'
 import { invalidateVendaDetalheCarregadaCache } from './data/useVendaDetalheCarregadaQuery'
 import type { NovoPedidoModalProps } from '../types'
 import {
@@ -103,8 +105,15 @@ export function useNovoPedidoOrchestrator({
   const notificarSucesso = useCallback(() => {
     resetarAoSairRef.current = true
     if (chaveRascunho) limparRascunhoPedidoWhatsApp(chaveRascunho)
+    if (empresaId) {
+      void invalidateCaixaEstacaoAtualQueries(
+        queryClient,
+        empresaId,
+        getEstacaoImpressaoId()
+      )
+    }
     onSuccess()
-  }, [chaveRascunho, onSuccess])
+  }, [chaveRascunho, empresaId, onSuccess, queryClient])
   const createVendaGestor = useCreateVendaGestor()
   const createPedidoDelivery = useCreatePedidoDelivery()
   const createSubmitPending =
@@ -856,6 +865,7 @@ export function useNovoPedidoOrchestrator({
       meiosPagamento,
       nomesMeiosPagamentoPedido,
       telefoneCliente: telefoneBuscadoEntrega ?? undefined,
+      estacaoId: getEstacaoImpressaoId() ?? undefined,
     },
     validacao: {
       pedidoDeliveryGestor,

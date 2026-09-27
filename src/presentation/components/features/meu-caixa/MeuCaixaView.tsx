@@ -1,472 +1,563 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { Caixa } from '@/src/domain/entities/Caixa'
-import { OperacaoCaixa } from '@/src/domain/entities/OperacaoCaixa'
+import { useEffect, useRef, useState } from 'react'
+import { MdArrowBack, MdHistory } from 'react-icons/md'
+import { TbCashRegister } from 'react-icons/tb'
+import { showToast } from '@/src/shared/utils/toast'
+import {
+  calcularDiferencaFechamento,
+  DESCRICAO_FUNDO_TROCO,
+  validarMovimentacaoCaixaEstacao,
+  validarSangriaContraSaldo,
+  validarSuprimentoCaixaEstacao,
+} from '@/src/domain/caixa-estacao/regrasCaixaEstacao'
+import { useEstacaoDestePc } from '@/src/presentation/hooks/useEstacaoDestePc'
+import { estacaoEhReceptoraDelivery } from '@/src/domain/caixa-estacao/estacaoReceptoraDelivery'
+import { useCaixaEstacaoAtual } from '@/src/presentation/components/features/meu-caixa/hooks/useCaixaEstacaoAtual'
+import {
+  useRegistrarSangriaCaixaEstacao,
+  useRegistrarSuprimentoCaixaEstacao,
+} from '@/src/presentation/components/features/meu-caixa/hooks/useMovimentacoesCaixaEstacao'
+import { useFecharCaixaEstacao } from '@/src/presentation/components/features/meu-caixa/hooks/useFecharCaixaEstacao'
+import { MovimentacaoCaixaHistorico } from './MovimentacaoCaixaHistorico'
+import {
+  useDeliveryConfigEstacaoImpressao,
+  useDeliveryConfigEstacoesImpressao,
+} from '@/src/presentation/hooks/useDeliveryConfigImpressaoQueries'
+import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { imprimirFechamentoCaixaEstacaoPorId } from '@/src/infrastructure/printing/imprimirCupomFechamentoCaixaEstacao'
+import { CaixaEstacaoNaoVinculada } from './CaixaEstacaoNaoVinculada'
+import { cn } from '@/src/shared/utils/cn'
 
-/**
- * Componente principal de Meu Caixa
- * Replica o design e funcionalidades do Flutter
- */
-export function MeuCaixaView() {
-  const router = useRouter()  const [caixaAtual, setCaixaAtual] = useState<Caixa | null>(null)
-  const [operacoes, setOperacoes] = useState<OperacaoCaixa[]>([])
-  const [saldoCaixa, setSaldoCaixa] = useState(0)
-  const [somaSuprimentos, setSomaSuprimentos] = useState(0)
-  const [somaSangrias, setSomaSangrias] = useState(0)
-  const [isLoading, setIsLoading] = useState(false)
-  const [mostrarModalSangria, setMostrarModalSangria] = useState(false)
-  const [mostrarModalSuprimento, setMostrarModalSuprimento] = useState(false)
-  const [mostrarModalFechar, setMostrarModalFechar] = useState(false)
+function formatarMoeda(valor: number): string {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
+}
 
-  // Buscar dados do caixa
+function formatarData(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const date = new Date(iso)
+  if (isNaN(date.getTime())) return '—'
+  return date.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function parseCurrencyInput(value: string): number {
+  const numbers = value.replace(/[^\d]/g, '')
+  if (!numbers) return 0
+  return parseFloat(numbers) / 100
+}
+
+function formatCurrencyInput(value: string): string {
+  const numbers = value.replace(/[^\d]/g, '')
+  if (!numbers) return 'R$ 0,00'
+  return formatarMoeda(parseFloat(numbers) / 100)
+}
+
+function CaixasRecentesButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex h-11 w-full items-center justify-center gap-2 rounded-full border border-primary/30 bg-white text-sm font-semibold text-primary shadow-sm transition-colors hover:border-primary/50 hover:bg-primary/[0.03]"
+    >
+      <MdHistory className="h-4 w-4" aria-hidden />
+      Caixas recentes
+    </button>
+  )
+}
+
+function CaixaPainel({
+  children,
+  className,
+}: {
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <div className={cn('rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm', className)}>
+      {children}
+    </div>
+  )
+}
+
+export function MeuCaixaView({
+  onVerRecentes,
+  onAbrirConfiguracaoEstacao,
+}: {
+  onVerRecentes?: () => void
+  onAbrirConfiguracaoEstacao?: () => void
+}) {
+  const { estacaoId, lembrarNome } = useEstacaoDestePc()
+  const estacoesQuery = useDeliveryConfigEstacoesImpressao(Boolean(estacaoId))
+  const estacaoImpressaoQuery = useDeliveryConfigEstacaoImpressao(Boolean(estacaoId))
+  const { preferenciasImpressaoDelivery } = usePreferenciasImpressaoDelivery()
+  const atual = useCaixaEstacaoAtual(estacaoId)
+  const aberta = atual.data?.aberta === true
+  const operacao = atual.data?.operacao
+  const suprimentoMut = useRegistrarSuprimentoCaixaEstacao(estacaoId)
+  const sangriaMut = useRegistrarSangriaCaixaEstacao(estacaoId)
+  const fecharMut = useFecharCaixaEstacao(estacaoId)
+
+  const [passo, setPasso] = useState<'resumo' | 'fechar' | 'suprimento' | 'sangria'>('resumo')
+  const [valorAbertura, setValorAbertura] = useState('R$ 0,00')
+  const inputAberturaRef = useRef<HTMLInputElement>(null)
+
+  const estacoesCarregadas = Boolean(estacaoId && estacoesQuery.data)
+  const ehReceptoraDelivery = estacoesCarregadas
+    ? estacaoEhReceptoraDelivery(estacaoId, estacoesQuery.data ?? [])
+    : null
+
   useEffect(() => {
-    const buscarCaixa = async () => {
-      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-      if (!token) return
-
-      setIsLoading(true)
-      try {
-        // TODO: Implementar chamada à API quando disponível
-        // Por enquanto, dados mockados
-        const mockCaixa = Caixa.create(
-          '1',
-          'Aberto',
-          new Date(),
-          undefined,
-          undefined,
-          undefined,
-          new Date(),
-          new Date()
-        )
-        setCaixaAtual(mockCaixa)
-
-        // Calcular totais
-        const suprimentos = operacoes.filter(op => op.isSuprimento())
-        const sangrias = operacoes.filter(op => op.isSangria())
-        
-        setSomaSuprimentos(suprimentos.reduce((sum, op) => sum + op.getValor(), 0))
-        setSomaSangrias(sangrias.reduce((sum, op) => sum + op.getValor(), 0))
-        setSaldoCaixa(somaSuprimentos - somaSangrias)
-      } catch (error) {
-        console.error('Erro ao buscar caixa:', error)
-      } finally {
-        setIsLoading(false)
-      }
+    if (operacao?.estacao.nome) {
+      lembrarNome(operacao.estacao.nome)
     }
+  }, [lembrarNome, operacao?.estacao.nome])
 
-    buscarCaixa()
-  }, [ operacoes, somaSuprimentos, somaSangrias])
+  useEffect(() => {
+    const encontrada = estacoesQuery.data?.find(item => item.id === estacaoId)
+    if (encontrada?.nome) {
+      lembrarNome(encontrada.nome)
+    }
+  }, [estacaoId, estacoesQuery.data, lembrarNome])
 
-  const formatarData = (data: Date) => {
-    return data.toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric',
-    })
+  useEffect(() => {
+    if (aberta || passo !== 'resumo') return
+    const timer = window.setTimeout(() => inputAberturaRef.current?.focus(), 120)
+    return () => window.clearTimeout(timer)
+  }, [aberta, passo])
+
+  if (!estacaoId) {
+    if (!onAbrirConfiguracaoEstacao) {
+      return (
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 text-sm text-secondary-text">
+          Estação deste computador não configurada.
+        </div>
+      )
+    }
+    return <CaixaEstacaoNaoVinculada onAbrirConfiguracao={onAbrirConfiguracaoEstacao} />
   }
 
-  const formatarMoeda = (valor: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(valor)
+  if (atual.isLoading) {
+    return (
+      <CaixaPainel>
+        <p className="py-10 text-center text-sm text-secondary-text">Carregando caixa…</p>
+      </CaixaPainel>
+    )
   }
 
-  return (
-    <div className="flex flex-col h-full">
-      <div className="px-[30px] pt-[30px] pb-[100px]">
-        {/* Header com data de abertura */}
-        <div className="mb-6">
-          <div className="h-10 bg-white/20 rounded-tl-[16px] rounded-br-[6px] rounded-bl-[6px] rounded-tr-[6px] flex items-center justify-between px-5">
-            <p className="text-primary text-sm font-semibold ">
-              {caixaAtual
-                ? `Aberto em ${formatarData(caixaAtual.getDataAbertura())}`
-                : 'Carregando...'}
+  if (atual.isError) {
+    return (
+      <CaixaPainel className="border-red-200 bg-red-50">
+        <p className="text-sm text-error">
+          {atual.error instanceof Error ? atual.error.message : 'Erro ao consultar o caixa da estação.'}
+        </p>
+      </CaixaPainel>
+    )
+  }
+
+  const valorAberturaNumerico = parseCurrencyInput(valorAbertura)
+  const validacaoAbertura = validarSuprimentoCaixaEstacao({
+    valor: valorAberturaNumerico,
+    descricao: DESCRICAO_FUNDO_TROCO,
+  })
+  const podeAbrir = validacaoAbertura.ok && !suprimentoMut.isPending
+  const esperado = operacao?.resumoCaixa?.valorLiquidoDinheiroCaixa ?? 0
+
+  if (passo === 'suprimento' || passo === 'sangria') {
+    return (
+      <MovimentacaoCaixaForm
+        tipo={passo}
+        estacaoId={estacaoId}
+        saldoDisponivel={esperado}
+        ocupado={passo === 'suprimento' ? suprimentoMut.isPending : sangriaMut.isPending}
+        onVoltar={() => setPasso('resumo')}
+        onConfirm={async input => {
+          try {
+            if (passo === 'suprimento') {
+              await suprimentoMut.mutateAsync(input)
+              showToast.success('Suprimento registrado.')
+            } else {
+              await sangriaMut.mutateAsync({ ...input, saldoDisponivel: esperado })
+              showToast.success('Sangria registrada.')
+            }
+            setPasso('resumo')
+          } catch (error) {
+            showToast.error(
+              error instanceof Error ? error.message : 'Não foi possível registrar a movimentação.'
+            )
+          }
+        }}
+      />
+    )
+  }
+
+  if (passo === 'fechar') {
+    return (
+      <FecharCaixaForm
+        esperado={esperado}
+        ocupado={fecharMut.isPending}
+        onVoltar={() => setPasso('resumo')}
+        onConfirm={async valorFornecido => {
+          try {
+            const resultado = await fecharMut.mutateAsync({ valorFornecido })
+            setPasso('resumo')
+            setValorAbertura('R$ 0,00')
+            showToast.success('Caixa fechado com sucesso.')
+
+            const operacaoCaixaId = resultado?.operacaoCaixaId?.trim()
+            const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+            if (operacaoCaixaId && token) {
+              const impressao = await imprimirFechamentoCaixaEstacaoPorId({
+                token,
+                operacaoCaixaId,
+                impressoraExpedicaoId: preferenciasImpressaoDelivery.impressoraExpedicaoId,
+                mapeamentos: estacaoImpressaoQuery.data?.mapeamentos ?? [],
+              })
+              if (impressao.ok) {
+                showToast.success('Cupom de fechamento enviado à impressora de expedição.')
+              } else if (impressao.mensagem) {
+                showToast.warning(impressao.mensagem)
+              }
+            }
+          } catch (error) {
+            showToast.error(error instanceof Error ? error.message : 'Não foi possível fechar o caixa.')
+          }
+        }}
+      />
+    )
+  }
+
+  if (aberta) {
+    return (
+      <div className="space-y-4">
+        {onVerRecentes ? <CaixasRecentesButton onClick={onVerRecentes} /> : null}
+
+        <CaixaPainel>
+          {operacao ? (
+            <div>
+              <p className="text-xs text-secondary-text">
+                Aberto {formatarData(operacao.dataAbertura)}
+              </p>
+              {operacao.abertoPorAtor?.nome ? (
+                <p className="mt-0.5 text-xs text-secondary-text">
+                  Por {operacao.abertoPorAtor.nome}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className={cn('grid grid-cols-2 gap-2', operacao ? 'mt-3' : '')}>
+            <CaixaResumoCelula
+              label="Vendas"
+              valor={String(operacao?.resumoOperacao?.countVendasEfetivadas ?? 0)}
+            />
+            <CaixaResumoCelula
+              label="Total vendido"
+              valor={formatarMoeda(operacao?.resumoOperacao?.totalLiquido ?? 0)}
+            />
+            <CaixaResumoCelula
+              label="Suprimentos"
+              valor={formatarMoeda(operacao?.resumoCaixa?.totalSuprimento ?? 0)}
+              destaque="positivo"
+            />
+            <CaixaResumoCelula
+              label="Sangrias"
+              valor={formatarMoeda(operacao?.resumoCaixa?.totalSangria ?? 0)}
+              destaque="negativo"
+            />
+          </div>
+
+          <div className={cn('mt-3 rounded-xl bg-gray-50 px-4 py-3')}>
+            <p className="text-xs font-medium text-secondary-text">Saldo em dinheiro</p>
+            <p className="mt-0.5 text-2xl font-semibold tracking-tight text-primary">
+              {formatarMoeda(esperado)}
             </p>
-           
+          </div>
+
+          {ehReceptoraDelivery === false ? (
+            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              Esta estação não recebe pedidos de delivery. Vendas delivery entram no caixa da
+              estação receptora.
+            </p>
+          ) : null}
+
+          <div className="mt-4 grid grid-cols-2 gap-2">
             <button
-              onClick={() => router.push('/historico-fechamento')}
-              className="h-9 px-6 bg-primary text-info rounded-[30px] font-medium text-sm hover:bg-primary/90 transition-colors"
+              type="button"
+              disabled={suprimentoMut.isPending || sangriaMut.isPending}
+              onClick={() => setPasso('suprimento')}
+              className="flex h-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-sm font-semibold text-primary-text transition-colors hover:bg-gray-50 disabled:opacity-60"
             >
-              Histórico de Fechamentos
+              Suprimento
             </button>
             <button
-              onClick={() => setMostrarModalFechar(true)}
-              className="h-9 px-6 bg-primary text-info rounded-[30px] font-medium text-sm hover:bg-primary/90 transition-colors"
+              type="button"
+              disabled={suprimentoMut.isPending || sangriaMut.isPending}
+              onClick={() => setPasso('sangria')}
+              className="flex h-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-sm font-semibold text-primary-text transition-colors hover:bg-gray-50 disabled:opacity-60"
             >
-              Fechar Caixa
+              Sangria
             </button>
           </div>
+
+          <button
+            type="button"
+            disabled={fecharMut.isPending}
+            onClick={() => setPasso('fechar')}
+            className="mt-3 flex h-11 w-full items-center justify-center rounded-xl bg-primary text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+          >
+            Fechar caixa
+          </button>
+        </CaixaPainel>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {onVerRecentes ? <CaixasRecentesButton onClick={onVerRecentes} /> : null}
+
+      <CaixaPainel className="space-y-5">
+        <div>
+          <label htmlFor="valor-abertura-caixa" className="mb-2 block text-sm font-medium text-primary-text">
+            Valor da abertura
+          </label>
+          <input
+            ref={inputAberturaRef}
+            id="valor-abertura-caixa"
+            type="text"
+            inputMode="numeric"
+            value={valorAbertura}
+            onChange={event => setValorAbertura(formatCurrencyInput(event.target.value))}
+            className="h-12 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-lg font-semibold tracking-tight text-primary-text outline-none transition-colors focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/15"
+          />
+          <p className="mt-2 text-xs text-secondary-text">
+            Fundo de troco para iniciar o caixa.
+          </p>
         </div>
 
-        {/* Cards de valores */}
-        <div className="grid grid-cols-3 gap-[30px] mb-[30px]">
-          {/* Saldo em Caixa */}
-          <div className="h-[120px] bg-info rounded-[10px] p-3 flex flex-col">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-2xl">💰</span>
-              <p className="text-primary-text text-sm font-semibold ">
-                Saldo em Caixa
-              </p>
-            </div>
-            <div className="flex-1 flex items-center justify-center">
-              <p className="text-tertiary text-xl font-semibold ">
-                {formatarMoeda(saldoCaixa)}
-              </p>
-            </div>
-          </div>
+        <button
+          type="button"
+          disabled={!podeAbrir}
+          onClick={async () => {
+            try {
+              await suprimentoMut.mutateAsync({
+                valor: valorAberturaNumerico,
+                descricao: DESCRICAO_FUNDO_TROCO,
+              })
+              showToast.success('Caixa aberto.')
+              setValorAbertura('R$ 0,00')
+            } catch (error) {
+              showToast.error(error instanceof Error ? error.message : 'Não foi possível abrir o caixa.')
+            }
+          }}
+          className={cn(
+            'flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-all',
+            podeAbrir
+              ? 'bg-primary text-white hover:opacity-90'
+              : 'cursor-not-allowed bg-gray-200 text-gray-400'
+          )}
+        >
+          <TbCashRegister className="h-4 w-4" aria-hidden />
+          {suprimentoMut.isPending ? 'Abrindo…' : 'Abrir caixa'}
+        </button>
+      </CaixaPainel>
+    </div>
+  )
+}
 
-          {/* Suprimentos */}
-          <button
-            onClick={() => setMostrarModalSuprimento(true)}
-            className="h-[120px] bg-info rounded-[10px] p-3 flex flex-col hover:bg-info/80 transition-colors"
-          >
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-2xl">⬇️</span>
-              <p className="text-primary-text text-sm font-semibold ">
-                Suprimentos
-              </p>
-            </div>
-            <div className="flex-1 flex items-center justify-center">
-              <p className="text-success text-xl font-semibold ">
-                {formatarMoeda(somaSuprimentos)}
-              </p>
-            </div>
-          </button>
+function CaixaResumoCelula({
+  label,
+  valor,
+  destaque,
+}: {
+  label: string
+  valor: string
+  destaque?: 'positivo' | 'negativo'
+}) {
+  return (
+    <div className="rounded-xl bg-gray-50 px-3 py-2.5">
+      <p className="text-[11px] font-medium text-secondary-text">{label}</p>
+      <p
+        className={cn(
+          'mt-0.5 text-sm font-semibold tracking-tight',
+          destaque === 'positivo'
+            ? 'text-emerald-600'
+            : destaque === 'negativo'
+              ? 'text-red-500'
+              : 'text-primary-text'
+        )}
+      >
+        {valor}
+      </p>
+    </div>
+  )
+}
 
-          {/* Sangrias */}
-          <button
-            onClick={() => setMostrarModalSangria(true)}
-            className="h-[120px] bg-info rounded-[10px] p-3 flex flex-col hover:bg-info/80 transition-colors"
-          >
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-2xl">⬆️</span>
-              <p className="text-primary-text text-sm font-semibold ">
-                Sangrias
-              </p>
-            </div>
-            <div className="flex-1 flex items-center justify-center">
-              <p className="text-error text-xl font-semibold ">
-                {formatarMoeda(somaSangrias)}
-              </p>
-            </div>
-          </button>
-        </div>
+function MovimentacaoCaixaForm({
+  tipo,
+  estacaoId,
+  saldoDisponivel,
+  ocupado,
+  onVoltar,
+  onConfirm,
+}: {
+  tipo: 'suprimento' | 'sangria'
+  estacaoId: string
+  saldoDisponivel: number
+  ocupado: boolean
+  onVoltar: () => void
+  onConfirm: (input: { valor: number; descricao: string }) => Promise<void>
+}) {
+  const [valor, setValor] = useState('R$ 0,00')
+  const [descricao, setDescricao] = useState('')
+  const valorNumerico = parseCurrencyInput(valor)
+  const validacaoBase =
+    tipo === 'suprimento'
+      ? validarSuprimentoCaixaEstacao({ valor: valorNumerico, descricao })
+      : validarMovimentacaoCaixaEstacao({ valor: valorNumerico, descricao })
+  const validacaoSangria =
+    tipo === 'sangria'
+      ? validarSangriaContraSaldo(valorNumerico, saldoDisponivel)
+      : { ok: true as const }
+  const podeConfirmar =
+    validacaoBase.ok && validacaoSangria.ok && !ocupado
 
-        {/* Histórico de Operações */}
-        <div className="mb-5">
-          <div className="flex items-center gap-5 mb-5">
-            <h3 className="text-secondary text-sm font-semibold ">
-              Histórico de Operações
-            </h3>
-            <div className="flex-1 h-[1px] bg-alternate"></div>
-          </div>
+  return (
+    <FormCard titulo={tipo === 'suprimento' ? 'Suprimento' : 'Sangria'} onVoltar={onVoltar}>
+      {tipo === 'sangria' ? (
+        <p className="mb-3 text-xs text-secondary-text">
+          Saldo disponível:{' '}
+          <span className="font-semibold text-primary-text">{formatarMoeda(saldoDisponivel)}</span>
+        </p>
+      ) : null}
+      <div className="space-y-3">
+        <label className="block">
+          <span className="mb-2 block text-sm font-medium text-primary-text">Valor</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={valor}
+            onChange={event => setValor(formatCurrencyInput(event.target.value))}
+            className="h-12 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-lg font-semibold tracking-tight outline-none transition-colors focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/15"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-2 block text-sm font-medium text-primary-text">Descrição</span>
+          <input
+            type="text"
+            value={descricao}
+            onChange={event => setDescricao(event.target.value)}
+            placeholder={tipo === 'suprimento' ? 'Ex.: Reforço de troco' : 'Ex.: Depósito no banco'}
+            className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm outline-none transition-colors focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/15"
+          />
+        </label>
+        {!validacaoBase.ok ? (
+          <p className="text-xs text-error">{validacaoBase.message}</p>
+        ) : !validacaoSangria.ok ? (
+          <p className="text-xs text-error">{validacaoSangria.message}</p>
+        ) : null}
+        <button
+          type="button"
+          disabled={!podeConfirmar}
+          onClick={() =>
+            void onConfirm({ valor: valorNumerico, descricao: descricao.trim() })
+          }
+          className="flex h-11 w-full items-center justify-center rounded-xl bg-primary text-sm font-semibold text-white disabled:opacity-60"
+        >
+          {ocupado ? 'Salvando…' : 'Confirmar'}
+        </button>
+        <MovimentacaoCaixaHistorico tipo={tipo} estacaoId={estacaoId} />
+      </div>
+    </FormCard>
+  )
+}
 
-          <div className="bg-info rounded-[6px] p-4">
-            {operacoes.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-secondary-text">Nenhuma operação registrada</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {operacoes.map((operacao) => (
-                  <div
-                    key={operacao.getId()}
-                    className="flex items-center justify-between p-3 bg-primary-bg rounded-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-xl">
-                        {operacao.isSuprimento() ? '⬇️' : '⬆️'}
-                      </span>
-                      <div>
-                        <p className="text-sm font-semibold text-primary-text">
-                          {operacao.getDescricao()}
-                        </p>
-                        <p className="text-xs text-secondary-text">
-                          {operacao.getDataCriacao().toLocaleDateString('pt-BR', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </p>
-                      </div>
-                    </div>
-                    <p
-                      className={`text-sm font-semibold ${
-                        operacao.isSuprimento() ? 'text-success' : 'text-error'
-                      }`}
-                    >
-                      {operacao.isSuprimento() ? '+' : '-'}
-                      {formatarMoeda(operacao.getValor())}
-                    </p>
-                  </div>
-                ))}
-              </div>
+function FormCard({
+  titulo,
+  onVoltar,
+  children,
+}: {
+  titulo: string
+  onVoltar: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <CaixaPainel>
+      <div className="mb-4 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onVoltar}
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-secondary-text transition-colors hover:bg-gray-50 hover:text-primary-text"
+          aria-label="Voltar"
+        >
+          <MdArrowBack className="h-4 w-4" />
+        </button>
+        <h3 className="text-sm font-semibold text-primary-text">{titulo}</h3>
+      </div>
+      {children}
+    </CaixaPainel>
+  )
+}
+
+function FecharCaixaForm({
+  esperado,
+  ocupado,
+  onVoltar,
+  onConfirm,
+}: {
+  esperado: number
+  ocupado: boolean
+  onVoltar: () => void
+  onConfirm: (valorFornecido: number) => Promise<void>
+}) {
+  const [valor, setValor] = useState(formatarMoeda(esperado))
+  const fornecido = parseCurrencyInput(valor)
+  const diferenca = Number.isFinite(fornecido) ? calcularDiferencaFechamento(fornecido, esperado) : 0
+
+  return (
+    <FormCard titulo="Fechar caixa" onVoltar={onVoltar}>
+      <div className="mb-4 rounded-xl bg-gray-50 px-4 py-3">
+        <p className="text-xs font-medium text-secondary-text">Esperado em dinheiro</p>
+        <p className="mt-0.5 text-2xl font-semibold tracking-tight text-primary">
+          {formatarMoeda(esperado)}
+        </p>
+      </div>
+      <div className="space-y-3">
+        <label className="block">
+          <span className="mb-2 block text-sm font-medium text-primary-text">Valor contado</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={valor}
+            onChange={event => setValor(formatCurrencyInput(event.target.value))}
+            className="h-12 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-lg font-semibold tracking-tight outline-none transition-colors focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/15"
+          />
+        </label>
+        <p className="text-sm text-secondary-text">
+          Diferença:{' '}
+          <strong
+            className={cn(
+              diferenca === 0 ? 'text-primary-text' : diferenca > 0 ? 'text-emerald-600' : 'text-red-500'
             )}
-          </div>
-        </div>
+          >
+            {formatarMoeda(diferenca)}
+          </strong>
+        </p>
+        <button
+          type="button"
+          disabled={ocupado || !Number.isFinite(fornecido) || fornecido < 0}
+          onClick={() => void onConfirm(fornecido)}
+          className="flex h-11 w-full items-center justify-center rounded-xl bg-primary text-sm font-semibold text-white disabled:opacity-60"
+        >
+          Confirmar fechamento
+        </button>
       </div>
-
-      {/* Modal de Sangria */}
-      {mostrarModalSangria && (
-        <CriarSangriaModal
-          onClose={() => setMostrarModalSangria(false)}
-          onConfirm={(valor, descricao) => {
-            // TODO: Implementar criação de sangria
-            console.log('Criar sangria:', { valor, descricao })
-            setMostrarModalSangria(false)
-          }}
-        />
-      )}
-
-      {/* Modal de Suprimento */}
-      {mostrarModalSuprimento && (
-        <CriarSuprimentoModal
-          onClose={() => setMostrarModalSuprimento(false)}
-          onConfirm={(valor, descricao) => {
-            // TODO: Implementar criação de suprimento
-            console.log('Criar suprimento:', { valor, descricao })
-            setMostrarModalSuprimento(false)
-          }}
-        />
-      )}
-
-      {/* Modal de Fechar Caixa */}
-      {mostrarModalFechar && (
-        <FecharCaixaModal
-          onClose={() => setMostrarModalFechar(false)}
-          onConfirm={(observacoes) => {
-            // TODO: Implementar fechamento de caixa
-            console.log('Fechar caixa:', { observacoes })
-            setMostrarModalFechar(false)
-            router.push('/meu-caixa/fechamentos')
-          }}
-        />
-      )}
-    </div>
+    </FormCard>
   )
 }
-
-// Componente Modal de Criar Sangria
-function CriarSangriaModal({
-  onClose,
-  onConfirm,
-}: {
-  onClose: () => void
-  onConfirm: (valor: number, descricao: string) => void
-}) {
-  const [valor, setValor] = useState('')
-  const [descricao, setDescricao] = useState('')
-
-  const handleConfirm = () => {
-    const valorNum = parseFloat(valor)
-    if (!valorNum || valorNum <= 0 || !descricao.trim()) {
-      alert('Preencha todos os campos corretamente')
-      return
-    }
-    onConfirm(valorNum, descricao)
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-primary-bg rounded-lg p-6 w-full max-w-md">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-semibold text-primary-text">Criar Sangria</h3>
-          <button onClick={onClose} className="text-secondary-text hover:text-primary-text">
-            ✕
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-2">
-              Valor
-            </label>
-            <input
-              type="number"
-              value={valor}
-              onChange={(e) => setValor(e.target.value)}
-              placeholder="0,00"
-              min="0"
-              step="0.01"
-              className="w-full h-12 px-4 rounded-lg border border-secondary bg-info text-primary-text focus:outline-none focus:border-primary"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-2">
-              Descrição
-            </label>
-            <textarea
-              value={descricao}
-              onChange={(e) => setDescricao(e.target.value)}
-              placeholder="Digite a descrição da sangria"
-              rows={3}
-              className="w-full px-4 py-3 rounded-lg border border-secondary bg-info text-primary-text focus:outline-none focus:border-primary resize-none"
-            />
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={handleConfirm}
-              className="flex-1 h-12 bg-primary text-info rounded-lg font-medium hover:bg-primary/90 transition-colors"
-            >
-              Confirmar
-            </button>
-            <button
-              onClick={onClose}
-              className="flex-1 h-12 bg-secondary-bg text-primary-text rounded-lg font-medium hover:bg-secondary-bg/80 transition-colors"
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Componente Modal de Criar Suprimento
-function CriarSuprimentoModal({
-  onClose,
-  onConfirm,
-}: {
-  onClose: () => void
-  onConfirm: (valor: number, descricao: string) => void
-}) {
-  const [valor, setValor] = useState('')
-  const [descricao, setDescricao] = useState('')
-
-  const handleConfirm = () => {
-    const valorNum = parseFloat(valor)
-    if (!valorNum || valorNum <= 0 || !descricao.trim()) {
-      alert('Preencha todos os campos corretamente')
-      return
-    }
-    onConfirm(valorNum, descricao)
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-primary-bg rounded-lg p-6 w-full max-w-md">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-semibold text-primary-text">Criar Suprimento</h3>
-          <button onClick={onClose} className="text-secondary-text hover:text-primary-text">
-            ✕
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-2">
-              Valor
-            </label>
-            <input
-              type="number"
-              value={valor}
-              onChange={(e) => setValor(e.target.value)}
-              placeholder="0,00"
-              min="0"
-              step="0.01"
-              className="w-full h-12 px-4 rounded-lg border border-secondary bg-info text-primary-text focus:outline-none focus:border-primary"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-2">
-              Descrição
-            </label>
-            <textarea
-              value={descricao}
-              onChange={(e) => setDescricao(e.target.value)}
-              placeholder="Digite a descrição do suprimento"
-              rows={3}
-              className="w-full px-4 py-3 rounded-lg border border-secondary bg-info text-primary-text focus:outline-none focus:border-primary resize-none"
-            />
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={handleConfirm}
-              className="flex-1 h-12 bg-primary text-info rounded-lg font-medium hover:bg-primary/90 transition-colors"
-            >
-              Confirmar
-            </button>
-            <button
-              onClick={onClose}
-              className="flex-1 h-12 bg-secondary-bg text-primary-text rounded-lg font-medium hover:bg-secondary-bg/80 transition-colors"
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Componente Modal de Fechar Caixa
-function FecharCaixaModal({
-  onClose,
-  onConfirm,
-}: {
-  onClose: () => void
-  onConfirm: (observacoes?: string) => void
-}) {
-  const [observacoes, setObservacoes] = useState('')
-
-  const handleConfirm = () => {
-    if (confirm('Tem certeza que deseja fechar o caixa?')) {
-      onConfirm(observacoes || undefined)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-primary-bg rounded-lg p-6 w-full max-w-md">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-semibold text-primary-text">Fechar Caixa</h3>
-          <button onClick={onClose} className="text-secondary-text hover:text-primary-text">
-            ✕
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-2">
-              Observações (opcional)
-            </label>
-            <textarea
-              value={observacoes}
-              onChange={(e) => setObservacoes(e.target.value)}
-              placeholder="Digite observações sobre o fechamento"
-              rows={3}
-              className="w-full px-4 py-3 rounded-lg border border-secondary bg-info text-primary-text focus:outline-none focus:border-primary resize-none"
-            />
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={handleConfirm}
-              className="flex-1 h-12 bg-primary text-info rounded-lg font-medium hover:bg-primary/90 transition-colors"
-            >
-              Confirmar Fechamento
-            </button>
-            <button
-              onClick={onClose}
-              className="flex-1 h-12 bg-secondary-bg text-primary-text rounded-lg font-medium hover:bg-secondary-bg/80 transition-colors"
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-

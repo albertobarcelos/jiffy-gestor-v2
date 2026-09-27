@@ -14,6 +14,9 @@ import {
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { invalidateCaixaEstacaoAtualQueries } from '@/src/presentation/components/features/meu-caixa/hooks/caixaEstacaoCache'
+import { useEstacaoDestePc } from '@/src/presentation/hooks/useEstacaoDestePc'
+import { useCaixaEstacaoAtual } from '@/src/presentation/components/features/meu-caixa/hooks/useCaixaEstacaoAtual'
 import { invalidateVendaDetalheCarregadaCache } from '../../pedidos/hooks/data/useVendaDetalheCarregadaQuery'
 import { useEntregaTransicoesKanban } from '../../delivery/kanban-panels/useEntregaTransicoesKanban'
 import { definirEntregadorKanbanCache } from '../../delivery/kanban-panels/entregadorKanbanStore'
@@ -61,6 +64,12 @@ export function useKanbanOrchestrator() {
   const queryClient = useQueryClient()
   const empresaId = useTenantEmpresaId()
   const superficie = useSuperficieQuadroPedidos()
+  const { estacaoId } = useEstacaoDestePc()
+  const caixaAtual = useCaixaEstacaoAtual(estacaoId)
+  const caixaAberta =
+    !caixaAtual.data && (caixaAtual.isLoading || caixaAtual.isError)
+      ? null
+      : (caixaAtual.data?.aberta ?? null)
 
   const filters = useKanbanFilters(timezoneAgregacao, {
     diaOperacionalFlow: superficie === 'fredy',
@@ -210,6 +219,8 @@ export function useKanbanOrchestrator() {
     modoKanbanVendas,
   ])
 
+  const handleAbrirCaixaEstacao = modais.abrirCaixaEstacao
+
   const preTransicao = useKanbanPreTransicao({
     isModoDeliveryKanban: data.isModoDeliveryKanban,
     infiniteQueryKey: data.infiniteQueryKey,
@@ -248,6 +259,9 @@ export function useKanbanOrchestrator() {
       void preTransicao.processarAposTransicoes(venda, acoesExecutadas, ticketsPreload, {
         omitirAvisoSemVinculoPc: true,
       })
+      if (acoesExecutadas.includes('finalizar') && empresaId) {
+        void invalidateCaixaEstacaoAtualQueries(queryClient, empresaId, estacaoId)
+      }
     },
     verificarImpressaoAntesTransicoes: preTransicao.verificarImpressaoAntesTransicoes,
     verificarEntregadorAntesDespachar: preTransicao.verificarEntregadorAntesDespachar,
@@ -398,17 +412,6 @@ export function useKanbanOrchestrator() {
     [colunas]
   )
 
-  const handleToggleDirecaoOrdenacao = useCallback(
-    (columnId: ColunaKanbanId) => {
-      colunas.setDirecaoOrdenacaoPorColuna(prev => ({
-        ...prev,
-        [columnId]: prev[columnId] === 'asc' ? 'desc' : 'asc',
-      }))
-      colunas.limparPinColuna(columnId)
-    },
-    [colunas]
-  )
-
   const handleFiltroStatusFiscalComNfChange = useCallback(
     (columnId: ColunaKanbanId, filtro: FiltroStatusEntreguesKanban) => {
       colunas.setFiltroStatusFiscalComNf(filtro)
@@ -447,6 +450,8 @@ export function useKanbanOrchestrator() {
     modoVisualizacao,
     onModoVisualizacaoChange: setModoVisualizacaoLivre,
     onAbrirConfiguracoesDelivery: modais.abrirConfigImpressoraExpedicao,
+    onAbrirCaixaEstacao: handleAbrirCaixaEstacao,
+    caixaAberta,
     onAbrirNovoPedido: handleAbrirNovoPedido,
     colunasDoModo,
     colunasOcultas,
@@ -470,15 +475,9 @@ export function useKanbanOrchestrator() {
     vendasPorColuna: colunas.vendasPorColuna,
     getColumnTotalCount: colunas.getColumnTotalCount,
     criterioOrdenacaoPorColuna: colunas.criterioOrdenacaoPorColuna,
-    direcaoOrdenacaoPorColuna: colunas.direcaoOrdenacaoPorColuna,
     onCriterioOrdenacaoChange: handleCriterioOrdenacaoChange,
-    onToggleDirecaoOrdenacao: handleToggleDirecaoOrdenacao,
     filtroStatusFiscalComNf: colunas.filtroStatusFiscalComNf,
     onFiltroStatusFiscalComNfChange: handleFiltroStatusFiscalComNfChange,
-    onOcultarColuna:
-      superficie === 'fredy'
-        ? (id: ColunaKanbanId) => visibilidadeColunas.setColunaVisivel(id, false, colunasDoModo)
-        : undefined,
     onColumnScroll: data.handleColumnScroll,
     deliveryKanban: data.deliveryKanban,
     balcaoKanban: data.balcaoKanban,
@@ -518,7 +517,11 @@ export function useKanbanOrchestrator() {
     },
     onAplicarPeriodoDatas: aplicarPeriodoDatas,
     deliveryConfiguracoesOpen: modais.deliveryConfiguracoesOpen,
-    onCloseDeliveryConfiguracoes: () => modais.setDeliveryConfiguracoesOpen(false),
+    onCloseDeliveryConfiguracoes: modais.fecharConfiguracoesDelivery,
+    configuracaoEstacaoCaixa: modais.configuracaoEstacaoCaixa,
+    onAbrirConfiguracaoEstacaoCaixa: modais.abrirConfiguracaoEstacaoCaixa,
+    caixaEstacaoOpen: modais.caixaEstacaoOpen,
+    onCloseCaixaEstacao: () => modais.setCaixaEstacaoOpen(false),
     vendaSelecionadaParaEmissao: modais.vendaSelecionadaParaEmissao,
     emitirNfeModalOpen: modais.emitirNfeModalOpen,
     onCloseEmitirNfe: () => {
