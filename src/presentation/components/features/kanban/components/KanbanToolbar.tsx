@@ -64,6 +64,7 @@ export interface KanbanToolbarProps {
   onModoVisualizacaoChange: (value: ModoVisualizacaoKanban) => void
   onAbrirConfiguracoesDelivery: () => void
   onAbrirCaixaEstacao: () => void
+  caixaAberta?: boolean | null
   onAbrirNovoPedido: () => void
   colunasDoModo: KanbanColumn[]
   colunasOcultas: readonly ColunaKanbanId[]
@@ -250,6 +251,7 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
     onModoVisualizacaoChange,
     onAbrirConfiguracoesDelivery,
     onAbrirCaixaEstacao,
+    caixaAberta,
     onAbrirNovoPedido,
     colunasDoModo,
     colunasOcultas,
@@ -451,12 +453,16 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
           <button
             type="button"
             onClick={onAbrirCaixaEstacao}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-600 shadow-sm transition-colors hover:bg-gray-50 hover:text-primary"
-            title="Meu caixa da estação"
+            className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm shadow-sm transition-colors hover:bg-gray-50"
+            title={caixaAberta === true ? 'Caixa aberto' : caixaAberta === false ? 'Caixa fechado' : 'Meu caixa da estação'}
             aria-label="Abrir meu caixa"
           >
-            <TbCashRegister className="h-5 w-5" />
-            Meu Caixa
+            <TbCashRegister
+              className={`h-5 w-5 ${caixaAberta === true ? 'text-green-500' : caixaAberta === false ? 'text-red-500' : 'text-gray-600'}`}
+            />
+            <span className={caixaAberta === true ? 'text-green-600' : caixaAberta === false ? 'text-red-500' : 'text-gray-600'}>
+              Meu Caixa
+            </span>
           </button>
           {noFredy ? (
             <KanbanModoVisualizacaoSelect

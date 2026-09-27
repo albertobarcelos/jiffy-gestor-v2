@@ -15,6 +15,8 @@ import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { invalidateCaixaEstacaoAtualQueries } from '@/src/presentation/hooks/caixa-estacao/caixaEstacaoCache'
+import { useEstacaoDestePc } from '@/src/presentation/hooks/caixa-estacao/useEstacaoDestePc'
+import { useCaixaEstacaoAtual } from '@/src/presentation/hooks/caixa-estacao/useCaixaEstacaoAtual'
 import { invalidateVendaDetalheCarregadaCache } from '../../pedidos/hooks/data/useVendaDetalheCarregadaQuery'
 import { useEntregaTransicoesKanban } from '../../delivery/kanban-panels/useEntregaTransicoesKanban'
 import { definirEntregadorKanbanCache } from '../../delivery/kanban-panels/entregadorKanbanStore'
@@ -62,6 +64,9 @@ export function useKanbanOrchestrator() {
   const queryClient = useQueryClient()
   const empresaId = useTenantEmpresaId()
   const superficie = useSuperficieQuadroPedidos()
+  const { estacaoId } = useEstacaoDestePc()
+  const caixaAtual = useCaixaEstacaoAtual(estacaoId)
+  const caixaAberta = caixaAtual.data?.aberta ?? null
 
   const filters = useKanbanFilters(timezoneAgregacao, {
     diaOperacionalFlow: superficie === 'fredy',
@@ -454,6 +459,7 @@ export function useKanbanOrchestrator() {
     onModoVisualizacaoChange: setModoVisualizacaoLivre,
     onAbrirConfiguracoesDelivery: modais.abrirConfigImpressoraExpedicao,
     onAbrirCaixaEstacao: handleAbrirCaixaEstacao,
+    caixaAberta,
     onAbrirNovoPedido: handleAbrirNovoPedido,
     colunasDoModo,
     colunasOcultas,
