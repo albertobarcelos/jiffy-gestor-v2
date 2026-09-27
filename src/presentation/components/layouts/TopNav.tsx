@@ -233,6 +233,7 @@ export function TopNav() {
           { name: 'Mesas Abertas', path: '/vendas/abertas', icon: MdTableBar },
           { name: 'Relatório de Vendas', path: '/relatorios-vendas', icon: MdAssessment },
           { name: 'Relatório de Produtos', path: '/relatorios-produtos-vendidos', icon: MdAnalytics },
+          { name: 'Relatório de Entregas', path: '/vendas/relatorio-entregas', icon: MdDeliveryDining },
           { name: 'Hist. Fechamentos', path: '/historico-fechamento', icon: MdHistory },
           { name: 'Comissões', path: '/vendas/comissoes', icon: MdPercent },
         ],
