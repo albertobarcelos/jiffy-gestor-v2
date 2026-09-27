@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
-import { useEstacaoDestePc } from '@/src/presentation/hooks/caixa-estacao/useEstacaoDestePc'
-import { useCaixaEstacaoAtual } from '@/src/presentation/hooks/caixa-estacao/useCaixaEstacaoAtual'
+import { useEstacaoDestePc } from '@/src/presentation/hooks/useEstacaoDestePc'
+import { useCaixaEstacaoAtual } from '@/src/presentation/components/features/meu-caixa/hooks/useCaixaEstacaoAtual'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
-import { invalidateCaixaEstacaoAtualQueries } from '@/src/presentation/hooks/caixa-estacao/caixaEstacaoCache'
+import { invalidateCaixaEstacaoAtualQueries } from '@/src/presentation/components/features/meu-caixa/hooks/caixaEstacaoCache'
 import { CaixaPanelHeader } from './CaixaPanelHeader'
 import { MeuCaixaView } from './MeuCaixaView'
 import { FechamentosList } from './FechamentosList'
@@ -26,7 +26,7 @@ export function MeuCaixaSidePanel({
   const empresaId = useTenantEmpresaId()
   const { estacaoId, estacaoNome } = useEstacaoDestePc()
   const atual = useCaixaEstacaoAtual(estacaoId)
-  const aberta = atual.data?.aberta === true
+  const aberta = !atual.isError && atual.data?.aberta === true
 
   useEffect(() => {
     if (!open || !estacaoId?.trim() || !empresaId) return
@@ -58,7 +58,7 @@ export function MeuCaixaSidePanel({
         <CaixaPanelHeader
           aba={aba}
           aberta={aberta}
-          loading={atual.isLoading}
+          loading={atual.isLoading || atual.isFetching}
           onVoltar={aba === 'recentes' ? () => setAba('atual') : undefined}
           onClose={() => {
             setAba('atual')
@@ -68,7 +68,7 @@ export function MeuCaixaSidePanel({
 
         <div className="h-0 min-h-0 flex-1 overflow-y-auto overscroll-y-contain bg-[#f9fafb] px-4 py-5 pb-8 [-webkit-overflow-scrolling:touch]">
           {aba === 'recentes' ? (
-            <FechamentosList onAbrirConfiguracaoEstacao={onAbrirConfiguracaoEstacao} />
+            <FechamentosList embedded onAbrirConfiguracaoEstacao={onAbrirConfiguracaoEstacao} />
           ) : (
             <MeuCaixaView
               onVerRecentes={() => setAba('recentes')}

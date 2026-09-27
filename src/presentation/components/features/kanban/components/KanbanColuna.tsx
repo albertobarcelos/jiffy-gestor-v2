@@ -2,12 +2,10 @@
 
 import type { ReactNode } from 'react'
 import { FormControl, MenuItem, Select } from '@mui/material'
-import { MdVisibilityOff } from 'react-icons/md'
 import { DroppableColumnContent } from './DroppableColumnContent'
 import type {
   ColunaKanbanId,
   CriterioOrdenacaoKanban,
-  DirecaoOrdenacaoKanban,
   FiltroStatusEntreguesKanban,
   KanbanColumn,
 } from '../types'
@@ -47,10 +45,7 @@ interface KanbanColunaProps {
   superficie: SuperficieQuadroPedidos
   count: number
   criterioOrdenacao: CriterioOrdenacaoKanban
-  direcaoOrdenacao: DirecaoOrdenacaoKanban
   onCriterioOrdenacaoChange: (columnId: ColunaKanbanId, criterio: CriterioOrdenacaoKanban) => void
-  onToggleDirecaoOrdenacao: (columnId: ColunaKanbanId) => void
-  onOcultarColuna?: (columnId: ColunaKanbanId) => void
   onColumnScroll?: (columnId: ColunaKanbanId, event: React.UIEvent<HTMLDivElement>) => void
   columnFooter?: ReactNode
   /** Rodapé fixo abaixo da área rolável (ex.: ações em lote). */
@@ -70,7 +65,6 @@ export function KanbanColuna(props: KanbanColunaProps) {
     count,
     criterioOrdenacao,
     onCriterioOrdenacaoChange,
-    onOcultarColuna,
     onColumnScroll,
     columnFooter,
     columnRodape,
@@ -87,7 +81,7 @@ export function KanbanColuna(props: KanbanColunaProps) {
         className={`relative flex-shrink-0 border-b ${column.borderColor} ${column.color}`}
       >
         <span
-          className={`absolute right-1 top-1 z-10 flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-white px-1.5 text-[11px] font-bold tabular-nums text-gray-900 shadow-sm ring-1 ring-black/10`}
+          className={`absolute right-1 top-1 z-10 flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-white px-1.5 text-[13px] font-bold tabular-nums text-gray-900 shadow-sm ring-1 ring-black/10`}
           aria-label={`${count} pedidos`}
         >
           {count}

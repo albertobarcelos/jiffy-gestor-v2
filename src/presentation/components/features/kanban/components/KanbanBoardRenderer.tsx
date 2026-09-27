@@ -11,7 +11,6 @@ import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
 import type {
   ColunaKanbanId,
   CriterioOrdenacaoKanban,
-  DirecaoOrdenacaoKanban,
   FiltroStatusEntreguesKanban,
   KanbanColumn,
   Venda,
@@ -39,15 +38,12 @@ export interface KanbanBoardRendererProps {
   vendasPorColuna: Partial<Record<ColunaKanbanId, Venda[]>>
   getColumnTotalCount: (columnId: ColunaKanbanId) => number
   criterioOrdenacaoPorColuna: Record<ColunaKanbanId, CriterioOrdenacaoKanban>
-  direcaoOrdenacaoPorColuna: Record<ColunaKanbanId, DirecaoOrdenacaoKanban>
   onCriterioOrdenacaoChange: (columnId: ColunaKanbanId, criterio: CriterioOrdenacaoKanban) => void
-  onToggleDirecaoOrdenacao: (columnId: ColunaKanbanId) => void
   filtroStatusFiscalComNf?: FiltroStatusEntreguesKanban
   onFiltroStatusFiscalComNfChange?: (
     columnId: ColunaKanbanId,
     filtro: FiltroStatusEntreguesKanban
   ) => void
-  onOcultarColuna?: (columnId: ColunaKanbanId) => void
   onColumnScroll: (columnId: ColunaKanbanId, event: React.UIEvent<HTMLDivElement>) => void
   deliveryKanban: DeliveryKanbanReturn
   balcaoKanban: BalcaoKanbanReturn
@@ -82,12 +78,9 @@ export function KanbanBoardRenderer({
   vendasPorColuna,
   getColumnTotalCount,
   criterioOrdenacaoPorColuna,
-  direcaoOrdenacaoPorColuna,
   onCriterioOrdenacaoChange,
-  onToggleDirecaoOrdenacao,
   filtroStatusFiscalComNf,
   onFiltroStatusFiscalComNfChange,
-  onOcultarColuna,
   onColumnScroll,
   deliveryKanban,
   balcaoKanban,
@@ -132,9 +125,7 @@ export function KanbanBoardRenderer({
                   superficie={superficie}
                   count={columnTotalCount}
                   criterioOrdenacao={criterioOrdenacaoPorColuna[colId] ?? 'data'}
-                  direcaoOrdenacao={direcaoOrdenacaoPorColuna[colId] ?? 'desc'}
                   onCriterioOrdenacaoChange={onCriterioOrdenacaoChange}
-                  onToggleDirecaoOrdenacao={onToggleDirecaoOrdenacao}
                   filtroStatusFiscal={
                     isModoDeliveryKanban && colId === 'FINALIZADAS'
                       ? filtroStatusFiscalComNf
@@ -145,7 +136,6 @@ export function KanbanBoardRenderer({
                       ? onFiltroStatusFiscalComNfChange
                       : undefined
                   }
-                  onOcultarColuna={onOcultarColuna}
                   onColumnScroll={onColumnScroll}
                   columnRodape={
                     colId === 'REJEITADAS' &&

@@ -5,18 +5,12 @@ import { MdClose } from 'react-icons/md'
 import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
-import type { OperacaoCaixaEstacaoDTO } from '@/src/application/dto/caixa-estacao/OperacaoCaixaEstacaoDTO'
-import { mapOperacaoCaixaEstacao } from '@/src/application/mappers/caixa-estacao/OperacaoCaixaEstacaoMapper'
-import {
-  fetchGestorApi,
-  lerErroCaixaEstacao,
-  pathOperacaoCaixaEstacao,
-} from '@/src/presentation/hooks/caixa-estacao/caixaEstacaoApi'
 import { resolverEstacaoImpressaoConfig } from '@/src/infrastructure/api/estacoesImpressaoApi'
 import { imprimirCupomFechamentoCaixaEstacao } from '@/src/infrastructure/printing/imprimirCupomFechamentoCaixaEstacao'
 import { useDeliveryConfigEstacaoImpressao } from '@/src/presentation/hooks/useDeliveryConfigImpressaoQueries'
 import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useOperacaoCaixaEstacaoPorId } from '@/src/presentation/components/features/meu-caixa/hooks/useOperacaoCaixaEstacaoPorId'
 import { FechamentoCaixaEstacaoRelatorioView } from './FechamentoCaixaEstacaoRelatorioView'
 
 export function DetalhesFechamentoEstacao({
@@ -28,41 +22,21 @@ export function DetalhesFechamentoEstacao({
   open: boolean
   onClose: () => void
 }) {
-  const [operacao, setOperacao] = useState<OperacaoCaixaEstacaoDTO | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const {
+    data: operacao,
+    isLoading,
+    isError,
+  } = useOperacaoCaixaEstacaoPorId(idOperacaoCaixa, open)
   const [imprimindo, setImprimindo] = useState(false)
   const [erroImpressao, setErroImpressao] = useState<string | null>(null)
   const { preferenciasImpressaoDelivery } = usePreferenciasImpressaoDelivery()
   const estacaoImpressaoQuery = useDeliveryConfigEstacaoImpressao(open)
 
   useEffect(() => {
-    if (!open || !idOperacaoCaixa) {
-      setOperacao(null)
-      return
+    if (isError) {
+      showToast.error('Não foi possível carregar o fechamento da estação.')
     }
-    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-    if (!token) return
-    let cancelado = false
-    setIsLoading(true)
-    void fetchGestorApi(pathOperacaoCaixaEstacao(idOperacaoCaixa), {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(async response => {
-        if (!response.ok) throw new Error(await lerErroCaixaEstacao(response))
-        const mapped = mapOperacaoCaixaEstacao(await response.json())
-        if (!cancelado) setOperacao(mapped)
-      })
-      .catch(error => {
-        console.error(error)
-        showToast.error('Não foi possível carregar o fechamento da estação.')
-      })
-      .finally(() => {
-        if (!cancelado) setIsLoading(false)
-      })
-    return () => {
-      cancelado = true
-    }
-  }, [open, idOperacaoCaixa])
+  }, [isError])
 
   async function handleImprimir() {
     if (!operacao || imprimindo) return

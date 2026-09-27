@@ -5,20 +5,22 @@ import { MdArrowBack, MdHistory } from 'react-icons/md'
 import { TbCashRegister } from 'react-icons/tb'
 import { showToast } from '@/src/shared/utils/toast'
 import {
+  calcularDiferencaFechamento,
   DESCRICAO_FUNDO_TROCO,
   validarMovimentacaoCaixaEstacao,
   validarSangriaContraSaldo,
   validarSuprimentoCaixaEstacao,
 } from '@/src/domain/caixa-estacao/regrasCaixaEstacao'
-import { previewDiferencaFechamento } from '@/src/application/use-cases/caixa-estacao/FecharCaixaEstacaoUseCase'
-import { useEstacaoDestePc } from '@/src/presentation/hooks/caixa-estacao/useEstacaoDestePc'
+import { useEstacaoDestePc } from '@/src/presentation/hooks/useEstacaoDestePc'
 import { estacaoEhReceptoraDelivery } from '@/src/domain/caixa-estacao/estacaoReceptoraDelivery'
-import { useCaixaEstacaoAtual } from '@/src/presentation/hooks/caixa-estacao/useCaixaEstacaoAtual'
+import { useCaixaEstacaoAtual } from '@/src/presentation/components/features/meu-caixa/hooks/useCaixaEstacaoAtual'
 import {
   useRegistrarSangriaCaixaEstacao,
   useRegistrarSuprimentoCaixaEstacao,
-} from '@/src/presentation/hooks/caixa-estacao/useMovimentacoesCaixaEstacao'
-import { useFecharCaixaEstacao } from '@/src/presentation/hooks/caixa-estacao/useFecharCaixaEstacao'
+} from '@/src/presentation/components/features/meu-caixa/hooks/useMovimentacoesCaixaEstacao'
+import { useFecharCaixaEstacao } from '@/src/presentation/components/features/meu-caixa/hooks/useFecharCaixaEstacao'
+import { useHistoricoMovimentacoesCaixaEstacao } from '@/src/presentation/components/features/meu-caixa/hooks/useHistoricoMovimentacoesCaixaEstacao'
+import type { MovimentacaoCaixaEstacaoDTO } from '@/src/application/dto/caixa-estacao/OperacaoCaixaEstacaoDTO'
 import {
   useDeliveryConfigEstacaoImpressao,
   useDeliveryConfigEstacoesImpressao,
@@ -106,13 +108,6 @@ export function MeuCaixaView({
   const [valorAbertura, setValorAbertura] = useState('R$ 0,00')
   const inputAberturaRef = useRef<HTMLInputElement>(null)
 
-  const valorAberturaNumerico = parseCurrencyInput(valorAbertura)
-  const validacaoAbertura = validarSuprimentoCaixaEstacao({
-    valor: valorAberturaNumerico,
-    descricao: DESCRICAO_FUNDO_TROCO,
-  })
-  const podeAbrir = validacaoAbertura.ok && !suprimentoMut.isPending
-
   const estacoesCarregadas = Boolean(estacaoId && estacoesQuery.data)
   const ehReceptoraDelivery = estacoesCarregadas
     ? estacaoEhReceptoraDelivery(estacaoId, estacoesQuery.data ?? [])
@@ -166,12 +161,19 @@ export function MeuCaixaView({
     )
   }
 
+  const valorAberturaNumerico = parseCurrencyInput(valorAbertura)
+  const validacaoAbertura = validarSuprimentoCaixaEstacao({
+    valor: valorAberturaNumerico,
+    descricao: DESCRICAO_FUNDO_TROCO,
+  })
+  const podeAbrir = validacaoAbertura.ok && !suprimentoMut.isPending
   const esperado = operacao?.resumoCaixa?.valorLiquidoDinheiroCaixa ?? 0
 
   if (passo === 'suprimento' || passo === 'sangria') {
     return (
       <MovimentacaoCaixaForm
         tipo={passo}
+        estacaoId={estacaoId}
         saldoDisponivel={esperado}
         ocupado={passo === 'suprimento' ? suprimentoMut.isPending : sangriaMut.isPending}
         onVoltar={() => setPasso('resumo')}
@@ -398,14 +400,80 @@ function CaixaResumoCelula({
   )
 }
 
+function MovimentacaoCaixaHistorico({
+  tipo,
+  estacaoId,
+}: {
+  tipo: 'suprimento' | 'sangria'
+  estacaoId: string
+}) {
+  const apiTipo = tipo === 'suprimento' ? 'suprimentos' : 'sangrias'
+  const historico = useHistoricoMovimentacoesCaixaEstacao(estacaoId, apiTipo)
+  const itens = historico.data ?? []
+
+  return (
+    <div className="mt-5 border-t border-gray-100 pt-4">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-secondary-text">
+        Histórico deste caixa
+        {!historico.isLoading && itens.length > 0 ? ` (${itens.length})` : ''}
+      </p>
+      {historico.isLoading ? (
+        <p className="py-2 text-xs text-secondary-text">Carregando…</p>
+      ) : historico.isError ? (
+        <p className="text-xs text-error">Não foi possível carregar o histórico.</p>
+      ) : itens.length === 0 ? (
+        <p className="py-2 text-xs text-secondary-text">Nenhum registro ainda.</p>
+      ) : (
+        <ul className="max-h-44 space-y-2 overflow-y-auto overscroll-y-contain pr-0.5">
+          {itens.map(item => (
+            <MovimentacaoCaixaHistoricoItem key={item.id} item={item} tipo={tipo} />
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function MovimentacaoCaixaHistoricoItem({
+  item,
+  tipo,
+}: {
+  item: MovimentacaoCaixaEstacaoDTO
+  tipo: 'suprimento' | 'sangria'
+}) {
+  const valorClass =
+    tipo === 'suprimento' ? 'text-emerald-600' : 'text-red-500'
+
+  return (
+    <li className="rounded-lg bg-gray-50 px-3 py-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-primary-text">
+            {item.descricao?.trim() || '—'}
+          </p>
+          <p className="mt-0.5 text-[11px] text-secondary-text">
+            {formatarData(item.dataCriacao)}
+            {item.realizadoPorAtor?.nome ? ` · ${item.realizadoPorAtor.nome}` : ''}
+          </p>
+        </div>
+        <p className={cn('shrink-0 text-sm font-semibold tabular-nums', valorClass)}>
+          {formatarMoeda(item.valor)}
+        </p>
+      </div>
+    </li>
+  )
+}
+
 function MovimentacaoCaixaForm({
   tipo,
+  estacaoId,
   saldoDisponivel,
   ocupado,
   onVoltar,
   onConfirm,
 }: {
   tipo: 'suprimento' | 'sangria'
+  estacaoId: string
   saldoDisponivel: number
   ocupado: boolean
   onVoltar: () => void
@@ -469,6 +537,7 @@ function MovimentacaoCaixaForm({
         >
           {ocupado ? 'Salvando…' : 'Confirmar'}
         </button>
+        <MovimentacaoCaixaHistorico tipo={tipo} estacaoId={estacaoId} />
       </div>
     </FormCard>
   )
@@ -514,7 +583,7 @@ function FecharCaixaForm({
 }) {
   const [valor, setValor] = useState(formatarMoeda(esperado))
   const fornecido = parseCurrencyInput(valor)
-  const diferenca = Number.isFinite(fornecido) ? previewDiferencaFechamento(fornecido, esperado) : 0
+  const diferenca = Number.isFinite(fornecido) ? calcularDiferencaFechamento(fornecido, esperado) : 0
 
   return (
     <FormCard titulo="Fechar caixa" onVoltar={onVoltar}>

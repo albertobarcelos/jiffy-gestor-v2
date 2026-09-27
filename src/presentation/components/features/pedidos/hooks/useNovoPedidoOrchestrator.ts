@@ -20,6 +20,7 @@ import { useImpressaoDelivery } from '@/features/delivery/hooks/useImpressaoDeli
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { useQueryClient } from '@tanstack/react-query'
 import { invalidateKanbanVendasListagens } from '@/features/kanban/hooks/kanbanListagemQueryCache'
+import { invalidateCaixaEstacaoAtualQueries } from '@/src/presentation/components/features/meu-caixa/hooks/caixaEstacaoCache'
 import { invalidateVendaDetalheCarregadaCache } from './data/useVendaDetalheCarregadaQuery'
 import type { NovoPedidoModalProps } from '../types'
 import {
@@ -104,8 +105,15 @@ export function useNovoPedidoOrchestrator({
   const notificarSucesso = useCallback(() => {
     resetarAoSairRef.current = true
     if (chaveRascunho) limparRascunhoPedidoWhatsApp(chaveRascunho)
+    if (empresaId) {
+      void invalidateCaixaEstacaoAtualQueries(
+        queryClient,
+        empresaId,
+        getEstacaoImpressaoId()
+      )
+    }
     onSuccess()
-  }, [chaveRascunho, onSuccess])
+  }, [chaveRascunho, empresaId, onSuccess, queryClient])
   const createVendaGestor = useCreateVendaGestor()
   const createPedidoDelivery = useCreatePedidoDelivery()
   const createSubmitPending =
