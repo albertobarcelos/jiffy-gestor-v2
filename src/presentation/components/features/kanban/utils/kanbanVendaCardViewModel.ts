@@ -76,8 +76,14 @@ function rotuloIdentificacaoKanban(venda: Venda): 'Pedido' | 'Venda' {
   return tipoVendaStr === 'delivery' ? 'Pedido' : 'Venda'
 }
 
+/** "Pedido 123" ou "Venda 123" — rótulo sem o código de pedido externo. */
+export function rotuloNumeroVendaKanban(venda: Venda): string {
+  return `${rotuloIdentificacaoKanban(venda)} ${venda.numeroVenda}`
+}
+
 export function linhaIdentificacaoVendaKanban(venda: Venda): string {
-  const rotulo = rotuloIdentificacaoKanban(venda)
   const codigo = codigoVendaKanban(venda)
-  return codigo ? `${rotulo} ${venda.numeroVenda} - ${codigo}` : `${rotulo} ${venda.numeroVenda}`
+  return codigo
+    ? `${rotuloNumeroVendaKanban(venda)} - ${codigo}`
+    : rotuloNumeroVendaKanban(venda)
 }
