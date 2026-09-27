@@ -12,6 +12,7 @@ import {
 } from '@/src/domain/caixa-estacao/regrasCaixaEstacao'
 import { previewDiferencaFechamento } from '@/src/application/use-cases/caixa-estacao/FecharCaixaEstacaoUseCase'
 import { useEstacaoDestePc } from '@/src/presentation/hooks/caixa-estacao/useEstacaoDestePc'
+import { estacaoEhReceptoraDelivery } from '@/src/domain/caixa-estacao/estacaoReceptoraDelivery'
 import { useCaixaEstacaoAtual } from '@/src/presentation/hooks/caixa-estacao/useCaixaEstacaoAtual'
 import {
   useRegistrarSangriaCaixaEstacao,
@@ -32,8 +33,11 @@ function formatarMoeda(valor: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
 }
 
-function formatarData(iso: string): string {
-  return new Date(iso).toLocaleString('pt-BR', {
+function formatarData(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const date = new Date(iso)
+  if (isNaN(date.getTime())) return '—'
+  return date.toLocaleString('pt-BR', {
     day: '2-digit',
     month: 'short',
     hour: '2-digit',
@@ -109,6 +113,11 @@ export function MeuCaixaView({
   })
   const podeAbrir = validacaoAbertura.ok && !suprimentoMut.isPending
 
+  const estacoesCarregadas = Boolean(estacaoId && estacoesQuery.data)
+  const ehReceptoraDelivery = estacoesCarregadas
+    ? estacaoEhReceptoraDelivery(estacaoId, estacoesQuery.data ?? [])
+    : null
+
   useEffect(() => {
     if (operacao?.estacao.nome) {
       lembrarNome(operacao.estacao.nome)
@@ -166,23 +175,21 @@ export function MeuCaixaView({
         saldoDisponivel={esperado}
         ocupado={passo === 'suprimento' ? suprimentoMut.isPending : sangriaMut.isPending}
         onVoltar={() => setPasso('resumo')}
-        onConfirm={input => {
-          const tipoAtual = passo
-          setPasso('resumo')
-          const mutPromise =
-            tipoAtual === 'suprimento'
-              ? suprimentoMut.mutateAsync(input)
-              : sangriaMut.mutateAsync({ ...input, saldoDisponivel: esperado })
-          void mutPromise.then(
-            () =>
-              showToast.success(
-                tipoAtual === 'suprimento' ? 'Suprimento registrado.' : 'Sangria registrada.'
-              ),
-            error =>
-              showToast.error(
-                error instanceof Error ? error.message : 'Não foi possível registrar a movimentação.'
-              )
-          )
+        onConfirm={async input => {
+          try {
+            if (passo === 'suprimento') {
+              await suprimentoMut.mutateAsync(input)
+              showToast.success('Suprimento registrado.')
+            } else {
+              await sangriaMut.mutateAsync({ ...input, saldoDisponivel: esperado })
+              showToast.success('Sangria registrada.')
+            }
+            setPasso('resumo')
+          } catch (error) {
+            showToast.error(
+              error instanceof Error ? error.message : 'Não foi possível registrar a movimentação.'
+            )
+          }
         }}
       />
     )
@@ -270,6 +277,13 @@ export function MeuCaixaView({
               {formatarMoeda(esperado)}
             </p>
           </div>
+
+          {ehReceptoraDelivery === false ? (
+            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              Esta estação não recebe pedidos de delivery. Vendas delivery entram no caixa da
+              estação receptora.
+            </p>
+          ) : null}
 
           <div className="mt-4 grid grid-cols-2 gap-2">
             <button
