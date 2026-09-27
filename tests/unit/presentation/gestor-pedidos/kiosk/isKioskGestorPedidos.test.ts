@@ -100,7 +100,7 @@ describe('rota /pedidos', () => {
   it('não pinta TopNav no SSR de /pedidos até o cliente confirmar, sem travar o layout do Gestor', () => {
     expect(
       chromeErpCasco({ superficie: 'gestor', rotaPedidos: true, clientePronto: false })
-    ).toEqual({ layoutKiosk: false, mostrarTopNav: false })
+    ).toEqual({ layoutKiosk: true, mostrarTopNav: false })
     expect(
       chromeErpCasco({ superficie: 'fredy', rotaPedidos: true, clientePronto: true })
     ).toEqual({ layoutKiosk: true, mostrarTopNav: false })

@@ -408,8 +408,6 @@ export function useKanbanVendasPorColuna({
     getColumnTotalCount,
     criterioOrdenacaoPorColuna,
     setCriterioOrdenacaoPorColuna,
-    direcaoOrdenacaoPorColuna,
-    setDirecaoOrdenacaoPorColuna,
     filtroStatusFiscalComNf,
     setFiltroStatusFiscalComNf,
     limparPinColuna,

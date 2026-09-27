@@ -95,6 +95,11 @@ export function buildCriarVendaGestorPayload(input: CriarVendaGestorInputDTO): C
     produtos: produtosLancados,
   }
 
+  const estacaoId = input.estacaoId?.trim()
+  if (estacaoId && input.tipoInicioPedido !== 'delivery') {
+    vendaData.estacaoId = estacaoId
+  }
+
   if (input.tipoInicioPedido === 'delivery') {
     vendaData.tipoAtendimento = input.tipoAtendimentoDelivery
     vendaData.modalidadeEntrega = input.tipoAtendimentoDelivery

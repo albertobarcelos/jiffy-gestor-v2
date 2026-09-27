@@ -67,15 +67,23 @@ export function codigoVendaKanban(venda: Venda): string | null {
   return codigo ? `#${codigo}` : null
 }
 
-export function rotuloNumeroVendaKanban(venda: Venda): string {
-  return `Pedido ${venda.numeroVenda}`
-}
-
 export function exibirSeloCanalMarketplace(origem: string | null | undefined): boolean {
   return temSeloCanalMarketplace(origem)
 }
 
+function rotuloIdentificacaoKanban(venda: Venda): 'Pedido' | 'Venda' {
+  const tipoVendaStr = String(venda.tipoVenda ?? '').trim().toLowerCase()
+  return tipoVendaStr === 'delivery' ? 'Pedido' : 'Venda'
+}
+
+/** "Pedido 123" ou "Venda 123" — rótulo sem o código de pedido externo. */
+export function rotuloNumeroVendaKanban(venda: Venda): string {
+  return `${rotuloIdentificacaoKanban(venda)} ${venda.numeroVenda}`
+}
+
 export function linhaIdentificacaoVendaKanban(venda: Venda): string {
   const codigo = codigoVendaKanban(venda)
-  return codigo ? `${rotuloNumeroVendaKanban(venda)} - ${codigo}` : rotuloNumeroVendaKanban(venda)
+  return codigo
+    ? `${rotuloNumeroVendaKanban(venda)} - ${codigo}`
+    : rotuloNumeroVendaKanban(venda)
 }
