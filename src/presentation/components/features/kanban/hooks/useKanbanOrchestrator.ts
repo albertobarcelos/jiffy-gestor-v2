@@ -67,7 +67,7 @@ export function useKanbanOrchestrator() {
   const { estacaoId } = useEstacaoDestePc()
   const caixaAtual = useCaixaEstacaoAtual(estacaoId)
   const caixaAberta =
-    caixaAtual.isError || caixaAtual.isLoading || caixaAtual.isFetching
+    !caixaAtual.data && (caixaAtual.isLoading || caixaAtual.isError)
       ? null
       : (caixaAtual.data?.aberta ?? null)
 

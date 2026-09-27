@@ -235,51 +235,16 @@ export function mapOperacaoCaixaEstacaoListaItemToDTO(
   }
 }
 
-function mapOperacaoCaixaEstacaoDtoFromApi(value: unknown): OperacaoCaixaEstacaoDTO | null {
-  if (!isRecord(value) || !asString(value.id)) return null
-  return {
-    id: asString(value.id),
-    status: asStatus(value.status),
-    empresaId: asString(value.empresaId),
-    abertoPorAtor: mapAtor(value.abertoPorAtor),
-    estacao: mapEstacao(value.estacao),
-    dataAbertura: asString(value.dataAbertura),
-    dataFechamento: value.dataFechamento == null ? null : asString(value.dataFechamento),
-    fechadoPorAtor: value.fechadoPorAtor == null ? null : mapAtor(value.fechadoPorAtor),
-    nomeEmpresa: asString(value.nomeEmpresa) || undefined,
-    resumoOperacao: mapResumoOperacao(value.resumoOperacao),
-    resumoCaixa: mapResumoCaixa(value.resumoCaixa),
-    resumoPagamentos: mapResumoPagamentos(value.resumoPagamentos),
-    resumoFechamento: mapResumoFechamento(value.resumoFechamento),
-    totalProdutosVendidos: mapProdutos(value.totalProdutosVendidos),
-    totalAdicionaisVendidos: mapProdutos(value.totalAdicionaisVendidos),
-  }
-}
-
-function mapOperacaoCaixaEstacaoListaItemDtoFromApi(
-  value: unknown
-): OperacaoCaixaEstacaoListaItemDTO | null {
-  if (!isRecord(value) || !asString(value.id)) return null
-  return {
-    id: asString(value.id),
-    status: asStatus(value.status),
-    empresaId: asString(value.empresaId),
-    abertoPorAtor: mapAtor(value.abertoPorAtor),
-    estacao: mapEstacao(value.estacao),
-    dataAbertura: asString(value.dataAbertura),
-    dataFechamento: value.dataFechamento == null ? null : asString(value.dataFechamento),
-    fechadoPorAtor: value.fechadoPorAtor == null ? null : mapAtor(value.fechadoPorAtor),
-  }
-}
-
 export function mapOperacaoCaixaEstacaoListaItem(
   value: unknown
 ): OperacaoCaixaEstacaoListaItemDTO | null {
-  return mapOperacaoCaixaEstacaoListaItemDtoFromApi(value)
+  const entity = mapOperacaoCaixaEstacaoToEntity(value)
+  return entity ? mapOperacaoCaixaEstacaoListaItemToDTO(entity) : null
 }
 
 export function mapOperacaoCaixaEstacao(value: unknown): OperacaoCaixaEstacaoDTO | null {
-  return mapOperacaoCaixaEstacaoDtoFromApi(value)
+  const entity = mapOperacaoCaixaEstacaoToEntity(value)
+  return entity ? mapOperacaoCaixaEstacaoToDTO(entity) : null
 }
 
 export function mapPaginationOperacaoCaixaEstacao(

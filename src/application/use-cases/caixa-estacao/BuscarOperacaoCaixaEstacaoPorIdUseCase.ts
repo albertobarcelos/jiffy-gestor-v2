@@ -1,8 +1,5 @@
 import type { OperacaoCaixaEstacaoDTO } from '@/src/application/dto/caixa-estacao/OperacaoCaixaEstacaoDTO'
-import {
-  mapOperacaoCaixaEstacaoToDTO,
-  mapOperacaoCaixaEstacaoToEntity,
-} from '@/src/application/mappers/caixa-estacao/OperacaoCaixaEstacaoMapper'
+import { mapOperacaoCaixaEstacao } from '@/src/application/mappers/caixa-estacao/OperacaoCaixaEstacaoMapper'
 import type { IOperacaoCaixaEstacaoGateway } from '@/src/application/ports/IOperacaoCaixaEstacaoGateway'
 
 export class BuscarOperacaoCaixaEstacaoPorIdUseCase {
@@ -12,7 +9,6 @@ export class BuscarOperacaoCaixaEstacaoPorIdUseCase {
     const id = operacaoCaixaId?.trim()
     if (!id) return null
     const body = await this.gateway.buscarPorId(id)
-    const operacao = mapOperacaoCaixaEstacaoToEntity(body)
-    return operacao ? mapOperacaoCaixaEstacaoToDTO(operacao) : null
+    return mapOperacaoCaixaEstacao(body)
   }
 }

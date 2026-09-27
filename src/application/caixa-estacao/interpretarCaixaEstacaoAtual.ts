@@ -1,5 +1,8 @@
 import type { CaixaEstacaoAtualDTO } from '@/src/application/dto/caixa-estacao/OperacaoCaixaEstacaoDTO'
-import { mapOperacaoCaixaEstacao } from '@/src/application/mappers/caixa-estacao/OperacaoCaixaEstacaoMapper'
+import {
+  mapOperacaoCaixaEstacaoToDTO,
+  mapOperacaoCaixaEstacaoToEntity,
+} from '@/src/application/mappers/caixa-estacao/OperacaoCaixaEstacaoMapper'
 
 /**
  * Interpreta a resposta do BFF (status HTTP + body) em um DTO tipado.
@@ -12,8 +15,12 @@ export function interpretarCaixaEstacaoAtual(
   if (statusHttp === 404) {
     return { aberta: false, operacao: null }
   }
-  const operacao = mapOperacaoCaixaEstacao(body)
-  if (!operacao || operacao.status === 'fechado') {
+  const entity = mapOperacaoCaixaEstacaoToEntity(body)
+  if (!entity) {
+    return { aberta: false, operacao: null }
+  }
+  const operacao = mapOperacaoCaixaEstacaoToDTO(entity)
+  if (!entity.isAberta()) {
     return { aberta: false, operacao }
   }
   return { aberta: true, operacao }

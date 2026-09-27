@@ -26,7 +26,7 @@ export function MeuCaixaSidePanel({
   const empresaId = useTenantEmpresaId()
   const { estacaoId, estacaoNome } = useEstacaoDestePc()
   const atual = useCaixaEstacaoAtual(estacaoId)
-  const aberta = !atual.isError && atual.data?.aberta === true
+  const aberta = atual.data?.aberta === true
 
   useEffect(() => {
     if (!open || !estacaoId?.trim() || !empresaId) return
@@ -58,7 +58,7 @@ export function MeuCaixaSidePanel({
         <CaixaPanelHeader
           aba={aba}
           aberta={aberta}
-          loading={atual.isLoading || atual.isFetching}
+          loading={atual.isLoading && !atual.data}
           onVoltar={aba === 'recentes' ? () => setAba('atual') : undefined}
           onClose={() => {
             setAba('atual')

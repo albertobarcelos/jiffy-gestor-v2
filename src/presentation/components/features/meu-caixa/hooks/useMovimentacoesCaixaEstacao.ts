@@ -16,7 +16,6 @@ import {
 import {
   aplicarMovimentacaoCaixaEstacaoOptimista,
   caixaEstacaoCurrentQueryKey,
-  invalidateMovimentacoesCaixaEstacaoQueries,
   type MovimentacaoCaixaEstacaoTipo,
 } from '@/src/presentation/components/features/meu-caixa/hooks/caixaEstacaoCache'
 
@@ -63,20 +62,11 @@ function useRegistrarMovimentacaoCaixaEstacao<TInput extends MovimentacaoCaixaEs
         }
       },
       onSettled: (_data, _error, _input, context) => {
-        const id = estacaoGestorId?.trim()
         if (context?.queryKey) {
           void queryClient.invalidateQueries({ queryKey: context.queryKey })
         }
         if (empresaId) {
           void queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'caixa-estacao'] })
-          if (id) {
-            void invalidateMovimentacoesCaixaEstacaoQueries(
-              queryClient,
-              empresaId,
-              id,
-              tipoCache
-            )
-          }
         }
       },
     }

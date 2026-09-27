@@ -22,6 +22,12 @@ describe('Caixa da estação — regras de negócio', () => {
       const resultado = interpretarCaixaEstacaoAtual(200, { status: 'aberto', id: 'abc' })
       expect(resultado.aberta).toBe(true)
     })
+
+    it('mostra o caixa como fechado quando a operação já foi encerrada', () => {
+      const resultado = interpretarCaixaEstacaoAtual(200, { status: 'fechado', id: 'abc' })
+      expect(resultado.aberta).toBe(false)
+      expect(resultado.operacao?.id).toBe('abc')
+    })
   })
 
   describe('quando alguém registra sangria ou suprimento', () => {
