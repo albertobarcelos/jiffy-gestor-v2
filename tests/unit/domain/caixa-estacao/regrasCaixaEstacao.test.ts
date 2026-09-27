@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   calcularDiferencaFechamento,
-  isCurrentCaixaEstacaoFechado,
   validarMovimentacaoCaixaEstacao,
   validarSangriaContraSaldo,
   validarSuprimentoCaixaEstacao,
@@ -10,18 +9,18 @@ import { interpretarCaixaEstacaoAtual } from '@/src/application/use-cases/caixa-
 
 describe('Caixa da estação — regras de negócio', () => {
   describe('quando consultamos se o caixa está aberto', () => {
-    it('entende que ainda não há operação aberta quando a API responde 404', () => {
-      expect(isCurrentCaixaEstacaoFechado(404)).toBe(true)
-      expect(isCurrentCaixaEstacaoFechado(200)).toBe(false)
-    })
-
-    it('mostra o caixa como fechado quando não existe operação em andamento', () => {
+    it('mostra o caixa como fechado quando a API responde 404', () => {
       expect(
         interpretarCaixaEstacaoAtual(404, { message: 'Operação de caixa não encontrada' })
       ).toEqual({
         aberta: false,
         operacao: null,
       })
+    })
+
+    it('mostra o caixa como aberto quando a API responde 200 com dados', () => {
+      const resultado = interpretarCaixaEstacaoAtual(200, { status: 'aberto', id: 'abc' })
+      expect(resultado.aberta).toBe(true)
     })
   })
 

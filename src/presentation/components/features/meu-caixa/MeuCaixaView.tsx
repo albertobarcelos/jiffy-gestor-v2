@@ -400,10 +400,10 @@ function MovimentacaoCaixaForm({
   const [valor, setValor] = useState('R$ 0,00')
   const [descricao, setDescricao] = useState('')
   const valorNumerico = parseCurrencyInput(valor)
-  const validacaoBase = validarMovimentacaoCaixaEstacao({
-    valor: valorNumerico,
-    descricao,
-  })
+  const validacaoBase =
+    tipo === 'suprimento'
+      ? validarSuprimentoCaixaEstacao({ valor: valorNumerico, descricao })
+      : validarMovimentacaoCaixaEstacao({ valor: valorNumerico, descricao })
   const validacaoSangria =
     tipo === 'sangria'
       ? validarSangriaContraSaldo(valorNumerico, saldoDisponivel)
