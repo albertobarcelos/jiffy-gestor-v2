@@ -32,7 +32,9 @@ export function Sidebar() {
       pathname === '/relatorios-vendas' ||
       pathname?.startsWith('/relatorios-vendas/') ||
       pathname === '/relatorios-produtos-vendidos' ||
-      pathname?.startsWith('/relatorios-produtos-vendidos/')
+      pathname?.startsWith('/relatorios-produtos-vendidos/') ||
+      pathname === '/vendas/relatorio-entregas' ||
+      pathname?.startsWith('/vendas/relatorio-entregas/')
     ) {
       setExpandedMenus(prev => {
         const next = new Set(prev)
@@ -136,6 +138,7 @@ export function Sidebar() {
         children: [
           { name: 'Vendas PDV', path: '/relatorios-vendas', icon: '📄' },
           { name: 'Produtos vendidos', path: '/relatorios-produtos-vendidos', icon: '🛒' },
+          { name: 'Entregas', path: '/vendas/relatorio-entregas', icon: '🛵' },
         ],
       },
       { name: 'Configurações', path: '/configuracoes/empresa', icon: '⚙️' },
