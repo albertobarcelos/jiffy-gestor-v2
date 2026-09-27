@@ -139,17 +139,6 @@ export function KanbanColuna(props: KanbanColunaProps) {
                 </Select>
               </FormControl>
             )}
-            {onOcultarColuna ? (
-              <button
-                type="button"
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-white/70 text-gray-700 hover:bg-white"
-                onClick={() => onOcultarColuna(colId)}
-                aria-label={`Esconder coluna ${column.title}`}
-                title="Esconder coluna"
-              >
-                <MdVisibilityOff className="h-4 w-4" />
-              </button>
-            ) : null}
           </div>
         </div>
       </div>
