@@ -371,15 +371,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
     )
   }
 
-  if (!isLoading && localProdutos.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-secondary-text text-sm ">
-          Nenhum produto associado a esta categoria.
-        </p>
-      </div>
-    )
-  }
+  const listaVazia = !isLoading && localProdutos.length === 0
 
   return (
     <>
@@ -401,11 +393,13 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
           </button>
         </div>
 
-        <div className="mt-1 grid grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] items-center gap-3 rounded-lg bg-custom-2 px-2 py-2 text-xs font-semibold text-secondary-text md:grid-cols-[minmax(0,1fr)_5.5rem_6.5rem] md:text-sm">
-          <span>Produto</span>
-          <span className="text-right">Valor</span>
-          <span className="text-center">Ordem</span>
-        </div>
+        {!listaVazia ? (
+          <div className="mt-1 grid grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] items-center gap-3 rounded-lg bg-custom-2 px-2 py-2 text-xs font-semibold text-secondary-text md:grid-cols-[minmax(0,1fr)_5.5rem_6.5rem] md:text-sm">
+            <span>Produto</span>
+            <span className="text-right">Valor</span>
+            <span className="text-center">Ordem</span>
+          </div>
+        ) : null}
 
         <div
           ref={listRef}
@@ -421,28 +415,39 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
             </div>
           )}
 
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={localProdutos.map((produto) => produto.id)}
-              strategy={verticalListSortingStrategy}
+          {listaVazia ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+              <p className="text-sm text-secondary-text">
+                Nenhum produto associado a esta categoria.
+              </p>
+              <p className="text-xs text-secondary-text">
+                Use &quot;Novo produto&quot; para cadastrar o primeiro nesta categoria.
+              </p>
+            </div>
+          ) : (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
             >
-              {localProdutos.map((produto, index) => (
-                <ProdutoItem
-                  key={produto.id}
-                  produto={produto}
-                  index={index}
-                  total={localProdutos.length}
-                  formatCurrency={formatCurrency}
-                  onEdit={handleEditProduto}
-                  onMove={handleMoveProduto}
-                />
-              ))}
-            </SortableContext>
-          </DndContext>
+              <SortableContext
+                items={localProdutos.map((produto) => produto.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {localProdutos.map((produto, index) => (
+                  <ProdutoItem
+                    key={produto.id}
+                    produto={produto}
+                    index={index}
+                    total={localProdutos.length}
+                    formatCurrency={formatCurrency}
+                    onEdit={handleEditProduto}
+                    onMove={handleMoveProduto}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+          )}
 
           {hasNextPage && (
             <div ref={loadMoreRef} className="py-4">
