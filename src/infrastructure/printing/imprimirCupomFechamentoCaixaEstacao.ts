@@ -1,7 +1,7 @@
 import { mapOperacaoCaixaEstacaoToPrintDocument } from '@/src/application/caixa-estacao/mapOperacaoCaixaEstacaoToPrintDocument'
 import type { OperacaoCaixaEstacaoDTO } from '@/src/application/dto/caixa-estacao/OperacaoCaixaEstacaoDTO'
 import { mapOperacaoCaixaEstacao } from '@/src/application/mappers/caixa-estacao/OperacaoCaixaEstacaoMapper'
-import type { EstacaoImpressaoMapeamento } from '@/src/infrastructure/api/estacoesImpressaoApi'
+import type { EstacaoImpressaoMapeamento } from '@/src/domain/estacao-impressao/EstacaoImpressao'
 import {
   printDeliveryCupom,
   type PrintDeliveryCupomResult,

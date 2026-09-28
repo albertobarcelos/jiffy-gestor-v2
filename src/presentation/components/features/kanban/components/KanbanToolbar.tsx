@@ -477,12 +477,12 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
             onClick={onAbrirConfiguracoesDelivery}
             className="rounded-lg border border-gray-200 bg-white p-1.5 text-gray-600 shadow-sm transition-colors hover:bg-gray-50 hover:text-primary"
             title={
-              isModoDelivery ? 'Configurações do delivery' : 'Cardápio do balcão'
+              isModoDelivery ? 'Configurações do delivery' : 'Configurações do balcão'
             }
             aria-label={
               isModoDelivery
                 ? 'Abrir configurações do delivery'
-                : 'Escolher cardápio do balcão'
+                : 'Abrir configurações do balcão'
             }
           >
             <MdSettings className="h-5 w-5" />
