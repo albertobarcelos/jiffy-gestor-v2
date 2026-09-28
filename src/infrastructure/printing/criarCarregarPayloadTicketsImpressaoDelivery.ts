@@ -9,10 +9,10 @@ import {
 } from '@/src/infrastructure/api/meiosPagamentoNomeCache'
 import { buscarMapeamentosEstacao } from '@/src/infrastructure/api/estacoesImpressaoApi'
 import { vendaDetalheReadRepository } from '@/src/infrastructure/api/repositories/VendaDetalheReadRepository'
-import { getEstacaoImpressaoId } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
+import { estacaoDestePcLocalStore } from '@/src/infrastructure/printing/EstacaoDestePcLocalStore'
 
 export const carregarPayloadTicketsImpressaoDelivery = criarCarregarPayloadTicketsImpressaoDelivery({
-  obterEstacaoId: getEstacaoImpressaoId,
+  obterEstacaoId: () => estacaoDestePcLocalStore.obterId(),
   buscarInstrucoes: fetchInstrucoesImpressaoPedido,
   buscarPedido: fetchPedidoDeliveryDetalhe,
   buscarMapeamentos: buscarMapeamentosEstacao,

@@ -6,6 +6,7 @@ import { DefinirEstacaoReceptoraDeliveryUseCase } from '@/src/application/use-ca
 import { RenomearEstacaoDestePcUseCase } from '@/src/application/use-cases/estacao-impressao/RenomearEstacaoDestePcUseCase'
 import { ResolverEstacaoImpressaoDestePcUseCase } from '@/src/application/use-cases/estacao-impressao/ResolverEstacaoImpressaoDestePcUseCase'
 import { SalvarMapeamentosEstacaoUseCase } from '@/src/application/use-cases/estacao-impressao/SalvarMapeamentosEstacaoUseCase'
+import { LembrarNomeEstacaoDestePcUseCase } from '@/src/application/use-cases/estacao-impressao/LembrarNomeEstacaoDestePcUseCase'
 import { VincularEstacaoDestePcUseCase } from '@/src/application/use-cases/estacao-impressao/VincularEstacaoDestePcUseCase'
 import {
   ESTACAO_IMPRESSAO_CONFIG_VAZIA,
@@ -15,7 +16,9 @@ import {
 function storeFake(id: string | null = null): IEstacaoDestePcStore {
   return {
     obterId: vi.fn().mockReturnValue(id),
+    obterNome: vi.fn().mockReturnValue(null),
     salvar: vi.fn(),
+    lembrarNome: vi.fn(),
     limpar: vi.fn(),
   }
 }
@@ -92,6 +95,20 @@ describe('VincularEstacaoDestePcUseCase', () => {
     new VincularEstacaoDestePcUseCase(store).execute('   ')
     expect(store.limpar).toHaveBeenCalled()
     expect(store.salvar).not.toHaveBeenCalled()
+  })
+})
+
+describe('LembrarNomeEstacaoDestePcUseCase', () => {
+  it('grava o nome neste PC', () => {
+    const store = storeFake()
+    new LembrarNomeEstacaoDestePcUseCase(store).execute('  Caixa 1  ')
+    expect(store.lembrarNome).toHaveBeenCalledWith('Caixa 1')
+  })
+
+  it('ignora nome vazio', () => {
+    const store = storeFake()
+    new LembrarNomeEstacaoDestePcUseCase(store).execute('   ')
+    expect(store.lembrarNome).not.toHaveBeenCalled()
   })
 })
 

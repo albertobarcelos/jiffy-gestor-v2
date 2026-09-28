@@ -4,6 +4,8 @@
  */
 export interface IEstacaoDestePcStore {
   obterId(): string | null
+  obterNome(): string | null
   salvar(id: string, nome?: string): void
+  lembrarNome(nome: string): void
   limpar(): void
 }

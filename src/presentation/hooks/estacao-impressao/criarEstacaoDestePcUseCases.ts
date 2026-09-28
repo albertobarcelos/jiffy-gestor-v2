@@ -1,15 +1,21 @@
 import { CriarEstacaoDestePcUseCase } from '@/src/application/use-cases/estacao-impressao/CriarEstacaoDestePcUseCase'
 import { DefinirEstacaoReceptoraDeliveryUseCase } from '@/src/application/use-cases/estacao-impressao/DefinirEstacaoReceptoraDeliveryUseCase'
+import { LembrarNomeEstacaoDestePcUseCase } from '@/src/application/use-cases/estacao-impressao/LembrarNomeEstacaoDestePcUseCase'
 import { ListarEstacoesImpressaoUseCase } from '@/src/application/use-cases/estacao-impressao/ListarEstacoesImpressaoUseCase'
 import { ListarImpressorasLogicasEstacaoUseCase } from '@/src/application/use-cases/estacao-impressao/ListarImpressorasLogicasEstacaoUseCase'
 import { RenomearEstacaoDestePcUseCase } from '@/src/application/use-cases/estacao-impressao/RenomearEstacaoDestePcUseCase'
 import { ResolverEstacaoImpressaoDestePcUseCase } from '@/src/application/use-cases/estacao-impressao/ResolverEstacaoImpressaoDestePcUseCase'
 import { SalvarMapeamentosEstacaoUseCase } from '@/src/application/use-cases/estacao-impressao/SalvarMapeamentosEstacaoUseCase'
 import { VincularEstacaoDestePcUseCase } from '@/src/application/use-cases/estacao-impressao/VincularEstacaoDestePcUseCase'
+import type { IEstacaoDestePcStore } from '@/src/application/ports/IEstacaoDestePcStore'
 import { EstacaoImpressaoApiRepository } from '@/src/infrastructure/api/repositories/EstacaoImpressaoApiRepository'
-import { EstacaoDestePcLocalStore } from '@/src/infrastructure/printing/EstacaoDestePcLocalStore'
+import { estacaoDestePcLocalStore } from '@/src/infrastructure/printing/EstacaoDestePcLocalStore'
 
-const store = new EstacaoDestePcLocalStore()
+const store = estacaoDestePcLocalStore
+
+export function estacaoDestePcStore(): IEstacaoDestePcStore {
+  return store
+}
 
 export function criarEstacaoImpressaoUseCases(token: string) {
   const gateway = new EstacaoImpressaoApiRepository(token)
@@ -35,4 +41,8 @@ export function criarEstacaoDestePcUseCases(token: string) {
 
 export function vincularEstacaoDestePcUseCase() {
   return new VincularEstacaoDestePcUseCase(store)
+}
+
+export function lembrarNomeEstacaoDestePcUseCase() {
+  return new LembrarNomeEstacaoDestePcUseCase(store)
 }
