@@ -22,6 +22,8 @@ interface TipoVendaIconProps {
   corBalcao?: string // Cor do ícone de balcão - padrão: var(--color-alternate)
   corGestor?: string // Cor do rótulo "Gestor" - padrão: var(--color-alternate)
   corEntrega?: string // Cor do ícone/rótulo "Entrega" - padrão: var(--color-primary)
+  /** Aproxima o rótulo do ícone (listagem de relatório). */
+  compactLabel?: boolean
 }
 
 /**
@@ -58,6 +60,7 @@ export function TipoVendaIcon({
   corGestor = 'var(--color-alternate)',
   corEntrega = 'var(--color-primary)',
   title,
+  compactLabel = false,
 }: TipoVendaIconProps) {
   const scale = containerScale
   const outerCircleSize = size // Tamanho do SVG e do container principal (mantém pétalas/tamanhos)
@@ -70,6 +73,7 @@ export function TipoVendaIcon({
   const balcaoTextSize = size / 5 // Tamanho da fonte do texto "Balcão"
   const gestorTextSize = size / 5 // Tamanho da fonte do texto "Gestor"
   const entregaTextSize = size / 5
+  const labelGapClass = compactLabel ? '-mt-1 leading-none' : 'mt-1'
 
   if (tipoVenda === 'mesa') {
     return (
@@ -185,18 +189,18 @@ export function TipoVendaIcon({
       <div
         className={`flex flex-col items-center justify-center ${className}`}
         style={{
-          height: `${iconHeight}px`,
+          height: compactLabel ? 'auto' : `${iconHeight}px`,
           width: `${outerCircleSize}px`,
-          minHeight: `${iconHeight}px`,
+          minHeight: compactLabel ? undefined : `${iconHeight}px`,
           minWidth: `${outerCircleSize}px`,
-          maxHeight: `${iconHeight}px`,
+          maxHeight: compactLabel ? undefined : `${iconHeight}px`,
           maxWidth: `${outerCircleSize}px`,
           flexShrink: 0,
         }}
       >
         <RiBeerFill size={beerIconSize} color={corBalcao} />
         <span
-          className="mt-1 whitespace-nowrap font-medium"
+          className={`${labelGapClass} whitespace-nowrap font-medium`}
           style={{ color: corBalcao, fontSize: `${balcaoTextSize}px`, lineHeight: 1 }}
         >
           Balcão
@@ -210,11 +214,11 @@ export function TipoVendaIcon({
       <div
         className={`flex flex-col items-center justify-center ${title ? 'tooltip-hover' : ''} ${className}`}
         style={{
-          height: `${iconHeight}px`,
+          height: compactLabel ? 'auto' : `${iconHeight}px`,
           width: `${outerCircleSize}px`,
-          minHeight: `${iconHeight}px`,
+          minHeight: compactLabel ? undefined : `${iconHeight}px`,
           minWidth: `${outerCircleSize}px`,
-          maxHeight: `${iconHeight}px`,
+          maxHeight: compactLabel ? undefined : `${iconHeight}px`,
           maxWidth: `${outerCircleSize}px`,
           flexShrink: 0,
         }}
@@ -236,7 +240,7 @@ export function TipoVendaIcon({
           />
         )}
         <span
-          className="mt-1 whitespace-nowrap font-medium"
+          className={`${labelGapClass} whitespace-nowrap font-medium`}
           style={{ color: corEntrega, fontSize: `${entregaTextSize}px`, lineHeight: 1 }}
         >
           {tipoVenda === 'retirada' ? 'Retirada' : tipoVenda === 'entrega' ? 'Entrega' : 'Delivery'}
@@ -251,11 +255,11 @@ export function TipoVendaIcon({
       <div
         className={`flex flex-col items-center justify-center ${title ? 'tooltip-hover' : ''} ${className}`}
         style={{
-          height: `${iconHeight}px`,
+          height: compactLabel ? 'auto' : `${iconHeight}px`,
           width: `${outerCircleSize}px`,
-          minHeight: `${iconHeight}px`,
+          minHeight: compactLabel ? undefined : `${iconHeight}px`,
           minWidth: `${outerCircleSize}px`,
-          maxHeight: `${iconHeight}px`,
+          maxHeight: compactLabel ? undefined : `${iconHeight}px`,
           maxWidth: `${outerCircleSize}px`,
           flexShrink: 0,
         }}
@@ -274,7 +278,7 @@ export function TipoVendaIcon({
           
         </div>
         <span
-          className="mt-1 whitespace-nowrap font-medium"
+          className={`${labelGapClass} whitespace-nowrap font-medium`}
           style={{ color: corGestor, fontSize: `${gestorTextSize}px`, lineHeight: 1 }}
         >
           Gestor

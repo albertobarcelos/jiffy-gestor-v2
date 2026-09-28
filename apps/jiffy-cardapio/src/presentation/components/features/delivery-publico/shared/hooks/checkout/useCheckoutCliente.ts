@@ -23,6 +23,7 @@ import {
   comporTelefoneApi,
   formatarTelefonePorPais,
 } from '@/src/shared/utils/deliveryTelefonePais'
+import { formatarCpfCnpjInput } from '@/src/shared/utils/cpfCnpj'
 import { showToast } from '@/src/shared/utils/toast'
 import {
   type DeliveryCheckoutCotacaoState,
@@ -139,11 +140,15 @@ export function useCheckoutCliente({
         const maisRecente = escolherEnderecoMaisRecenteCliente(enderecos)
         const nomeApi = cliente?.nome?.trim() ?? ''
         const nome = nomeApi || prev.nome.trim() || ''
+        const cpfDigits = cliente?.cpf?.replace(/\D/g, '').slice(0, 11) ?? ''
+        const cpfNotaFiscal =
+          cpfDigits.length === 11 ? formatarCpfCnpjInput(cpfDigits) : ''
 
         if (preferirNovoEnderecoRef.current) {
           return {
             ...prev,
             nome,
+            cpfNotaFiscal,
             modoEndereco: 'novo',
             enderecoIdSelecionado: '',
           }
@@ -153,6 +158,7 @@ export function useCheckoutCliente({
           return {
             ...prev,
             nome,
+            cpfNotaFiscal,
             modoEndereco: 'existente',
             enderecoIdSelecionado: maisRecente.id,
           }
@@ -161,6 +167,7 @@ export function useCheckoutCliente({
         return {
           ...prev,
           nome,
+          cpfNotaFiscal,
           modoEndereco: 'novo',
           enderecoIdSelecionado: '',
         }
@@ -171,8 +178,11 @@ export function useCheckoutCliente({
 
   useEffect(() => {
     if (clienteLookup.status !== 'encontrado') return
-    const nomeApi = clienteLookup.cliente?.nome?.trim()
-    if (!nomeApi) return
+    const cliente = clienteLookup.cliente
+    if (!cliente) return
+    const nomeApi = cliente.nome?.trim() ?? ''
+    const cpfDigits = cliente.cpf?.replace(/\D/g, '').slice(0, 11) ?? ''
+    if (!nomeApi && cpfDigits.length !== 11) return
     const telConsultado = clienteLookup.telefoneConsultado
     if (!telConsultado) return
     const telForm = comporTelefoneApi(
@@ -184,8 +194,13 @@ export function useCheckoutCliente({
     }
 
     setForm(prev => {
-      if (prev.nome.trim()) return prev
-      return { ...prev, nome: nomeApi }
+      const nextNome = prev.nome.trim() ? prev.nome : nomeApi
+      const nextCpf =
+        cpfDigits.length === 11
+          ? formatarCpfCnpjInput(cpfDigits)
+          : prev.cpfNotaFiscal
+      if (nextNome === prev.nome && nextCpf === prev.cpfNotaFiscal) return prev
+      return { ...prev, nome: nextNome, cpfNotaFiscal: nextCpf }
     })
   }, [
     clienteLookup.status,
@@ -212,6 +227,7 @@ export function useCheckoutCliente({
           ...prev,
           modoEndereco: 'novo',
           enderecoIdSelecionado: '',
+          cpfNotaFiscal: '',
         }))
         return { status: 'invalido', cliente: null }
       }
@@ -464,6 +480,7 @@ export function useCheckoutCliente({
       ...prev,
       telefone: tel ? formatarTelefonePorPais(tel, 'BR') : prev.telefone,
       nome: '',
+      cpfNotaFiscal: '',
       modoEndereco: 'novo',
       enderecoIdSelecionado: '',
     }))

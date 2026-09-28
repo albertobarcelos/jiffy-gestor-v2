@@ -17,14 +17,28 @@ export interface VendaListTaxaLancadaItem {
   dataRemocao?: string | null
 }
 
+export type VendaListTipoVenda =
+  | 'balcao'
+  | 'mesa'
+  | 'gestor'
+  | 'delivery'
+  | 'entrega'
+  | 'retirada'
+  | string
+
 export interface VendaListItem {
   id: string
   numeroVenda: number
   codigoVenda: string
   numeroMesa?: number
   valorFinal: number
-  tipoVenda: 'balcao' | 'mesa' | 'gestor'
+  tipoVenda: VendaListTipoVenda
+  /** Logística do delivery. Não substitui `tipoVenda`. */
+  tipoEntrega?: 'entrega' | 'retirada' | null
+  origem?: string | null
+  tabelaOrigem?: 'venda' | 'venda_gestor'
   abertoPorId: string
+  abertoPorNome?: string
   canceladoPorId?: string
   codigoTerminal: string
   terminalId: string
@@ -37,16 +51,20 @@ export interface VendaListItem {
   pagamentos?: VendaListPagamentoItem[]
   status?: string
   totalValorProdutosRemovidos?: number
+  documentoFiscalId?: string | null
 }
 
 export interface MetricasVendas {
   totalFaturado: number
   countVendasEfetivadas: number
   countVendasCanceladas: number
-  countProdutosVendidos: number
+  /** Ausente na listagem unificada (sem itens da venda). */
+  countProdutosVendidos: number | null
+  /** Soma de `valorFinal` das vendas canceladas do conjunto completo. */
+  totalCancelado: number
 }
 
-/** Snapshot dos filtros para montar a query da listagem (GET /api/vendas). */
+/** Snapshot dos filtros para montar a query da listagem (GET /api/vendas/unificado). */
 export interface VendasFiltrosQuerySnapshot {
   searchQuery: string
   valorMinimo: string

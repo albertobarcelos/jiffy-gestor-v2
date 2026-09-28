@@ -256,10 +256,10 @@ export function InformacoesProdutoStep({
               variant="outlined"
               sx={sxEntradaCompactaProdutoSelect}
             >
-              <InputLabel id="np-unidade-label">Unidade</InputLabel>
+              <InputLabel id="np-unidade-label">Unid. Medida</InputLabel>
               <Select
                 labelId="np-unidade-label"
-                label="Unidade"
+                label="Unid. Medida"
                 value={unidadeProduto || ''}
                 onChange={e => onUnidadeProdutoChange(e.target.value || null)}
               >

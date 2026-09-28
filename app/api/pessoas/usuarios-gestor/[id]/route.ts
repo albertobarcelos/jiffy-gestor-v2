@@ -19,9 +19,9 @@ export async function GET(
     const { tokenInfo } = validation
 
     const { id: idBruto } = await params
-    const id = idUsuarioParaConsulta(idBruto) || idBruto
+    const id = idUsuarioParaConsulta(idBruto)
     if (!id) {
-      return NextResponse.json({ error: 'ID do usuário gestor é obrigatório' }, { status: 400 })
+      return NextResponse.json({ error: 'Usuário gestor não encontrado' }, { status: 404 })
     }
 
     const apiClient = new ApiClient()
@@ -34,13 +34,16 @@ export async function GET(
 
     return NextResponse.json(response.data)
   } catch (error) {
-    console.error('Erro ao buscar usuário gestor:', error)
     if (error instanceof ApiError) {
+      if (error.status !== 404) {
+        console.error('Erro ao buscar usuário gestor:', error)
+      }
       return NextResponse.json(
         { error: error.message || 'Erro ao buscar usuário gestor' },
         { status: error.status }
       )
     }
+    console.error('Erro ao buscar usuário gestor:', error)
     return NextResponse.json(
       { error: 'Erro interno do servidor' },
       { status: 500 }

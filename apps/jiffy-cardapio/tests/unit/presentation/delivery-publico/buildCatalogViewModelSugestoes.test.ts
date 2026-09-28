@@ -42,7 +42,7 @@ function grupoBase(
 }
 
 describe('buildCatalogViewModel — grupo Sugestões', () => {
-  it('não injeta Sugestões sem grupo real, mesmo com favoritos', () => {
+  it('injeta Sugestões quando há favoritos, sem exigir grupo portador', () => {
     const grupos = [
       grupoBase({
         id: 'g1',
@@ -53,18 +53,14 @@ describe('buildCatalogViewModel — grupo Sugestões', () => {
 
     const vm = buildCatalogViewModel(grupos)
 
-    expect(vm.grupos).toHaveLength(1)
-    expect(vm.grupos[0]?.id).toBe('g1')
+    expect(vm.grupos[0]?.id).toBe(DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID)
+    expect(vm.grupos[0]?.nome).toBe(DELIVERY_PUBLICO_GRUPO_SUGESTOES_NOME)
+    expect(vm.grupos[0]?.produtos.map(p => p.id)).toEqual(['p1'])
+    expect(vm.grupos).toHaveLength(2)
   })
 
-  it('não injeta Sugestões com grupo real mas sem favoritos', () => {
+  it('não injeta Sugestões sem favoritos', () => {
     const grupos = [
-      grupoBase({
-        id: 'sug',
-        nome: DELIVERY_PUBLICO_GRUPO_SUGESTOES_NOME,
-        imagemUrl: 'https://cdn.example/banner.jpg',
-        produtos: [],
-      }),
       grupoBase({
         id: 'g1',
         nome: 'Bebidas',
@@ -75,18 +71,12 @@ describe('buildCatalogViewModel — grupo Sugestões', () => {
     const vm = buildCatalogViewModel(grupos)
 
     expect(vm.grupos.every(g => g.id !== DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID)).toBe(true)
-    expect(vm.grupos.every(g => g.id !== 'sug')).toBe(true)
     expect(vm.grupos).toHaveLength(1)
+    expect(vm.grupos[0]?.id).toBe('g1')
   })
 
-  it('injeta Sugestões com imagem do grupo real e omite o grupo da lista', () => {
+  it('lista favoritos de vários grupos no carrossel e mantém os grupos originais', () => {
     const grupos = [
-      grupoBase({
-        id: 'sug',
-        nome: 'sugestões da casa',
-        imagemUrl: 'https://cdn.example/banner.jpg',
-        produtos: [],
-      }),
       grupoBase({
         id: 'g1',
         nome: 'Lanches',
@@ -107,20 +97,12 @@ describe('buildCatalogViewModel — grupo Sugestões', () => {
     const vm = buildCatalogViewModel(grupos)
 
     expect(vm.grupos[0]?.id).toBe(DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID)
-    expect(vm.grupos[0]?.nome).toBe(DELIVERY_PUBLICO_GRUPO_SUGESTOES_NOME)
-    expect(vm.grupos[0]?.imagemUrl).toBe('https://cdn.example/banner.jpg')
     expect(vm.grupos[0]?.produtos.map(p => p.id)).toEqual(['p3', 'p1'])
-    expect(vm.grupos.some(g => g.id === 'sug')).toBe(false)
     expect(vm.grupos).toHaveLength(3)
   })
 
   it('mantém favoritos também no grupo original e grupoId de origem', () => {
     const grupos = [
-      grupoBase({
-        id: 'sug',
-        nome: DELIVERY_PUBLICO_GRUPO_SUGESTOES_NOME,
-        produtos: [],
-      }),
       grupoBase({
         id: 'g-origem',
         nome: 'Pratos',
@@ -136,28 +118,5 @@ describe('buildCatalogViewModel — grupo Sugestões', () => {
     expect(sugestoes?.produtos[0]?.grupoId).toBe('g-origem')
     expect(origem?.id).toBe('g-origem')
     expect(origem?.produtos.map(p => p.id)).toEqual(['fav-1'])
-  })
-
-  it('reconhece carrier sem acento e em maiúsculas e exibe nome com acento', () => {
-    const grupos = [
-      grupoBase({
-        id: 'sug',
-        nome: 'SUGESTOES DA CASA',
-        imagemUrl: 'https://cdn.example/banner.jpg',
-        produtos: [],
-      }),
-      grupoBase({
-        id: 'g1',
-        nome: 'Lanches',
-        produtos: [produtoBase({ id: 'p1', nome: 'X', favorito: true })],
-      }),
-    ]
-
-    const vm = buildCatalogViewModel(grupos)
-
-    expect(vm.grupos[0]?.id).toBe(DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID)
-    expect(vm.grupos[0]?.nome).toBe(DELIVERY_PUBLICO_GRUPO_SUGESTOES_NOME)
-    expect(vm.grupos[0]?.imagemUrl).toBe('https://cdn.example/banner.jpg')
-    expect(vm.grupos.some(g => g.id === 'sug')).toBe(false)
   })
 })

@@ -67,6 +67,10 @@ GESTOR_URL=http://localhost:5000 CARDAPIO_PUBLIC_URL=http://localhost:5001 SLUG=
 
 - [ ] `npm run build` e `npm test` em `apps/jiffy-cardapio`
 - [ ] `npm run cardapio:smoke` com slug real
+- [ ] `https://cardapio.jiffy.run/robots.txt` é texto (`User-agent`), não o app
+- [ ] Backend `GET /api/v1/delivery/slugs-publicos` no ar — o sitemap não tem lista local
+- [ ] HTML `/{slug}` com `s-maxage` ~30 (2ª abertura HIT; outra loja não reaproveita)
+- [ ] Foto de produto via `/_next/image` (não `original.jpg` no LCP)
 - [ ] Pedido teste entrega + retirada no host novo
 - [ ] `NEXT_PUBLIC_CARDAPIO_PUBLIC_URL` no Gestor apontando para o host
 - [ ] Link antigo `/delivery/{slug}` redireciona

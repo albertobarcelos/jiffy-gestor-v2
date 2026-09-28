@@ -1,9 +1,12 @@
 import type {
+  MetodoPagamentoRelatorio,
   VendaListItem,
   VendaListPagamentoItem,
   VendaListTaxaLancadaItem,
 } from './vendasListTypes'
+import { ehFormaPagamentoDinheiro } from '@/src/shared/utils/corFormaPagamentoFiscal'
 import { calcularQuantidadeProdutosVendidosDetalhe } from './vendasListCalculos'
+import { endpointDetalheVendaRelatorio } from './vendasListQuery'
 
 const EXPORT_PAGAMENTOS_CONCORRENCIA = 8
 
@@ -127,6 +130,75 @@ function normalizarFallbackMetodoPagamento(metodoPagamento?: string): string {
   return unicos.length === 1 ? unicos[0] : unicos.join('\n')
 }
 
+function arredondarCentavos(valor: number): number {
+  return Math.round(valor * 100) / 100
+}
+
+/**
+ * Totais por forma nas vendas faturadas (finalizadas e não canceladas).
+ * Troco sai do dinheiro (valor recebido − valorFinal), igual ao dashboard.
+ * Sem pagamento válido, o valor da venda entra em "Sem forma registrada".
+ */
+export function agregarFormasPagamentoRelatorio(
+  vendas: VendaListItem[],
+  pagamentosPorVendaId: Map<string, VendaListPagamentoItem[]>,
+  meiosPagamentoPorId: Map<string, string>
+): MetodoPagamentoRelatorio[] {
+  const grupos = new Map<string, { metodo: string; valor: number; quantidade: number }>()
+
+  const somar = (chave: string, metodo: string, valor: number) => {
+    const existente = grupos.get(chave)
+    if (existente) {
+      existente.valor = arredondarCentavos(existente.valor + valor)
+      existente.quantidade += 1
+    } else {
+      grupos.set(chave, { metodo, valor: arredondarCentavos(valor), quantidade: 1 })
+    }
+  }
+
+  for (const venda of vendas) {
+    if (venda.dataCancelamento) continue
+    if (!venda.dataFinalizacao) continue
+
+    const pagamentos = (pagamentosPorVendaId.get(venda.id) ?? venda.pagamentos ?? []).filter(
+      pagamentoValidoParaRelatorio
+    )
+
+    if (pagamentos.length === 0) {
+      somar('__sem_forma__', 'Sem forma registrada', Number(venda.valorFinal) || 0)
+      continue
+    }
+
+    const totalPago = pagamentos.reduce((soma, item) => soma + (Number(item.valor) || 0), 0)
+    const troco = Math.max(0, arredondarCentavos(totalPago - (Number(venda.valorFinal) || 0)))
+    const totalDinheiro = pagamentos.reduce((soma, item) => {
+      const nome = obterNomeMeioPagamento(item, meiosPagamentoPorId)
+      return ehFormaPagamentoDinheiro('', nome) ? soma + (Number(item.valor) || 0) : soma
+    }, 0)
+
+    for (const pagamento of pagamentos) {
+      const nome = obterNomeMeioPagamento(pagamento, meiosPagamentoPorId)
+      const valorOriginal = Number(pagamento.valor) || 0
+      let valor = valorOriginal
+      if (troco > 0 && totalDinheiro > 0 && ehFormaPagamentoDinheiro('', nome)) {
+        valor = Math.max(0, valorOriginal - troco * (valorOriginal / totalDinheiro))
+      }
+      const chave = pagamento.meioPagamentoId || nome
+      somar(chave, nome, valor)
+    }
+  }
+
+  const total = Array.from(grupos.values()).reduce((soma, grupo) => soma + grupo.valor, 0)
+  return Array.from(grupos.values())
+    .map(grupo => ({
+      metodo: grupo.metodo,
+      valor: grupo.valor,
+      quantidade: grupo.quantidade,
+      percentual: total === 0 ? 0 : (grupo.valor / total) * 100,
+    }))
+    .sort((a, b) => b.valor - a.valor)
+}
+
 export function formatarFormasPagamentoCelulaExport(
   pagamentos: VendaListPagamentoItem[] | undefined,
   meiosPagamentoPorId: Map<string, string>,
@@ -160,9 +232,10 @@ function mapearTaxaLancadaApiRow(raw: Record<string, unknown>): VendaListTaxaLan
 
 async function buscarDetalheVendaExport(
   vendaId: string,
-  token: string
+  token: string,
+  tabelaOrigem?: 'venda' | 'venda_gestor'
 ): Promise<VendaDetalheExport> {
-  const response = await fetch(`/api/vendas/${vendaId}`, {
+  const response = await fetch(endpointDetalheVendaRelatorio(vendaId, tabelaOrigem), {
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
@@ -223,7 +296,7 @@ async function executarPool<T>(
 }
 
 /**
- * Carrega pagamentos, quantidade de produtos e taxas via GET /api/vendas/:id (a listagem não inclui).
+ * Carrega pagamentos, quantidade de produtos e taxas via GET de detalhe (PDV ou Gestor).
  */
 export async function buscarDetalhesVendasParaExport(input: {
   vendas: VendaListItem[]
@@ -241,7 +314,7 @@ export async function buscarDetalhesVendasParaExport(input: {
   let processadas = 0
 
   await executarPool(vendas, EXPORT_PAGAMENTOS_CONCORRENCIA, async venda => {
-    const detalhe = await buscarDetalheVendaExport(venda.id, token)
+    const detalhe = await buscarDetalheVendaExport(venda.id, token, venda.tabelaOrigem)
     pagamentosPorVendaId.set(venda.id, detalhe.pagamentos)
     quantidadeProdutosPorVendaId.set(venda.id, detalhe.quantidadeProdutos)
     taxasLancadasPorVendaId.set(venda.id, detalhe.taxasLancadas)

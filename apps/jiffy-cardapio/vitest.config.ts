@@ -11,6 +11,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, '.'),
+      '@jiffy/preco-vigente-snapshot': path.resolve(
+        __dirname,
+        '../../src/domain/policies/menu/precoVigenteSnapshot.ts'
+      ),
     },
   },
 })

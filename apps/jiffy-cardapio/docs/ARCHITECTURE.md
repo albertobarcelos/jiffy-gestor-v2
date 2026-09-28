@@ -61,6 +61,47 @@ Todas as chamadas ao backend passam por rotas `app/api/...` deste app. O cliente
 1. Esconde a URL e credenciais do backend do browser
 2. Permite rate-limit e validação de entrada
 3. Facilita migração de URL sem mudar o frontend
+4. Encaminha o IP do celular (`X-Forwarded-For`) para o backend — o 10/min de cotação/pedido é por cliente, não por egress da Vercel
+
+## Cache multi-empresa (por slug)
+
+Há ~200 lojas. Nenhum cache é global.
+
+| Superfície | Chave | TTL |
+|------------|--------|-----|
+| HTML/RSC `/{slug}` e `/{slug}/carrinho` | path (ISR on-demand, `generateStaticParams = []`) | 30s |
+| Prefetch RSC do catálogo | URL + tag `catalogo-publico:{slug}` | 30s |
+| BFF `GET /api/public/delivery/catalogo/{slug}` | URL | `s-maxage=30, swr=60` |
+| React Query no browser | `['public-delivery', slug, ...]` | 5 min stale |
+
+POST cotação/pedido/cliente: `no-store`.
+
+Publicar design/cardápio no Gestor pode levar até 30s para aparecer no celular. Aberto/fechado idem.
+
+## SEO / Google (por loja)
+
+Não existe um cardápio global. Cada `/{slug}` precisa de título, cidade e JSON-LD próprios.
+
+| Arquivo | Papel |
+|---------|--------|
+| `app/robots.ts` | `Allow: /` — **não** deixar `/robots.txt` cair no `[slug]` |
+| `app/sitemap.ts` | só `GET /api/v1/delivery/slugs-publicos` (1h). Sem env. |
+| `generateMetadata` em `/{slug}` | `{nome} \| Delivery em {cidade}` |
+| JSON-LD `FoodEstablishment` | endereço + geo daquela empresa |
+
+Carrinho e pedido: `noindex`. Visibilidade na cidade do cliente também depende do Google Perfil da Empresa apontar para `cardapio.jiffy.run/{slug}`.
+
+Contrato do sitemap (Wilcker):
+
+```http
+GET /api/v1/delivery/slugs-publicos
+```
+
+Sem auth. Só lojas com delivery ativo e slug publicado. Corpo: `{ "slugs": ["nexsyn", "outra-loja"] }`. Sem id, telefone ou endereço.
+
+## Imagens (mobile first)
+
+`next/image` recorta capa, logo e cards. Só a **capa** leva `priority` (LCP no 4G). Logo e produtos entram lazy para não competir com a capa. Hosts conhecidos (S3, CloudFront, R2) passam pelo otimizador; CDN próprio da loja cai no original (`unoptimized`).
 
 ## Estado local
 

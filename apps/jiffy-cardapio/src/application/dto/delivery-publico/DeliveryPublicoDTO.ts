@@ -27,6 +27,10 @@ export type CatalogoPublicoProdutoDTO = {
   id: string
   nome: string
   valor: number
+  valorPromocional?: number
+  /** Campo opcional do backend; o preço exibido usa valor + valorPromocional + promocaoAtiva. */
+  valorVigente?: number
+  promocaoAtiva?: boolean
   descricao: string | null
   imagemUrl: string | null
   ordem: number
@@ -80,6 +84,11 @@ export type EmpresaPublicaDTO = {
   segmento: string | null
   logoUrl: string | null
   bannerUrl: string | null
+  /**
+   * Quando true, o checkout exige CPF do cliente para finalizar o pedido.
+   * Vem na raiz da empresa pública (não em parametroDelivery).
+   */
+  exigeCpfVenda?: boolean
   endereco: {
     rua: string
     numero: string

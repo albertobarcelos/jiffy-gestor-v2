@@ -1,4 +1,5 @@
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
+import { latLngFromGeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import type { EnderecoGeocodeInput } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 import { mensagemAmigavelErroGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 import {
@@ -34,6 +35,26 @@ export type PlacesBias = {
   lat: number
   lng: number
   radiusMeters?: number
+}
+
+/**
+ * Raio padrão para viesar autocomplete perto da loja.
+ * Places API aceita no máximo 50 km; 25 km cobre bem a cidade sem “endurecer” demais.
+ */
+export const PLACES_BIAS_RADIUS_LOJA_METROS = 25_000
+
+/** Converte a localização da empresa (GeoJSON Point) em bias do Places autocomplete. */
+export function placesBiasFromGeoJsonPoint(
+  point: GeoJsonPoint | null | undefined,
+  radiusMeters: number = PLACES_BIAS_RADIUS_LOJA_METROS
+): PlacesBias | null {
+  const ll = latLngFromGeoJsonPoint(point)
+  if (!ll) return null
+  return {
+    lat: ll.lat,
+    lng: ll.lng,
+    radiusMeters,
+  }
 }
 
 /** Token de sessão Places (agrupa autocomplete + details na cobrança). */

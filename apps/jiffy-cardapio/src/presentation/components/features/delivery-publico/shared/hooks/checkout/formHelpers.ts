@@ -99,5 +99,6 @@ export function limparLookupEstadoIncompleto(
     ...prev,
     modoEndereco: 'novo',
     enderecoIdSelecionado: '',
+    cpfNotaFiscal: '',
   }))
 }

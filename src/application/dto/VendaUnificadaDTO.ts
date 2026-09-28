@@ -285,11 +285,20 @@ function normalizarOrigemUnificado(raw: unknown): OrigemVendaUnificada | null {
 }
 
 function extrairTipoEntregaUnificado(item: Record<string, unknown>): TipoEntregaUnificada | null {
-  const raw = item.tipoEntrega ?? item.tipo_entrega
-  const s = String(raw ?? '')
-    .trim()
-    .toLowerCase()
-  if (s === 'entrega' || s === 'retirada') return s
+  const candidatos = [
+    item.tipoEntrega,
+    item.tipo_entrega,
+    item.tipoAtendimento,
+    item.tipo_atendimento,
+    item.modalidadeEntrega,
+    item.modalidade_entrega,
+  ]
+  for (const raw of candidatos) {
+    const s = String(raw ?? '')
+      .trim()
+      .toLowerCase()
+    if (s === 'entrega' || s === 'retirada') return s
+  }
   return null
 }
 
@@ -523,8 +532,10 @@ export interface VendasUnificadasQueryParams {
   origem?: 'PDV' | 'GESTOR' | 'JIFFY_DELIVERY' | 'AIQFOME' | 'IFOOD'
   /** Canal unificado (`tipo` na API). Não confundir com `origem`. */
   tipo?: 'PDV' | 'GESTOR' | 'DELIVERY'
-  /** Filtro operacional do modo delivery (entrega/retirada). Ignorado pelo unificado/balcão. */
+  /** Filtro operacional do modo delivery (entrega/retirada). */
   tipoEntrega?: 'entrega' | 'retirada'
+  /** `balcao` | `mesa` | `delivery` — quando o backend aceitar na listagem unificada. */
+  tipoVenda?: string
   /** Kanban balcão: filtra server-side por coluna fiscal. */
   colunaKanban?: EtapaKanbanBalcao
   statusFiscal?: string
@@ -643,6 +654,8 @@ export function montarSearchParamsVendasUnificadas(
   const searchParams = new URLSearchParams()
   if (params.origem) searchParams.append('origem', params.origem)
   if (params.tipo) searchParams.append('tipo', params.tipo)
+  if (params.tipoEntrega) searchParams.append('tipoEntrega', params.tipoEntrega)
+  if (params.tipoVenda?.trim()) searchParams.append('tipoVenda', params.tipoVenda.trim().toLowerCase())
   if (params.colunaKanban) searchParams.append('colunaKanban', params.colunaKanban)
   if (params.terminalId?.trim()) searchParams.append('terminalId', params.terminalId.trim())
   if (params.statusFiscal) searchParams.append('statusFiscal', params.statusFiscal)

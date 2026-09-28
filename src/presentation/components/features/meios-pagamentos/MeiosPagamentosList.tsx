@@ -727,7 +727,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
             Forma Fiscal
           </div>
           <div className="md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text">
-            TEF Ativo
+            Terminal
           </div>
           <div className="md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text">
             Delivery
@@ -739,7 +739,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
             Tipo parcelamento
           </div>
           <div className="md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text">
-            POS Ativo
+            TEF
           </div>
           <div className="md:flex-[2] flex-[1] text-right font-semibold md:text-sm text-xs text-primary-text">
             Ações
@@ -788,17 +788,17 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
                 onTouchStart={(e) => e.stopPropagation()}
               >
                 <JiffyIconSwitch
-                  checked={meioPagamento.isTefAtivo()}
+                  checked={meioPagamento.isAtivo()}
                   onChange={(e) => {
                     e.stopPropagation()
-                    handleToggleTefAtivo(meioPagamento, e.target.checked)
+                    handleToggleAtivo(meioPagamento, e.target.checked)
                   }}
-                  disabled={!!updatingTefAtivo[meioPagamento.getId()]}
+                  disabled={!!updatingAtivo[meioPagamento.getId()]}
                   size="sm"
                   className="justify-center gap-0 px-0 py-0"
                   inputProps={{
-                    'aria-label': `TEF — ${meioPagamento.getNome()}`,
-                    title: meioPagamento.isTefAtivo() ? 'TEF Ativo' : 'TEF Inativo',
+                    'aria-label': `Ativo — ${meioPagamento.getNome()}`,
+                    title: meioPagamento.isAtivo() ? 'Ativo' : 'Desativado',
                   }}
                 />
               </div>
@@ -891,17 +891,17 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
                 onTouchStart={(e) => e.stopPropagation()}
               >
                 <JiffyIconSwitch
-                  checked={meioPagamento.isAtivo()}
+                  checked={meioPagamento.isTefAtivo()}
                   onChange={(e) => {
                     e.stopPropagation()
-                    handleToggleAtivo(meioPagamento, e.target.checked)
+                    handleToggleTefAtivo(meioPagamento, e.target.checked)
                   }}
-                  disabled={!!updatingAtivo[meioPagamento.getId()]}
+                  disabled={!!updatingTefAtivo[meioPagamento.getId()]}
                   size="sm"
                   className="justify-center gap-0 px-0 py-0"
                   inputProps={{
-                    'aria-label': `Ativo — ${meioPagamento.getNome()}`,
-                    title: meioPagamento.isAtivo() ? 'Ativo' : 'Desativado',
+                    'aria-label': `TEF — ${meioPagamento.getNome()}`,
+                    title: meioPagamento.isTefAtivo() ? 'TEF Ativo' : 'TEF Inativo',
                   }}
                 />
               </div>

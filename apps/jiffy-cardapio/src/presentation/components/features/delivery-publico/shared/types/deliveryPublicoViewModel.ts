@@ -2,7 +2,12 @@ export type DeliveryPublicoProdutoViewModel = {
   id: string
   nome: string
   descricao: string | null
+  /** Preço vigente (promocional quando a promo está ativa). */
   preco: number
+  /** Preço normal riscado quando há promoção vigente. */
+  precoRegular?: number | null
+  /** % de desconto exibido ao lado do preço riscado. */
+  descontoPercentual?: number | null
   imagemUrl: string | null
   grupoId: string
   /** Quando true, não exibe atalho "+" — deve abrir detalhes. */

@@ -126,7 +126,6 @@ export function mapProdutoDetalheVenda(prod: Record<string, unknown>): ProdutoSe
     removidoPorId: prod.removidoPorId != null ? String(prod.removidoPorId) : undefined,
     dataLancamento: prod.dataLancamento != null ? String(prod.dataLancamento) : undefined,
     dataRemocao: prod.dataRemocao != null ? String(prod.dataRemocao) : undefined,
-    ncm: prod.ncm != null ? String(prod.ncm) : undefined,
     observacao: textoObservacaoProdutoApi(prod) || undefined,
   }
 }

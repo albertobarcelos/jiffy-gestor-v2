@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { proxyPublicDeliveryGet } from '@/src/infrastructure/bff/proxyPublicDeliveryRoute'
+import { catalogoPublicoCacheControl } from '@/src/infrastructure/cache/catalogoPublicoCache'
 
 /**
  * GET /api/public/delivery/catalogo/[slug]
@@ -26,6 +27,6 @@ export async function GET(
   return proxyPublicDeliveryGet(
     `/api/v1/delivery/catalogo/${encodeURIComponent(slug.trim())}`,
     allowed,
-    { cacheControl: 'public, s-maxage=30, stale-while-revalidate=60' }
+    { cacheControl: catalogoPublicoCacheControl(), incoming: request }
   )
 }

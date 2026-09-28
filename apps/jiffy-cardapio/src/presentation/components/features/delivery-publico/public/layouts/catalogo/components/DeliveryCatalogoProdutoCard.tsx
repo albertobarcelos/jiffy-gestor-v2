@@ -1,18 +1,22 @@
 'use client'
 
 import { Camera } from 'lucide-react'
-import { formatDeliveryCurrency } from '../../../../shared/utils/formatDeliveryCurrency'
 import type { DeliveryPublicoProdutoViewModel } from '../../../../shared/types/deliveryPublicoViewModel'
+import { DeliveryPublicoMidiaImagem } from '../../../../shared/media/DeliveryPublicoMidiaImagem'
+import { DELIVERY_IMAGEM_SIZES } from '../../../../shared/media/deliveryPublicoImageHosts'
+import { DeliveryProdutoPreco } from '../../../../shared/components/DeliveryProdutoPreco'
 
 type DeliveryCatalogoProdutoCardProps = {
   produto: DeliveryPublicoProdutoViewModel
   interactive?: boolean
+  priority?: boolean
   onClick?: (produtoId: string) => void
 }
 
 export function DeliveryCatalogoProdutoCard({
   produto,
   interactive = false,
+  priority = false,
   onClick,
 }: DeliveryCatalogoProdutoCardProps) {
   const content = (
@@ -25,8 +29,13 @@ export function DeliveryCatalogoProdutoCard({
         }}
       >
         {produto.imagemUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={produto.imagemUrl} alt="" loading="lazy" decoding="async" data-delivery-produto-img={produto.id} className="absolute inset-0 h-full w-full object-cover" />
+          <DeliveryPublicoMidiaImagem
+            src={produto.imagemUrl}
+            sizes={DELIVERY_IMAGEM_SIZES.catalogoCard}
+            priority={priority}
+            produtoId={produto.id}
+            className="object-cover"
+          />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
             <Camera className="h-10 w-10" style={{ color: 'var(--delivery-text-muted)' }} aria-hidden />
@@ -42,15 +51,7 @@ export function DeliveryCatalogoProdutoCard({
       >
         {produto.nome}
       </p>
-      <p
-        className="mt-0.5 text-sm font-semibold"
-        style={{
-          color: 'var(--delivery-primary)',
-          fontFamily: 'var(--delivery-font-body)',
-        }}
-      >
-        {formatDeliveryCurrency(produto.preco)}
-      </p>
+      <DeliveryProdutoPreco produto={produto} className="mt-0.5" />
     </>
   )
 

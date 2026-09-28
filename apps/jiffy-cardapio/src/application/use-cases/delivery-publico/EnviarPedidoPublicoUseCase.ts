@@ -14,7 +14,11 @@ import {
   isEmpresaDeliveryFechadaError,
 } from '@/src/application/errors/publicDeliveryErrors'
 import { normalizarClienteDeliveryPublico } from '@/src/application/mappers/ClienteDeliveryPublicoMapper'
-import { montarPedidoPublico } from '@/src/application/mappers/MontarPedidoPublicoMapper'
+import {
+  montarPedidoPublico,
+  validarCpfPedidoPublico,
+} from '@/src/application/mappers/MontarPedidoPublicoMapper'
+import { validarPagamentosPedidoPublico } from '@/src/domain/policies/PagamentoObrigatorioPedidoPublico'
 import type {
   IClienteDeliveryPublicoPort,
   IPedidoPublicoPort,
@@ -36,6 +40,8 @@ export type EnviarPedidoPublicoInput = {
   form: CheckoutFormData
   clienteLookup: ClienteDeliveryPublicoDTO | null
   tokenCotacao: string
+  /** Quando true, o CPF é obrigatório no payload. */
+  exigeCpfVenda?: boolean
   onEtapa?: (etapa: EtapaEnvioPedidoPublico) => void
 }
 
@@ -76,6 +82,19 @@ export class EnviarPedidoPublicoUseCase {
     }
     if (!input.tokenCotacao.trim()) {
       return { ok: false, error: 'Cotação do pedido não encontrada. Aguarde a atualização dos valores.' }
+    }
+
+    const cpfGate = validarCpfPedidoPublico(
+      input.form.cpfNotaFiscal,
+      input.exigeCpfVenda === true
+    )
+    if (!cpfGate.ok) {
+      return cpfGate
+    }
+
+    const pagamentosGate = validarPagamentosPedidoPublico(input.form.pagamentos, input.total)
+    if (!pagamentosGate.ok) {
+      return pagamentosGate
     }
 
     let enderecoIdEntrega: string | null = null
@@ -148,6 +167,7 @@ export class EnviarPedidoPublicoUseCase {
       enderecoIdEntrega,
       telefoneApi: tel,
       tokenCotacao: input.tokenCotacao,
+      exigeCpfVenda: input.exigeCpfVenda === true,
     })
     if (!resultado.ok) {
       return resultado

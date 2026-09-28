@@ -6,12 +6,14 @@ import type { DeliveryPublicoDesignConfig } from '../types/deliveryPublicoDesign
 import type { DeliveryPublicoGrupoViewModel } from '../types/deliveryPublicoViewModel'
 import { DeliverySugestoesProdutoCard } from './DeliverySugestoesProdutoCard'
 import { resolveGrupoTituloBarStyle } from '../utils/resolveGrupoTituloBarStyle'
+import { devePriorizarImagemProduto } from '../media/deliveryPublicoImageHosts'
 
 type DeliverySecaoSugestoesProps = {
   config: DeliveryPublicoDesignConfig
   grupo: DeliveryPublicoGrupoViewModel
   interactive?: boolean
   stickyTitle?: boolean
+  primeirasImagensPriority?: boolean
   quantidadePorProduto?: Record<string, number>
   onProdutoClick?: (produtoId: string) => void
   onProdutoAddRapido?: (produtoId: string) => void
@@ -24,6 +26,7 @@ export function DeliverySecaoSugestoes({
   grupo,
   interactive = false,
   stickyTitle = false,
+  primeirasImagensPriority = false,
   quantidadePorProduto,
   onProdutoClick,
   onProdutoAddRapido,
@@ -37,7 +40,7 @@ export function DeliverySecaoSugestoes({
     handleMouseMove,
     handleMouseUp,
     handleMouseLeave,
-  } = useHorizontalDragScroll<HTMLDivElement>()
+  } = useHorizontalDragScroll<HTMLDivElement>({ mapVerticalWheel: false })
 
   if (grupo.produtos.length === 0) return null
 
@@ -69,16 +72,17 @@ export function DeliverySecaoSugestoes({
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
         onWheel={handleWheel}
-        className={`flex items-start gap-3 overflow-x-auto px-4 pb-0 pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+        className={`flex items-start gap-3 overflow-x-auto overscroll-x-contain px-4 pb-0 pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
           isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'
         }`}
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
-        {grupo.produtos.map(produto => (
+        {grupo.produtos.map((produto, index) => (
           <DeliverySugestoesProdutoCard
             key={produto.id}
             produto={produto}
             interactive={interactive}
+            priority={devePriorizarImagemProduto(primeirasImagensPriority, index)}
             quantidadeNoCarrinho={quantidadePorProduto?.[produto.id] ?? 0}
             onClick={onProdutoClick}
             onAddRapido={onProdutoAddRapido}

@@ -6,6 +6,7 @@ import { DeliverySecaoSugestoes } from './DeliverySecaoSugestoes'
 import type { DeliveryPublicoDesignConfig } from '../types/deliveryPublicoDesignConfig'
 import type { DeliveryPublicoGrupoViewModel } from '../types/deliveryPublicoViewModel'
 import { resolveGrupoTituloBarStyle } from '../utils/resolveGrupoTituloBarStyle'
+import { devePriorizarImagemProduto } from '../media/deliveryPublicoImageHosts'
 
 type DeliverySecaoGrupoProps = {
   config: DeliveryPublicoDesignConfig
@@ -14,6 +15,7 @@ type DeliverySecaoGrupoProps = {
   stickyTitle?: boolean
   /** Reduz o espaço acima (ex.: grupo logo após Sugestões). */
   denseTop?: boolean
+  primeirasImagensPriority?: boolean
   quantidadePorProduto?: Record<string, number>
   onProdutoClick?: (produtoId: string) => void
   onProdutoAddRapido?: (produtoId: string) => void
@@ -26,6 +28,7 @@ export function DeliverySecaoGrupo({
   interactive = false,
   stickyTitle = false,
   denseTop = false,
+  primeirasImagensPriority = false,
   quantidadePorProduto,
   onProdutoClick,
   onProdutoAddRapido,
@@ -40,6 +43,7 @@ export function DeliverySecaoGrupo({
         grupo={grupo}
         interactive={interactive}
         stickyTitle={stickyTitle}
+        primeirasImagensPriority={primeirasImagensPriority}
         quantidadePorProduto={quantidadePorProduto}
         onProdutoClick={onProdutoClick}
         onProdutoAddRapido={onProdutoAddRapido}
@@ -70,11 +74,12 @@ export function DeliverySecaoGrupo({
         {mostrarNome ? <span className="min-w-0 leading-tight">{grupo.nome}</span> : null}
       </h2>
       <div className="grid grid-cols-1 gap-3 @lg:grid-cols-2 @lg:gap-4">
-        {grupo.produtos.map(produto => (
+        {grupo.produtos.map((produto, index) => (
           <div key={produto.id} className="min-w-0">
             <DeliveryProdutoListItem
               produto={produto}
               interactive={interactive}
+              priority={devePriorizarImagemProduto(primeirasImagensPriority, index)}
               quantidadeNoCarrinho={quantidadePorProduto?.[produto.id] ?? 0}
               onClick={onProdutoClick}
               onAddRapido={onProdutoAddRapido}

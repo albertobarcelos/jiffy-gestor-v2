@@ -343,7 +343,8 @@ h6 {
 @media (min-width: 768px) {
   .catalog-row-menu {
     grid-template-areas: 'foto nome codigo acoes meta';
-    grid-template-columns: auto 25ch 4.75rem minmax(0, 1fr) auto;
+    /* meta com largura mínima estável (promo + preço + pause) para alinhar ícones */
+    grid-template-columns: auto 25ch 4.75rem minmax(0, 1fr) minmax(15.5rem, auto);
   }
 
   .catalog-row-menu-hidecodigo {

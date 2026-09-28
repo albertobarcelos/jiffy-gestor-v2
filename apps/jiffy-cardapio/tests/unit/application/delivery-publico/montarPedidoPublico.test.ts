@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
 import { CreatePedidoPublicoInputSchema } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { montarPedidoPublico } from '@/src/application/mappers/MontarPedidoPublicoMapper'
+import { MSG_PAGAMENTO_OBRIGATORIO_PEDIDO_PUBLICO } from '@/src/domain/policies/PagamentoObrigatorioPedidoPublico'
 import {
   calcularTrocoCheckout,
   pagamentosCobremTotalCheckout,
@@ -80,6 +81,49 @@ describe('montarPedidoPublico + CreatePedidoPublicoInputSchema', () => {
       tokenCotacao: 'token-teste',
     })
     expect(result.ok).toBe(false)
+  })
+
+  it('permite CPF vazio quando exigeCpfVenda é false', () => {
+    const result = montarPedidoPublico({
+      slug: 'loja',
+      itens: [item],
+      total: 30.5,
+      form: formBase({ cpfNotaFiscal: '' }),
+      tokenCotacao: 'token-teste',
+      exigeCpfVenda: false,
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.payload.documentoCpfCnpj).toBeUndefined()
+  })
+
+  it('rejeita pedido sem pagamento', () => {
+    const result = montarPedidoPublico({
+      slug: 'loja',
+      itens: [item],
+      total: 30.5,
+      form: formBase({ pagamentos: [] }),
+      tokenCotacao: 'token-teste',
+    })
+    expect(result).toEqual({
+      ok: false,
+      error: MSG_PAGAMENTO_OBRIGATORIO_PEDIDO_PUBLICO,
+    })
+  })
+
+  it('rejeita CPF vazio quando exigeCpfVenda é true', () => {
+    const result = montarPedidoPublico({
+      slug: 'loja',
+      itens: [item],
+      total: 30.5,
+      form: formBase({ cpfNotaFiscal: '' }),
+      tokenCotacao: 'token-teste',
+      exigeCpfVenda: true,
+    })
+    expect(result).toEqual({
+      ok: false,
+      error: 'Informe o CPF para finalizar o pedido',
+    })
   })
 })
 

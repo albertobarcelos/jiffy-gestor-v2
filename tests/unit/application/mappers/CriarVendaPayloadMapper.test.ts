@@ -26,6 +26,7 @@ function baseInput(
     tipoInicioPedido: 'balcao',
     origem: 'GESTOR',
     status: 'FINALIZADA',
+    estacaoId: 'estacao-teste',
     produtos: [produto()],
     pagamentos: [{ meioPagamentoId: 'mp-1', valor: 10 }],
     totalProdutos: 10,
@@ -104,6 +105,11 @@ describe('CriarVendaPayloadMapper (contrato PR #115)', () => {
     expect(payload.totalDesconto).toBeUndefined()
     expect(payload.totalAcrescimo).toBeUndefined()
     expect(payload.produtosLancados).toHaveLength(1)
+  })
+
+  it('envia estacaoId no create da venda gestor', () => {
+    const payload = buildCriarVendaGestorPayload(baseInput({ estacaoId: 'est-abc' }))
+    expect(payload.estacaoId).toBe('est-abc')
   })
 
   it('envia tipoVenda delivery no create do canal delivery', () => {

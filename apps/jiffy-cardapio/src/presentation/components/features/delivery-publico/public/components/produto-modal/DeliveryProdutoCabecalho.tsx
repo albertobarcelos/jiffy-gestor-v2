@@ -2,7 +2,8 @@
 
 import { Camera, List, Share2 } from 'lucide-react'
 import type { CatalogoPublicoProdutoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
-import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurrency'
+import { DeliveryProdutoPreco } from '../../../shared/components/DeliveryProdutoPreco'
+import { resolverPrecosDeliveryProduto } from '../../../shared/utils/resolverPrecosDeliveryProduto'
 
 type DeliveryProdutoCabecalhoProps = {
   produto: CatalogoPublicoProdutoDTO
@@ -17,6 +18,8 @@ export function DeliveryProdutoCabecalho({
   onIrParaComplementos,
   onCompartilhar,
 }: DeliveryProdutoCabecalhoProps) {
+  const precos = resolverPrecosDeliveryProduto(produto)
+
   return (
     <>
       <div className="relative w-full shrink-0 overflow-hidden aspect-square">
@@ -51,9 +54,12 @@ export function DeliveryProdutoCabecalho({
           <p className="delivery-text-secondary mt-2 text-sm leading-relaxed">{produto.descricao}</p>
         ) : null}
 
-        <p className="mt-2 text-lg font-semibold delivery-text-primary">
-          {formatDeliveryCurrency(produto.valor)}
-        </p>
+        <DeliveryProdutoPreco
+          produto={precos}
+          size="md"
+          className="mt-2"
+          accentColor="var(--delivery-text-primary, var(--delivery-primary))"
+        />
 
         <div className="mt-4 flex items-center gap-2">
           {precisaComplementos ? (

@@ -1,18 +1,22 @@
 'use client'
 
 import { Camera } from 'lucide-react'
-import { formatDeliveryCurrency } from '../../../../shared/utils/formatDeliveryCurrency'
 import type { DeliveryPublicoProdutoViewModel } from '../../../../shared/types/deliveryPublicoViewModel'
+import { DeliveryPublicoMidiaImagem } from '../../../../shared/media/DeliveryPublicoMidiaImagem'
+import { DELIVERY_IMAGEM_SIZES } from '../../../../shared/media/deliveryPublicoImageHosts'
+import { DeliveryProdutoPreco } from '../../../../shared/components/DeliveryProdutoPreco'
 
 type DeliveryVitrineProdutoCardProps = {
   produto: DeliveryPublicoProdutoViewModel
   interactive?: boolean
+  priority?: boolean
   onClick?: (produtoId: string) => void
 }
 
 export function DeliveryVitrineProdutoCard({
   produto,
   interactive = false,
+  priority = false,
   onClick,
 }: DeliveryVitrineProdutoCardProps) {
   const cardStyle = {
@@ -27,14 +31,12 @@ export function DeliveryVitrineProdutoCard({
         style={{ backgroundColor: '#ffffff', borderColor: '#e5e7eb' }}
       >
         {produto.imagemUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <DeliveryPublicoMidiaImagem
             src={produto.imagemUrl}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            data-delivery-produto-img={produto.id}
-            className="absolute inset-0 h-full w-full object-cover"
+            sizes={DELIVERY_IMAGEM_SIZES.vitrineCard}
+            priority={priority}
+            produtoId={produto.id}
+            className="object-cover"
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -52,15 +54,12 @@ export function DeliveryVitrineProdutoCard({
         >
           {produto.nome}
         </p>
-        <p
-          className="shrink-0 text-base font-bold @sm:text-lg"
-          style={{
-            color: 'var(--delivery-primary)',
-            fontFamily: 'var(--delivery-font-body)',
-          }}
-        >
-          {formatDeliveryCurrency(produto.preco)}
-        </p>
+        <DeliveryProdutoPreco
+          produto={produto}
+          align="end"
+          size="md"
+          className="mt-0 shrink-0"
+        />
       </div>
     </>
   )

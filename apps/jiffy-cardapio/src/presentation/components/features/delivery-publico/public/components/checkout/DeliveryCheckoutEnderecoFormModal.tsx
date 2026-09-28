@@ -24,6 +24,7 @@ import {
 import { useCepMaskedInputHandler } from '@/src/presentation/hooks/useCepMaskedInputHandler'
 import {
   placeDetailsParaEnderecoGeocode,
+  placesBiasFromGeoJsonPoint,
   type PlaceDetailsResult,
   type PlacesBias,
 } from '@/src/shared/utils/geolocalizacaoPlaces'
@@ -165,6 +166,11 @@ export function DeliveryCheckoutEnderecoFormModal({
   onSelecionarEnderecoCadastrado,
   onRemoverEnderecoCadastrado,
 }: DeliveryCheckoutEnderecoFormModalProps) {
+  const biasAutocomplete = useMemo(
+    () => placesBias ?? placesBiasFromGeoJsonPoint(localizacaoEmpresa),
+    [placesBias, localizacaoEmpresa]
+  )
+
   const onCepChange = useCallback(
     (cep: string) => {
       onChange('cep', cep)
@@ -1146,7 +1152,7 @@ export function DeliveryCheckoutEnderecoFormModal({
           onClear={limparCamposAposBuscaPlaces}
           onSemResultadoConfiavel={marcarSemResultadoPlaces}
           onResultadosEncontrados={marcarResultadosPlaces}
-          bias={placesBias}
+          bias={biasAutocomplete}
           disabled={salvando || formOverlayOpen}
         />
 

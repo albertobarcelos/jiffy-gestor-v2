@@ -5,7 +5,7 @@ import { proxyPublicDeliveryGet } from '@/src/infrastructure/bff/proxyPublicDeli
  * Proxy público → GET /api/v1/delivery/meios-pagamento/:slug
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params
@@ -14,6 +14,8 @@ export async function GET(
   }
 
   return proxyPublicDeliveryGet(
-    `/api/v1/delivery/meios-pagamento/${encodeURIComponent(slug.trim())}`
+    `/api/v1/delivery/meios-pagamento/${encodeURIComponent(slug.trim())}`,
+    undefined,
+    { incoming: request }
   )
 }

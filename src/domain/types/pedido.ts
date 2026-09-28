@@ -41,7 +41,6 @@ export interface ProdutoSelecionado {
   removidoPorId?: string
   dataLancamento?: string
   dataRemocao?: string
-  ncm?: string
   /** Texto único na UI; enviado como `observacoes: [texto]` na API. */
   observacao?: string
 }

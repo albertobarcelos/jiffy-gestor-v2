@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { MdMenuBook, MdStorefront, type IconType } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
@@ -58,6 +58,8 @@ export function DeliveryNomeCardapioView({ embedded = false }: { embedded?: bool
   const atualizarMutation = useAtualizarEmpresaDelivery()
 
   const [menuDeliveryId, setMenuDeliveryId] = useState<string | null>(null)
+  const [exigeCpfVenda, setExigeCpfVenda] = useState(false)
+  const exigeCpfHidratadoRef = useRef(false)
 
   const empresaDelivery = empresaDeliveryQuery.data
   const pendencias = empresaDelivery?.pendencias ?? []
@@ -70,6 +72,14 @@ export function DeliveryNomeCardapioView({ embedded = false }: { embedded?: bool
   }, [pendencias])
   const configurado = empresaDelivery != null
   const carregando = empresaDeliveryQuery.isPending || atualizarMutation.isPending
+
+  useEffect(() => {
+    if (exigeCpfHidratadoRef.current || empresaDeliveryQuery.isPending) return
+    if (!empresaDelivery) return
+
+    exigeCpfHidratadoRef.current = true
+    setExigeCpfVenda(empresaDelivery.parametroDelivery?.exigeCpfVenda === true)
+  }, [empresaDelivery, empresaDeliveryQuery.isPending])
 
   useEffect(() => {
     if (menuDeliveryIdSalvo) {
@@ -96,7 +106,7 @@ export function DeliveryNomeCardapioView({ embedded = false }: { embedded?: bool
 
     try {
       await atualizarMutation.mutateAsync({
-        parametroDelivery: { menuDeliveryId },
+        parametroDelivery: { menuDeliveryId, exigeCpfVenda },
       })
       showToast.success('Cardápio do delivery atualizado.')
     } catch (error) {
@@ -104,7 +114,7 @@ export function DeliveryNomeCardapioView({ embedded = false }: { embedded?: bool
         error instanceof Error ? error.message : 'Não foi possível salvar as configurações.'
       showToast.error(msg)
     }
-  }, [atualizarMutation, configurado, menuDeliveryId])
+  }, [atualizarMutation, configurado, exigeCpfVenda, menuDeliveryId])
 
   if (empresaDeliveryQuery.isPending) {
     return (
@@ -184,6 +194,29 @@ export function DeliveryNomeCardapioView({ embedded = false }: { embedded?: bool
             onChange={setMenuDeliveryId}
             disabled={carregando || !configurado}
           />
+
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-3">
+            <div className="min-w-0">
+              <label
+                htmlFor="delivery-hub-exige-cpf"
+                className="text-sm font-semibold text-primary-text"
+              >
+                Exigir CPF na finalização do pedido
+              </label>
+              <p className="mt-0.5 text-xs text-secondary-text">
+                No cardápio público, o cliente só consegue finalizar o pedido informando um CPF
+                válido.
+              </p>
+            </div>
+            <input
+              id="delivery-hub-exige-cpf"
+              type="checkbox"
+              checked={exigeCpfVenda}
+              disabled={carregando || !configurado}
+              onChange={e => setExigeCpfVenda(e.target.checked)}
+              className="h-4 w-4 shrink-0 rounded border-gray-300 accent-secondary focus:ring-secondary disabled:cursor-not-allowed disabled:opacity-60"
+            />
+          </div>
         </CardapioOpcaoCard>
 
         <div className="flex justify-end">
