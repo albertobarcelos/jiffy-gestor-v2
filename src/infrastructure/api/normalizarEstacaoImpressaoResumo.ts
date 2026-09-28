@@ -1,4 +1,4 @@
-import type { EstacaoImpressaoResumo } from '@/src/infrastructure/api/estacoesImpressaoApi'
+import type { EstacaoImpressaoResumo } from '@/src/domain/estacao-impressao/EstacaoImpressao'
 
 /** Corpo típico: `{ id, nome, ativo, gestorDelivery }` ou `{ data: { … } }`. */
 function extrairObjetoPayload(raw: unknown): Record<string, unknown> | null {

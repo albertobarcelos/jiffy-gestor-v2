@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useImpressaoDelivery } from '@/features/delivery/hooks/useImpressaoDelivery'
 import {
@@ -11,8 +11,8 @@ import {
   connectDeliverySocket,
   disconnectDeliverySocket,
 } from '@/src/infrastructure/realtime/deliverySocketClient'
-import { getEstacaoImpressaoId } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useEstacaoDestePc } from '@/src/presentation/hooks/useEstacaoDestePc'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { estaNoAppJiffyFlow } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 import { prepararSomPedidoNovo } from '@/src/presentation/gestor-pedidos/som/somPedidoNovo'
@@ -38,7 +38,7 @@ export function DeliveryRealtimeBridge() {
   const empresaId = useTenantEmpresaId()
   const tenantAuth = useAuthStore(s => s.tenantAuth)
   const { imprimirPorComandoRealtime } = useImpressaoDelivery()
-  const [estacaoId, setEstacaoId] = useState<string | null>(() => getEstacaoImpressaoId())
+  const { estacaoId } = useEstacaoDestePc()
   const socketRef = useRef<Socket | null>(null)
   const imprimirRef = useRef(imprimirPorComandoRealtime)
   const invalidateDebouncedRef = useRef(createDebouncedKanbanInvalidator())
@@ -62,21 +62,6 @@ export function DeliveryRealtimeBridge() {
       window.removeEventListener('keydown', destravar)
     }
   }, [])
-
-  const syncEstacaoId = useCallback(() => {
-    setEstacaoId(getEstacaoImpressaoId())
-  }, [])
-
-  useEffect(() => {
-    syncEstacaoId()
-    const onChanged = () => syncEstacaoId()
-    window.addEventListener('jiffy:estacao-impressao-changed', onChanged)
-    window.addEventListener('storage', onChanged)
-    return () => {
-      window.removeEventListener('jiffy:estacao-impressao-changed', onChanged)
-      window.removeEventListener('storage', onChanged)
-    }
-  }, [syncEstacaoId])
 
   useEffect(() => {
     const token = tenantAuth?.getAccessToken()?.trim()

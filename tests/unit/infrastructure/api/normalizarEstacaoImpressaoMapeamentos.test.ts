@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import {
-  montarMapeamentosEstacaoParaSalvar,
-  normalizarListaMapeamentosEstacao,
-} from '@/src/infrastructure/api/normalizarEstacaoImpressaoMapeamentos'
+import { montarMapeamentosEstacaoParaSalvar } from '@/src/application/estacao-impressao/montarMapeamentosEstacaoParaSalvar'
+import { normalizarListaMapeamentosEstacao } from '@/src/infrastructure/api/normalizarEstacaoImpressaoMapeamentos'
 
 describe('normalizarListaMapeamentosEstacao', () => {
   it('preserva modoImpressao da estação', () => {

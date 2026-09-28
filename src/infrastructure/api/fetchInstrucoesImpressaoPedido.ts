@@ -1,6 +1,6 @@
 import { fetchGestorApi } from '@/src/infrastructure/api/fetchGestorApi'
 import type { InstrucoesImpressaoResponse } from '@/src/shared/types/instrucoesImpressao'
-import { getEstacaoImpressaoId } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
+import { estacaoDestePcLocalStore } from '@/src/infrastructure/printing/EstacaoDestePcLocalStore'
 import {
   obterInstrucoesImpressaoCache,
   salvarInstrucoesImpressaoCache,
@@ -72,7 +72,7 @@ export async function fetchInstrucoesImpressaoPedido(
     return { ok: false, status: 401, error: 'Sem token' }
   }
 
-  const estacao = (estacaoImpressaoId ?? getEstacaoImpressaoId())?.trim()
+  const estacao = (estacaoImpressaoId ?? estacaoDestePcLocalStore.obterId())?.trim()
   if (!estacao) {
     warnImpressao('fetchInstrucoes.abort', { motivo: 'sem_estacao', vendaId })
     return {

@@ -5,9 +5,9 @@ import { MdClose } from 'react-icons/md'
 import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
-import { resolverEstacaoImpressaoConfig } from '@/src/infrastructure/api/estacoesImpressaoApi'
+import { criarEstacaoImpressaoUseCases } from '@/src/presentation/hooks/estacao-impressao/criarEstacaoDestePcUseCases'
 import { imprimirCupomFechamentoCaixaEstacao } from '@/src/infrastructure/printing/imprimirCupomFechamentoCaixaEstacao'
-import { useDeliveryConfigEstacaoImpressao } from '@/src/presentation/hooks/useDeliveryConfigImpressaoQueries'
+import { useEstacaoImpressaoDestePc } from '@/src/presentation/hooks/useEstacaoImpressaoQueries'
 import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useOperacaoCaixaEstacaoPorId } from '@/src/presentation/components/features/meu-caixa/hooks/useOperacaoCaixaEstacaoPorId'
@@ -30,7 +30,7 @@ export function DetalhesFechamentoEstacao({
   const [imprimindo, setImprimindo] = useState(false)
   const [erroImpressao, setErroImpressao] = useState<string | null>(null)
   const { preferenciasImpressaoDelivery } = usePreferenciasImpressaoDelivery()
-  const estacaoImpressaoQuery = useDeliveryConfigEstacaoImpressao(open)
+  const estacaoImpressaoQuery = useEstacaoImpressaoDestePc(open)
 
   useEffect(() => {
     if (isError) {
@@ -56,7 +56,7 @@ export function DetalhesFechamentoEstacao({
         mapeamentos = refetch.data?.mapeamentos ?? []
       }
       if (mapeamentos.length === 0) {
-        const config = await resolverEstacaoImpressaoConfig(token)
+        const config = await criarEstacaoImpressaoUseCases(token).resolverDestePc.execute()
         mapeamentos = config.mapeamentos
       }
 

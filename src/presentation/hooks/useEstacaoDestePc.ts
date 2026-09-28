@@ -2,20 +2,20 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import {
-  getEstacaoImpressaoId,
-  getEstacaoImpressaoNome,
-  salvarEstacaoImpressaoId,
-  salvarEstacaoImpressaoNome,
-} from '@/src/infrastructure/printing/estacaoImpressaoStorage'
+  estacaoDestePcStore,
+  lembrarNomeEstacaoDestePcUseCase,
+  vincularEstacaoDestePcUseCase,
+} from '@/src/presentation/hooks/estacao-impressao/criarEstacaoDestePcUseCases'
 
 export function useEstacaoDestePc() {
-  const [estacaoId, setEstacaoId] = useState<string | null>(() => getEstacaoImpressaoId())
-  const [estacaoNome, setEstacaoNome] = useState<string | null>(() => getEstacaoImpressaoNome())
+  const store = estacaoDestePcStore()
+  const [estacaoId, setEstacaoId] = useState<string | null>(() => store.obterId())
+  const [estacaoNome, setEstacaoNome] = useState<string | null>(() => store.obterNome())
 
   const sincronizar = useCallback(() => {
-    setEstacaoId(getEstacaoImpressaoId())
-    setEstacaoNome(getEstacaoImpressaoNome())
-  }, [])
+    setEstacaoId(store.obterId())
+    setEstacaoNome(store.obterNome())
+  }, [store])
 
   useEffect(() => {
     sincronizar()
@@ -27,18 +27,21 @@ export function useEstacaoDestePc() {
     }
   }, [sincronizar])
 
-  const vincular = useCallback((id: string, nome?: string) => {
-    salvarEstacaoImpressaoId(id, nome)
-    setEstacaoId(id.trim() || null)
-    if (nome?.trim()) setEstacaoNome(nome.trim())
-  }, [])
+  const vincular = useCallback(
+    (id: string, nome?: string) => {
+      vincularEstacaoDestePcUseCase().execute(id, nome)
+      sincronizar()
+    },
+    [sincronizar]
+  )
 
-  const lembrarNome = useCallback((nome: string) => {
-    const value = nome.trim()
-    if (!value || value === estacaoNome) return
-    salvarEstacaoImpressaoNome(value)
-    setEstacaoNome(value)
-  }, [estacaoNome])
+  const lembrarNome = useCallback(
+    (nome: string) => {
+      lembrarNomeEstacaoDestePcUseCase().execute(nome)
+      sincronizar()
+    },
+    [sincronizar]
+  )
 
   return { estacaoId, estacaoNome, vincular, lembrarNome, sincronizar }
 }
