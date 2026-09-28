@@ -212,6 +212,7 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
         onErro: m => showToast.error(m),
         onAviso: m => showToast.warning(m),
         imprimirTickets: imprimirTicketsApiGestor,
+        fetchVendaGestorTickets,
       })
     },
     [deliveryCupomTemplate, empresa, preferenciasImpressaoDelivery]

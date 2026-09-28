@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { MdAccessTime, MdLocationOn, MdSportsMotorsports } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
-import { temSeloCanalMarketplace } from '@/src/domain/policies/pedido/origemCanalMarketplace'
+import { temSeloCanalOrigem } from '@/src/domain/policies/pedido/origemCanalMarketplace'
 import { montarMensagemWhatsappClienteKanban } from '@/src/application/delivery/montarMensagemWhatsappClienteKanban'
 import { montarMensagemWhatsappEntregadorKanban } from '@/src/application/delivery/montarMensagemWhatsappEntregadorKanban'
 import {
@@ -246,7 +246,7 @@ export function PedidoDetalhesVisaoUnica() {
             <p className="mt-1 inline-flex flex-wrap items-center gap-x-1.5 text-sm text-gray-600">
               <span>Feito às {horaCriacao}</span>
               {codigo ? <span>· #{codigo}</span> : null}
-              {temSeloCanalMarketplace(origem) ? (
+              {temSeloCanalOrigem(origem) ? (
                 <OrigemCanalMark origem={origem} size={24} />
               ) : origem ? (
                 <span>· {rotuloOrigemExibicao(origem)}</span>

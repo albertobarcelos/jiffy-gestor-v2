@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  canalSeloOrigem,
   isOrigemAiqfome,
   isOrigemIfood,
+  isOrigemJiffyCardapio,
   temSeloCanalMarketplace,
+  temSeloCanalOrigem,
 } from '@/src/domain/policies/pedido/origemCanalMarketplace'
 
 describe('origemCanalMarketplace', () => {
@@ -23,11 +26,29 @@ describe('origemCanalMarketplace', () => {
     expect(isOrigemAiqfome('OUTROS')).toBe(false)
     expect(isOrigemAiqfome(null)).toBe(false)
     expect(temSeloCanalMarketplace('GESTOR')).toBe(false)
+    expect(temSeloCanalOrigem('GESTOR')).toBe(false)
   })
 
   it('selo vale para iFood e Aiqfome canônicos', () => {
     expect(temSeloCanalMarketplace('IFOOD')).toBe(true)
     expect(temSeloCanalMarketplace('AIQFOME')).toBe(true)
     expect(temSeloCanalMarketplace('DELIVERY_IFOOD')).toBe(false)
+  })
+
+  it('selo do site Jiffy não confunde com lançamento manual', () => {
+    expect(isOrigemJiffyCardapio('JIFFY_DELIVERY')).toBe(true)
+    expect(isOrigemJiffyCardapio('delivery')).toBe(true)
+    expect(isOrigemJiffyCardapio('GESTOR')).toBe(false)
+    expect(temSeloCanalMarketplace('JIFFY_DELIVERY')).toBe(false)
+    expect(temSeloCanalOrigem('JIFFY_DELIVERY')).toBe(true)
+    expect(temSeloCanalOrigem('GESTOR')).toBe(false)
+    expect(temSeloCanalOrigem('PDV')).toBe(false)
+  })
+
+  it('canalSeloOrigem devolve chave canônica do logo', () => {
+    expect(canalSeloOrigem('IFOOD')).toBe('IFOOD')
+    expect(canalSeloOrigem('AIQFOME')).toBe('AIQFOME')
+    expect(canalSeloOrigem('DELIVERY')).toBe('JIFFY_DELIVERY')
+    expect(canalSeloOrigem('GESTOR')).toBeNull()
   })
 })

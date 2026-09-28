@@ -200,7 +200,7 @@ export type FaturamentoRangeCalendarProps = {
 }
 
 /**
- * Calendário de intervalo (dois meses), valor por célula e rodapé com hora início/fim.
+ * Calendário de intervalo (dois meses), valor por célula e hora início/fim no header.
  */
 export function FaturamentoRangeCalendar({
   className,
@@ -798,6 +798,80 @@ export function FaturamentoRangeCalendar({
             </div>
           ) : null}
         </div>
+
+        <div className="fat-time-grid mt-2 grid grid-cols-1 gap-2 border-t pt-2 xl:gap-3 2xl:gap-4">
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor="faturamento-range-hora-inicio"
+              className="text-xs font-medium text-primary-text"
+            >
+              Hora de início
+            </label>
+            <div className="relative flex items-center">
+              <input
+                id="faturamento-range-hora-inicio"
+                type="time"
+                step={60}
+                value={horaInicio}
+                onChange={e => {
+                  const v = e.target.value
+                  if (horaInicioControlled === undefined) setHoraInicioUncontrolled(v)
+                  onHorariosChange?.(v, horaFim)
+                }}
+                className={cn(
+                  'w-full rounded-lg border py-1 pl-3 pr-10 text-sm',
+                  fundoModalClaro
+                    ? 'border-gray-300 bg-white text-gray-900 placeholder:text-gray-400'
+                    : 'border-[#530CA3]/40 bg-[#F5F3FF] text-[#330468] placeholder:text-[#530CA3]/60',
+                  'appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none'
+                )}
+              />
+              <Clock
+                className={cn(
+                  'pointer-events-none absolute right-3 size-4',
+                  fundoModalClaro ? 'text-gray-500' : 'text-[#530CA3]/70'
+                )}
+                aria-hidden
+              />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor="faturamento-range-hora-fim"
+              className="text-xs font-medium text-primary-text"
+            >
+              Hora de término
+            </label>
+            <div className="relative flex items-center">
+              <input
+                id="faturamento-range-hora-fim"
+                type="time"
+                step={60}
+                value={horaFim}
+                onChange={e => {
+                  const v = e.target.value
+                  if (horaFimControlled === undefined) setHoraFimUncontrolled(v)
+                  onHorariosChange?.(horaInicio, v)
+                }}
+                className={cn(
+                  'w-full rounded-lg border py-1 pl-3 pr-10 text-sm',
+                  fundoModalClaro
+                    ? 'border-gray-300 bg-white text-primary-text'
+                    : 'border-[#530CA3]/40 bg-[#F5F3FF] text-[#330468]',
+                  horarioInvalido && 'border-red-400 focus:ring-red-300',
+                  'appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none'
+                )}
+              />
+              <Clock
+                className={cn(
+                  'pointer-events-none absolute right-3 size-4',
+                  fundoModalClaro ? 'text-gray-500' : 'text-[#530CA3]/70'
+                )}
+                aria-hidden
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* showOutsideDays=false: não mostra células do mês anterior/seguinte (evita duplicar datas e confundir com o intervalo). */}
@@ -845,87 +919,6 @@ export function FaturamentoRangeCalendar({
             DayButton: dayButtonRenderer,
           }}
         />
-      </div>
-
-      <div
-        className={cn(
-          'mt-1.5 shrink-0 border-t pt-1.5',
-          fundoModalClaro ? 'border-gray-200' : 'border-white/20'
-        )}
-      >
-        <div className="fat-time-grid mx-2 grid grid-cols-1 gap-2 xl:gap-4 2xl:gap-6">
-          <div className="flex flex-col gap-1">
-            <label
-              htmlFor="faturamento-range-hora-inicio"
-              className="text-sm font-medium text-primary-text"
-            >
-              Hora de início
-            </label>
-            <div className="relative flex items-center">
-              <input
-                id="faturamento-range-hora-inicio"
-                type="time"
-                step={60}
-                value={horaInicio}
-                onChange={e => {
-                  const v = e.target.value
-                  if (horaInicioControlled === undefined) setHoraInicioUncontrolled(v)
-                  onHorariosChange?.(v, horaFim)
-                }}
-                className={cn(
-                  'w-full rounded-lg border py-1 pl-3 pr-10 text-sm',
-                  fundoModalClaro
-                    ? 'border-gray-300 bg-white text-gray-900 placeholder:text-gray-400'
-                    : 'border-[#530CA3]/40 bg-[#F5F3FF] text-[#330468] placeholder:text-[#530CA3]/60',
-                  'appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none'
-                )}
-              />
-              <Clock
-                className={cn(
-                  'pointer-events-none absolute right-3 size-4',
-                  fundoModalClaro ? 'text-gray-500' : 'text-[#530CA3]/70'
-                )}
-                aria-hidden
-              />
-            </div>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label
-              htmlFor="faturamento-range-hora-fim"
-              className="text-sm font-medium text-primary-text"
-            >
-              Hora de término
-            </label>
-            <div className="relative flex items-center">
-              <input
-                id="faturamento-range-hora-fim"
-                type="time"
-                step={60}
-                value={horaFim}
-                onChange={e => {
-                  const v = e.target.value
-                  if (horaFimControlled === undefined) setHoraFimUncontrolled(v)
-                  onHorariosChange?.(horaInicio, v)
-                }}
-                className={cn(
-                  'w-full rounded-lg border py-1 pl-3 pr-10 text-sm',
-                  fundoModalClaro
-                    ? 'border-gray-300 bg-white text-primary-text'
-                    : 'border-[#530CA3]/40 bg-[#F5F3FF] text-[#330468]',
-                  horarioInvalido && 'border-red-400 focus:ring-red-300',
-                  'appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none'
-                )}
-              />
-              <Clock
-                className={cn(
-                  'pointer-events-none absolute right-3 size-4',
-                  fundoModalClaro ? 'text-gray-500' : 'text-[#530CA3]/70'
-                )}
-                aria-hidden
-              />
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   )

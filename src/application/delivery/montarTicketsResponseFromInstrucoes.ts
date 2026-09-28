@@ -6,8 +6,8 @@ import { resolverTaxaEntregaValorSync } from '@/src/application/mappers/VendaDet
 import { resolverTrocoLevarPedidoEntrega } from '@/src/application/mappers/resolverTrocoLevarPedidoEntrega'
 import type { EnderecoEntregaDetalhe } from '@/src/domain/types/vendaDetalhe'
 import type { PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
-import type { EstacaoImpressaoMapeamento } from '@/src/infrastructure/api/estacoesImpressaoApi'
-import { isTcpPrinterRef } from '@/src/infrastructure/printing/tcpPrinterRef'
+import { isTcpPrinterRef } from '@/src/domain/printing/tcpPrinterRef'
+import type { EstacaoImpressaoMapeamento } from '@/src/shared/types/estacaoImpressao'
 import type { InstrucoesImpressaoResponse } from '@/src/shared/types/instrucoesImpressao'
 import type {
   VendaGestorTicket,

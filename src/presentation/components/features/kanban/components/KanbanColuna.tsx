@@ -2,12 +2,10 @@
 
 import type { ReactNode } from 'react'
 import { FormControl, MenuItem, Select } from '@mui/material'
-import { MdArrowDownward, MdArrowUpward, MdVisibilityOff } from 'react-icons/md'
 import { DroppableColumnContent } from './DroppableColumnContent'
 import type {
   ColunaKanbanId,
   CriterioOrdenacaoKanban,
-  DirecaoOrdenacaoKanban,
   FiltroStatusEntreguesKanban,
   KanbanColumn,
 } from '../types'
@@ -47,10 +45,7 @@ interface KanbanColunaProps {
   superficie: SuperficieQuadroPedidos
   count: number
   criterioOrdenacao: CriterioOrdenacaoKanban
-  direcaoOrdenacao: DirecaoOrdenacaoKanban
   onCriterioOrdenacaoChange: (columnId: ColunaKanbanId, criterio: CriterioOrdenacaoKanban) => void
-  onToggleDirecaoOrdenacao: (columnId: ColunaKanbanId) => void
-  onOcultarColuna?: (columnId: ColunaKanbanId) => void
   onColumnScroll?: (columnId: ColunaKanbanId, event: React.UIEvent<HTMLDivElement>) => void
   columnFooter?: ReactNode
   /** Rodapé fixo abaixo da área rolável (ex.: ações em lote). */
@@ -69,10 +64,7 @@ export function KanbanColuna(props: KanbanColunaProps) {
     superficie,
     count,
     criterioOrdenacao,
-    direcaoOrdenacao,
     onCriterioOrdenacaoChange,
-    onToggleDirecaoOrdenacao,
-    onOcultarColuna,
     onColumnScroll,
     columnFooter,
     columnRodape,
@@ -86,19 +78,26 @@ export function KanbanColuna(props: KanbanColunaProps) {
   return (
     <div className={classesKanbanColunaCasco(superficie)}>
       <div
-        className={`px-3 py-2 ${column.color} border-b ${column.borderColor} flex flex-shrink-0 items-center justify-between`}
+        className={`relative flex-shrink-0 border-b ${column.borderColor} ${column.color}`}
       >
-        <div className="flex min-w-0 items-center gap-1.5">
-          {column.icon}
-          <h3 className={`truncate text-xs font-medium ${column.tituloClasse ?? 'text-gray-900'}`}>
-            {column.title} ({count})
-          </h3>
-        </div>
-        <div className="flex items-center gap-1">
-          {mostrarFiltroStatusFiscal ? (
-            <>
-              <span className={`text-[11px] font-medium ${column.tituloClasse ?? 'text-gray-700'}`}>Status</span>
-              <FormControl size="small" sx={{ minWidth: 118 }}>
+        <span
+          className={`absolute right-1 top-1 z-10 flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-white px-1.5 text-[13px] font-bold tabular-nums text-gray-900 shadow-sm ring-1 ring-black/10`}
+          aria-label={`${count} pedidos`}
+        >
+          {count}
+        </span>
+        <div className="flex min-h-7 items-center gap-1 px-2 py-1 pr-9">
+          <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
+            {column.icon}
+            <h3
+              className={`truncate text-xs font-semibold ${column.tituloClasse ?? 'text-gray-900'}`}
+            >
+              {column.title}
+            </h3>
+          </div>
+          <div className="flex shrink-0 items-center gap-0.5">
+            {mostrarFiltroStatusFiscal ? (
+              <FormControl size="small" sx={{ minWidth: 96 }}>
                 <Select
                   value={filtroStatusFiscal}
                   onChange={e =>
@@ -109,6 +108,7 @@ export function KanbanColuna(props: KanbanColunaProps) {
                   }
                   MenuProps={MENU_PROPS_CABECALHO_KANBAN}
                   sx={SX_SELECT_CABECALHO_KANBAN}
+                  aria-label="Filtrar por status"
                 >
                   {OPCOES_FILTRO_STATUS_ENTREGUES.map(opcao => (
                     <MenuItem key={opcao.value} value={opcao.value}>
@@ -117,11 +117,8 @@ export function KanbanColuna(props: KanbanColunaProps) {
                   ))}
                 </Select>
               </FormControl>
-            </>
-          ) : (
-            <>
-              <span className={`text-[11px] font-medium ${column.tituloClasse ?? 'text-gray-700'}`}>Ordem</span>
-              <FormControl size="small" sx={{ minWidth: 80 }}>
+            ) : (
+              <FormControl size="small" sx={{ minWidth: 72 }}>
                 <Select
                   value={criterioOrdenacao}
                   onChange={e =>
@@ -129,37 +126,14 @@ export function KanbanColuna(props: KanbanColunaProps) {
                   }
                   MenuProps={MENU_PROPS_CABECALHO_KANBAN}
                   sx={SX_SELECT_CABECALHO_KANBAN}
+                  aria-label="Ordenar coluna"
                 >
                   <MenuItem value="data">Data</MenuItem>
                   <MenuItem value="numero">Nº da venda</MenuItem>
                 </Select>
               </FormControl>
-            </>
-          )}
-          {onOcultarColuna ? (
-            <button
-              type="button"
-              className="flex h-6 w-6 items-center justify-center rounded bg-white/70 text-gray-700 hover:bg-white"
-              onClick={() => onOcultarColuna(colId)}
-              aria-label={`Esconder coluna ${column.title}`}
-              title="Esconder coluna"
-            >
-              <MdVisibilityOff className="h-4 w-4" />
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className="flex h-6 w-5 items-center justify-center rounded bg-white/70 text-gray-700 hover:bg-white"
-            onClick={() => onToggleDirecaoOrdenacao(colId)}
-            aria-label="Alternar direção da ordenação"
-            title="Alternar: crescente/decrescente"
-          >
-            {direcaoOrdenacao === 'asc' ? (
-              <MdArrowUpward className="h-4 w-4" />
-            ) : (
-              <MdArrowDownward className="h-4 w-4" />
             )}
-          </button>
+          </div>
         </div>
       </div>
 

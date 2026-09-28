@@ -90,6 +90,8 @@ export interface CriarVendaGestorApiRequest {
   pagamentos?: unknown[]
   pagamento?: CriarVendaGestorPagamentoApi
   observacoes?: string[]
+  /** Obrigatório em POST /gestor/vendas. Estação deste PC. */
+  estacaoId?: string
 }
 
 export interface MoradaEntregaSelecionadaApi {

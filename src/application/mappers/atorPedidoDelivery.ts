@@ -1,3 +1,5 @@
+import { isOrigemJiffyCardapio } from '@/src/domain/policies/pedido/origemCanalMarketplace'
+
 /**
  * Ator do GET delivery (`abertoPor`, `lancadoPor`, etc.).
  * Pedido do cardápio costuma vir com `sourceReference` = telefone do cliente,
@@ -104,8 +106,7 @@ export function rotuloAtorPedido(ator: unknown): string {
 }
 
 export function origemPedidoDoCardapio(origem: string | null | undefined): boolean {
-  const o = String(origem ?? '').trim().toUpperCase()
-  return o === 'JIFFY_DELIVERY' || o === 'DELIVERY'
+  return isOrigemJiffyCardapio(origem)
 }
 
 /**

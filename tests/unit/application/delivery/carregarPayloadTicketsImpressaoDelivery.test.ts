@@ -1,41 +1,30 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { carregarPayloadTicketsImpressaoDelivery } from '@/src/application/delivery/carregarPayloadTicketsImpressaoDelivery'
-import { fetchInstrucoesImpressaoPedido } from '@/src/infrastructure/api/fetchInstrucoesImpressaoPedido'
-import { fetchPedidoDeliveryDetalhe } from '@/src/infrastructure/api/fetchPedidoDeliveryDetalhe'
-import { buscarMapeamentosEstacao } from '@/src/infrastructure/api/estacoesImpressaoApi'
-import { fetchModosImpressaoDaEstacaoPorIds } from '@/src/infrastructure/api/fetchModosImpressaoDaEstacaoPorIds'
-import { getEstacaoImpressaoId } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
+import { criarCarregarPayloadTicketsImpressaoDelivery } from '@/src/application/delivery/carregarPayloadTicketsImpressaoDelivery'
 import { DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY } from '@/src/shared/types/deliveryImpressao'
-import { lembrarNomeMeioPagamento } from '@/src/infrastructure/api/meiosPagamentoNomeCache'
-import { vendaDetalheReadRepository } from '@/src/infrastructure/api/repositories/VendaDetalheReadRepository'
 
-vi.mock('@/src/infrastructure/api/fetchInstrucoesImpressaoPedido', () => ({
-  fetchInstrucoesImpressaoPedido: vi.fn(),
-}))
-vi.mock('@/src/infrastructure/api/fetchPedidoDeliveryDetalhe', () => ({
-  fetchPedidoDeliveryDetalhe: vi.fn(),
-}))
-vi.mock('@/src/infrastructure/api/estacoesImpressaoApi', () => ({
-  buscarMapeamentosEstacao: vi.fn(),
-}))
-vi.mock('@/src/infrastructure/api/fetchModosImpressaoDaEstacaoPorIds', () => ({
-  fetchModosImpressaoDaEstacaoPorIds: vi.fn(),
-}))
-vi.mock('@/src/infrastructure/printing/estacaoImpressaoStorage', () => ({
-  getEstacaoImpressaoId: vi.fn(),
-}))
-vi.mock('@/src/infrastructure/api/repositories/VendaDetalheReadRepository', () => ({
+const fetchInstrucoesMock = vi.fn()
+const fetchPedidoMock = vi.fn()
+const buscarMapeamentosMock = vi.fn()
+const fetchModosMock = vi.fn()
+const getEstacaoMock = vi.fn()
+const fetchMeioMock = vi.fn()
+const lembrarNomeMock = vi.fn()
+const obterNomeCacheMock = vi.fn()
+const snapshotNomesMock = vi.fn()
+
+const carregarPayloadTicketsImpressaoDelivery = criarCarregarPayloadTicketsImpressaoDelivery({
+  fetchInstrucoesImpressaoPedido: fetchInstrucoesMock,
+  fetchPedidoDeliveryDetalhe: fetchPedidoMock,
+  buscarMapeamentosEstacao: buscarMapeamentosMock,
+  fetchModosImpressaoDaEstacaoPorIds: fetchModosMock,
+  getEstacaoImpressaoId: getEstacaoMock,
+  lembrarNomeMeioPagamento: lembrarNomeMock,
+  obterNomeMeioPagamentoCache: obterNomeCacheMock,
+  snapshotNomesMeiosPagamentoCache: snapshotNomesMock,
   vendaDetalheReadRepository: {
-    fetchMeioPagamento: vi.fn(),
+    fetchMeioPagamento: fetchMeioMock,
   },
-}))
-
-const fetchInstrucoesMock = vi.mocked(fetchInstrucoesImpressaoPedido)
-const fetchPedidoMock = vi.mocked(fetchPedidoDeliveryDetalhe)
-const buscarMapeamentosMock = vi.mocked(buscarMapeamentosEstacao)
-const fetchModosMock = vi.mocked(fetchModosImpressaoDaEstacaoPorIds)
-const getEstacaoMock = vi.mocked(getEstacaoImpressaoId)
-const fetchMeioMock = vi.mocked(vendaDetalheReadRepository.fetchMeioPagamento)
+})
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -53,13 +42,18 @@ describe('carregarPayloadTicketsImpressaoDelivery', () => {
     fetchModosMock.mockReset()
     getEstacaoMock.mockReset()
     fetchMeioMock.mockReset()
+    lembrarNomeMock.mockReset()
+    obterNomeCacheMock.mockReset()
+    snapshotNomesMock.mockReset()
     getEstacaoMock.mockReturnValue('est-1')
+    snapshotNomesMock.mockReturnValue({})
+    obterNomeCacheMock.mockReturnValue(null)
   })
 
   it('dispara instrucoes, pedido e mapeamentos juntos e nao forca GET do pedido', async () => {
-    const instrucoes = deferred<Awaited<ReturnType<typeof fetchInstrucoesImpressaoPedido>>>()
-    const pedido = deferred<Awaited<ReturnType<typeof fetchPedidoDeliveryDetalhe>>>()
-    const mapeamentos = deferred<Awaited<ReturnType<typeof buscarMapeamentosEstacao>>>()
+    const instrucoes = deferred<Awaited<ReturnType<typeof fetchInstrucoesMock>>>()
+    const pedido = deferred<Awaited<ReturnType<typeof fetchPedidoMock>>>()
+    const mapeamentos = deferred<Awaited<ReturnType<typeof buscarMapeamentosMock>>>()
 
     let instrucoesStarted = false
     let pedidoStarted = false
@@ -109,7 +103,7 @@ describe('carregarPayloadTicketsImpressaoDelivery', () => {
   })
 
   it('nao busca meio de pagamento na API quando o nome ja esta em cache', async () => {
-    lembrarNomeMeioPagamento('mp-1', 'Dinheiro')
+    snapshotNomesMock.mockReturnValue({ 'mp-1': 'Dinheiro' })
     fetchInstrucoesMock.mockResolvedValue({ ok: true, data: { mapeamentos: [], warnings: [] } })
     fetchPedidoMock.mockResolvedValue({
       ok: true,

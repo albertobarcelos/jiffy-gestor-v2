@@ -35,10 +35,13 @@ describe('renderDeliveryCupomHtml via de produção', () => {
     expect(html).toContain('font-family:Arial, Tahoma, sans-serif; font-weight:800')
     expect(html).not.toContain('.prod-pill { background:#000')
     expect(html).toContain('2x X-BACON')
-    expect(html).toContain('ENTREGA #ABC123')
+    expect(html).toContain('prod-brand')
+    expect(html).toContain('Loja Teste')
+    expect(html).toContain('ENTREGA#9842 #ABC123')
     expect(html).toContain('prod-pill-codigo')
     expect(html).toContain('JOAO DA SILVA COSTA')
     expect(html).not.toContain('ENTREGA #ABC123 | JOAO')
+    expect(html).not.toContain('PEDIDO #9842')
     expect(html).not.toContain('ITENS DO PEDIDO')
     expect(html).not.toContain('Data Prevista:')
     expect(html).not.toContain('Feito com carinho')
@@ -85,16 +88,69 @@ describe('renderDeliveryCupomHtml via de produção', () => {
     expect(html).toContain('.charge-box { box-sizing:border-box; padding:4px 8px 10px; background:#fff; color:#000; border:3px dashed #000')
     expect(html).not.toContain('background:#000; color:#fff')
     expect(html).not.toContain('.charge-box { box-sizing:border-box; padding:4px 8px 10px; border:2px solid #000')
-    expect(html).toContain('#ABC123')
-    expect(html).not.toMatch(/class="method">[^<]*ABC123/)
+    expect(html).toContain('ENTREGA#9842 #ABC123')
+    expect(html).toContain('prod-brand')
+    expect(html).toContain('Loja Teste')
+    expect(html).toContain(".prod-brand { text-align:center; font-family:'EscPosFontA', ui-monospace, monospace; font-weight:400;")
+    expect(html).toContain('text-shadow:none')
+    expect(html).toContain('.receipt[data-tipo="expedicao"] .prod-brand { -webkit-text-stroke:0; text-shadow:none; }')
+    expect(html).not.toContain('text-shadow:1px 0 0 #000')
+    expect(html).not.toContain('Pedido #9842')
+    expect(html).not.toMatch(/class="method">/)
     expect(html).toContain('2x X-BACON')
     expect(html).toContain('item-title')
+    expect(html).toContain('.item-title, .item-title .label, .item-title .value { font-weight:500; font-size:13px;')
+    expect(html).not.toContain('data-atendimento="retirada"')
     expect(html).toContain('BACON EXTRA')
     expect(html).toContain('item-comp-sign')
     expect(html).toContain('Obs: Ponto medio')
     expect(html).toMatch(/40,00/)
     expect(html).toContain('text-overflow:ellipsis')
     expect(html).not.toContain('2 X X-Bacon')
+  })
+
+  it('retirada não renderiza QR de WhatsApp na expedição', () => {
+    const html = renderDeliveryCupomHtml({
+      root: {
+        ...root,
+        tipoEntrega: 'retirada',
+        cliente: { nome: 'Joao da Silva Costa', telefone: '65999998888' },
+      },
+      ticket: {
+        ticketId: 't-exp-retirada',
+        tipoCupom: 'expedicao',
+        impressoraId: 'imp-exp',
+        impressoraNome: 'Expedição',
+        copias: 1,
+        itens: [{ nomeProduto: 'X-Bacon', quantidade: 1, valorFinal: 20 }],
+      },
+    })
+    expect(html).toContain('RETIRADA#9842 #ABC123')
+    expect(html).toContain('data-atendimento="retirada"')
+    expect(html).toContain('.item-title, .item-title .label, .item-title .value { font-weight:700; font-size:16px;')
+    expect(html).not.toContain('class="whatsapp-qr"')
+    expect(html).not.toContain('wa.me')
+    expect(html).not.toContain('Scaneie e fale com o cliente')
+  })
+
+  it('impressão gráfica omite empresa e pílula no HTML para sair igual produção', () => {
+    const html = renderDeliveryCupomHtml({
+      root,
+      ticket: {
+        ticketId: 't-exp-2',
+        tipoCupom: 'expedicao',
+        impressoraId: 'imp-exp',
+        impressoraNome: 'Expedição',
+        copias: 1,
+        itens: [{ nomeProduto: 'X-Bacon', quantidade: 1, valorFinal: 20 }],
+      },
+      omitirNomeEmpresa: true,
+      omitirIdentidade: true,
+    })
+    expect(html).not.toContain('class="prod-brand"')
+    expect(html).not.toContain('class="codigo-destaque"')
+    expect(html).not.toContain('Loja Teste')
+    expect(html).not.toContain('ENTREGA#9842 #ABC123')
   })
 
   it('via por unidade mostra o codigo e i DE N, sem a palavra PEDIDO', () => {
@@ -108,8 +164,9 @@ describe('renderDeliveryCupomHtml via de produção', () => {
     expect(html).toContain('#ABC123 - 2 DE 4')
     expect(html).toContain('prod-pill-codigo')
     expect(html).not.toContain('PEDIDO ABC123')
+    expect(html).not.toContain('PEDIDO #9842')
     expect(html).not.toContain('ENTREGA #ABC123')
-    expect(html).toContain('ENTREGA')
+    expect(html).toContain('ENTREGA#9842')
     expect(html).toContain('JOAO DA SILVA COSTA')
     expect(html).not.toContain('ENTREGA | JOAO')
   })

@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { FormControl, InputLabel, MenuItem, Select } from '@mui/material'
+import { useState, type ReactNode } from 'react'
+import { FormControl, MenuItem, Select } from '@mui/material'
 import {
   MdAdd,
   MdFilterAltOff,
@@ -10,7 +10,7 @@ import {
   MdSearch,
   MdSettings,
 } from 'react-icons/md'
-import { FredySomPedidosToggle } from '@/src/presentation/gestor-pedidos/som/FredySomPedidosToggle'
+import { TbCashRegister } from 'react-icons/tb'
 import { KanbanModoVendasToggle, type ModoKanbanVendas } from '../KanbanModoVendasToggle'
 import type {
   ColunaKanbanFiltroExtra,
@@ -63,6 +63,8 @@ export interface KanbanToolbarProps {
   modoVisualizacao: ModoVisualizacaoKanban
   onModoVisualizacaoChange: (value: ModoVisualizacaoKanban) => void
   onAbrirConfiguracoesDelivery: () => void
+  onAbrirCaixaEstacao: () => void
+  caixaAberta?: boolean | null
   onAbrirNovoPedido: () => void
   colunasDoModo: KanbanColumn[]
   colunasOcultas: readonly ColunaKanbanId[]
@@ -74,10 +76,13 @@ export interface KanbanToolbarProps {
 const KANBAN_BUTTON_COLOR = '#530CA3'
 
 const sxKanbanFiltroSelect = {
-  minWidth: 140,
+  minWidth: 0,
+  width: 'max-content',
+  margin: 0,
   '& .MuiOutlinedInput-root': {
     height: 32,
     minHeight: 32,
+    width: 'max-content',
     borderRadius: '8px',
     backgroundColor: 'var(--color-info)',
     fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
@@ -93,17 +98,52 @@ const sxKanbanFiltroSelect = {
       borderWidth: 1,
     },
   },
-  '& .MuiInputLabel-root': {
-    color: 'var(--color-secondary-text)',
-    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
-    fontSize: '0.875rem',
-    fontWeight: 300,
-  },
-  '& .MuiInputLabel-root.Mui-focused, & .MuiInputLabel-root.MuiInputLabel-shrink': {
-    color: 'var(--color-secondary-text)',
-    fontWeight: 300,
+  '& .MuiSelect-select': {
+    display: 'flex',
+    alignItems: 'center',
+    paddingTop: '4px',
+    paddingBottom: '4px',
+    paddingLeft: '8px',
+    paddingRight: '26px !important',
+    fontSize: '0.8125rem',
   },
 } as const
+
+function KanbanFiltroSelect({
+  ariaLabel,
+  value,
+  onChange,
+  disabled,
+  renderValor,
+  children,
+}: {
+  ariaLabel: string
+  value: string
+  onChange: (value: string) => void
+  disabled?: boolean
+  renderValor: (value: string) => string
+  children: ReactNode
+}) {
+  return (
+    <FormControl size="small" variant="outlined" sx={sxKanbanFiltroSelect} disabled={disabled}>
+      <Select
+        value={value}
+        displayEmpty
+        disabled={disabled}
+        onChange={e => onChange(e.target.value)}
+        aria-label={ariaLabel}
+        renderValue={selected => (
+          <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
+            <span className="text-[11px] font-light text-secondary-text">{ariaLabel}</span>
+            <span>{renderValor(String(selected))}</span>
+          </span>
+        )}
+      >
+        {children}
+      </Select>
+    </FormControl>
+  )
+}
 
 const MESES_ABREV = [
   'jan',
@@ -143,48 +183,38 @@ function PeriodoSelecionadoResumo({
   )
 }
 
+function textoPresetPeriodo(preset: string): string {
+  return (
+    KANBAN_FILTRO_DATA_PRESET_OPCOES.find(opcao => opcao.value === preset)?.label ?? 'Hoje'
+  )
+}
+
 function FiltroDataPresetSelect({
-  labelId,
-  label,
   preset,
   onPresetChange,
   periodoResumo,
 }: {
-  labelId: string
-  label: string
   preset: KanbanFiltroDataPreset
   onPresetChange: (preset: KanbanFiltroDataPreset) => void
   periodoResumo?: { inicio: Date; fim: Date } | null
 }) {
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-2">
-        <FormControl
-          size="small"
-          variant="outlined"
-          sx={{ ...sxKanbanFiltroSelect, minWidth: 168 }}
-        >
-          <InputLabel id={labelId} shrink>
-            {label}
-          </InputLabel>
-          <Select
-            labelId={labelId}
-            label={label}
-            value={preset}
-            onChange={e => onPresetChange(e.target.value as KanbanFiltroDataPreset)}
-            className=""
-          >
-            {KANBAN_FILTRO_DATA_PRESET_OPCOES.map(opcao => (
-              <MenuItem key={opcao.value} value={opcao.value}>
-                {opcao.label}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        {preset === 'por_data' && periodoResumo ? (
-          <PeriodoSelecionadoResumo inicio={periodoResumo.inicio} fim={periodoResumo.fim} />
-        ) : null}
-      </div>
+    <div className="flex items-center gap-2">
+      <KanbanFiltroSelect
+        ariaLabel="Período"
+        value={preset}
+        onChange={value => onPresetChange(value as KanbanFiltroDataPreset)}
+        renderValor={textoPresetPeriodo}
+      >
+        {KANBAN_FILTRO_DATA_PRESET_OPCOES.map(opcao => (
+          <MenuItem key={opcao.value} value={opcao.value}>
+            {opcao.label}
+          </MenuItem>
+        ))}
+      </KanbanFiltroSelect>
+      {preset === 'por_data' && periodoResumo ? (
+        <PeriodoSelecionadoResumo inicio={periodoResumo.inicio} fim={periodoResumo.fim} />
+      ) : null}
     </div>
   )
 }
@@ -220,6 +250,8 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
     modoVisualizacao,
     onModoVisualizacaoChange,
     onAbrirConfiguracoesDelivery,
+    onAbrirCaixaEstacao,
+    caixaAberta,
     onAbrirNovoPedido,
     colunasDoModo,
     colunasOcultas,
@@ -233,6 +265,31 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
   const colunaKanbanFiltro = colunaKanbanFiltroProp ?? ''
   const onColunaKanbanFiltro = onColunaKanbanFiltroChange ?? (() => undefined)
   const noFredy = superficie === 'fredy'
+  const buscaPlaceholder = noFredy ? 'Código, cliente ou telefone' : 'Buscar pedido'
+  const buscaContainerClass =
+    'flex min-w-0 shrink-0 flex-col w-full md:w-[17.57rem]'
+  const buscaInputClass =
+    'h-[2.2rem] w-full rounded-lg border bg-info pl-7 pr-3 text-sm shadow-sm'
+
+  const campoBuscaPedido = (
+    <div className={buscaContainerClass}>
+      <div className="relative w-full px-1">
+        <MdSearch
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text"
+          size={22}
+        />
+        <input
+          type="text"
+          placeholder={buscaPlaceholder}
+          value={searchInput}
+          onChange={e => onSearchInputChange(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && onRefresh()}
+          className={buscaInputClass}
+          aria-label={buscaPlaceholder}
+        />
+      </div>
+    </div>
+  )
 
   return (
     <div className="bg-primary-background mt-2 flex-shrink-0 rounded-b-lg rounded-t-lg pb-0">
@@ -250,170 +307,103 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
       </div>
 
       <div
-        className={`flex flex-wrap items-end justify-center gap-x-1 gap-y-4 rounded-t-lg bg-custom-2 px-1 pb-2 pt-1.5 md:justify-start ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
+        className={`flex flex-col gap-1.5 rounded-t-lg bg-custom-2 px-1 py-1.5 md:flex-row md:flex-wrap md:items-center md:justify-start md:gap-x-1 md:gap-y-1 ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
       >
-        <div
-          className={
-            noFredy
-              ? 'flex min-w-[18rem] flex-[1_1_18rem] items-end gap-0.5 sm:max-w-2xl'
-              : 'flex w-[13.5rem] shrink-0 flex-col gap-1'
-          }
-        >
-          <div className="relative min-w-0 w-full flex-1 px-1">
-            <MdSearch
-              className="absolute left-2 top-1/2 -translate-y-1/2 text-secondary-text"
-              size={20}
-            />
-            <input
-              type="text"
-              placeholder={noFredy ? 'Código, cliente ou telefone' : 'Buscar pedido'}
-              value={searchInput}
-              onChange={e => onSearchInputChange(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && onRefresh()}
-              className="h-8 w-full rounded-lg border bg-info pl-6 pr-3 text-sm shadow-sm"
-              aria-label={noFredy ? 'Código, cliente ou telefone' : 'Buscar pedido'}
-            />
-          </div>
-          {noFredy ? (
-            <KanbanColunasMenu
-              variante="discreto"
-              colunasDoModo={colunasDoModo}
-              ocultas={colunasOcultas}
-              onSetColunaVisivel={onSetColunaVisivel}
-              contagemPorColuna={contagemPorColuna}
-            />
-          ) : null}
-        </div>
-
+        <div className="flex flex-wrap items-center justify-center gap-1 md:order-2">
         {!isModoDelivery ? (
-        <div className="flex flex-col gap-1">
-          <FormControl size="small" variant="outlined" sx={sxKanbanFiltroSelect}>
-            <InputLabel id="kanban-filtro-tipo-canal-label" shrink>
-              Canal
-            </InputLabel>
-            <Select
-              labelId="kanban-filtro-tipo-canal-label"
-              label="Canal"
-              value={tipoCanalFilter}
-              onChange={e => onTipoCanalFilterChange(e.target.value as TipoCanalFiltro)}
-              displayEmpty
-              disabled={tipoCanalFilterDisabled}
-              className=""
-            >
-              <MenuItem value="">Todos</MenuItem>
-              <MenuItem value="PDV">POS</MenuItem>
-              <MenuItem value="GESTOR">Balcão</MenuItem>
-            </Select>
-          </FormControl>
-        </div>
+          <KanbanFiltroSelect
+            ariaLabel="Canal"
+            value={tipoCanalFilter}
+            onChange={value => onTipoCanalFilterChange(value as TipoCanalFiltro)}
+            disabled={tipoCanalFilterDisabled}
+            renderValor={value =>
+              value === 'PDV' ? 'POS' : value === 'GESTOR' ? 'Balcão' : 'Todos'
+            }
+          >
+            <MenuItem value="">Todos</MenuItem>
+            <MenuItem value="PDV">POS</MenuItem>
+            <MenuItem value="GESTOR">Balcão</MenuItem>
+          </KanbanFiltroSelect>
         ) : null}
 
-        <div className="flex flex-col gap-1">
-          <FormControl size="small" variant="outlined" sx={sxKanbanFiltroSelect}>
-            <InputLabel id="kanban-filtro-origem-label" shrink>
-              Origem
-            </InputLabel>
-            <Select
-              labelId="kanban-filtro-origem-label"
-              label="Origem"
-              value={origemFilter}
-              onChange={e => onOrigemFilterChange(e.target.value as OrigemFiltro)}
-              displayEmpty
-              disabled={origemFilterDisabled}
-              className=""
-            >
-              <MenuItem value="">Todas</MenuItem>
-              {!isModoDelivery ? <MenuItem value="PDV">POS</MenuItem> : null}
-              <MenuItem value="GESTOR">
-                {isModoDelivery ? 'Gestor Delivery' : 'Gestor'}
-              </MenuItem>
-              <MenuItem value="JIFFY_DELIVERY">Jiffy Delivery</MenuItem>
-              <MenuItem value="AIQFOME">Aiqfome</MenuItem>
-              <MenuItem value="IFOOD">iFood</MenuItem>
-            </Select>
-          </FormControl>
-        </div>
+        <KanbanFiltroSelect
+          ariaLabel="Origem"
+          value={origemFilter}
+          onChange={value => onOrigemFilterChange(value as OrigemFiltro)}
+          disabled={origemFilterDisabled}
+          renderValor={value => {
+            if (value === 'PDV') return 'POS'
+            if (value === 'GESTOR') return isModoDelivery ? 'Gestor Delivery' : 'Gestor'
+            if (value === 'JIFFY_DELIVERY') return 'Jiffy Delivery'
+            if (value === 'AIQFOME') return 'Aiqfome'
+            if (value === 'IFOOD') return 'iFood'
+            return 'Todas'
+          }}
+        >
+          <MenuItem value="">Todas</MenuItem>
+          {!isModoDelivery ? <MenuItem value="PDV">POS</MenuItem> : null}
+          <MenuItem value="GESTOR">
+            {isModoDelivery ? 'Gestor Delivery' : 'Gestor'}
+          </MenuItem>
+          <MenuItem value="JIFFY_DELIVERY">Jiffy Delivery</MenuItem>
+          <MenuItem value="AIQFOME">Aiqfome</MenuItem>
+          <MenuItem value="IFOOD">iFood</MenuItem>
+        </KanbanFiltroSelect>
 
         {isModoDelivery ? (
-        <div className="flex flex-col gap-1">
-          <FormControl size="small" variant="outlined" sx={sxKanbanFiltroSelect}>
-            <InputLabel id="kanban-filtro-tipo-entrega-label" shrink>
-              Tipo de entrega
-            </InputLabel>
-            <Select
-              labelId="kanban-filtro-tipo-entrega-label"
-              label="Tipo de entrega"
-              value={tipoEntregaFilter}
-              onChange={e => onTipoEntregaFilterChange(e.target.value as TipoEntregaFiltro)}
-              displayEmpty
-              className=""
-            >
-              <MenuItem value="">Todos</MenuItem>
-              <MenuItem value="entrega">Entrega</MenuItem>
-              <MenuItem value="retirada">Retirada</MenuItem>
-            </Select>
-          </FormControl>
-        </div>
-        ) : null}
-
-        {modoKanbanVendas === 'balcao' ? (
-        <div className="flex flex-col gap-1">
-          <FormControl size="small" variant="outlined" sx={sxKanbanFiltroSelect}>
-            <InputLabel id="kanban-filtro-coluna-fiscal-label" shrink>
-              Filtro
-            </InputLabel>
-            <Select
-              labelId="kanban-filtro-coluna-fiscal-label"
-              label="Filtro"
-              value={colunaKanbanFiltro}
-              onChange={e =>
-                onColunaKanbanFiltro(e.target.value as ColunaKanbanFiltroExtra)
-              }
-              displayEmpty
-              className=""
-            >
-              <MenuItem value="">Emitidas</MenuItem>
-              <MenuItem value="PENDENTE_EMISSAO">Pendentes</MenuItem>
-              <MenuItem value="REJEITADAS">Rejeitadas</MenuItem>
-              <MenuItem value="TODAS">Todas</MenuItem>
-            </Select>
-          </FormControl>
-        </div>
-        ) : null}
-
-        {modoKanbanVendas === 'balcao' ? (
-        <div className="flex flex-col gap-1">
-          <FormControl
-            size="small"
-            variant="outlined"
-            sx={{ ...sxKanbanFiltroSelect, minWidth: 160 }}
+          <KanbanFiltroSelect
+            ariaLabel="Tipo de entrega"
+            value={tipoEntregaFilter}
+            onChange={value => onTipoEntregaFilterChange(value as TipoEntregaFiltro)}
+            renderValor={value =>
+              value === 'entrega' ? 'Entrega' : value === 'retirada' ? 'Retirada' : 'Todos'
+            }
           >
-            <InputLabel id="kanban-filtro-terminal-label" shrink>
-              Terminal
-            </InputLabel>
-            <Select
-              labelId="kanban-filtro-terminal-label"
-              label="Terminal"
-              value={terminalFilter}
-              onChange={e => onTerminalFilterChange(e.target.value)}
-              displayEmpty
-              disabled={isLoadingTerminais}
-              className=""
-            >
-              <MenuItem value="">Todos</MenuItem>
-              {terminais.map(terminal => (
-                <MenuItem key={terminal.id} value={terminal.id}>
-                  {terminal.nome}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </div>
+            <MenuItem value="">Todos</MenuItem>
+            <MenuItem value="entrega">Entrega</MenuItem>
+            <MenuItem value="retirada">Retirada</MenuItem>
+          </KanbanFiltroSelect>
+        ) : null}
+
+        {modoKanbanVendas === 'balcao' ? (
+          <KanbanFiltroSelect
+            ariaLabel="Filtro"
+            value={colunaKanbanFiltro}
+            onChange={value => onColunaKanbanFiltro(value as ColunaKanbanFiltroExtra)}
+            renderValor={value => {
+              if (value === 'PENDENTE_EMISSAO') return 'Pendentes'
+              if (value === 'REJEITADAS') return 'Rejeitadas'
+              if (value === 'TODAS') return 'Todas'
+              return 'Emitidas'
+            }}
+          >
+            <MenuItem value="">Emitidas</MenuItem>
+            <MenuItem value="PENDENTE_EMISSAO">Pendentes</MenuItem>
+            <MenuItem value="REJEITADAS">Rejeitadas</MenuItem>
+            <MenuItem value="TODAS">Todas</MenuItem>
+          </KanbanFiltroSelect>
+        ) : null}
+
+        {modoKanbanVendas === 'balcao' ? (
+          <KanbanFiltroSelect
+            ariaLabel="Terminal"
+            value={terminalFilter}
+            onChange={onTerminalFilterChange}
+            disabled={isLoadingTerminais}
+            renderValor={value =>
+              terminais.find(terminal => terminal.id === value)?.nome ?? 'Todos'
+            }
+          >
+            <MenuItem value="">Todos</MenuItem>
+            {terminais.map(terminal => (
+              <MenuItem key={terminal.id} value={terminal.id}>
+                {terminal.nome}
+              </MenuItem>
+            ))}
+          </KanbanFiltroSelect>
         ) : null}
 
         <FiltroDataPresetSelect
-          labelId="kanban-filtro-periodo-label"
-          label="Filtrar por Período"
           preset={periodoPreset}
           onPresetChange={onPeriodoPresetChange}
           periodoResumo={
@@ -429,8 +419,24 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
           <MdFilterAltOff size={16} />
           Limpar
         </button>
+        </div>
 
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
+        {noFredy ? (
+          <div className="flex w-full min-w-0 shrink-0 items-center gap-0.5 md:order-1 md:w-auto">
+            {campoBuscaPedido}
+            <KanbanColunasMenu
+              variante="discreto"
+              colunasDoModo={colunasDoModo}
+              ocultas={colunasOcultas}
+              onSetColunaVisivel={onSetColunaVisivel}
+              contagemPorColuna={contagemPorColuna}
+            />
+          </div>
+        ) : (
+          <div className="shrink-0 md:order-1">{campoBuscaPedido}</div>
+        )}
+
+        <div className="flex flex-wrap items-center justify-end gap-1 md:order-3 md:ml-auto">
           <button
             type="button"
             onClick={() => {
@@ -444,7 +450,18 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
             <MdRefresh className={`h-5 w-5 ${refreshSpinning ? 'animate-spin' : ''}`} />
           </button>
           <CompartilharCardapioPublicoButton />
-          {noFredy ? <FredySomPedidosToggle /> : null}
+          <button
+            type="button"
+            onClick={onAbrirCaixaEstacao}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-600 shadow-sm transition-colors hover:bg-gray-50 hover:text-primary"
+            title={caixaAberta === true ? 'Caixa aberto' : caixaAberta === false ? 'Caixa fechado' : 'Meu caixa da estação'}
+            aria-label="Abrir meu caixa"
+          >
+            <TbCashRegister
+              className={`h-5 w-5 ${caixaAberta === true ? 'text-green-500' : caixaAberta === false ? 'text-red-500' : 'text-gray-600'}`}
+            />
+            Meu Caixa
+          </button>
           {noFredy ? (
             <KanbanModoVisualizacaoSelect
               value={modoVisualizacao}

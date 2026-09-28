@@ -1,4 +1,4 @@
-import { carregarPayloadTicketsImpressaoDelivery } from '@/src/application/delivery/carregarPayloadTicketsImpressaoDelivery'
+import { carregarPayloadTicketsImpressaoDelivery } from '@/src/infrastructure/delivery/carregarPayloadTicketsImpressaoDelivery'
 import type { PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
 import type { VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
 import type { EmpresaMeResumo } from '@/src/presentation/hooks/useEmpresaMe'

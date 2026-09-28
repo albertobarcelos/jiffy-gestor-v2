@@ -25,13 +25,24 @@ import {
   sectionFeedLines,
   telefoneWhatsappE164,
 } from '@/src/application/delivery/cupomPrintLayout'
-import { detalheLinhasItemPedido } from '@/src/application/delivery/layoutProducao80mm'
-import type { DesenharPilulaProducao } from '@/src/application/ports/IDesenharPilulaProducao'
+import {
+  detalheLinhasItemPedido,
+  textoEscPosProducao,
+  cupomMostraQrWhatsappCliente,
+  expedicaoDestacaItensPedido,
+  textosIdentidadeProducao,
+} from '@/src/application/delivery/layoutProducao80mm'
+import { headerIdentidadeComContorno } from '@/src/application/delivery/cupomPrintHeaderBlocks'
+import type {
+  DesenharMolduraIdentidade,
+  DesenharPilulaProducao,
+} from '@/src/application/ports/IDesenharPilulaProducao'
 
 export interface MapTicketToPrintDocumentOptions {
   nomeEmpresa?: string
   template?: DeliveryCupomTemplateConfig
   desenharPilula?: DesenharPilulaProducao
+  desenharMolduraIdentidade?: DesenharMolduraIdentidade
 }
 
 function numeroFinito(v: unknown): number | null {
@@ -87,20 +98,6 @@ function valorComplemento(comp: {
   } | null
 } | null): number | null {
   return numeroFinito(comp?.impressao?.valorFinal ?? comp?.impressao?.valorTotal ?? comp?.impressao?.valorUnitario)
-}
-
-function normalizarTipoVenda(root: VendaGestorTicketsResponse): string {
-  const raw = String(root.tipoVenda || '').trim().toLowerCase()
-  if (!raw) return 'Entrega'
-  if (raw.includes('balc')) return 'Balcão'
-  if (raw.includes('retir') || raw.includes('pickup') || raw.includes('take')) return 'Retirada'
-  if (raw.includes('entrega') || raw.includes('delivery')) return 'Entrega'
-  return raw.charAt(0).toUpperCase() + raw.slice(1)
-}
-
-function codigoPedido(root: VendaGestorTicketsResponse): string {
-  const codigo = root.codigoVenda || root.rastreamento?.codigoVenda || ''
-  return codigo ? `#${codigo}` : ''
 }
 
 function nomeEmpresa(root: VendaGestorTicketsResponse, fallback: string): string {
@@ -305,25 +302,24 @@ export function mapTicketToPrintDocument(
   const template = mergeCupomTemplate(options?.template)
   const fontes = cupomPrintFontes(template, 'expedicao')
   const negrito = cupomPrintNegrito(template, 'expedicao')
+  const destacaItens = expedicaoDestacaItensPedido(root.tipoVenda, root.tipoEntrega)
+  const negritoItens = negrito.itens || destacaItens
+  const sizeItens = destacaItens ? 'double' : fontes.itens
   const gap = sectionFeedLines(template.densidade)
   const empresa = nomeEmpresa(root, options?.nomeEmpresa?.trim() || 'Jiffy Gestor')
-  const tipoVenda = normalizarTipoVenda(root)
-  const codigo = codigoPedido(root)
-  const numero = root.numeroVenda != null ? `Pedido #${root.numeroVenda}` : 'Pedido'
-  const titulo = `${numero} ${tipoVenda}`.trim()
+  const identidade = textosIdentidadeProducao({
+    tipoVenda: root.tipoVenda,
+    tipoEntrega: root.tipoEntrega,
+    codigoVenda: root.codigoVenda || root.rastreamento?.codigoVenda,
+    numeroVenda: root.numeroVenda,
+  }).primaria
   const content: PrintContentBlock[] = []
 
   if (template.mostrarLogoTexto) {
-    pushText(content, empresa, { align: 'center', bold: negrito.cabecalho, size: fontes.cabecalho })
+    pushText(content, textoEscPosProducao(empresa), { align: 'center', bold: true, size: 'normal' })
   }
-  pushText(content, titulo, { align: 'center', bold: negrito.cabecalho, size: fontes.cabecalho })
-  if (codigo) {
-    const pilula = options?.desenharPilula?.(codigo, 'identidade')
-    if (pilula) {
-      content.push({ type: 'image', data: pilula, align: 'center' })
-    } else {
-      pushText(content, codigo, { align: 'center', bold: true, size: 'double' })
-    }
+  if (identidade) {
+    content.push(...headerIdentidadeComContorno(identidade, options?.desenharMolduraIdentidade))
   }
   if (template.cabecalhoExtra.trim()) {
     pushText(content, template.cabecalhoExtra.trim(), { align: 'center', bold: negrito.cabecalho, size: fontes.cabecalho })
@@ -350,16 +346,16 @@ export function mapTicketToPrintDocument(
   }
 
   content.push(...mapEndereco(root, template, fontes.cliente, negrito.cliente))
-  if (template.mostrarTelefoneCliente) {
+  if (template.mostrarTelefoneCliente && cupomMostraQrWhatsappCliente(root.tipoVenda, root.tipoEntrega)) {
     content.push(...mapWhatsappQr(tel, template.larguraMm))
   }
 
   content.push({ type: 'divider' })
   pushFeed(content, gap)
   const totalItens = (ticket.itens ?? []).reduce((acc, item) => acc + quantidadeItem(item), 0)
-  pushText(content, `ITENS DO PEDIDO (${totalItens})`, { bold: negrito.itens, size: fontes.itens })
+  pushText(content, `ITENS DO PEDIDO (${totalItens})`, { bold: negritoItens, size: sizeItens })
   content.push(
-    ...mapItens(ticket, template.mostrarValores, template.destacarProdutos, negrito.itens, fontes.itens)
+    ...mapItens(ticket, template.mostrarValores, template.destacarProdutos, negritoItens, sizeItens)
   )
 
   if (template.mostrarObservacaoPedido && root.observacaoPedido?.trim()) {
