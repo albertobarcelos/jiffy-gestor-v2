@@ -1,4 +1,4 @@
-import { carregarPayloadTicketsImpressaoDelivery } from '@/src/application/delivery/carregarPayloadTicketsImpressaoDelivery'
+import type { CarregarPayloadTicketsImpressao } from '@/src/application/delivery/carregarPayloadTicketsImpressaoDelivery'
 import type { AcaoTransicaoGestor } from '@/src/application/dto/TransicaoKanbanDTO'
 import type { EmpresaMeResumo } from '@/src/application/dto/EmpresaMeDTO'
 import type { ModoImpressaoDelivery, PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
@@ -107,6 +107,7 @@ export async function validarImpressaoAntesTransicaoKanban(params: {
   prefs: PreferenciasImpressaoDelivery
   empresa?: EmpresaMeResumo | null
   acoes: AcaoTransicaoGestor[]
+  carregarPayload: CarregarPayloadTicketsImpressao
 }): Promise<ValidarImpressaoAntesTransicaoResult> {
   const modo = params.prefs.modo
   const impressoraExpedicaoId = params.prefs.impressoraExpedicaoId
@@ -115,7 +116,7 @@ export async function validarImpressaoAntesTransicaoKanban(params: {
     return { podeAvancar: true, abrirModalConfig: false }
   }
 
-  const ticketsFetch = await carregarPayloadTicketsImpressaoDelivery({
+  const ticketsFetch = await params.carregarPayload({
     vendaId: params.vendaId,
     accessToken: params.token,
     prefs: params.prefs,
