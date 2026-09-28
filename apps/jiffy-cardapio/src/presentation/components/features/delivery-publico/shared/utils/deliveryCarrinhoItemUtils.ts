@@ -100,5 +100,7 @@ export function itemSemComplemento(
     valorTotal: valorUnitario * item.quantidade,
     observacoes: item.observacoes,
     complementos,
+    precoRegular: item.precoRegular,
+    descontoPercentual: item.descontoPercentual,
   }
 }

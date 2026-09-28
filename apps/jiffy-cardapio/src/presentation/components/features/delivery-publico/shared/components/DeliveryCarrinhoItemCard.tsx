@@ -8,6 +8,7 @@ import {
 } from '../utils/deliveryCarrinhoItemUtils'
 import { formatDeliveryCurrency } from '../utils/formatDeliveryCurrency'
 import { DeliveryCarrinhoComplementoRow } from './DeliveryCarrinhoComplementoRow'
+import { DeliveryProdutoPreco } from './DeliveryProdutoPreco'
 import { DeliveryQuantidadeStepper } from './DeliveryQuantidadeStepper'
 
 type DeliveryCarrinhoItemCardProps = {
@@ -51,6 +52,7 @@ export function DeliveryCarrinhoItemCard({
   onRemoveComplemento,
 }: DeliveryCarrinhoItemCardProps) {
   const obs = observacaoItemCarrinho(item)
+  const precoBase = valorUnitarioBaseProduto(item)
 
   return (
     <article className="py-4">
@@ -67,9 +69,15 @@ export function DeliveryCarrinhoItemCard({
             >
               {item.produtoNome}
             </button>
-            <span className="mt-0.5 inline-block text-sm font-medium tabular-nums delivery-text-accent">
-              {formatDeliveryCurrency(valorUnitarioBaseProduto(item))}
-            </span>
+            <DeliveryProdutoPreco
+              produto={{
+                preco: precoBase,
+                precoRegular: item.precoRegular,
+                descontoPercentual: item.descontoPercentual,
+              }}
+              accentColor="var(--delivery-primary)"
+              className="mt-0.5"
+            />
           </div>
 
           <DeliveryQuantidadeStepper

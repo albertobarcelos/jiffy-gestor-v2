@@ -243,15 +243,18 @@ export function DeliveryPublicoHomeScreen({
       }
 
       const precoVigente = resolverPrecosDeliveryProduto(produto).preco
+      const precos = resolverPrecosDeliveryProduto(produto)
       adicionarItem(slug, {
         produtoId: produto.id,
         produtoNome: produto.nome,
         produtoImagemUrl: produto.imagemUrl,
         quantidade: 1,
-        valorUnitario: precoVigente,
-        valorTotal: precoVigente,
+        valorUnitario: precos.preco,
+        valorTotal: precos.preco,
         observacoes: [],
         complementos: [],
+        precoRegular: precos.precoRegular,
+        descontoPercentual: precos.descontoPercentual,
       })
 
       handleProdutoAdicionado({

@@ -232,14 +232,10 @@ export const MenuProdutoSnapshotForm = forwardRef<
   )
 
   const handleValorNormalChange = (raw: string) => {
+    // Com promoção configurada o normal fica travado (mesmo pausada).
+    if (modoPromocao) return
     const next = formatCurrency(raw)
     setValor(next)
-    if (!modoPromocao) return
-    const normal = parseCurrency(next)
-    const promo = parseCurrency(valorPromocional)
-    if (Number.isFinite(normal) && normal > 0 && Number.isFinite(promo) && promo >= 0) {
-      setDescontoPct(formatDescontoPct(descontoPercentualFromPrecos(normal, promo)))
-    }
   }
 
   const handleValorPromocionalChange = (raw: string) => {
@@ -489,6 +485,8 @@ export const MenuProdutoSnapshotForm = forwardRef<
                       placeholder="R$ 0,00"
                       className="bg-white"
                       sx={sxEntradaCompactaProduto}
+                      disabled
+                      title="Remova a promoção para alterar o preço normal"
                       inputProps={inputPropsSelecionarConteudo}
                     />
                     <Input

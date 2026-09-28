@@ -10,6 +10,7 @@ interface ProdutoValorInputProps {
   valor: number
   disabled?: boolean
   className?: string
+  title?: string
   /**
    * Retorne `false` (ou Promise de `false`) para indicar cancelamento —
    * o input volta ao `valor` prop sem recarregar a página.
@@ -21,6 +22,7 @@ export function ProdutoValorInput({
   valor,
   disabled = false,
   className,
+  title,
   onCommit,
 }: ProdutoValorInputProps) {
   const [inputValue, setInputValue] = useState(() => formatBRLFromMaskedInput(valor))
@@ -83,6 +85,7 @@ export function ProdutoValorInput({
         if (e.key === 'Enter') e.currentTarget.blur()
       }}
       disabled={disabled}
+      title={title}
       className={cn(
         'w-24 rounded-lg border border-primary/50 bg-info p-2 text-center text-xs font-normal text-primary-text focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 md:text-sm',
         className

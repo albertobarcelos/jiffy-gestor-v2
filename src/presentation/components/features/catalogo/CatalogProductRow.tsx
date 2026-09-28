@@ -15,7 +15,10 @@ import { ProdutoNomeInput } from '@/src/presentation/components/features/produto
 import { MenuProdutoPauseControl } from '@/src/presentation/components/features/menus/MenuProdutoPauseControl'
 import { cn } from '@/src/shared/utils/cn'
 import { formatBRLFromMaskedInput } from '@/src/shared/utils/formatters'
-import { promocaoSnapshotVigente } from '@/src/domain/policies/menu/precoVigenteSnapshot'
+import {
+  produtoTemPromocaoPreenchida,
+  promocaoSnapshotVigente,
+} from '@/src/domain/policies/menu/precoVigenteSnapshot'
 import {
   NOME_CATALOGO_LISTA_MAX_CHARS,
   truncarNomeCatalogoLista,
@@ -120,13 +123,18 @@ function CatalogProductRowInner({
   const podeEditarNome = Boolean(onNomeChange)
   const podeEditarValor = Boolean(onValorChange)
   const promoNum = Number(valorPromocional ?? 0)
-  const mostrarPrecoPromocional =
+  const temPromocaoPreenchida = isMenu && produtoTemPromocaoPreenchida(valorPromocional)
+  const valorNormalBloqueadoPorPromocao = temPromocaoPreenchida
+  const promocaoVigente =
     isMenu &&
     promocaoSnapshotVigente({
       valor,
       valorPromocional,
       promocaoAtiva,
     })
+  /** Promo configurada mas pausada: ainda exibe o valor, em vermelho riscado. */
+  const promocaoPausadaNaLista = temPromocaoPreenchida && !promocaoVigente
+  const mostrarBadgePromocional = promocaoVigente || promocaoPausadaNaLista
 
   const renderPauseMenu = () =>
     hidePauseAndPrice ? null : (
@@ -348,20 +356,39 @@ function CatalogProductRowInner({
                   'min-w-[calc(4.5rem+0.375rem+6rem)]'
                 )}
               >
-                {mostrarPrecoPromocional ? (
-                  <span
-                    className="inline-flex min-w-[4.5rem] items-center justify-center rounded-lg border border-emerald-600/40 bg-emerald-50 px-2 py-2 text-center text-xs font-semibold tabular-nums text-emerald-700 md:text-sm"
-                    title="Preço promocional"
+                {mostrarBadgePromocional ? (
+                  <Tooltip
+                    title={
+                      promocaoPausadaNaLista
+                        ? 'A promoção está pausada'
+                        : 'Preço promocional'
+                    }
+                    arrow
+                    placement="top"
                   >
-                    {formatBRLFromMaskedInput(promoNum)}
-                  </span>
+                    <span
+                      className={cn(
+                        'inline-flex min-w-[4.5rem] items-center justify-center rounded-lg border px-2 py-2 text-center text-xs font-semibold tabular-nums md:text-sm',
+                        promocaoPausadaNaLista
+                          ? 'border-red-300 bg-red-50 text-red-600 line-through decoration-red-600/80'
+                          : 'border-emerald-600/40 bg-emerald-50 text-emerald-700'
+                      )}
+                    >
+                      {formatBRLFromMaskedInput(promoNum)}
+                    </span>
+                  </Tooltip>
                 ) : null}
                 {podeEditarValor && onValorChange ? (
                   <ProdutoValorInput
                     valor={valor}
-                    disabled={isSavingValor}
+                    disabled={Boolean(isSavingValor) || valorNormalBloqueadoPorPromocao}
+                    title={
+                      valorNormalBloqueadoPorPromocao
+                        ? 'Remova a promoção para alterar o preço normal'
+                        : undefined
+                    }
                     className={
-                      mostrarPrecoPromocional
+                      promocaoVigente
                         ? 'text-secondary-text line-through decoration-primary/60'
                         : undefined
                     }
@@ -371,7 +398,7 @@ function CatalogProductRowInner({
                   <span
                     className={cn(
                       'inline-flex w-24 items-center justify-center rounded-lg border border-primary/50 bg-info p-2 text-center text-xs font-normal text-primary-text md:text-sm',
-                      mostrarPrecoPromocional &&
+                      promocaoVigente &&
                         'text-secondary-text line-through decoration-primary/60'
                     )}
                   >
