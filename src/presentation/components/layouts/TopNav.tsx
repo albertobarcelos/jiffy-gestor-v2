@@ -11,7 +11,7 @@ import { urlLoginDaSessaoAtual } from '@/src/presentation/gestor-pedidos/sessao/
 import { useEmpresaUrlSync } from '@/src/presentation/hooks/useEmpresaUrlSync'
 import { EmpresaSwitcherTopNav } from './EmpresaSwitcherTopNav'
 import { useQueryClient } from '@tanstack/react-query'
-import { MdDashboard, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose, MdDeliveryDining, MdApps } from 'react-icons/md'
+import { MdDashboard, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose, MdDeliveryDining, MdApps, MdMoreHoriz } from 'react-icons/md'
 import { 
   MdInventory2, 
   MdShoppingBag, 
@@ -36,6 +36,10 @@ import { useDeliveryGestorConfigStatus } from '@/src/presentation/hooks/useDeliv
 import { EmpresaDeliveryPendenteGestorModal } from '@/src/presentation/components/features/delivery/EmpresaDeliveryPendenteGestorModal'
 import { matchesModulePath } from '@/src/shared/utils/gestaoRoutes'
 import { isConfiguracoesModulePath } from '@/src/shared/constants/configuracoesRoutes'
+import { useTopNavOverflow } from '@/src/presentation/hooks/useTopNavOverflow'
+
+const NAV_ITEM_CLASS =
+  'flex min-w-max shrink-0 items-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-2 text-xs font-medium transition-all duration-200 xl:px-2 xl:text-sm 2xl:gap-1.5 2xl:px-3'
 
 const MENU_ICON_PARENT =
   'inline-flex h-5 w-5 shrink-0 items-center justify-center [&>svg]:h-5 [&>svg]:w-5'
@@ -248,6 +252,15 @@ export function TopNav() {
     return items
   }, [temAcessoFiscal])
 
+  const itensMenuDesktop = useMemo(
+    () => menuItems.filter(item => item.name !== 'Configurações'),
+    [menuItems]
+  )
+  const { containerRef, faixaMedicaoRef, maisMedicaoRef, visiveis, pronto } =
+    useTopNavOverflow(itensMenuDesktop.length)
+  const itensVisiveis = itensMenuDesktop.slice(0, visiveis)
+  const itensOverflow = itensMenuDesktop.slice(visiveis)
+
   const isMenuActive = (item: typeof menuItems[0]) => {
     if (item.path === '/configuracoes/empresa') {
       return isConfiguracoesModulePath(pathname ?? '')
@@ -268,6 +281,96 @@ export function TopNav() {
   }
 
   const isChildActive = (childPath: string) => matchesModulePath(pathname ?? '', childPath)
+
+  const classeItemDesktop = (ativo: boolean) =>
+    `${NAV_ITEM_CLASS} ${
+      ativo ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+    }`
+
+  const renderConteudoItem = (item: MenuItem, expandido = false) => (
+    <>
+      {renderNavIcon(item, MENU_ICON_PARENT)}
+      <span className="shrink-0 whitespace-nowrap">{item.name}</span>
+      {item.children ? (
+        <MdExpandMore
+          className={`h-4 w-4 shrink-0 transition-transform duration-200 ${
+            expandido ? 'rotate-180' : ''
+          }`}
+          aria-hidden
+        />
+      ) : null}
+    </>
+  )
+
+  const renderSubmenuDesktop = (item: MenuItem) => {
+    if (!item.children || !expandedMenus.has(item.name)) {
+      return null
+    }
+    return (
+      <div className="absolute top-full left-0 z-50 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-2 shadow-lg">
+        {item.children.map(child => {
+          const renderedChildIcon = renderNavIcon(child, MENU_ICON_CHILD)
+          const childIsActive = isChildActive(child.path)
+          return (
+            <Link
+              key={`${child.name}-${child.path}`}
+              href={toGestao(child.path)}
+              onMouseEnter={() => handleLinkHover(child.path)}
+              onClick={() => setExpandedMenus(new Set())}
+              prefetch={true}
+              className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                childIsActive
+                  ? 'bg-gray-50 text-gray-900 font-medium'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              {renderedChildIcon}
+              <span>{child.name}</span>
+              {childIsActive && (
+                <MdChevronRight className="ml-auto h-4 w-4 text-gray-400" />
+              )}
+            </Link>
+          )
+        })}
+      </div>
+    )
+  }
+
+  const renderItemDesktop = (item: MenuItem) => {
+    const isActive = isMenuActive(item)
+    const itemClass = classeItemDesktop(isActive)
+
+    if (item.children) {
+      return (
+        <div key={item.name} className="relative shrink-0">
+          <button
+            type="button"
+            onClick={() => toggleMenu(item.name)}
+            className={itemClass}
+            title={item.name}
+            aria-label={item.name}
+          >
+            {renderConteudoItem(item, expandedMenus.has(item.name))}
+          </button>
+          {renderSubmenuDesktop(item)}
+        </div>
+      )
+    }
+
+    return (
+      <Link
+        key={item.path}
+        href={toGestao(item.path)}
+        onMouseEnter={() => handleLinkHover(item.path)}
+        prefetch={true}
+        title={item.name}
+        aria-label={item.name}
+        className={itemClass}
+      >
+        {renderConteudoItem(item)}
+      </Link>
+    )
+  }
 
   const closeSubmenus = useCallback(() => setExpandedMenus(new Set()), [])
 
@@ -471,90 +574,108 @@ export function TopNav() {
           </Link>
         </div>
 
-        <div
-          ref={menuRef}
-          className="hidden shrink-0 items-center gap-0.5 lg:flex xl:gap-1"
-        >
-          {menuItems
-            .filter(item => item.name !== 'Configurações')
-            .map((item) => {
-            const isActive = isMenuActive(item)
-            const isExpanded = expandedMenus.has(item.name)
-            const renderedIcon = renderNavIcon(item, MENU_ICON_PARENT)
-            const itemClass = `flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-2 text-xs font-medium transition-all duration-200 xl:px-2 xl:text-sm 2xl:gap-1.5 2xl:px-3 ${
-              isActive
-                ? 'bg-gray-100 text-gray-900'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-            }`
+        <div ref={menuRef} className="hidden min-w-0 flex-1 items-center lg:flex">
+          <div ref={containerRef} className="relative min-w-0 w-full">
+            <div
+              ref={faixaMedicaoRef}
+              className="pointer-events-none invisible absolute left-0 top-0 flex items-center gap-0.5 xl:gap-1"
+              aria-hidden
+            >
+              {itensMenuDesktop.map(item => (
+                <span key={`medicao-${item.name}`} className={NAV_ITEM_CLASS}>
+                  {renderConteudoItem(item)}
+                </span>
+              ))}
+            </div>
+            <span
+              ref={maisMedicaoRef}
+              className={`${NAV_ITEM_CLASS} pointer-events-none invisible absolute`}
+              aria-hidden
+            >
+              <MdMoreHoriz className="h-5 w-5 shrink-0" />
+              <span className="shrink-0 whitespace-nowrap">Mais</span>
+              <MdExpandMore className="h-4 w-4 shrink-0" />
+            </span>
 
-            if (item.children) {
-              return (
-                <div key={item.name} className="relative shrink-0">
+            <div className="flex items-center gap-0.5 xl:gap-1">
+              {pronto ? itensVisiveis.map(item => renderItemDesktop(item)) : null}
+              {pronto && itensOverflow.length > 0 ? (
+                <div className="relative shrink-0">
                   <button
-                    onClick={() => toggleMenu(item.name)}
-                    className={itemClass}
-                    title={item.name}
-                    aria-label={item.name}
+                    type="button"
+                    onClick={() => toggleMenu('__mais')}
+                    className={classeItemDesktop(itensOverflow.some(item => isMenuActive(item)))}
+                    title="Mais"
+                    aria-label="Mais itens de menu"
+                    aria-expanded={expandedMenus.has('__mais')}
                   >
-                    {renderedIcon}
-                    <span className="whitespace-nowrap">{item.name}</span>
+                    <MdMoreHoriz className="h-5 w-5 shrink-0" aria-hidden />
+                    <span className="shrink-0 whitespace-nowrap">Mais</span>
                     <MdExpandMore
                       className={`h-4 w-4 shrink-0 transition-transform duration-200 ${
-                        isExpanded ? 'rotate-180' : ''
+                        expandedMenus.has('__mais') ? 'rotate-180' : ''
                       }`}
                     />
                   </button>
-
-                  {isExpanded && (
-                    <div className="absolute top-full left-0 z-50 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-2 shadow-lg">
-                      {item.children.map((child) => {
-                        const renderedChildIcon = renderNavIcon(child, MENU_ICON_CHILD)
-                        const childIsActive = isChildActive(child.path)
+                  {expandedMenus.has('__mais') ? (
+                    <div className="absolute top-full right-0 z-50 mt-1 max-h-[min(24rem,70vh)] w-64 overflow-y-auto rounded-lg border border-gray-200 bg-white py-2 shadow-lg">
+                      {itensOverflow.map(item => {
+                        if (item.children) {
+                          return (
+                            <div key={item.name} className="py-1">
+                              <p className="px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                {item.name}
+                              </p>
+                              {item.children.map(child => {
+                                const childIsActive = isChildActive(child.path)
+                                return (
+                                  <Link
+                                    key={`${child.name}-${child.path}`}
+                                    href={toGestao(child.path)}
+                                    onMouseEnter={() => handleLinkHover(child.path)}
+                                    onClick={() => setExpandedMenus(new Set())}
+                                    prefetch={true}
+                                    className={`flex items-center gap-3 px-4 py-2 text-sm transition-colors ${
+                                      childIsActive
+                                        ? 'bg-gray-50 text-gray-900 font-medium'
+                                        : 'text-gray-700 hover:bg-gray-50'
+                                    }`}
+                                  >
+                                    {renderNavIcon(child, MENU_ICON_CHILD)}
+                                    <span>{child.name}</span>
+                                  </Link>
+                                )
+                              })}
+                            </div>
+                          )
+                        }
                         return (
                           <Link
-                            key={`${child.name}-${child.path}`}
-                            href={toGestao(child.path)}
-                            onMouseEnter={() => handleLinkHover(child.path)}
+                            key={item.path}
+                            href={toGestao(item.path)}
+                            onMouseEnter={() => handleLinkHover(item.path)}
                             onClick={() => setExpandedMenus(new Set())}
                             prefetch={true}
                             className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
-                              childIsActive
+                              isMenuActive(item)
                                 ? 'bg-gray-50 text-gray-900 font-medium'
                                 : 'text-gray-700 hover:bg-gray-50'
                             }`}
                           >
-                            {renderedChildIcon}
-                            <span>{child.name}</span>
-                            {childIsActive && (
-                              <MdChevronRight className="ml-auto h-4 w-4 text-gray-400" />
-                            )}
+                            {renderNavIcon(item, MENU_ICON_PARENT)}
+                            <span>{item.name}</span>
                           </Link>
                         )
                       })}
                     </div>
-                  )}
+                  ) : null}
                 </div>
-              )
-            }
-
-            return (
-              <Link
-                key={item.path}
-                href={toGestao(item.path)}
-                onMouseEnter={() => handleLinkHover(item.path)}
-                prefetch={true}
-                title={item.name}
-                aria-label={item.name}
-                className={itemClass}
-              >
-                {renderedIcon}
-                <span className="whitespace-nowrap">{item.name}</span>
-              </Link>
-            )
-          })}
+              ) : null}
+            </div>
+          </div>
         </div>
 
-        <div className="ml-auto flex min-w-0 items-center gap-1 sm:gap-1.5">
+        <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-1.5">
           <EmpresaSwitcherTopNav variant="desktop" />
 
           <button
@@ -646,7 +767,7 @@ export function TopNav() {
             </Link>
 
             <div
-              className="hidden min-w-0 max-w-[12rem] flex-col items-end justify-center border-l border-gray-200 px-2 py-1.5 text-right xl:flex 2xl:max-w-[16rem]"
+              className="hidden min-w-0 max-w-[14rem] flex-col items-end justify-center border-l border-gray-200 px-2 py-1.5 text-right 2xl:flex"
               title={
                 isHydrated
                   ? `${user?.getName() || 'Usuário'}${user?.getEmail() ? ` • ${user.getEmail()}` : ''}`

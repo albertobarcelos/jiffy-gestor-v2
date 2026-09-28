@@ -19,14 +19,16 @@ Object.defineProperty(globalThis, 'sessionStorage', {
 
 import {
   buildAgentPrintJob,
-  DEFAULT_JIFFY_PRINT_SETUP_URL,
   DEFAULT_PRINT_AGENT_URL,
   jaPediuDownloadJiffyPrint,
   marcarDownloadJiffyPrintIniciado,
   mensagemJiffyPrintIndisponivel,
+} from '@/src/infrastructure/printing/agent/localAgentClient'
+import {
+  DEFAULT_JIFFY_PRINT_SETUP_URL,
   nomeFicheiroInstaladorJiffyPrint,
   urlInstaladorJiffyPrint,
-} from '@/src/infrastructure/printing/agent/localAgentClient'
+} from '@/src/shared/constants/jiffyPrintSetup'
 
 describe('localAgentClient', () => {
   beforeEach(() => {

@@ -1,4 +1,4 @@
-import type { CarregarPayloadTicketsImpressaoDelivery } from '@/src/application/delivery/carregarPayloadTicketsImpressaoDelivery'
+import type { CarregarPayloadTicketsImpressao } from '@/src/application/delivery/carregarPayloadTicketsImpressaoDelivery'
 import type { AcaoTransicaoGestor } from '@/src/application/dto/TransicaoKanbanDTO'
 import type { EmpresaMeResumo } from '@/src/application/dto/EmpresaMeDTO'
 import type { ModoImpressaoDelivery, PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
@@ -107,7 +107,7 @@ export async function validarImpressaoAntesTransicaoKanban(params: {
   prefs: PreferenciasImpressaoDelivery
   empresa?: EmpresaMeResumo | null
   acoes: AcaoTransicaoGestor[]
-  carregarPayload: CarregarPayloadTicketsImpressaoDelivery
+  carregarPayload: CarregarPayloadTicketsImpressao
 }): Promise<ValidarImpressaoAntesTransicaoResult> {
   const modo = params.prefs.modo
   const impressoraExpedicaoId = params.prefs.impressoraExpedicaoId

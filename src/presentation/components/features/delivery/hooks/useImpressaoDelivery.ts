@@ -9,6 +9,7 @@ import { filtrarTicketsPorTipoDecidido } from '@/src/application/delivery/filtra
 import { filtrarWarningsTicketsParaImpressao } from '@/src/application/delivery/filtrarWarningsTicketsParaImpressao'
 import { marcarImpressaoDeliveryRecente } from '@/src/application/delivery/impressaoDeliveryDedupe'
 import { imprimirPorComandoRealtime as imprimirPorComandoRealtimeApp } from '@/src/application/delivery/imprimirPorComandoRealtime'
+import { carregarPayloadTicketsImpressaoDelivery } from '@/src/infrastructure/printing/criarCarregarPayloadTicketsImpressaoDelivery'
 import { notificarWarningsTickets } from '@/src/application/delivery/imprimirTicketsApiGestor'
 import { imprimirTicketsApiGestor } from '@/src/infrastructure/printing/imprimirTicketsApiGestor'
 import { fetchVendaGestorTickets } from '@/src/infrastructure/api/fetchVendaGestorTickets'
@@ -212,7 +213,7 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
         onErro: m => showToast.error(m),
         onAviso: m => showToast.warning(m),
         imprimirTickets: imprimirTicketsApiGestor,
-        fetchVendaGestorTickets,
+        carregarPayload: carregarPayloadTicketsImpressaoDelivery,
       })
     },
     [deliveryCupomTemplate, empresa, preferenciasImpressaoDelivery]
