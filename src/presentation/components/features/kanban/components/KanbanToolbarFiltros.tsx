@@ -103,7 +103,7 @@ export function KanbanToolbarFiltros({
   return (
     <>
       {noFredy ? (
-        <div className="flex w-[min(100%,17.57rem)] shrink-0 items-center gap-0.5">
+        <div className="flex shrink-0 items-center gap-0.5">
           {campoBuscaPedido}
           <KanbanColunasMenu
             variante="discreto"
