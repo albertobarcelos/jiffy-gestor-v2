@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
-  buildGraphicPrintDocument,
   headerEmpresaEscPos,
   headerIdentidadeComContorno,
   headerIdentidadeEscPos,
+} from '@/src/application/delivery/cupomPrintHeaderBlocks'
+import {
+  buildGraphicPrintDocument,
   LINHAS_ANTES_DO_CORTE_GRAFICO,
 } from '@/src/application/delivery/mapTicketToGraphicPrintDocument'
 import { fonteProdutoEscPosA22Px, graphicRasterScale } from '@/src/application/delivery/cupomPrintLayout'

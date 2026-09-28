@@ -15,7 +15,7 @@ import {
   formatTcpPrinterRef,
   isTcpPrinterRef,
   parseTcpPrinterRef,
-} from '@/src/infrastructure/printing/tcpPrinterRef'
+} from '@/src/domain/printing/tcpPrinterRef'
 import {
   MODO_IMPRESSAO_IMPRESSORA_OPCOES,
   parseModoImpressaoImpressora,

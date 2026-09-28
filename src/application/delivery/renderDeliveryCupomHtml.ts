@@ -10,11 +10,8 @@ import {
   type DeliveryCupomModeloFonteConfig,
   type DeliveryCupomTemplateConfig,
 } from '@/src/shared/types/deliveryCupomTemplate'
-import {
-  renderDashSeparatorHtml,
-  renderQrSvg,
-  TRACEJADO_PRODUCAO,
-} from '@/src/infrastructure/printing/receiptBitmaps'
+import { TRACEJADO_PRODUCAO } from '@/src/shared/printing/cupomTracejado'
+import { renderDashSeparatorHtml, renderQrSvg } from '@/src/shared/printing/receiptBitmaps'
 import {
   avisoCobrancaEntregadorCupom,
   deveCobrarNaEntregaCupom,
@@ -35,7 +32,7 @@ import {
   textosIdentidadeProducao,
 } from '@/src/application/delivery/layoutProducao80mm'
 import { origemModeloProducaoDeTicket } from '@/src/application/delivery/origemModeloProducao'
-import { ESCPOS_FONT_A_FACE_CSS } from '@/src/infrastructure/printing/escposFontAFace'
+import { ESCPOS_FONT_A_FACE_CSS } from '@/src/shared/printing/escposFontAFaceCss'
 
 export interface RenderDeliveryCupomHtmlInput {
   root: VendaGestorTicketsResponse

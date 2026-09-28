@@ -15,13 +15,6 @@ import type { PrintContentBlock, PrintDocument } from '@/src/application/ports/p
 import type { DeliveryCupomTemplateConfig } from '@/src/shared/types/deliveryCupomTemplate'
 import type { VendaGestorTicket, VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
 
-export {
-  headerEmpresaEscPos,
-  headerIdentidadeComContorno,
-  headerIdentidadeEscPos,
-  identidadeCabecalhoGrafico,
-} from '@/src/application/delivery/cupomPrintHeaderBlocks'
-
 /**
  * Folga depois do rodapé no cupom gráfico. O corte GS V 65 já avança até a faca;
  * 8 linhas somavam ~34 mm em branco. 2 linhas ≈ 8 mm — só para não cortar o texto.

@@ -3,7 +3,7 @@ import {
   formatTcpPrinterRef,
   isTcpPrinterRef,
   parseTcpPrinterRef,
-} from '@/src/infrastructure/printing/tcpPrinterRef'
+} from '@/src/domain/printing/tcpPrinterRef'
 
 describe('tcpPrinterRef', () => {
   it('reconhece tcp://host:porta', () => {

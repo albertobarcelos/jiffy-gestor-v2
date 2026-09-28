@@ -1,4 +1,4 @@
-import type { EstacaoImpressaoMapeamento } from '@/src/infrastructure/api/estacoesImpressaoApi'
+import type { EstacaoImpressaoMapeamento } from '@/src/shared/types/estacaoImpressao'
 
 /** Nome Windows ou tcp:// vinculado à impressora lógica de expedição nesta estação. */
 export function resolverNomeImpressoraExpedicaoEstacao(

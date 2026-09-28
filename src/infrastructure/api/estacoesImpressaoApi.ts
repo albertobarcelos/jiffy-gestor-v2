@@ -6,6 +6,7 @@ import {
 } from '@/src/infrastructure/api/normalizarEstacaoImpressaoResumo'
 import { normalizarListaMapeamentosEstacao } from '@/src/infrastructure/api/normalizarEstacaoImpressaoMapeamentos'
 import type { ModoImpressaoImpressora } from '@/src/domain/types/modoImpressaoImpressora'
+import type { EstacaoImpressaoMapeamento } from '@/src/shared/types/estacaoImpressao'
 import {
   getEstacaoImpressaoId,
   limparEstacaoImpressaoId,
@@ -28,14 +29,6 @@ export type AtualizarEstacaoImpressaoPatch = {
 export interface ImpressoraLogica {
   id: string
   nome: string
-}
-
-export interface EstacaoImpressaoMapeamento {
-  impressoraId: string
-  nomeImpressora: string
-  nomeImpressoraWindows: string
-  /** Homolog: modo da via nesta estação (`PUT/GET .../estacoes-impressao/{id}/impressoras`). */
-  modoImpressao?: ModoImpressaoImpressora
 }
 
 export class EstacaoImpressaoApiError extends Error {

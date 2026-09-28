@@ -10,7 +10,7 @@ import {
   desenharMolduraIdentidadePng,
   desenharPilulaProducaoPng,
 } from '@/src/infrastructure/printing/pilulaProducaoPng'
-import { desenharSeparadorTracejadoPng } from '@/src/infrastructure/printing/receiptBitmaps'
+import { desenharSeparadorTracejadoPng } from '@/src/shared/printing/receiptBitmaps'
 import { showToast } from '@/src/shared/utils/toast'
 import { DeliveryConfigCollapsibleSection } from './DeliveryConfigCollapsibleSection'
 import { larguraCupomDeliveryPx, renderDeliveryCupomHtml } from '@/src/application/delivery/renderDeliveryCupomHtml'

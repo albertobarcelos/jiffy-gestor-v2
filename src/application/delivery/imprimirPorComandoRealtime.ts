@@ -9,11 +9,23 @@ import {
   jaImprimiuDeliveryRecentemente,
   marcarImpressaoDeliveryRecente,
 } from '@/src/application/delivery/impressaoDeliveryDedupe'
-import { fetchVendaGestorTickets } from '@/src/infrastructure/api/fetchVendaGestorTickets'
 import type { DeliveryCupomTemplateConfig } from '@/src/shared/types/deliveryCupomTemplate'
 import type { PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
+import type { VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
 import type { EmpresaMeResumo } from '@/src/application/dto/EmpresaMeDTO'
 import { erroImpressao, logImpressao, warnImpressao } from '@/src/shared/utils/logImpressaoDelivery'
+
+export type FetchVendaGestorTicketsForRealtime = (
+  vendaId: string,
+  accessToken: string | undefined,
+  context: {
+    prefs: PreferenciasImpressaoDelivery
+    empresa?: EmpresaMeResumo | null
+  }
+) => Promise<
+  | { ok: true; data: VendaGestorTicketsResponse }
+  | { ok: false; status: number; error?: string }
+>
 
 export type ImprimirPorComandoRealtimeResult =
   | 'skipped_dedupe'
@@ -32,6 +44,7 @@ export type ImprimirPorComandoRealtimeParams = {
   onErro?: (mensagem: string) => void
   onAviso?: (mensagem: string) => void
   imprimirTickets: ImprimirTicketsApiGestor
+  fetchVendaGestorTickets: FetchVendaGestorTicketsForRealtime
 }
 
 /**
@@ -56,7 +69,7 @@ export async function imprimirPorComandoRealtime(
     return 'sem_token'
   }
 
-  const ticketsFetch = await fetchVendaGestorTickets(vendaId, token, {
+  const ticketsFetch = await params.fetchVendaGestorTickets(vendaId, token, {
     prefs: params.prefs,
     empresa: params.empresa,
   })
