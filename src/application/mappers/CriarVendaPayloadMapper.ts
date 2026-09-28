@@ -91,7 +91,6 @@ export function buildCriarVendaGestorPayload(input: CriarVendaGestorInputDTO): C
     tipoVenda: input.tipoInicioPedido === 'delivery' ? 'delivery' : 'balcao',
     origem: input.origem,
     statusVenda: input.status,
-    estacaoId: (input.estacaoId ?? '').trim(),
     produtosLancados,
     produtos: produtosLancados,
   }
