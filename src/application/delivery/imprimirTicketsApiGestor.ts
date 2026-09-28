@@ -1,5 +1,5 @@
 import { mapTicketToPrintDocument } from '@/src/application/delivery/mapTicketToPrintDocument'
-import { mapTicketToGraphicPrintDocument } from '@/src/application/delivery/mapTicketToGraphicPrintDocument'
+import type { MapTicketToGraphicPrintDocument } from '@/src/application/delivery/mapTicketToGraphicPrintDocument'
 import { mapTicketToProducaoHibridoDocument } from '@/src/application/delivery/mapTicketToProducaoHibridoDocument'
 import {
   avisosProdutoSemImpressora,
@@ -78,6 +78,7 @@ export type ImprimirTicketsApiGestorDeps = {
   desenharPilula: DesenharPilulaProducao
   desenharMolduraIdentidade?: DesenharMolduraIdentidade
   desenharSeparador?: () => string | null
+  mapTicketToGraphicPrintDocument: MapTicketToGraphicPrintDocument
   enviarCupom: EnviarCupomPrintJob
   gerarJobId: GerarPrintJobId
 }
@@ -189,7 +190,7 @@ export function criarImprimirTicketsApiGestor(
             desenharSeparador: deps.desenharSeparador,
           })
         } else if (cupomTemplate?.modoPapel === 'grafico') {
-          document = await mapTicketToGraphicPrintDocument(response, ticket, {
+          document = await deps.mapTicketToGraphicPrintDocument(response, ticket, {
             nomeEmpresa,
             template: cupomTemplate,
             desenharMolduraIdentidade: deps.desenharMolduraIdentidade,

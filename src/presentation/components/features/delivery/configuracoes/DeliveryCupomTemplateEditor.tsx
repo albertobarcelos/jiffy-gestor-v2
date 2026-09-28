@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MdPrint, MdReceiptLong, MdRestartAlt } from 'react-icons/md'
-import { mapTicketToGraphicPrintDocument } from '@/src/application/delivery/mapTicketToGraphicPrintDocument'
+import { mapTicketToGraphicPrintDocument } from '@/src/infrastructure/printing/mapTicketToGraphicPrintDocument'
 import { mapTicketToPrintDocument } from '@/src/application/delivery/mapTicketToPrintDocument'
 import { mapTicketToProducaoHibridoDocument } from '@/src/application/delivery/mapTicketToProducaoHibridoDocument'
 import { printDeliveryCupom } from '@/src/infrastructure/printing/printDeliveryCupom'

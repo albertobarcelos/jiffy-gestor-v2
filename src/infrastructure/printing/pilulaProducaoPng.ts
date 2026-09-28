@@ -1,12 +1,12 @@
-/** Dimensões 80 mm alinhadas a `PRODUCAO_80MM` — sem importar a application. */
+import type { VariantePilulaProducao } from '@/src/application/ports/IDesenharPilulaProducao'
+
+/** Dimensões 80 mm alinhadas a `PRODUCAO_80MM` — sem importar layout da application. */
 const PILULA_80MM = {
   larguraRasterPx: 576,
   margemPilulaPx: 12,
   gapAbaixoPilulaPx: 10,
   raioPilulaPx: 2,
 } as const
-
-export type VariantePilulaProducao = 'senha' | 'identidade' | 'codigo'
 
 type EstiloPilula = {
   fontPx: number

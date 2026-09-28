@@ -1,8 +1,10 @@
-import { temSeloCanalOrigem } from '@/src/domain/policies/pedido/origemCanalMarketplace'
+import {
+  canalSeloOrigem,
+  type CanalSeloOrigem,
+  temSeloCanalOrigem,
+} from '@/src/domain/policies/pedido/origemCanalMarketplace'
 import { colors } from '@/src/shared/theme/colors'
 import { cn } from '@/src/shared/utils/cn'
-
-type CanalLogoOrigem = 'AIQFOME' | 'IFOOD' | 'JIFFY_DELIVERY'
 
 type LogoOrigemConfig = {
   src: string
@@ -15,7 +17,7 @@ type LogoOrigemConfig = {
   imageScale?: number
 }
 
-const LOGO_ORIGEM: Record<CanalLogoOrigem, LogoOrigemConfig> = {
+const LOGO_ORIGEM: Record<CanalSeloOrigem, LogoOrigemConfig> = {
   AIQFOME: { src: '/images/aiqfome.png', alt: 'Aiqfome', bg: '#5C0D8A' },
   IFOOD: { src: '/images/ifood.png', alt: 'iFood', bg: '#EA1D2C' },
   JIFFY_DELIVERY: {
@@ -26,14 +28,6 @@ const LOGO_ORIGEM: Record<CanalLogoOrigem, LogoOrigemConfig> = {
     square: true,
     imageScale: 0.88,
   },
-}
-
-function logoOrigem(origem: string | null | undefined): CanalLogoOrigem | null {
-  const canal = String(origem ?? '').trim().toUpperCase()
-  if (canal === 'IFOOD') return 'IFOOD'
-  if (canal === 'AIQFOME') return 'AIQFOME'
-  if (canal === 'JIFFY_DELIVERY' || canal === 'DELIVERY') return 'JIFFY_DELIVERY'
-  return null
 }
 
 export function OrigemCanalMark({
@@ -49,7 +43,7 @@ export function OrigemCanalMark({
 }) {
   if (!temSeloCanalOrigem(origem)) return null
 
-  const canal = logoOrigem(origem)
+  const canal = canalSeloOrigem(origem)
   if (!canal) return null
   const logo = LOGO_ORIGEM[canal]
   const imageScale = logo.imageScale ?? 1

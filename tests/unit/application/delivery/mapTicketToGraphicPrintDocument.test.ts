@@ -6,8 +6,7 @@ import {
   headerIdentidadeEscPos,
   LINHAS_ANTES_DO_CORTE_GRAFICO,
 } from '@/src/application/delivery/mapTicketToGraphicPrintDocument'
-import { fonteProdutoEscPosA22Px } from '@/src/application/delivery/cupomPrintLayout'
-import { graphicRasterScale } from '@/src/infrastructure/printing/rasterizeCupomHtml'
+import { fonteProdutoEscPosA22Px, graphicRasterScale } from '@/src/application/delivery/cupomPrintLayout'
 
 describe('mapTicketToGraphicPrintDocument', () => {
   it('monta um job com a foto, avanço e corte', () => {

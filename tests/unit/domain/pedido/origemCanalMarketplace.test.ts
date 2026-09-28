@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  canalSeloOrigem,
   isOrigemAiqfome,
   isOrigemIfood,
   isOrigemJiffyCardapio,
@@ -42,5 +43,12 @@ describe('origemCanalMarketplace', () => {
     expect(temSeloCanalOrigem('JIFFY_DELIVERY')).toBe(true)
     expect(temSeloCanalOrigem('GESTOR')).toBe(false)
     expect(temSeloCanalOrigem('PDV')).toBe(false)
+  })
+
+  it('canalSeloOrigem devolve chave canônica do logo', () => {
+    expect(canalSeloOrigem('IFOOD')).toBe('IFOOD')
+    expect(canalSeloOrigem('AIQFOME')).toBe('AIQFOME')
+    expect(canalSeloOrigem('DELIVERY')).toBe('JIFFY_DELIVERY')
+    expect(canalSeloOrigem('GESTOR')).toBeNull()
   })
 })

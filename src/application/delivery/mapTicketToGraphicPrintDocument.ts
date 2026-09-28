@@ -1,56 +1,32 @@
-import { renderDeliveryCupomHtml, larguraCupomDeliveryPx } from '@/src/application/delivery/renderDeliveryCupomHtml'
-import { columnsFromCupomTemplate, mergeCupomTemplate } from '@/src/application/delivery/cupomPrintLayout'
-import { textoEscPosProducao, textosIdentidadeProducao } from '@/src/application/delivery/layoutProducao80mm'
 import {
+  headerEmpresaEscPos,
+  headerIdentidadeComContorno,
+  identidadeCabecalhoGrafico,
+} from '@/src/application/delivery/cupomPrintHeaderBlocks'
+import {
+  columnsFromCupomTemplate,
   graphicRasterScale,
-  rasterizeCupomHtmlToPngBase64,
-} from '@/src/infrastructure/printing/rasterizeCupomHtml'
+  mergeCupomTemplate,
+} from '@/src/application/delivery/cupomPrintLayout'
+import { renderDeliveryCupomHtml, larguraCupomDeliveryPx } from '@/src/application/delivery/renderDeliveryCupomHtml'
 import type { DesenharMolduraIdentidade } from '@/src/application/ports/IDesenharPilulaProducao'
+import type { RasterizeCupomHtmlToPngBase64 } from '@/src/application/ports/IRasterizeCupomHtml'
 import type { PrintContentBlock, PrintDocument } from '@/src/application/ports/printDocument'
 import type { DeliveryCupomTemplateConfig } from '@/src/shared/types/deliveryCupomTemplate'
 import type { VendaGestorTicket, VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
+
+export {
+  headerEmpresaEscPos,
+  headerIdentidadeComContorno,
+  headerIdentidadeEscPos,
+  identidadeCabecalhoGrafico,
+} from '@/src/application/delivery/cupomPrintHeaderBlocks'
 
 /**
  * Folga depois do rodapé no cupom gráfico. O corte GS V 65 já avança até a faca;
  * 8 linhas somavam ~34 mm em branco. 2 linhas ≈ 8 mm — só para não cortar o texto.
  */
 export const LINHAS_ANTES_DO_CORTE_GRAFICO = 2
-
-export function headerEmpresaEscPos(empresa: string): PrintContentBlock[] {
-  const texto = textoEscPosProducao(empresa)
-  if (!texto) return []
-  return [{ type: 'text', text: texto, align: 'center', bold: true, size: 'normal' }]
-}
-
-export function headerIdentidadeEscPos(identidade: string): PrintContentBlock[] {
-  const texto = textoEscPosProducao(identidade)
-  if (!texto) return []
-  return [{ type: 'text', text: texto, align: 'center', bold: true, size: 'double' }]
-}
-
-export function headerIdentidadeComContorno(
-  identidade: string,
-  desenharMoldura?: DesenharMolduraIdentidade
-): PrintContentBlock[] {
-  const texto = headerIdentidadeEscPos(identidade)
-  if (texto.length === 0) return []
-  const topo = desenharMoldura?.('topo')
-  const base = desenharMoldura?.('base')
-  return [
-    ...(topo ? [{ type: 'image' as const, data: topo, align: 'center' as const }] : []),
-    ...texto,
-    ...(base ? [{ type: 'image' as const, data: base, align: 'center' as const }] : []),
-  ]
-}
-
-export function identidadeCabecalhoGrafico(root: VendaGestorTicketsResponse): string {
-  return textosIdentidadeProducao({
-    tipoVenda: root.tipoVenda,
-    tipoEntrega: root.tipoEntrega,
-    codigoVenda: root.codigoVenda || root.rastreamento?.codigoVenda,
-    numeroVenda: root.numeroVenda,
-  }).primaria
-}
 
 export function buildGraphicPrintDocument(
   pngBase64: string,
@@ -82,35 +58,47 @@ function nomeEmpresaGrafico(
   )
 }
 
-export async function mapTicketToGraphicPrintDocument(
+export type MapTicketToGraphicPrintDocumentOptions = {
+  nomeEmpresa?: string
+  template?: DeliveryCupomTemplateConfig
+  desenharMolduraIdentidade?: DesenharMolduraIdentidade
+}
+
+export type MapTicketToGraphicPrintDocument = (
   root: VendaGestorTicketsResponse,
   ticket: VendaGestorTicket,
-  options?: {
-    nomeEmpresa?: string
-    template?: DeliveryCupomTemplateConfig
-    desenharMolduraIdentidade?: DesenharMolduraIdentidade
+  options?: MapTicketToGraphicPrintDocumentOptions
+) => Promise<PrintDocument>
+
+export function criarMapTicketToGraphicPrintDocument(deps: {
+  rasterizeCupomHtmlToPngBase64: RasterizeCupomHtmlToPngBase64
+}): MapTicketToGraphicPrintDocument {
+  return async function mapTicketToGraphicPrintDocument(
+    root: VendaGestorTicketsResponse,
+    ticket: VendaGestorTicket,
+    options?: MapTicketToGraphicPrintDocumentOptions
+  ): Promise<PrintDocument> {
+    const template = mergeCupomTemplate(options?.template)
+    const empresa = template.mostrarLogoTexto
+      ? nomeEmpresaGrafico(root, options?.nomeEmpresa)
+      : ''
+    const identidade = identidadeCabecalhoGrafico(root)
+    const html = renderDeliveryCupomHtml({
+      root,
+      ticket,
+      nomeEmpresa: options?.nomeEmpresa,
+      template,
+      omitirNomeEmpresa: Boolean(empresa),
+      omitirIdentidade: Boolean(identidade),
+    })
+    const widthPx = larguraCupomDeliveryPx(template.larguraMm)
+    const png = await deps.rasterizeCupomHtmlToPngBase64(html, {
+      widthPx,
+      scale: graphicRasterScale(template.larguraMm),
+    })
+    return buildGraphicPrintDocument(png, columnsFromCupomTemplate(template), [
+      ...headerEmpresaEscPos(empresa),
+      ...headerIdentidadeComContorno(identidade, options?.desenharMolduraIdentidade),
+    ])
   }
-): Promise<PrintDocument> {
-  const template = mergeCupomTemplate(options?.template)
-  const empresa = template.mostrarLogoTexto
-    ? nomeEmpresaGrafico(root, options?.nomeEmpresa)
-    : ''
-  const identidade = identidadeCabecalhoGrafico(root)
-  const html = renderDeliveryCupomHtml({
-    root,
-    ticket,
-    nomeEmpresa: options?.nomeEmpresa,
-    template,
-    omitirNomeEmpresa: Boolean(empresa),
-    omitirIdentidade: Boolean(identidade),
-  })
-  const widthPx = larguraCupomDeliveryPx(template.larguraMm)
-  const png = await rasterizeCupomHtmlToPngBase64(html, {
-    widthPx,
-    scale: graphicRasterScale(template.larguraMm),
-  })
-  return buildGraphicPrintDocument(png, columnsFromCupomTemplate(template), [
-    ...headerEmpresaEscPos(empresa),
-    ...headerIdentidadeComContorno(identidade, options?.desenharMolduraIdentidade),
-  ])
 }

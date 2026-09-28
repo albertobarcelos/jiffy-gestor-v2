@@ -9,6 +9,7 @@ describe('criarImprimirTicketsApiGestor', () => {
     const desenharPilula = vi.fn().mockReturnValue(null)
     const imprimir = criarImprimirTicketsApiGestor({
       desenharPilula,
+      mapTicketToGraphicPrintDocument: vi.fn(),
       enviarCupom,
       gerarJobId,
     })
@@ -52,6 +53,7 @@ describe('criarImprimirTicketsApiGestor', () => {
     const onAviso = vi.fn()
     const imprimir = criarImprimirTicketsApiGestor({
       desenharPilula: vi.fn().mockReturnValue(null),
+      mapTicketToGraphicPrintDocument: vi.fn(),
       enviarCupom,
       gerarJobId: vi.fn(),
     })

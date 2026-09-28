@@ -32,7 +32,7 @@ import {
   expedicaoDestacaItensPedido,
   textosIdentidadeProducao,
 } from '@/src/application/delivery/layoutProducao80mm'
-import { headerIdentidadeComContorno } from '@/src/application/delivery/mapTicketToGraphicPrintDocument'
+import { headerIdentidadeComContorno } from '@/src/application/delivery/cupomPrintHeaderBlocks'
 import type {
   DesenharMolduraIdentidade,
   DesenharPilulaProducao,

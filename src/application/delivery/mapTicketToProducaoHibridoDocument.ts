@@ -9,7 +9,7 @@ import {
   origemModeloProducaoDeTicket,
   type OrigemModeloProducaoDeTicketOptions,
 } from '@/src/application/delivery/origemModeloProducao'
-import { headerIdentidadeComContorno } from '@/src/application/delivery/mapTicketToGraphicPrintDocument'
+import { headerIdentidadeComContorno } from '@/src/application/delivery/cupomPrintHeaderBlocks'
 import type {
   DesenharMolduraIdentidade,
   DesenharPilulaProducao,
