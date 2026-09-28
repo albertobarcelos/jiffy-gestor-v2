@@ -87,16 +87,26 @@ describe('mapTicketToPrintDocument', () => {
     expect(
       doc.content.some(
         b =>
-          (b.type === 'text' && b.text === '#ABC123' && b.size === 'double' && b.align === 'center') ||
-          (b.type === 'image' && b.align === 'center')
+          b.type === 'text' &&
+          (b.text ?? '').includes('Loja Teste') &&
+          b.bold === true &&
+          b.size === 'normal' &&
+          b.align === 'center'
+      )
+    ).toBe(true)
+    expect(
+      doc.content.some(
+        b =>
+          b.type === 'text' &&
+          b.text === 'ENTREGA#9842 #ABC123' &&
+          b.bold === true &&
+          b.size === 'double' &&
+          b.align === 'center'
       )
     ).toBe(true)
     expect(doc.content.some(b => b.type === 'text' && (b.text ?? '').includes('Pedido #9842 Entrega'))).toBe(
-      true
+      false
     )
-    expect(
-      doc.content.some(b => b.type === 'text' && (b.text ?? '').includes('Pedido #9842') && (b.text ?? '').includes('ABC123'))
-    ).toBe(false)
     expect(
       doc.content.some(
         b => b.type === 'row' && b.left === '2x X-BACON' && (b.right ?? '').includes('40,00') && b.size === 'normal'
@@ -125,6 +135,20 @@ describe('mapTicketToPrintDocument', () => {
       doc.content.some(b => b.type === 'text' && (b.text ?? '').startsWith('Data Prevista:'))
     ).toBe(true)
     expect(doc.content.at(-1)?.type).toBe('cut')
+  })
+
+  it('retirada não imprime QR de WhatsApp', () => {
+    const doc = mapTicketToPrintDocument(
+      { ...root, tipoEntrega: 'retirada' },
+      ticketExpedicao
+    )
+    expect(doc.content.some(b => b.type === 'qrcode')).toBe(false)
+    expect(doc.content.some(b => (b.text ?? '').includes('WhatsApp'))).toBe(false)
+    expect(
+      doc.content.some(
+        b => b.type === 'row' && b.left === '2x X-BACON' && b.bold === true && b.size === 'double'
+      )
+    ).toBe(true)
   })
 
   it('58 mm reduz colunas', () => {

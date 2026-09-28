@@ -1,4 +1,4 @@
-import { temSeloCanalMarketplace } from '@/src/domain/policies/pedido/origemCanalMarketplace'
+import { temSeloCanalOrigem } from '@/src/domain/policies/pedido/origemCanalMarketplace'
 import type { Venda } from '../types'
 
 export type TipoVendaExibicaoCard =
@@ -68,7 +68,7 @@ export function codigoVendaKanban(venda: Venda): string | null {
 }
 
 export function exibirSeloCanalMarketplace(origem: string | null | undefined): boolean {
-  return temSeloCanalMarketplace(origem)
+  return temSeloCanalOrigem(origem)
 }
 
 function rotuloIdentificacaoKanban(venda: Venda): 'Pedido' | 'Venda' {

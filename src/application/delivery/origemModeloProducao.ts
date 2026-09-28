@@ -9,6 +9,8 @@ export const VERSAO_CUPOM_GESTOR = '0.1.0'
 export interface OrigemModeloProducaoDeTicketOptions {
   reimpressao?: boolean
   versao?: string
+  nomeEmpresa?: string | null
+  mostrarLogoTexto?: boolean
 }
 
 export function origemModeloProducaoDeTicket(
@@ -19,9 +21,22 @@ export function origemModeloProducaoDeTicket(
   const identificacao =
     textoEscPosProducao(root.identificacao ?? '') ||
     identificacaoClienteProducao(root.cliente?.nome ?? '')
+  const mostrarEmpresa = options?.mostrarLogoTexto !== false
+  const empresa = mostrarEmpresa
+    ? textoEscPosProducao(
+        options?.nomeEmpresa ||
+          root.empresa?.nomeExibicao ||
+          root.empresa?.nome ||
+          root.empresa?.razaoSocial ||
+          ''
+      )
+    : ''
   return {
+    empresa: empresa || null,
     tipoVenda: root.tipoVenda,
+    tipoEntrega: root.tipoEntrega,
     codigoVenda: root.codigoVenda || root.rastreamento?.codigoVenda,
+    numeroVenda: root.numeroVenda ?? root.rastreamento?.numeroVenda,
     numeroMesa: root.numeroMesa,
     identificacao: identificacao || null,
     senha: root.senha ?? null,

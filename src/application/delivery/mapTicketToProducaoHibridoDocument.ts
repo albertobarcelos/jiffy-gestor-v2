@@ -1,6 +1,5 @@
 import {
   dotsEntreModificadoresProducao,
-  identidadePrimariaEhTipoAvulso,
   montarModeloProducao80mm,
   PRODUCAO_80MM,
   textoEscPosProducao,
@@ -10,7 +9,11 @@ import {
   origemModeloProducaoDeTicket,
   type OrigemModeloProducaoDeTicketOptions,
 } from '@/src/application/delivery/origemModeloProducao'
-import type { DesenharPilulaProducao } from '@/src/application/ports/IDesenharPilulaProducao'
+import { headerIdentidadeComContorno } from '@/src/application/delivery/mapTicketToGraphicPrintDocument'
+import type {
+  DesenharMolduraIdentidade,
+  DesenharPilulaProducao,
+} from '@/src/application/ports/IDesenharPilulaProducao'
 import type {
   PrintAlign,
   PrintContentBlock,
@@ -23,6 +26,7 @@ export type DesenharSeparadorProducao = () => string | null
 
 export type MapTicketToProducaoHibridoOptions = OrigemModeloProducaoDeTicketOptions & {
   desenharPilula?: DesenharPilulaProducao
+  desenharMolduraIdentidade?: DesenharMolduraIdentidade
   desenharSeparador?: DesenharSeparadorProducao
 }
 
@@ -72,11 +76,15 @@ function pushPilula(
 export function modeloToProducaoHibridoContent(
   modelo: ModeloProducao80mm,
   desenharPilula?: DesenharPilulaProducao,
-  desenharSeparador?: DesenharSeparadorProducao
+  desenharSeparador?: DesenharSeparadorProducao,
+  desenharMolduraIdentidade?: DesenharMolduraIdentidade
 ): PrintContentBlock[] {
   const content: PrintContentBlock[] = []
   if (modelo.reimpressao) {
     pushTexto(content, '** REIMPRESSAO **', { align: 'center', bold: true, size: 'normal' })
+  }
+  if (modelo.empresa) {
+    pushTexto(content, modelo.empresa, { align: 'center', bold: true, size: 'normal' })
   }
   if (modelo.senha) pushPilula(content, modelo.senha, 'senha', desenharPilula)
   if (modelo.conferencia) {
@@ -84,15 +92,10 @@ export function modeloToProducaoHibridoContent(
   }
   if (modelo.unidade) pushPilula(content, modelo.unidade, 'codigo', desenharPilula)
   if (modelo.identidade.primaria) {
-    pushPilula(
-      content,
-      modelo.identidade.primaria,
-      identidadePrimariaEhTipoAvulso(modelo.identidade.primaria) ? 'identidade' : 'codigo',
-      desenharPilula
-    )
+    content.push(...headerIdentidadeComContorno(modelo.identidade.primaria, desenharMolduraIdentidade))
   }
   if (modelo.identidade.secundaria) {
-    pushPilula(content, modelo.identidade.secundaria, 'identidade', desenharPilula)
+    content.push(...headerIdentidadeComContorno(modelo.identidade.secundaria, desenharMolduraIdentidade))
   }
   for (const item of modelo.itens) {
     pushTexto(content, item.produto, { align: 'left', bold: true, size: 'double' })
@@ -142,7 +145,8 @@ export function mapTicketToProducaoHibridoDocument(
     content: modeloToProducaoHibridoContent(
       modelo,
       options?.desenharPilula,
-      options?.desenharSeparador
+      options?.desenharSeparador,
+      options?.desenharMolduraIdentidade
     ),
   }
 }

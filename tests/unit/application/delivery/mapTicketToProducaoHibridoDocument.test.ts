@@ -100,7 +100,7 @@ describe('mapTicketToProducaoHibridoDocument', () => {
           b.type === 'image'
       )
     ).toBe(true)
-    expect(textos(unidade).some(t => t.includes('ENTREGA #1842'))).toBe(false)
+    expect(textos(unidade).some(t => t.includes('ENTREGA#1842'))).toBe(false)
   })
 
   it('usa PNG tracejado entre produtos, sem linha acima do primeiro', () => {
@@ -113,6 +113,35 @@ describe('mapTicketToProducaoHibridoDocument', () => {
     expect(idxSep).toBeGreaterThan(idxItem)
     expect(doc.content.filter(b => b.type === 'image' && b.data === 'png-tracejado').length).toBeGreaterThanOrEqual(2)
     expect(doc.content.some(b => b.type === 'divider')).toBe(false)
+  })
+
+  it('junta número e código na mesma pílula e mostra a empresa no topo', () => {
+    const doc = mapTicketToProducaoHibridoDocument(
+      {
+        ...root,
+        numeroVenda: 12,
+        codigoVenda: 'SIXWMAWDD',
+        cliente: { nome: 'Priscila' },
+        empresa: { nomeExibicao: 'Espeto do Joaquim' },
+      },
+      ticket
+    )
+    const all = textos(doc).join('\n')
+    expect(all).toContain('Espeto do Joaquim')
+    expect(all).toContain('ENTREGA#12 #SIXWMAWDD')
+    expect(all).toContain('Venda #SIXWMAWDD')
+    expect(all).not.toContain('PEDIDO #12')
+    expect(all.indexOf('Espeto do Joaquim')).toBeLessThan(all.indexOf('ENTREGA#12 #SIXWMAWDD'))
+    expect(
+      doc.content.some(
+        b =>
+          b.type === 'text' &&
+          b.text === 'ENTREGA#12 #SIXWMAWDD' &&
+          b.bold === true &&
+          b.size === 'double' &&
+          b.align === 'center'
+      )
+    ).toBe(true)
   })
 
   it('marca reimpressão no topo', () => {

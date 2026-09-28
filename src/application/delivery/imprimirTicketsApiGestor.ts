@@ -8,7 +8,10 @@ import {
 } from '@/src/application/delivery/deliveryProdutoSemImpressoraAvisos'
 import { warningRedundanteMapeamentoImpressoraWindows } from '@/src/application/delivery/deliveryTicketWarningUtils'
 import { ticketPrintKey } from '@/src/application/delivery/ticketPrintKey'
-import type { DesenharPilulaProducao } from '@/src/application/ports/IDesenharPilulaProducao'
+import type {
+  DesenharMolduraIdentidade,
+  DesenharPilulaProducao,
+} from '@/src/application/ports/IDesenharPilulaProducao'
 import type { EnviarCupomPrintJob } from '@/src/application/ports/IEnviarCupomPrintJob'
 import type { GerarPrintJobId } from '@/src/application/ports/IGerarPrintJobId'
 import { TOAST_CUPOM_NAO_IMPRIMIU_SEM_VINCULO_PC } from '@/src/shared/utils/deliveryImpressoraExpedicao'
@@ -73,6 +76,7 @@ export function notificarWarningsTickets(
 
 export type ImprimirTicketsApiGestorDeps = {
   desenharPilula: DesenharPilulaProducao
+  desenharMolduraIdentidade?: DesenharMolduraIdentidade
   desenharSeparador?: () => string | null
   enviarCupom: EnviarCupomPrintJob
   gerarJobId: GerarPrintJobId
@@ -157,9 +161,11 @@ export function criarImprimirTicketsApiGestor(
         falhas += 1
         const nomeLogica = ticket.impressoraNome?.trim() || ticket.impressora?.nome?.trim() || 'lógica'
         const mensagem = TOAST_CUPOM_NAO_IMPRIMIU_SEM_VINCULO_PC(nomeLogica)
-        erroImpressao('ticket.sem_impressora_fisica', {
+        warnImpressao('ticket.sem_impressora_fisica', {
           tipoCupom: ticket.tipoCupom,
           impressoraId: ticket.impressoraId,
+          impressoraNome: nomeLogica,
+          origem: ticket.impressora?.origem ?? null,
         })
         if (!omitirAvisoSemVinculoPc) {
           if (onAviso) {
@@ -176,19 +182,24 @@ export function criarImprimirTicketsApiGestor(
         if (ticket.tipoCupom === 'producao') {
           document = mapTicketToProducaoHibridoDocument(response, ticket, {
             reimpressao,
+            nomeEmpresa,
+            mostrarLogoTexto: cupomTemplate?.mostrarLogoTexto,
             desenharPilula: deps.desenharPilula,
+            desenharMolduraIdentidade: deps.desenharMolduraIdentidade,
             desenharSeparador: deps.desenharSeparador,
           })
         } else if (cupomTemplate?.modoPapel === 'grafico') {
           document = await mapTicketToGraphicPrintDocument(response, ticket, {
             nomeEmpresa,
             template: cupomTemplate,
+            desenharMolduraIdentidade: deps.desenharMolduraIdentidade,
           })
         } else {
           document = mapTicketToPrintDocument(response, ticket, {
             nomeEmpresa,
             template: cupomTemplate,
             desenharPilula: deps.desenharPilula,
+            desenharMolduraIdentidade: deps.desenharMolduraIdentidade,
           })
         }
       } catch (error) {
