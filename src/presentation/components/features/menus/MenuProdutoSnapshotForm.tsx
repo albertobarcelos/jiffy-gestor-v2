@@ -76,13 +76,26 @@ function parseCurrency(value: string): number {
 
 function formatDescontoPct(value: number | null): string {
   if (value == null || !Number.isFinite(value)) return ''
-  return String(value).replace('.', ',')
+  // Inteiro sem casas; senão 1 casa (passo 0,1%).
+  if (Number.isInteger(value)) return String(value)
+  return value.toFixed(1).replace('.', ',')
 }
 
 function parseDescontoPct(value: string): number {
   const normalized = value.replace('%', '').trim().replace(',', '.')
   if (!normalized) return NaN
   return Number(normalized)
+}
+
+/** Aceita só dígitos e no máximo 1 casa decimal (vírgula ou ponto). */
+function sanitizeDescontoPctInput(raw: string): string {
+  const cleaned = raw.replace(/[^\d.,]/g, '').replace(',', '.')
+  const match = cleaned.match(/^(\d{0,3})(?:\.(\d{0,1}))?/)
+  if (!match) return ''
+  const inteiro = match[1] ?? ''
+  if (match[2] !== undefined) return `${inteiro},${match[2]}`
+  if (cleaned.includes('.')) return `${inteiro},`
+  return inteiro
 }
 
 /** Props do input nativo: seleciona o conteúdo ao focar/clicar. */
@@ -249,7 +262,7 @@ export const MenuProdutoSnapshotForm = forwardRef<
   }
 
   const handleDescontoPctChange = (raw: string) => {
-    const cleaned = raw.replace(/[^\d.,]/g, '')
+    const cleaned = sanitizeDescontoPctInput(raw)
     setDescontoPct(cleaned)
     const normal = parseCurrency(valor)
     const pct = parseDescontoPct(cleaned)

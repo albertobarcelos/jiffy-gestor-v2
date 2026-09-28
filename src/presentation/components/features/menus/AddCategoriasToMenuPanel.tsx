@@ -6,6 +6,7 @@ import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useGruposProdutosInfinite } from '@/src/presentation/hooks/useGruposProdutos'
 import { useMenuMutations } from '@/src/presentation/hooks/menus/useMenuMutations'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { listarIdsProdutosDoGrupo } from '@/src/presentation/utils/listarIdsProdutosDoGrupo'
 import { showToast } from '@/src/shared/utils/toast'
 import type { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
@@ -32,7 +33,9 @@ export function AddCategoriasToMenuPanel({
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const { syncProdutos } = useMenuMutations(menuId)
+  const { syncProdutos, updateProduto } = useMenuMutations(menuId)
+  const invalidate = useInvalidateTenantQueries()
+  const salvando = syncProdutos.isPending || updateProduto.isPending
 
   useEffect(() => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
@@ -119,34 +122,61 @@ export function AddCategoriasToMenuPanel({
     }
     try {
       const addSet = new Set<string>()
-      const vazias: string[] = []
+      /** Produtos já no cardápio cuja categoria no cadastro mudou — precisam do grupoProdutoId no snapshot. */
+      const reposicionar: Array<{ produtoId: string; grupoProdutoId: string }> = []
+      const vaziasCadastro: string[] = []
+      let categoriasComAcao = 0
+
       for (const grupoId of grupoIds) {
+        const nome = disponiveis.find(g => g.getId() === grupoId)?.getNome() ?? grupoId
         const ids = await listarIdsProdutosDoGrupo(grupoId)
-        const novos = ids.filter(id => !produtosJaNoMenu.has(id))
-        if (novos.length === 0) {
-          const nome = disponiveis.find(g => g.getId() === grupoId)?.getNome() ?? grupoId
-          vazias.push(nome)
+        if (ids.length === 0) {
+          vaziasCadastro.push(nome)
           continue
         }
+
+        const novos = ids.filter(id => !produtosJaNoMenu.has(id))
+        const jaNoMenu = ids.filter(id => produtosJaNoMenu.has(id))
         novos.forEach(id => addSet.add(id))
+        jaNoMenu.forEach(produtoId => reposicionar.push({ produtoId, grupoProdutoId: grupoId }))
+
+        if (novos.length > 0 || jaNoMenu.length > 0) {
+          categoriasComAcao += 1
+        }
       }
-      if (addSet.size === 0) {
+
+      if (addSet.size === 0 && reposicionar.length === 0) {
         showToast.error(
-          vazias.length > 0
+          vaziasCadastro.length > 0
             ? 'Essas categorias não têm produtos no cadastro. Cadastre um produto nelas para aparecerem neste cardápio.'
-            : 'Nenhum produto novo para adicionar'
+            : 'Nenhum produto para adicionar'
         )
         return
       }
-      await syncProdutos.mutateAsync({ add: Array.from(addSet) })
+
+      if (addSet.size > 0) {
+        await syncProdutos.mutateAsync({ add: Array.from(addSet) })
+      }
+
+      // Produtos já vinculados (ex.: mudaram de categoria no cadastro) passam a compor a seção nova.
+      for (const item of reposicionar) {
+        await updateProduto.mutateAsync({
+          produtoId: item.produtoId,
+          input: { grupoProdutoId: item.grupoProdutoId },
+        })
+      }
+
+      await invalidate(['menu-produtos', menuId])
+      await invalidate(['menu-grupos', menuId])
+
       showToast.success(
-        addSet.size === 1
+        categoriasComAcao === 1
           ? 'Categoria adicionada a este cardápio'
-          : `${grupoIds.length - vazias.length} categorias adicionadas a este cardápio`
+          : `${categoriasComAcao} categorias adicionadas a este cardápio`
       )
-      if (vazias.length > 0) {
+      if (vaziasCadastro.length > 0) {
         showToast.warning(
-          `Sem produtos no cadastro: ${vazias.join(', ')}. Cadastre um produto para elas aparecerem.`
+          `Sem produtos no cadastro: ${vaziasCadastro.join(', ')}. Cadastre um produto para elas aparecerem.`
         )
       }
       closeAndReset()
@@ -160,7 +190,7 @@ export function AddCategoriasToMenuPanel({
       open={open}
       onClose={closeAndReset}
       title="Adicionar categorias"
-      subtitle="Inclui nesta vitrine os produtos do cadastro que estão nessas categorias."
+      subtitle="Inclui os produtos do cadastro nestas categorias. Se o produto já estiver no cardápio, ele passa a aparecer nesta seção."
       scrollableBody={false}
       footerVariant="bar"
       panelClassName={MENU_SIDE_PANEL_CLASS}
@@ -172,8 +202,8 @@ export function AddCategoriasToMenuPanel({
         showSave: true,
         saveLabel: selected.size > 0 ? `Adicionar (${selected.size})` : 'Adicionar',
         onSave: handleConfirm,
-        saveLoading: syncProdutos.isPending,
-        saveDisabled: selected.size === 0 || syncProdutos.isPending,
+        saveLoading: salvando,
+        saveDisabled: selected.size === 0 || salvando,
       }}
     >
       <div className="flex min-h-0 flex-1 flex-col p-2 md:p-4">
