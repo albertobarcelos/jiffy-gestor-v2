@@ -1,8 +1,8 @@
 'use client'
 
 import { Camera, Plus } from 'lucide-react'
-import { formatDeliveryCurrency } from '../utils/formatDeliveryCurrency'
 import type { DeliveryPublicoProdutoViewModel } from '../types/deliveryPublicoViewModel'
+import { DeliveryProdutoPreco } from './DeliveryProdutoPreco'
 
 type DeliveryProdutoListItemProps = {
   produto: DeliveryPublicoProdutoViewModel
@@ -10,7 +10,7 @@ type DeliveryProdutoListItemProps = {
   /** Unidades deste produto já no carrinho (soma de linhas). */
   quantidadeNoCarrinho?: number
   onClick?: (produtoId: string) => void
-  /** Atalho: adiciona direto ao carrinho (só produtos sem complemento). */
+  /** Atalho +: sem complemento adiciona ao carrinho; com complemento abre o detalhe. */
   onAddRapido?: (produtoId: string) => void
   /** Clique na bolinha de quantidade → abre o carrinho. */
   onAbrirCarrinho?: () => void
@@ -28,12 +28,14 @@ function ProdutoThumb({
   interactive,
   onOpenClick,
   onAddClick,
+  addAriaLabel,
 }: {
   imagemUrl: string | null
   produtoNome: string
   interactive: boolean
   onOpenClick?: () => void
   onAddClick?: () => void
+  addAriaLabel?: string
 }) {
   const media = imagemUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
@@ -73,7 +75,7 @@ function ProdutoThumb({
             e.stopPropagation()
             onAddClick()
           }}
-          aria-label={`Adicionar ${produtoNome} ao carrinho`}
+          aria-label={addAriaLabel ?? `Adicionar ${produtoNome} ao carrinho`}
           className="absolute bottom-2 right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full shadow-sm transition-transform active:scale-95 @lg:h-9 @lg:w-9"
           style={{ backgroundColor: 'rgba(255, 255, 255, 0.8)' }}
         >
@@ -145,7 +147,15 @@ export function DeliveryProdutoListItem({
     onClick?.(produto.id)
   }
 
-  const podeAddRapido = interactive && !produto.temComplementos && Boolean(onAddRapido)
+  const mostrarBotaoAdd =
+    interactive && (produto.temComplementos ? Boolean(onClick) : Boolean(onAddRapido))
+  const handleAddClick = () => {
+    if (produto.temComplementos) {
+      handleOpenProduto()
+      return
+    }
+    onAddRapido?.(produto.id)
+  }
 
   if (interactive && onClick) {
     return (
@@ -159,7 +169,7 @@ export function DeliveryProdutoListItem({
           className={`${textClassName} text-left${quantidadeNoCarrinho > 0 ? ' pb-9 @lg:pb-10' : ''}`}
         >
           <p
-            className="text-base font-medium leading-snug @lg:text-lg"
+            className="text-sm font-medium leading-snug @lg:text-lg"
             style={{
               color: 'var(--delivery-text)',
               fontFamily: 'var(--delivery-font-title)',
@@ -172,15 +182,11 @@ export function DeliveryProdutoListItem({
               {produto.descricao}
             </p>
           ) : null}
-          <p
-            className="mt-1 text-sm font-medium @lg:mt-1.5 @lg:text-base"
-            style={{
-              color: 'var(--delivery-text)',
-              fontFamily: 'var(--delivery-font-body)',
-            }}
-          >
-            {formatDeliveryCurrency(produto.preco)}
-          </p>
+          <DeliveryProdutoPreco
+            produto={produto}
+            accentColor="var(--delivery-text)"
+            className="mt-1 @lg:mt-1.5"
+          />
         </button>
         <QuantidadeCarrinhoBadge
           quantidade={quantidadeNoCarrinho}
@@ -192,7 +198,12 @@ export function DeliveryProdutoListItem({
           produtoNome={produto.nome}
           interactive
           onOpenClick={handleOpenProduto}
-          onAddClick={podeAddRapido ? () => onAddRapido?.(produto.id) : undefined}
+          onAddClick={mostrarBotaoAdd ? handleAddClick : undefined}
+          addAriaLabel={
+            produto.temComplementos
+              ? `Escolher opções de ${produto.nome}`
+              : `Adicionar ${produto.nome} ao carrinho`
+          }
         />
       </div>
     )
@@ -202,7 +213,7 @@ export function DeliveryProdutoListItem({
     <div className={`relative ${cardClassName}`} style={cardStyle}>
       <div className={textClassName}>
         <p
-          className="text-base font-semibold leading-snug @lg:text-lg"
+          className="text-sm font-semibold leading-snug @lg:text-lg"
           style={{
             color: 'var(--delivery-text)',
             fontFamily: 'var(--delivery-font-title)',
@@ -215,15 +226,7 @@ export function DeliveryProdutoListItem({
             {produto.descricao}
           </p>
         ) : null}
-        <p
-          className="mt-1 text-sm font-medium @lg:mt-1.5 @lg:text-base"
-          style={{
-            color: 'var(--delivery-primary)',
-            fontFamily: 'var(--delivery-font-body)',
-          }}
-        >
-          {formatDeliveryCurrency(produto.preco)}
-        </p>
+        <DeliveryProdutoPreco produto={produto} className="mt-1 @lg:mt-1.5" />
       </div>
       <QuantidadeCarrinhoBadge quantidade={quantidadeNoCarrinho} produtoNome={produto.nome} />
       <ProdutoThumb

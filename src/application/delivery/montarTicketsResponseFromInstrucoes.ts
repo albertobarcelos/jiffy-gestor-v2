@@ -25,10 +25,16 @@ import {
   type ModoImpressaoImpressora,
 } from '@/src/domain/types/modoImpressaoImpressora'
 import {
+  magnitudeValorComplementoLancamento,
+  valorAssinadoComplementoImpressao,
+} from '@/src/application/delivery/valorComplementoImpressao'
+import {
   planejarTicketsProducaoImpressora,
   ticketIdViaProducao,
 } from '@/src/application/delivery/planejarTicketsProducaoImpressora'
+import { normalizeTipoImpactoPreco } from '@/src/application/mappers/VendaApiNormalizer'
 import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
+import { meioNomeEhDinheiro } from '@/src/domain/services/pedido/CalculadoraPagamentoPedido'
 
 function asRecord(v: unknown): Record<string, unknown> | null {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return null
@@ -50,6 +56,10 @@ function isoOrEmpty(v: unknown): string {
 function numeroFinito(v: unknown): number {
   const n = Number(v)
   return Number.isFinite(n) ? n : 0
+}
+
+function roundCentavos(valor: number): number {
+  return Math.round(valor * 100) / 100
 }
 
 function numeroOpcional(v: unknown): number | null {
@@ -123,17 +133,23 @@ function produtoLancadoAtivo(pl: Record<string, unknown>): boolean {
 
 function mapComplemento(c: Record<string, unknown>): VendaGestorTicketItemComplemento {
   const quantidade = numeroFinito(c.quantidade) || 1
-  const valorUnitario = numeroFinito(c.valorUnitario)
+  const tipoImpactoPreco = normalizeTipoImpactoPreco(c.tipoImpactoPreco)
+  const magnitude = magnitudeValorComplementoLancamento(c)
+  const { valorUnitario, valorFinal } = valorAssinadoComplementoImpressao(
+    tipoImpactoPreco,
+    magnitude,
+    quantidade
+  )
   return {
     nome: asStr(c.nomeComplemento) || asStr(c.nome),
     quantidade,
     complementoId: asStr(c.complementoId) || asStr(c.id) || undefined,
-    tipoImpactoPreco: asStr(c.tipoImpactoPreco) || undefined,
+    tipoImpactoPreco,
     impressao: {
       quantidade,
       valorUnitario,
-      valorFinal: quantidade * valorUnitario,
-      valorTotal: quantidade * valorUnitario,
+      valorFinal,
+      valorTotal: valorFinal,
     },
   }
 }
@@ -181,7 +197,12 @@ function buildResumoPedido(
         const r = asRecord(c)
         if (!r) return ss
         const q = numeroFinito(r.quantidade) || 1
-        return ss + q * numeroFinito(r.valorUnitario)
+        const { valorFinal } = valorAssinadoComplementoImpressao(
+          r.tipoImpactoPreco,
+          magnitudeValorComplementoLancamento(r),
+          q
+        )
+        return ss + valorFinal
       }, 0)
     )
   }, 0)
@@ -228,14 +249,30 @@ function buildPagamento(
   const cobrancas = fontesPagamentoCupom(pedido)
   const cobrancasAtivas = cobrancas.filter(cobrancaAtivaNoCupom)
   const cobrancasNaEntregaPendentes = cobrancasAtivas.filter(cobrancaPendenteNaEntregaNoCupom)
-
+  const somaCedulaNaEntrega = cobrancasNaEntregaPendentes.reduce(
+    (soma, cobranca) => soma + numeroFinito(cobranca.valor),
+    0
+  )
   const valorCobrarNaEntrega = cobrancasAtivas.length
-    ? cobrancasNaEntregaPendentes.reduce(
-        (soma, cobranca) => soma + numeroFinito(cobranca.valor),
-        0
-      )
+    ? Math.max(0, roundCentavos(somaCedulaNaEntrega - Math.max(0, troco)))
     : totalFaltaPagar
   const cobrarCliente = valorCobrarNaEntrega > 0
+
+  const indiceCedulaComTroco =
+    troco > 0
+      ? cobrancasNaEntregaPendentes.findIndex(cobranca => {
+          const meioId = asStr(cobranca.meioPagamentoId)
+          const nome =
+            extrairNomeMeioPagamentoDeRegistro(cobranca, meioId, nomesMeiosPagamentoPorId) || ''
+          return meioNomeEhDinheiro(nome)
+        })
+      : -1
+  const cobrancaCedulaComTroco =
+    indiceCedulaComTroco >= 0
+      ? cobrancasNaEntregaPendentes[indiceCedulaComTroco]
+      : troco > 0 && cobrancasNaEntregaPendentes.length === 1
+        ? cobrancasNaEntregaPendentes[0]
+        : null
 
   const nomesNaEntrega = cobrancasNaEntregaPendentes
     .map(cobranca => {
@@ -261,10 +298,16 @@ function buildPagamento(
     const meioId = asStr(r.meioPagamentoId || r.meio_pagamento_id)
     const nome =
       extrairNomeMeioPagamentoDeRegistro(r, meioId, nomesMeiosPagamentoPorId) || 'PAGAMENTO'
+    const naEntrega = cobrancaPendenteNaEntregaNoCupom(r)
+    const valorCedula = numeroFinito(r.valor)
+    const valor =
+      naEntrega && cobrancaCedulaComTroco === r
+        ? Math.max(0, roundCentavos(valorCedula - troco))
+        : valorCedula
     meios.push({
       nome,
-      valor: numeroFinito(r.valor),
-      naEntrega: cobrancaPendenteNaEntregaNoCupom(r),
+      valor,
+      naEntrega,
     })
   }
 
@@ -583,6 +626,7 @@ export function montarTicketsResponseFromInstrucoes(params: {
     senha: (pedido.senha ?? pedido.senhaNumero ?? pedido.numeroSenha) as string | number | null | undefined,
     codigoTerminal: asStr(pedido.codigoTerminal) || undefined,
     dataPedido: isoOrEmpty(pedido.dataCriacao),
+    dataInicioPreparo: isoOrEmpty(pedido.dataInicioPreparo) || null,
     dataPrevista: isoOrEmpty(pedido.previsaoEntregaEm ?? pedido.previsaoEntrega),
     tiradoPor: (() => {
       const raw = asRecord(pedido.tiradoPor) || asRecord(pedido.abertoPor)

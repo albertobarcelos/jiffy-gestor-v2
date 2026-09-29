@@ -1,4 +1,5 @@
 import { fetchBffJson } from '@/src/infrastructure/api/bffClient'
+import { normalizeMenuProduto } from '@/src/application/mappers/MenuProdutoCatalogMapper'
 import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
 
 const PAGE_LIMIT = 100
@@ -33,7 +34,10 @@ export async function fetchMenuProdutosPagina(
     token
   )
   const items = Array.isArray(data.items) ? data.items : []
-  return { items, count: data.count ?? items.length }
+  return {
+    items: items.map(normalizeMenuProduto),
+    count: data.count ?? items.length,
+  }
 }
 
 export async function fetchAllMenuProdutos(
@@ -102,7 +106,7 @@ export async function fetchMenuProdutoSnapshot(
     const obj = raw as Record<string, unknown>
     const data = obj.data && typeof obj.data === 'object' ? obj.data : obj
     if (!data || typeof data !== 'object') return null
-    return data as MenuProduto
+    return normalizeMenuProduto(data as MenuProduto)
   } catch {
     return null
   }

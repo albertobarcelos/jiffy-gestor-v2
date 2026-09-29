@@ -22,15 +22,9 @@ import { DeliveryImageUploadField } from '@/src/presentation/components/ui/Deliv
 import { DELIVERY_GRUPO_BANNER_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
-import { cn } from '@/src/shared/utils/cn'
 import { showToast } from '@/src/shared/utils/toast'
 import type { DeliveryPublicoDesignConfig } from '../../../shared/types/deliveryPublicoDesignConfig'
 import type { DesignCategoriaGrupo } from '../../../shared/types/designCategoriaGrupo'
-import {
-  DELIVERY_PUBLICO_GRUPO_SUGESTOES_NOME,
-  findGrupoSugestoesDaCasaCarrier,
-  omitGrupoSugestoesDaCasaCarrier,
-} from '../../../shared/constants/deliveryPublicoSugestoes'
 import { resolveDesignPaletteColors } from '../../../shared/constants/colorPalettes'
 import { DesignCategoriaGrupoSortableItem } from '../DesignCategoriaGrupoSortableItem'
 import { useDesignCategoriaGrupoActions } from '../../hooks/useDesignCategoriaGrupoActions'
@@ -69,19 +63,6 @@ export function DesignCategoriasTab({
   } = useDesignCategoriaGrupoActions(menuId)
 
   const palette = resolveDesignPaletteColors(config)
-  const mostrarSugestoes = config.categorias.mostrarSugestoesDaCasa !== false
-  const grupoSugestoesReal = useMemo(
-    () => findGrupoSugestoesDaCasaCarrier(localGrupos),
-    [localGrupos]
-  )
-  const gruposOrdenaveis = useMemo(
-    () => omitGrupoSugestoesDaCasaCarrier(localGrupos),
-    [localGrupos]
-  )
-  const grupoSugestoesExiste = Boolean(grupoSugestoesReal)
-  const isSugestoesSelected = Boolean(
-    grupoSugestoesReal && selectedCategoryId === grupoSugestoesReal.id
-  )
   const selectedCategory = localGrupos.find(c => c.id === selectedCategoryId)
   const selectedNome = selectedCategory?.nome ?? '—'
   const selectedImagemUrl = selectedCategory?.imagemUrl ?? null
@@ -95,16 +76,9 @@ export function DesignCategoriasTab({
   const isUploadingSelected = uploadingGrupoId === selectedCategoryId
   const isReordering = reorderingGrupoId != null
 
-  const hasListaGrupos =
-    gruposOrdenaveis.length > 0 || (mostrarSugestoes && grupoSugestoesExiste)
+  const hasListaGrupos = localGrupos.length > 0
 
-  const selectableIds = useMemo(() => {
-    const ids = gruposOrdenaveis.map(g => g.id)
-    if (mostrarSugestoes && grupoSugestoesReal) {
-      return [grupoSugestoesReal.id, ...ids]
-    }
-    return ids
-  }, [gruposOrdenaveis, mostrarSugestoes, grupoSugestoesReal])
+  const selectableIds = useMemo(() => localGrupos.map(g => g.id), [localGrupos])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -146,15 +120,12 @@ export function DesignCategoriasTab({
       const { active, over } = event
       if (!over || active.id === over.id || isReordering) return
 
-      const oldIndex = gruposOrdenaveis.findIndex(g => g.id === active.id)
-      const newIndex = gruposOrdenaveis.findIndex(g => g.id === over.id)
+      const oldIndex = localGrupos.findIndex(g => g.id === active.id)
+      const newIndex = localGrupos.findIndex(g => g.id === over.id)
       if (oldIndex === -1 || newIndex === -1) return
 
       const previous = localGrupos
-      const reorderedOrdenaveis = arrayMove(gruposOrdenaveis, oldIndex, newIndex)
-      const nextLocal = grupoSugestoesReal
-        ? [grupoSugestoesReal, ...reorderedOrdenaveis]
-        : reorderedOrdenaveis
+      const nextLocal = arrayMove(localGrupos, oldIndex, newIndex)
       updateGrupos(nextLocal)
 
       try {
@@ -166,14 +137,7 @@ export function DesignCategoriasTab({
         showToast.error(error instanceof Error ? error.message : 'Erro ao reordenar grupo')
       }
     },
-    [
-      grupoSugestoesReal,
-      gruposOrdenaveis,
-      isReordering,
-      localGrupos,
-      reordenarGrupo,
-      updateGrupos,
-    ]
+    [isReordering, localGrupos, reordenarGrupo, updateGrupos]
   )
 
   const handleImagemUpload = useCallback(
@@ -190,16 +154,6 @@ export function DesignCategoriasTab({
         const imagemUrl = await uploadImagemGrupo(selectedCategoryId, file)
         const nextGrupos = patchGrupoImagemUrl(localGrupos, selectedCategoryId, imagemUrl)
         updateGrupos(nextGrupos)
-        // Limpa legado em data URL no design (imagem agora fica no grupo CDN).
-        if (isSugestoesSelected) {
-          onChange(current => ({
-            ...current,
-            categorias: {
-              ...current.categorias,
-              sugestoesDaCasaImagemUrl: null,
-            },
-          }))
-        }
         setImagemPreviewUrl(prev => {
           if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
           return imagemUrl ?? preview
@@ -212,9 +166,7 @@ export function DesignCategoriasTab({
       }
     },
     [
-      isSugestoesSelected,
       localGrupos,
-      onChange,
       patchGrupoImagemUrl,
       selectedCategory?.imagemUrl,
       selectedCategoryId,
@@ -413,40 +365,6 @@ export function DesignCategoriasTab({
             }
           />
         </div>
-
-        <div className="space-y-1.5 border-t border-gray-100 pt-1">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-primary-text">Grupo Sugestões da Casa</p>
-              <p className="mt-0.5 text-xs text-secondary-text">
-                Exibe no topo os favoritos. Exige um grupo &quot;
-                {DELIVERY_PUBLICO_GRUPO_SUGESTOES_NOME}&quot; em Grupos de produtos (aceita sem
-                acento / maiúsculas; no cardápio aparece com acento). Também usado para o banner.
-              </p>
-            </div>
-            <JiffyIconSwitch
-              size="xs"
-              label={mostrarSugestoes ? 'ON' : 'OFF'}
-              labelPosition="start"
-              checked={mostrarSugestoes}
-              onChange={e =>
-                onChange(current => ({
-                  ...current,
-                  categorias: {
-                    ...current.categorias,
-                    mostrarSugestoesDaCasa: e.target.checked,
-                  },
-                }))
-              }
-            />
-          </div>
-          {mostrarSugestoes && !grupoSugestoesExiste ? (
-            <p className="rounded-lg bg-amber-50 px-2.5 py-2 text-xs text-amber-800">
-              Crie o grupo &quot;{DELIVERY_PUBLICO_GRUPO_SUGESTOES_NOME}&quot; (ou &quot;SUGESTOES
-              DA CASA&quot;) em Grupos de produtos para exibir no delivery e poder enviar o banner.
-            </p>
-          ) : null}
-        </div>
       </div>
 
       {!hasListaGrupos ? (
@@ -462,50 +380,26 @@ export function DesignCategoriasTab({
           <div className="w-full shrink-0 lg:max-w-[240px]">
             <p className="mb-1.5 text-xs text-secondary-text">Arraste para definir a ordem</p>
             <ul className="space-y-1.5">
-              {mostrarSugestoes && grupoSugestoesReal ? (
-                <li>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedCategoryId(grupoSugestoesReal.id)}
-                    className={cn(
-                      'flex w-full items-center gap-2 rounded-lg border-2 px-3 py-2.5 text-left text-sm font-semibold transition-colors',
-                      isSugestoesSelected
-                        ? 'border-secondary bg-secondary/5 text-primary-text'
-                        : 'border-gray-200 text-primary-text hover:border-gray-300'
-                    )}
-                  >
-                    <span className="min-w-0 flex-1 truncate">
-                      {DELIVERY_PUBLICO_GRUPO_SUGESTOES_NOME}
-                    </span>
-                    <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-secondary-text">
-                      Fixo
-                    </span>
-                  </button>
-                </li>
-              ) : null}
-
-              {gruposOrdenaveis.length > 0 ? (
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleDragEnd}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={localGrupos.map(g => g.id)}
+                  strategy={verticalListSortingStrategy}
                 >
-                  <SortableContext
-                    items={gruposOrdenaveis.map(g => g.id)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    {gruposOrdenaveis.map(cat => (
-                      <DesignCategoriaGrupoSortableItem
-                        key={cat.id}
-                        grupo={cat}
-                        isSelected={cat.id === selectedCategoryId}
-                        disabled={isReordering}
-                        onSelect={setSelectedCategoryId}
-                      />
-                    ))}
-                  </SortableContext>
-                </DndContext>
-              ) : null}
+                  {localGrupos.map(cat => (
+                    <DesignCategoriaGrupoSortableItem
+                      key={cat.id}
+                      grupo={cat}
+                      isSelected={cat.id === selectedCategoryId}
+                      disabled={isReordering}
+                      onSelect={setSelectedCategoryId}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
             </ul>
           </div>
 
@@ -516,9 +410,8 @@ export function DesignCategoriasTab({
                   Banner · {selectedNome}
                 </p>
                 <p className="mt-0.5 text-xs text-secondary-text">
-                  {isSugestoesSelected
-                    ? 'Banner salvo no grupo Sugestões da Casa (CDN). Sem banner, usa a cor definida acima.'
-                    : 'Fundo da barra com o nome do grupo no layout Básico. Sem banner, usa a cor definida acima.'}
+                  Fundo da barra com o nome do grupo no layout Básico. Sem banner, usa a cor
+                  definida acima.
                 </p>
                 <div className="mt-3">
                   <DeliveryImageUploadField

@@ -6,10 +6,16 @@ import {
   ajustarQuantidadeComplementoLivre,
   controleQuantidadeComplementoNaLinha,
 } from '@/src/domain/policies/pedido/ComplementoQuantidadeLinhaPolicy'
+import {
+  alteracaoComplementoRespeitaMinimoGrupo,
+  podeIncrementarComplementoNoGrupo,
+  quantidadeSelecionadaNoGrupoCarrinho,
+} from '@/src/domain/policies/pedido/GrupoComplementoLimitesPolicy'
 import { MdDeleteOutline } from 'react-icons/md'
 import { useNovoPedidoFormContext } from '../../context/NovoPedidoFormContext'
 import { useNovoPedidoUIContext } from '../../context/NovoPedidoUIContext'
 import { criarHandlersLongPressLinha } from '../../utils/longPressLinhaPedido'
+import { obterLimitesGrupoComplementoCarrinho } from '../../utils/obterLimitesGrupoComplementoCarrinho'
 import { PedidoCarrinhoQtdStepper } from './PedidoCarrinhoQtdStepper'
 import {
   ACAO_REMOVER_CLASS,
@@ -34,6 +40,7 @@ export function PedidoCarrinhoLinhaComplemento({
 }: PedidoCarrinhoLinhaComplementoProps) {
   const {
     atualizarComplemento,
+    catalogoProdutosPorId,
     formatarValorComplemento,
     abrirEdicaoComplementoNoPainel,
     abrirModalComplementosProdutoExistente,
@@ -53,6 +60,27 @@ export function PedidoCarrinhoLinhaComplemento({
     complemento.quantidade,
     unidadeMedida
   )
+
+  const grupo = obterLimitesGrupoComplementoCarrinho(
+    catalogoProdutosPorId[produto.produtoId],
+    complemento.grupoId
+  )
+  const quantidadeNoGrupo = quantidadeSelecionadaNoGrupoCarrinho(
+    produto.complementos,
+    complemento.grupoId
+  )
+  const remocaoBloqueadaPorMinimo = !alteracaoComplementoRespeitaMinimoGrupo(
+    grupo,
+    quantidadeNoGrupo - Math.max(0, Math.floor(complemento.quantidade))
+  ).permitido
+  const reducaoBloqueadaPorMinimo = !alteracaoComplementoRespeitaMinimoGrupo(
+    grupo,
+    quantidadeNoGrupo - 1
+  ).permitido
+  const incrementoBloqueadoPorMaximo =
+    grupo != null && !podeIncrementarComplementoNoGrupo(grupo, quantidadeNoGrupo + 1)
+  const menosDesabilitado = controle.menosDesabilitado || reducaoBloqueadaPorMinimo
+  const maisDesabilitado = controle.maisDesabilitado || incrementoBloqueadoPorMaximo
 
   const longPress = criarHandlersLongPressLinha({
     index,
@@ -82,11 +110,12 @@ export function PedidoCarrinhoLinhaComplemento({
             ? valoresEmEdicao[qtdCompKey]
             : String(controle.quantidadeExibida)
         }
-        menosDisabled={controle.menosDesabilitado}
-        maisDisabled={controle.maisDesabilitado}
+        menosDisabled={menosDesabilitado}
+        maisDisabled={maisDesabilitado}
         inputClassName="h-6 w-7 min-w-0 border-0 bg-transparent p-0 text-center text-xs font-medium tabular-nums text-gray-600 focus:outline-none"
         onMenos={e => {
           e.stopPropagation()
+          if (menosDesabilitado) return
           atualizarComplemento(
             index,
             compIndex,
@@ -101,6 +130,7 @@ export function PedidoCarrinhoLinhaComplemento({
         }}
         onMais={e => {
           e.stopPropagation()
+          if (maisDesabilitado) return
           atualizarComplemento(
             index,
             compIndex,
@@ -186,11 +216,23 @@ export function PedidoCarrinhoLinhaComplemento({
       >
         <span className="block h-7 w-7 shrink-0" aria-hidden />
         <button
-          onClick={() => removerComplemento(index, compIndex)}
+          onClick={() => {
+            if (remocaoBloqueadaPorMinimo) return
+            removerComplemento(index, compIndex)
+          }}
           type="button"
-          title="Remover complemento"
-          aria-label="Remover complemento"
-          className={ACAO_REMOVER_CLASS}
+          disabled={remocaoBloqueadaPorMinimo}
+          title={
+            remocaoBloqueadaPorMinimo
+              ? `Mínimo de ${grupo?.qtdMinima ?? 0} em "${grupo?.nome ?? 'grupo'}"`
+              : 'Remover complemento'
+          }
+          aria-label={
+            remocaoBloqueadaPorMinimo
+              ? 'Remoção bloqueada pelo mínimo do grupo'
+              : 'Remover complemento'
+          }
+          className={`${ACAO_REMOVER_CLASS} disabled:cursor-not-allowed disabled:opacity-40`}
         >
           <MdDeleteOutline className="h-4 w-4" />
         </button>

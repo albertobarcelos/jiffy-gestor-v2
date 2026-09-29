@@ -13,6 +13,8 @@ function snapshot(over: Partial<MenuProduto> = {}): MenuProduto {
     nome: 'X-Calabresa',
     descricao: null,
     valor: 16,
+    valorPromocional: 0,
+    promocaoAtiva: false,
     ordem: 1,
     favorito: false,
     ativo: true,

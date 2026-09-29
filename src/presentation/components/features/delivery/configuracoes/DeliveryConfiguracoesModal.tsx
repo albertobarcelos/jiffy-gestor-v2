@@ -43,6 +43,16 @@ import { BaixarFredyCard } from '@/src/presentation/gestor-pedidos/windows/Baixa
 import { BaixarJiffyPrintCard } from './BaixarJiffyPrintCard'
 import { MenuParametroEmpresaSelect } from '@/src/presentation/components/features/configuracoes/MenuParametroEmpresaSelect'
 import { DeliveryConfiguracoesSkeleton } from './DeliveryConfiguracoesSkeleton'
+import {
+  clampTempoPreparoKanbanMinutos,
+  gravarTempoPreparoKanbanMinutos,
+  lerTempoPreparoKanbanMinutos,
+} from '@/src/infrastructure/delivery/tempoPreparoKanbanStorage'
+import {
+  TEMPO_PREPARO_KANBAN_MAX,
+  TEMPO_PREPARO_KANBAN_MIN,
+  TEMPO_PREPARO_KANBAN_PADRAO_MIN,
+} from '@/src/shared/constants/tempoPreparoKanban'
 
 interface DeliveryConfiguracoesModalProps {
   open: boolean
@@ -118,6 +128,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
   const [modoImpressao, setModoImpressao] = useState<ModoImpressaoDelivery>('unificado')
   const [copiasUnificado, setCopiasUnificado] = useState(1)
   const [autoIniciarPreparoNovosPedidos, setAutoIniciarPreparoNovosPedidos] = useState(false)
+  const [tempoPreparoMinutos, setTempoPreparoMinutos] = useState(TEMPO_PREPARO_KANBAN_PADRAO_MIN)
   const [imprimirAoReceber, setImprimirAoReceber] = useState(true)
   const [imprimirAoFicarPronto, setImprimirAoFicarPronto] = useState(true)
   const [impressoraExpedicaoId, setImpressoraExpedicaoId] = useState<string>('')
@@ -203,6 +214,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
     setModoImpressao(prefs.modo)
     setCopiasUnificado(Math.min(99, Math.max(1, prefs.copiasCupomUnificado)))
     setAutoIniciarPreparoNovosPedidos(prefs.autoIniciarPreparoNovosPedidos)
+    setTempoPreparoMinutos(lerTempoPreparoKanbanMinutos(empresa.id))
     setImprimirAoReceber(prefs.imprimirAoReceber)
     setImprimirAoFicarPronto(prefs.imprimirAoFicarPronto)
     setImpressoraExpedicaoId(prefs.impressoraExpedicaoId ?? '')
@@ -310,6 +322,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
     try {
       await atualizarEmpresaDelivery.mutateAsync({ parametroDelivery })
       salvarDeliveryCupomTemplateLocal(empresaId, cupomTemplate)
+      gravarTempoPreparoKanbanMinutos(empresaId, tempoPreparoMinutos)
       const casos = criarEstacaoImpressaoUseCases(token)
       const estacaoId = estacaoIdSelecionada.trim()
       if (estacaoId) {
@@ -350,6 +363,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
     atualizarEmpresaDelivery,
     empresa?.id,
     autoIniciarPreparoNovosPedidos,
+    tempoPreparoMinutos,
     impressoraExpedicaoId,
     imprimirAoFicarPronto,
     imprimirAoReceber,
@@ -466,6 +480,31 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
               titulo="Enviar novos pedidos direto para produção"
               info="Ligado: o pedido novo já entra na cozinha, sem você aceitar um a um. Desligado: você decide quando começar o preparo."
             />
+
+            <div className="flex flex-wrap items-center gap-2 rounded-lg bg-white px-2 py-2 shadow-sm ring-1 ring-gray-100">
+              <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                <label htmlFor="delivery-tempo-preparo" className="text-sm font-semibold text-primary-text">
+                  Tempo de preparo no quadro
+                </label>
+                <CupomCampoInfo
+                  texto="Prazo da coluna Em preparo. Laranja nos 10 minutos finais; vermelho ao chegar no prazo."
+                  ariaLabel="Tempo de preparo no quadro"
+                />
+              </div>
+              <input
+                id="delivery-tempo-preparo"
+                type="number"
+                min={TEMPO_PREPARO_KANBAN_MIN}
+                max={TEMPO_PREPARO_KANBAN_MAX}
+                value={tempoPreparoMinutos}
+                disabled={carregando}
+                onChange={e =>
+                  setTempoPreparoMinutos(clampTempoPreparoKanbanMinutos(Number(e.target.value)))
+                }
+                className="w-16 rounded-md border border-gray-300 px-2 py-1 text-sm tabular-nums disabled:opacity-60"
+              />
+              <span className="text-xs text-gray-500">min</span>
+            </div>
 
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold text-primary-text">Modo de cupom delivery</span>

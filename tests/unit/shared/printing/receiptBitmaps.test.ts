@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { renderDashSeparatorHtml, renderQrSvg } from '@/src/infrastructure/printing/receiptBitmaps'
+import { renderDashSeparatorHtml, renderQrSvg } from '@/src/shared/printing/receiptBitmaps'
 
 describe('receiptBitmaps', () => {
   it('gera QR local', () => {

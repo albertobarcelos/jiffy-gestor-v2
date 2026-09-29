@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { rotuloOrigemExibicao } from '@/src/application/mappers/PedidoDisplayMapper'
-import { temSeloCanalMarketplace } from '@/src/domain/policies/pedido/origemCanalMarketplace'
+import { temSeloCanalOrigem } from '@/src/domain/policies/pedido/origemCanalMarketplace'
 import { OrigemCanalMark } from '@/src/presentation/components/features/origem/OrigemCanalMark'
 import { useNovoPedidoDetalheContext } from '../context/NovoPedidoDetalheContext'
 import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
@@ -58,7 +58,7 @@ export function PedidoDetalhesResumoBalcao() {
         <Linha
           label="Origem:"
           value={
-            temSeloCanalMarketplace(origem) ? (
+            temSeloCanalOrigem(origem) ? (
               <OrigemCanalMark origem={origem} size={24} />
             ) : (
               rotuloOrigemExibicao(origem)

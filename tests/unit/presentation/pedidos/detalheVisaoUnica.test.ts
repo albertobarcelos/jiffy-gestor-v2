@@ -6,6 +6,9 @@ import {
   colunaKanbanDeTimestampsEntrega,
   resolverColunaDetalhePedido,
   deveUsarVisaoUnicaDetalhePedido,
+  modalidadeLogisticaDetalhePedido,
+  pedidoDetalheEhEntrega,
+  pedidoDetalheEhRetirada,
   rotuloEtapaDetalhePedido,
   rotuloTipoAtendimento,
 } from '@/src/presentation/components/features/pedidos/utils/detalheVisaoUnica'
@@ -126,6 +129,19 @@ describe('rotuloTipoAtendimento', () => {
     expect(rotuloTipoAtendimento('retirada')).toBe('Retirada')
     expect(rotuloTipoAtendimento('delivery')).toBe('Delivery')
     expect(rotuloTipoAtendimento('balcao')).toBe('Balcão')
+  })
+})
+
+describe('modalidadeLogisticaDetalhePedido', () => {
+  it('usa tipoEntrega e não tipoVenda=delivery', () => {
+    expect(modalidadeLogisticaDetalhePedido('retirada')).toBe('retirada')
+    expect(modalidadeLogisticaDetalhePedido('entrega')).toBe('entrega')
+    expect(modalidadeLogisticaDetalhePedido('delivery')).toBeNull()
+    expect(modalidadeLogisticaDetalhePedido(null)).toBeNull()
+    expect(pedidoDetalheEhRetirada('retirada')).toBe(true)
+    expect(pedidoDetalheEhEntrega('retirada')).toBe(false)
+    expect(pedidoDetalheEhEntrega('entrega')).toBe(true)
+    expect(pedidoDetalheEhEntrega('delivery')).toBe(false)
   })
 })
 

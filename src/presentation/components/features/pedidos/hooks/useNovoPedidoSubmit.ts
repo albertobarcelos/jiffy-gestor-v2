@@ -3,19 +3,24 @@
 import { useCallback, useMemo, useRef } from 'react'
 import type { CriarVendaGestorInputDTO } from '@/src/application/dto/CriarVendaGestorDTO'
 import { extrairIdPedidoDeliveryCriado } from '@/src/application/use-cases/delivery/CriarPedidoDeliveryUseCase'
-import { criarPedidoDeliveryUseCase } from '@/src/infrastructure/composition/pedidoUseCases'
+import {
+  criarPedidoDeliveryUseCase,
+  resolverEstacaoIdParaCriarVendaGestorUseCase,
+} from '@/src/infrastructure/composition/pedidoUseCases'
 import {
   CriarVendaGestorUseCase,
   extrairIdVendaCriada,
   validarCriarVendaGestor,
   validarInformacoesPedido,
 } from '@/src/application/use-cases/vendas/CriarVendaGestorUseCase'
+import { MSG_ESTACAO_OBRIGATORIA_CRIAR_PEDIDO } from '@/src/domain/policies/pedido/estacaoCriarVendaGestor'
 import type { CriarPedidoDeliveryApiRequest } from '@/src/application/dto/api/pedidoDeliveryApi'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
 import { notificarEnderecoForaDaCobertura, useHrefCoberturaEntregaPedido } from '../utils/coberturaEntregaPedidoUi'
 import { validarObservacoesPedido } from '@/src/shared/helpers/observacaoPedido'
 import { salvarRascunhoInformacoesAdicionais } from '@/src/shared/helpers/informacoesAdicionaisNota'
+import { solicitarAbrirConfigEstacaoImpressao } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
 
 export { validarInformacoesPedido }
 
@@ -191,11 +196,24 @@ export function useNovoPedidoSubmit({
       return
     }
 
+    const isPedidoDelivery = tipoInicioPedido === 'delivery'
+    let estacaoIdCriacao = ''
+
+    if (!isPedidoDelivery) {
+      const estacao = await resolverEstacaoIdParaCriarVendaGestorUseCase.execute(accessToken)
+      if (!estacao.ok) {
+        showToast.error(estacao.mensagem)
+        if (estacao.codigo === 'AUSENTE') {
+          solicitarAbrirConfigEstacaoImpressao()
+        }
+        return
+      }
+      estacaoIdCriacao = estacao.estacaoId
+    }
+
     if (!iniciarSubmit()) return
 
     try {
-      const isPedidoDelivery = tipoInicioPedido === 'delivery'
-
       const resultado = isPedidoDelivery
         ? await criarPedidoDeliveryUseCase.execute(
             {
@@ -208,8 +226,9 @@ export function useNovoPedidoSubmit({
             payload => createPedidoDelivery!.mutateAsync(payload),
             accessToken
           )
-        : await criarVendaGestorUseCase.execute(input, payload =>
-            createVendaGestor.mutateAsync(payload)
+        : await criarVendaGestorUseCase.execute(
+            { ...input, estacaoId: estacaoIdCriacao },
+            payload => createVendaGestor.mutateAsync(payload)
           )
 
       showToast.success('Pedido criado com sucesso!')
@@ -270,6 +289,15 @@ export function useNovoPedidoSubmit({
           'Não foi possível obter a localização. Confira o endereço e a geo da empresa no hub Delivery.'
         )
         setCurrentStep(2)
+        return
+      }
+
+      if (
+        /estacaoId|esta[cç][aã]o.*obrigat/i.test(rawMessage) ||
+        /esta[cç][aã]o do gestor/i.test(rawMessage)
+      ) {
+        showToast.error(MSG_ESTACAO_OBRIGATORIA_CRIAR_PEDIDO)
+        solicitarAbrirConfigEstacaoImpressao()
         return
       }
 

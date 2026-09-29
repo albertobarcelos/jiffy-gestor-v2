@@ -161,10 +161,29 @@ function extrairObservacoesArray(item: Record<string, unknown>): string[] | unde
   return undefined
 }
 
+function extrairIsoOpcional(item: Record<string, unknown>, keys: readonly string[]): string | null {
+  for (const k of keys) {
+    const raw = item[k]
+    if (raw != null && String(raw).trim() !== '') return String(raw).trim()
+  }
+  return null
+}
+
 function extrairPrevisaoEntregaEm(item: Record<string, unknown>): string | null {
-  const raw = item.previsaoEntregaEm ?? item.previsaoEntrega ?? item.previsao_entrega_em
-  if (raw == null || String(raw).trim() === '') return null
-  return String(raw).trim()
+  return extrairIsoOpcional(item, ['previsaoEntregaEm', 'previsaoEntrega', 'previsao_entrega_em'])
+}
+
+function extrairDataInicioPreparo(item: Record<string, unknown>): string | null {
+  return extrairIsoOpcional(item, ['dataInicioPreparo', 'data_inicio_preparo'])
+}
+
+function extrairDataFinalizacaoPreparo(item: Record<string, unknown>): string | null {
+  return extrairIsoOpcional(item, [
+    'dataFinalizacaoPreparo',
+    'data_finalizacao_preparo',
+    'dataPronto',
+    'data_pronto',
+  ])
 }
 
 function extrairTempoTotalEstimadoSegundos(item: Record<string, unknown>): number | null {
@@ -398,7 +417,11 @@ export class VendaUnificadaDTO {
     /** Kanban balcão: coluna resolvida no backend (source of truth). */
     public readonly etapaKanbanBalcao?: EtapaKanbanBalcao | null,
     /** Delivery: `entrega` | `retirada`. Não substitui `tipoVenda`. */
-    public readonly tipoEntrega?: TipoEntregaUnificada | null
+    public readonly tipoEntrega?: TipoEntregaUnificada | null,
+    /** Delivery: quando entrou em Em preparo (transição persistida). */
+    public readonly dataInicioPreparo?: string | null,
+    /** Delivery: quando ficou Pronto (transição persistida). */
+    public readonly dataFinalizacaoPreparo?: string | null
   ) {}
 
   private possuiDocumentoFiscal(): boolean {
@@ -609,7 +632,9 @@ export function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): Ve
     extrairEntregadorDelivery(v),
     extrairContextoEntregaDelivery(v),
     extrairEtapaKanbanBalcao(v),
-    extrairTipoEntregaUnificado(v)
+    extrairTipoEntregaUnificado(v),
+    extrairDataInicioPreparo(v),
+    extrairDataFinalizacaoPreparo(v)
   )
 }
 

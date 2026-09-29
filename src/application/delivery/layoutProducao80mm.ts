@@ -17,6 +17,12 @@ export const PRODUCAO_80MM = {
   raioPilulaPx: 2,
   /** Folga até a faca. 4 linhas ≈ 12 mm para o rodapé não ser cortado. */
   linhasAntesDoCorte: 4,
+  /** Vão entre o pontilhado e o rodapé (ITENS / v / terminal). */
+  linhasAposPontilhadoRodape: 2,
+  /** Vão entre o contorno do código e o nome do cliente. */
+  linhasAposCodigoIdentidade: 1,
+  /** Vão entre o nome do cliente e o primeiro produto. */
+  linhasAposNomeCliente: 1,
   /** Vão fino entre modificadores do mesmo tipo (ESC J, ~2 mm). */
   dotsEntreExtras: 16,
   /** Vão na virada * (sem ação) ↔ +/− (com ação). */
@@ -144,30 +150,73 @@ export function baseIdentidadeProducao(
   const atendimento = String(tipoEntrega ?? '').trim().toLowerCase()
   if (venda.includes('mesa')) return 'MESA'
   if (venda.includes('balc') || venda === 'gestor') return 'BALCAO'
-  if (atendimento === 'retirada') return 'RETIRADA'
+  if (atendimento === 'retirada' || venda === 'retirada') return 'RETIRADA'
   return 'ENTREGA'
+}
+
+/** QR de WhatsApp só faz sentido na via do entregador. */
+export function cupomMostraQrWhatsappCliente(
+  tipoVenda?: string | null,
+  tipoEntrega?: string | null
+): boolean {
+  return baseIdentidadeProducao(tipoVenda, tipoEntrega) !== 'RETIRADA'
+}
+
+/** No balcão, o bloco de itens da retirada precisa saltar mais que na entrega. */
+export function expedicaoDestacaItensPedido(
+  tipoVenda?: string | null,
+  tipoEntrega?: string | null
+): boolean {
+  return baseIdentidadeProducao(tipoVenda, tipoEntrega) === 'RETIRADA'
+}
+
+export function fonteItensExpedicaoPx(fonteItens: number, destaca: boolean): number {
+  return destaca ? Math.min(18, fonteItens + 3) : fonteItens
+}
+
+export function numeroPedidoProducao(valor?: string | number | null): string {
+  if (valor == null || valor === '') return ''
+  const n = typeof valor === 'number' ? valor : Number(String(valor).trim())
+  if (!Number.isFinite(n) || n <= 0) return ''
+  return String(Math.floor(n))
+}
+
+/** `#12 #SIXWMAWDD` quando os dois existem e são diferentes; senão um só. */
+export function destaqueIdentidadeProducao(params: {
+  codigoVenda?: string | null
+  numeroVenda?: string | number | null
+}): string {
+  const codigo = textoEscPosProducao(String(params.codigoVenda ?? '')).toUpperCase()
+  const numero = numeroPedidoProducao(params.numeroVenda)
+  if (numero && codigo && numero !== codigo) return `#${numero} #${codigo}`
+  if (numero) return `#${numero}`
+  if (codigo) return `#${codigo}`
+  return ''
 }
 
 export function textosIdentidadeProducao(params: {
   tipoVenda?: string | null
   tipoEntrega?: string | null
   codigoVenda?: string | null
+  numeroVenda?: string | number | null
   numeroMesa?: string | number | null
   identificacao?: string | null
   viaUnitaria?: boolean
 }): { primaria: string; secundaria: string | null } {
   const base = baseIdentidadeProducao(params.tipoVenda, params.tipoEntrega)
   const codigo = textoEscPosProducao(String(params.codigoVenda ?? '')).toUpperCase()
+  const numero = numeroPedidoProducao(params.numeroVenda)
+  const destaque = destaqueIdentidadeProducao(params)
   const mesa = textoEscPosProducao(String(params.numeroMesa ?? ''))
   const ident = textoEscPosProducao(params.identificacao ?? '').toUpperCase()
 
   let primaria = ''
   if (base === 'MESA') {
-    primaria = mesa ? `MESA ${mesa}` : codigo ? `MESA #${codigo}` : 'MESA'
+    primaria = mesa ? `MESA ${mesa}` : destaque ? `MESA ${destaque}` : 'MESA'
   } else if (params.viaUnitaria && codigo) {
-    primaria = base
+    primaria = numero && numero !== codigo ? `${base}#${numero}` : base
   } else {
-    primaria = codigo ? `${base} #${codigo}` : base
+    primaria = destaque ? `${base}${destaque}` : base
   }
 
   if (!ident) return { primaria, secundaria: null }
@@ -251,6 +300,16 @@ export type DetalheLinhasItemPedido = {
   observacao: string | null
 }
 
+/** Gratuito (`*`) primeiro; adicionais (`+`/`-`) depois. Mantém a ordem relativa em cada grupo. */
+export function compararComplementosImpressao(
+  a: Pick<OrigemComplementoItemPedido, 'tipoImpactoPreco'>,
+  b: Pick<OrigemComplementoItemPedido, 'tipoImpactoPreco'>
+): number {
+  const rank = (tipo: string | null | undefined) =>
+    impactoComplementoProducao(tipo) === 'nenhum' ? 0 : 1
+  return rank(a.tipoImpactoPreco) - rank(b.tipoImpactoPreco)
+}
+
 export function detalheLinhasItemPedido(
   item: OrigemLinhaItemPedido,
   options?: { permitirQuantidadeZero?: boolean; recuoBloco?: boolean }
@@ -260,8 +319,10 @@ export function detalheLinhasItemPedido(
   const recuoBloco = Boolean(options?.recuoBloco)
   const recuo = recuoComplementoEspacos(qtd, recuoBloco)
   const complementos: DetalheLinhasItemPedido['complementos'] = []
-  for (const comp of item.complementos ?? []) {
-    if (!comp) continue
+  const origemOrdenada = [...(item.complementos ?? [])]
+    .filter((comp): comp is NonNullable<typeof comp> => Boolean(comp))
+    .sort(compararComplementosImpressao)
+  for (const comp of origemOrdenada) {
     const texto = linhaComplementoProducao({
       recuo,
       nome: String(comp.nome || comp.descricao || ''),
@@ -294,6 +355,7 @@ export function montarLinhasItemPedido(
 
 export type ModeloProducao80mm = {
   reimpressao: boolean
+  empresa: string | null
   senha: string | null
   conferencia: boolean
   unidade: string | null
@@ -305,9 +367,11 @@ export type ModeloProducao80mm = {
 }
 
 export type OrigemModeloProducao80mm = {
+  empresa?: string | null
   tipoVenda?: string | null
   tipoEntrega?: 'entrega' | 'retirada' | null
   codigoVenda?: string | null
+  numeroVenda?: string | number | null
   numeroMesa?: string | number | null
   identificacao?: string | null
   senha?: string | number | null
@@ -373,6 +437,7 @@ export function montarModeloProducao80mm(origem: OrigemModeloProducao80mm): Mode
 
   return {
     reimpressao: Boolean(origem.reimpressao),
+    empresa: textoEscPosProducao(origem.empresa ?? '') || null,
     senha: senhaTexto || null,
     conferencia: viaKind === 'conference',
     unidade,
@@ -380,6 +445,7 @@ export function montarModeloProducao80mm(origem: OrigemModeloProducao80mm): Mode
       tipoVenda: origem.tipoVenda,
       tipoEntrega: origem.tipoEntrega,
       codigoVenda: codigo,
+      numeroVenda: origem.numeroVenda,
       numeroMesa: origem.numeroMesa,
       identificacao: identificacao || null,
       viaUnitaria,

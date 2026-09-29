@@ -59,7 +59,7 @@ export const sxRelatorioFiltroSelectPeriodo = {
 } as const
 
 export const sxRelatorioFiltroTextFieldMoeda = {
-  width: '8.5rem',
+  width: '7rem',
   marginTop: 0,
   marginBottom: 0,
   '& .MuiOutlinedInput-root': {
@@ -104,7 +104,7 @@ export const sxRelatorioFiltroTextFieldMoeda = {
 } as const
 
 export const sxRelatorioFiltroTextFieldNumero = {
-  width: '6.5rem',
+  width: '5.5rem',
   marginTop: 0,
   marginBottom: 0,
   '& .MuiOutlinedInput-root': {

@@ -18,6 +18,8 @@ function snapshotMenu(over: Partial<MenuProduto> = {}): MenuProduto {
     nome: 'X-Bacon do cardápio',
     descricao: null,
     valor: 25,
+    valorPromocional: 0,
+    promocaoAtiva: false,
     ordem: 1,
     favorito: false,
     ativo: true,
@@ -40,7 +42,7 @@ function produtoCadastroComComplementos(): Produto {
     valor: 20,
     ativo: true,
     abreComplementos: true,
-    ncm: '21069090',
+    fiscal: { ncm: '21069090' },
     unidadeMedida: 'UN',
     gruposComplementos: [
       {

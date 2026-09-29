@@ -21,7 +21,9 @@ import {
   kanbanVendaUsaCupomPublicoNfce,
 } from '../rules/vendasKanban.rules'
 import { KanbanCardAcaoButton } from './KanbanCardAcaoButton'
+import { KanbanCronometroNoBotao } from './KanbanCronometroNoBotao'
 import type { ColunaKanbanId, KanbanColumn, Venda } from '../types'
+import type { TomTempoPedidoKanban } from '../utils/kanbanPedidoTempo'
 
 const KANBAN_BUTTON_COLOR = '#530CA3'
 
@@ -56,6 +58,8 @@ export interface KanbanVendaCardActionsProps {
   onAbrirQuickView: (anchor: HTMLElement) => void
   onAbrirDocumentoVenda: (venda: Venda) => void
   linhaEtapa?: { texto: string; titulo: string } | null
+  cronometroRotulo?: string | null
+  cronometroTom?: TomTempoPedidoKanban
 }
 
 export function KanbanVendaCardActions(props: KanbanVendaCardActionsProps) {
@@ -79,6 +83,8 @@ export function KanbanVendaCardActions(props: KanbanVendaCardActionsProps) {
     onAbrirQuickView,
     onAbrirDocumentoVenda,
     linhaEtapa = null,
+    cronometroRotulo = null,
+    cronometroTom,
   } = props
 
   const colunaAtual = column.id as ColunaKanbanId
@@ -260,6 +266,11 @@ export function KanbanVendaCardActions(props: KanbanVendaCardActionsProps) {
               onClick={() => onAvancarEtapa(venda, colunaAtual)}
               disabled={!!avancandoEtapaIds[venda.id]}
               loading={!!avancandoEtapaIds[venda.id]}
+              endAdornment={
+                cronometroRotulo ? (
+                  <KanbanCronometroNoBotao rotulo={cronometroRotulo} tom={cronometroTom} />
+                ) : null
+              }
             >
               {avancandoEtapaIds[venda.id] ? rotuloAvancar.loading : rotuloAvancar.label}
             </KanbanCardAcaoButton>

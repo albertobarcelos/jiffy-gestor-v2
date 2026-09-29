@@ -5,6 +5,7 @@ import { MdAddAPhoto, MdImageNotSupported } from 'react-icons/md'
 import { MENU_PRODUTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
 import { useImageCropFlow } from '@/src/presentation/hooks/useImageCropFlow'
 import {
+  formatDescontoPreview,
   formatPrecoPreview,
   type ProdutoPreviewModel,
 } from './produtoPreviewModel'
@@ -30,6 +31,9 @@ interface ProdutoSimplePreviewCardProps extends ProdutoPreviewModel {
 export function ProdutoSimplePreviewCard({
   nome,
   preco,
+  precoRegular,
+  promocaoAtiva = false,
+  descontoPercentual,
   descricao,
   imagemUrl,
   className,
@@ -38,6 +42,22 @@ export function ProdutoSimplePreviewCard({
   const nomeExibicao = nome.trim() || 'Nome do produto'
   const descricaoExibicao = descricao?.trim() || 'Descrição do produto'
   const imagem = imagemUrl?.trim() || null
+  const mostrarPromo =
+    promocaoAtiva &&
+    preco != null &&
+    precoRegular != null &&
+    Number.isFinite(preco) &&
+    Number.isFinite(precoRegular) &&
+    preco > 0 &&
+    precoRegular > preco
+  const descontoExibicao = mostrarPromo
+    ? formatDescontoPreview(
+        descontoPercentual ??
+          (precoRegular && preco
+            ? ((precoRegular - preco) / precoRegular) * 100
+            : null)
+      )
+    : ''
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragActive, setDragActive] = useState(false)
   const onUploadRef = useRef(imageUpload?.onUpload)
@@ -205,7 +225,23 @@ export function ProdutoSimplePreviewCard({
           <h3 className="line-clamp-2 text-sm font-semibold uppercase tracking-wide text-primary-text">
             {nomeExibicao}
           </h3>
-          <p className="text-base font-bold text-primary">{formatPrecoPreview(preco)}</p>
+          {mostrarPromo ? (
+            <>
+              <div className="flex flex-wrap items-baseline gap-2">
+                <p className="text-sm text-secondary-text line-through">
+                  {formatPrecoPreview(precoRegular)}
+                </p>
+                {descontoExibicao ? (
+                  <span className="rounded px-1.5 py-0.5 text-xs font-semibold leading-none bg-emerald-600 text-white">
+                    {descontoExibicao}
+                  </span>
+                ) : null}
+              </div>
+              <p className="text-base font-bold text-primary">{formatPrecoPreview(preco)}</p>
+            </>
+          ) : (
+            <p className="text-base font-bold text-primary">{formatPrecoPreview(preco)}</p>
+          )}
           <p className="line-clamp-4 whitespace-pre-wrap text-xs leading-relaxed text-secondary-text">
             {descricaoExibicao}
           </p>

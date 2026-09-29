@@ -29,6 +29,8 @@ function buildMockGruposFromPreviewCatalog(): DeliveryPublicoGrupoViewModel[] {
       nome: p.nome,
       descricao: p.descricao ?? null,
       preco: p.preco,
+      precoRegular: 'precoRegular' in p ? (p.precoRegular ?? null) : null,
+      descontoPercentual: 'descontoPercentual' in p ? (p.descontoPercentual ?? null) : null,
       imagemUrl: null as string | null,
       grupoId: p.grupoId,
       temComplementos: false,

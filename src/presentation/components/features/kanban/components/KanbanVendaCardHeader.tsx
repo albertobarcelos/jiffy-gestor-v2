@@ -1,7 +1,7 @@
 'use client'
 
 import Tooltip from '@mui/material/Tooltip'
-import { MdAccessTime, MdEdit } from 'react-icons/md'
+import { MdEdit } from 'react-icons/md'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
 import { StatusFiscalBadge } from '../../fiscal/StatusFiscalBadge'
 import { fiscalKanbanPodeReemitirAposCooldown } from '../rules/vendasKanban.rules'
@@ -23,7 +23,6 @@ export interface KanbanVendaCardHeaderProps {
   formaCobrancaKanban: string | null
   formaPagamentoKanban: string | null
   observacaoPedidoTexto: string
-  previsaoEntregaKanban: string | null
   tipoVendaExibicao: TipoVendaExibicaoCard
   exibirColunaTipoVenda: boolean
   exibirAcaoAlterarTipoPedido: boolean
@@ -156,7 +155,6 @@ export function KanbanVendaCardHeader(props: KanbanVendaCardHeaderProps) {
     formaCobrancaKanban,
     formaPagamentoKanban,
     observacaoPedidoTexto,
-    previsaoEntregaKanban,
     tipoVendaExibicao,
     exibirColunaTipoVenda,
     exibirAcaoAlterarTipoPedido,
@@ -176,17 +174,6 @@ export function KanbanVendaCardHeader(props: KanbanVendaCardHeaderProps) {
       onAbrirAlterarTipoPedido={onAbrirAlterarTipoPedido}
     />
   )
-
-  const previsaoEntregaKanbanBadge =
-    exibirMetaDeliveryKanban && previsaoEntregaKanban ? (
-      <div
-        className="flex items-center gap-1 text-sm font-semibold tabular-nums leading-none text-gray-700"
-        title="Previsão de entrega"
-      >
-        <MdAccessTime className="h-[18px] w-[18px] shrink-0 text-primary" aria-hidden />
-        <span>{previsaoEntregaKanban}</span>
-      </div>
-    ) : null
 
   const colunaTipoVendaIcon = tipoVendaIconEl ? (
     <div className="flex flex-shrink-0 flex-col items-center justify-start">{tipoVendaIconEl}</div>
@@ -251,10 +238,9 @@ export function KanbanVendaCardHeader(props: KanbanVendaCardHeaderProps) {
           ) : null}
           <BlocoStatusFiscal venda={venda} />
         </div>
-        {previsaoEntregaKanbanBadge || !ocultarIconeTipoVenda ? (
+        {!ocultarIconeTipoVenda ? (
           <div className="flex flex-shrink-0 flex-col items-center gap-1 self-start">
-            {previsaoEntregaKanbanBadge}
-            {ocultarIconeTipoVenda ? null : tipoVendaIconEl}
+            {tipoVendaIconEl}
           </div>
         ) : null}
       </div>

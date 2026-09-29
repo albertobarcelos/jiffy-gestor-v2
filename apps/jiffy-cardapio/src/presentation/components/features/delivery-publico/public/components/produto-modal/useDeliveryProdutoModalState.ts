@@ -2,6 +2,8 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CatalogoPublicoProdutoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import { calcularTotalProduto } from '@/src/domain/services/pedido/CalculadoraPedido'
+import { itemCarrinhoParaProdutoSelecionado } from '@/src/application/mappers/CarrinhoDeliveryMapper'
 import { showToast } from '@/src/shared/utils/toast'
 import { useProdutoComplementos } from '../../../shared/hooks/useProdutoComplementos'
 import {
@@ -16,6 +18,7 @@ import { getProdutoImageSourceRect } from '../../../shared/utils/getProdutoImage
 import type { FlySourceRect } from '../../../shared/components/FlyingProduct'
 import { observacaoItemCarrinho } from '../../../shared/utils/deliveryCarrinhoItemUtils'
 import type { GrupoComplementoPendente } from '../../../shared/utils/produtoComplementosUtils'
+import { resolverPrecosDeliveryProduto } from '../../../shared/utils/resolverPrecosDeliveryProduto'
 
 export type DeliveryProdutoModalProps = {
   slug: string
@@ -78,6 +81,13 @@ export function useDeliveryProdutoModalState({
     requestClose()
   }
 
+  const complementosIniciaisModal = (itemEdicao?.complementos ?? []).map(c => {
+    const qtdProd = Math.max(1, Math.floor(itemEdicao?.quantidade ?? 1))
+    const qtdComp = Math.max(1, Math.floor(c.quantidade))
+    const quantidadePorUnidade = qtdProd > 1 && qtdComp === qtdProd ? 1 : qtdComp
+    return { ...c, quantidade: quantidadePorUnidade }
+  })
+
   const {
     grupos,
     precisaComplementos,
@@ -88,10 +98,23 @@ export function useDeliveryProdutoModalState({
     ajustarQuantidadeComplemento,
     getQuantidadeComplemento,
     obterGruposPendentes,
-  } = useProdutoComplementos(slug, produto, itemEdicao?.complementos)
+  } = useProdutoComplementos(slug, produto, complementosIniciaisModal)
 
-  const valorUnitario = produto.valor + valorComplementosUnitario
-  const valorTotal = valorUnitario * quantidade
+  const valorBaseProduto = resolverPrecosDeliveryProduto(produto).preco
+  const valorUnitario = valorBaseProduto
+  const valorTotal = calcularTotalProduto(
+    itemCarrinhoParaProdutoSelecionado(
+      {
+        produtoId: produto.id,
+        produtoNome: produto.nome,
+        quantidade,
+        valorUnitario,
+        observacoes: [],
+        complementos: complementosSelecionados,
+      },
+      { quantidade, valorUnitario }
+    )
+  )
   const painelAmplo = precisaComplementos
   const carregandoOpcoes =
     precisaComplementos && carregandoComplementos && !cacheComplementos

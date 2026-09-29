@@ -31,7 +31,8 @@ import type {
 
 
 
-export const RELATORIO_MVP_LIST_PAGE_SIZE = 50
+/** Máximo aceito pelo BFF (`limit` ≤ 200). Páginas seguintes usam `somentePagina` (cache). */
+export const RELATORIO_MVP_LIST_PAGE_SIZE = 200
 
 
 

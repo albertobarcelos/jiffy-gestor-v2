@@ -169,13 +169,10 @@ export function aplicarProdutoAtualizadoNasLinhasCarrinho(
       }
     })
 
-    const ncmAtualizado = produtoAtualizado.getNcm()
-
     return {
       ...linha,
       nome: produtoAtualizado.getNome(),
       unidadeMedida: produtoAtualizado.getUnidadeMedida(),
-      ncm: ncmAtualizado || linha.ncm,
       valorCatalogo: novoValorCatalogo,
       permiteAlterarPreco,
       complementos,

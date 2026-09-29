@@ -8,10 +8,12 @@ import {
   extrairColumnIdDePedidosDeliveryKanbanQueryKey,
   vendaPertenceColunaDeliveryKanban,
 } from './kanbanDeliveryColumnConfig'
+import { isoTimestampPreparoValido } from '@/src/application/kanban/timestampPreparoKanban'
 import {
   cloneVendaUnificadaDTO,
   extrairPatchOperacionalKanbanDeStatusDelivery,
   extrairVendaUnificadaDeRespostaDeliverySummary,
+  mesclarTimestampsPreparoNoCard,
   pedidoDeliverySummaryTemCamposComerciais,
 } from './kanbanVendaCacheUpdate'
 import type { KanbanVendaCachePatch } from '@/src/application/dto/TransicaoKanbanDTO'
@@ -213,7 +215,10 @@ export function aplicarPedidoDeliveryStatusAlteradoNoKanbanCache(
     return true
   }
 
-  upsertVendaDeliveryKanbanColumnCaches(queryClient, card)
+  upsertVendaDeliveryKanbanColumnCaches(
+    queryClient,
+    mesclarTimestampsPreparoNoCard(card, existente)
+  )
   return true
 }
 
@@ -327,23 +332,47 @@ const STATUS_OPERACIONAL_POR_COLUNA_DESTINO: Partial<Record<ColunaKanbanId, stri
  * Garante que o patch carregue a etapa operacional do destino quando a resposta da transição
  * não devolve `statusDelivery`. Sem a etapa, o card sai da coluna operacional.
  */
+function completarTimestampsPreparoNoPatch(
+  patch: KanbanVendaCachePatch,
+  colunaDestino?: ColunaKanbanId | null,
+  existente?: Pick<VendaUnificadaDTO, 'dataInicioPreparo' | 'dataFinalizacaoPreparo'> | null
+): KanbanVendaCachePatch {
+  if (
+    colunaDestino === 'EM_PREPARO' &&
+    !isoTimestampPreparoValido(patch.dataInicioPreparo) &&
+    !isoTimestampPreparoValido(existente?.dataInicioPreparo)
+  ) {
+    return { ...patch, dataInicioPreparo: new Date().toISOString() }
+  }
+  if (
+    colunaDestino === 'PRONTO_ENTREGA' &&
+    !isoTimestampPreparoValido(patch.dataFinalizacaoPreparo) &&
+    !isoTimestampPreparoValido(existente?.dataFinalizacaoPreparo)
+  ) {
+    return { ...patch, dataFinalizacaoPreparo: new Date().toISOString() }
+  }
+  return patch
+}
+
 function aplicarStatusDestinoNoPatch(
   patch: KanbanVendaCachePatch,
-  colunaDestino?: ColunaKanbanId | null
+  colunaDestino?: ColunaKanbanId | null,
+  existente?: Pick<VendaUnificadaDTO, 'dataInicioPreparo' | 'dataFinalizacaoPreparo'> | null
 ): KanbanVendaCachePatch {
-  if (!colunaDestino) return patch
-  if (String(patch.statusEtapaOperacional ?? '').trim()) return patch
+  const comPreparo = completarTimestampsPreparoNoPatch(patch, colunaDestino, existente)
+  if (!colunaDestino) return comPreparo
+  if (String(comPreparo.statusEtapaOperacional ?? '').trim()) return comPreparo
 
   const statusDestino = STATUS_OPERACIONAL_POR_COLUNA_DESTINO[colunaDestino]
-  if (!statusDestino) return patch
+  if (!statusDestino) return comPreparo
 
   const ehFinalizado = statusDestino === 'FINALIZADO'
   return {
-    ...patch,
+    ...comPreparo,
     statusEtapaOperacional: statusDestino,
     dataFinalizacao: ehFinalizado
-      ? (patch.dataFinalizacao ?? new Date().toISOString())
-      : patch.dataFinalizacao,
+      ? (comPreparo.dataFinalizacao ?? new Date().toISOString())
+      : comPreparo.dataFinalizacao,
   }
 }
 
@@ -368,17 +397,21 @@ export function sincronizarVendaDeliveryKanbanColumnCaches(
     vendaPertenceAlgumaColunaDeliveryKanban(cardAtualizado) &&
     summaryCompleto
 
+  const base = fallbackVenda ?? encontrarVendaNasColunasDeliveryKanban(queryClient, vendaId)
+
   if (cardAtualizado && cardSummaryUtilizavel) {
-    upsertVendaDeliveryKanbanColumnCaches(queryClient, cardAtualizado)
+    upsertVendaDeliveryKanbanColumnCaches(
+      queryClient,
+      mesclarTimestampsPreparoNoCard(cardAtualizado, base)
+    )
     return true
   }
 
   const patch = aplicarStatusDestinoNoPatch(
     extrairPatchOperacionalKanbanDeStatusDelivery(respostaTransicao),
-    colunaDestino
+    colunaDestino,
+    base
   )
-
-  const base = fallbackVenda ?? encontrarVendaNasColunasDeliveryKanban(queryClient, vendaId)
   if (base) {
     const merged = cloneVendaUnificadaDTO(base, patch)
     if (vendaPertenceAlgumaColunaDeliveryKanban(merged)) {

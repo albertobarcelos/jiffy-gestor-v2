@@ -42,7 +42,10 @@ export interface CriarVendaGestorInputDTO {
   meiosPagamento: Array<{ getId(): string; getNome(): string }>
   nomesMeiosPagamentoPedido: Record<string, string>
   observacaoPedido?: string
-  /** Id da estação deste PC (`gestor-estacao-impressao-id`). Obrigatório no create de balcão. */
+  /**
+   * Estação deste PC (`gestor-estacao-impressao-id`).
+   * Obrigatória no create de balcão — resolvida no submit.
+   */
   estacaoId?: string
 }
 

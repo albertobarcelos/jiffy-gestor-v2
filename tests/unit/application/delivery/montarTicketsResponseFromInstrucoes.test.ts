@@ -88,6 +88,19 @@ describe('montarTicketsResponseFromInstrucoes', () => {
     expect(result.modoImpressaoDelivery).toBe('unificado')
     expect(result.cliente?.nome).toBe('Maria')
     expect(result.cliente?.telefone).toBe('65999998888')
+    expect(result.dataPedido).toBe('2026-06-15T10:00:00.000Z')
+    expect(result.dataInicioPreparo).toBeNull()
+  })
+
+  it('carrega dataInicioPreparo do pedido para o cupom de produção', () => {
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: { mapeamentos: [], warnings: [] },
+      pedido: { ...pedidoBase, dataInicioPreparo: '2026-06-15T10:22:00.000Z' },
+      prefs: DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      empresa: { id: 'emp-1', nomeExibicao: 'Loja Teste' },
+    })
+    expect(result.dataPedido).toBe('2026-06-15T10:00:00.000Z')
+    expect(result.dataInicioPreparo).toBe('2026-06-15T10:22:00.000Z')
   })
 
   it('modo separado gera tickets de produção e expedição com todos os itens', () => {
@@ -233,7 +246,40 @@ describe('montarTicketsResponseFromInstrucoes', () => {
     })
 
     expect(result.pagamento?.trocoParaLevar).toBe(10.1)
-    expect(result.pagamento?.valorCobrarNaEntrega).toBe(50)
+    expect(result.pagamento?.valorCobrarNaEntrega).toBe(39.9)
+    expect(result.pagamento?.meios).toEqual([
+      { nome: 'Dinheiro', valor: 39.9, naEntrega: true },
+    ])
+  })
+
+  it('COBRAR usa o valor do pedido, não a cédula, quando há troco', () => {
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: { mapeamentos: [], warnings: [] },
+      pedido: {
+        ...pedidoBase,
+        valorFinal: 45,
+        totalPago: 0,
+        totalFaltaPagar: 45,
+        troco: 0,
+        cobrancas: [
+          {
+            id: 'cob-1',
+            meioPagamentoId: 'mp-dinheiro',
+            valor: 145,
+            momentoCobranca: 'na_entrega',
+            status: 'pendente',
+          },
+        ],
+      },
+      prefs: DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      nomesMeiosPagamentoPorId: { 'mp-dinheiro': 'Dinheiro' },
+    })
+
+    expect(result.pagamento?.trocoParaLevar).toBe(100)
+    expect(result.pagamento?.valorCobrarNaEntrega).toBe(45)
+    expect(result.pagamento?.meios).toEqual([
+      { nome: 'Dinheiro', valor: 45, naEntrega: true },
+    ])
   })
 
   it('nao leva troco no cupom quando a cobranca na entrega e PIX', () => {
@@ -648,5 +694,90 @@ describe('montarTicketsResponseFromInstrucoes', () => {
     expect(producao).toHaveLength(1)
     expect(producao[0].itens).toHaveLength(1)
     expect(producao[0].itens[0].quantidade).toBe(2)
+  })
+
+  it('tipo nenhum zera valor de impressão mesmo com valorUnitario de cadastro', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      modo: 'unificado' as const,
+      impressoraExpedicaoId: 'imp-exp',
+    }
+
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: {
+        mapeamentos: [
+          {
+            impressoraId: 'imp-exp',
+            impressoraNome: 'Expedição',
+            nomeImpressoraWindows: 'EPSON_EXP',
+            produtosLancadosIds: ['pl-1'],
+          },
+        ],
+        warnings: [],
+      },
+      pedido: {
+        ...pedidoBase,
+        valorFinal: 20,
+        produtosLancados: [
+          {
+            id: 'pl-1',
+            produtoId: 'p-1',
+            nomeProduto: 'Hambúrguer',
+            quantidade: 1,
+            valorUnitario: 20,
+            valorFinal: 20,
+            removido: false,
+            complementos: [
+              {
+                id: 'c-alface',
+                nomeComplemento: 'Alface',
+                quantidade: 2,
+                valorUnitario: 3.5,
+                valorFinal: 7,
+                tipoImpactoPreco: 'nenhum',
+              },
+              {
+                id: 'c-bacon',
+                nomeComplemento: 'Bacon',
+                quantidade: 1,
+                valorUnitario: 4,
+                valorFinal: 4,
+                tipoImpactoPreco: 'aumenta',
+              },
+              {
+                id: 'c-sem-cebola',
+                nomeComplemento: 'Sem cebola',
+                quantidade: 1,
+                valorUnitario: 1,
+                valorFinal: 1,
+                tipoImpactoPreco: 'diminui',
+              },
+            ],
+            observacoes: [],
+          },
+        ],
+      },
+      prefs,
+    })
+
+    const item = result.tickets[0].itens[0]
+    const alface = item.complementos.find(c => c.nome === 'Alface')
+    const bacon = item.complementos.find(c => c.nome === 'Bacon')
+    const semCebola = item.complementos.find(c => c.nome === 'Sem cebola')
+
+    expect(alface?.impressao).toEqual({
+      quantidade: 2,
+      valorUnitario: 0,
+      valorFinal: 0,
+      valorTotal: 0,
+    })
+    expect(bacon?.impressao).toEqual({
+      quantidade: 1,
+      valorUnitario: 4,
+      valorFinal: 4,
+      valorTotal: 4,
+    })
+    expect(semCebola?.impressao?.valorFinal).toBe(-1)
+    expect(result.resumoPedido?.valorAdicionais).toBe(3)
   })
 })

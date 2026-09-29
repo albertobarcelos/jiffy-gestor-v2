@@ -22,7 +22,7 @@ function badgeVariacao(pct: number | null | undefined): { badge: string; badgePo
   }
 }
 
-function MvpMetricCard({
+export function MvpMetricCard({
   tituloBase,
   icon,
   valor,

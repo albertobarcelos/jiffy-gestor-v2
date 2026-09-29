@@ -62,6 +62,7 @@ import { DeliveryPublicoCarrinhoScreen } from './DeliveryPublicoCarrinhoScreen'
 import { useFlyToCart } from '../../shared/hooks/useFlyToCart'
 import type { FlySourceRect } from '../../shared/components/FlyingProduct'
 import { getProdutoImageSourceRect } from '../../shared/utils/getProdutoImageSourceRect'
+import { resolverPrecosDeliveryProduto } from '../../shared/utils/resolverPrecosDeliveryProduto'
 import { useDeliveryBodyScrollLock } from '../../shared/hooks/useDeliveryBodyScrollLock'
 import type { DeliveryCarrinhoThumb } from '../../shared/components/DeliveryPedidoFooter'
 import { buildCarrinhoThumbsFromItens } from '../../shared/utils/buildCarrinhoThumbsFromItens'
@@ -241,13 +242,14 @@ export function DeliveryPublicoHomeScreen({
         return
       }
 
+      const precoVigente = resolverPrecosDeliveryProduto(produto).preco
       adicionarItem(slug, {
         produtoId: produto.id,
         produtoNome: produto.nome,
         produtoImagemUrl: produto.imagemUrl,
         quantidade: 1,
-        valorUnitario: produto.valor,
-        valorTotal: produto.valor,
+        valorUnitario: precoVigente,
+        valorTotal: precoVigente,
         observacoes: [],
         complementos: [],
       })

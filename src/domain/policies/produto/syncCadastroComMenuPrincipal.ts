@@ -81,6 +81,57 @@ export function garantirMenuPrincipalNosIds(
   return idsUnicos([principalId, ...ids])
 }
 
+/**
+ * Descarta ids que não existem mais na empresa (vínculo stale na lista/cache).
+ * Evita o POST de criação/cópia falhar em `ensureMenusExist`.
+ */
+export function filtrarMenuIdsExistentesNaEmpresa(
+  candidatos: readonly string[],
+  menusEmpresa: ReadonlyArray<{ id: string }>
+): string[] {
+  const existentes = new Set(
+    menusEmpresa.map(menu => menu.id?.trim()).filter((id): id is string => Boolean(id))
+  )
+  if (existentes.size === 0) return []
+  return idsUnicos(candidatos).filter(id => existentes.has(id))
+}
+
+/** Seed da aba Menus na cópia: só menus ainda existentes + principal. */
+export function menuIdsParaSeedCopiaProduto(input: {
+  candidatosDoProduto: readonly string[]
+  menusEmpresa: ReadonlyArray<{ id: string }>
+  principalId: string | null | undefined
+}): string[] {
+  return menuIdsProntosParaCriacaoProduto({
+    candidatos: input.candidatosDoProduto,
+    menusEmpresa: input.menusEmpresa,
+    principalId: input.principalId,
+  })
+}
+
+/** Criação/cópia: filtra órfãos e garante o principal (se existir na empresa) antes do POST. */
+export function menuIdsProntosParaCriacaoProduto(input: {
+  candidatos: readonly string[]
+  menusEmpresa: ReadonlyArray<{ id: string }>
+  principalId: string | null | undefined
+}): string[] {
+  const validos = filtrarMenuIdsExistentesNaEmpresa(input.candidatos, input.menusEmpresa)
+
+  // Lista da empresa indisponível: mantém o comportamento anterior (principal + candidatos).
+  if (input.menusEmpresa.length === 0) {
+    return garantirMenuPrincipalNosIds(input.candidatos, input.principalId)
+  }
+
+  const principalExiste =
+    Boolean(input.principalId) &&
+    input.menusEmpresa.some(menu => menu.id === input.principalId)
+
+  return garantirMenuPrincipalNosIds(
+    validos,
+    principalExiste ? input.principalId : null
+  )
+}
+
 /** IDs que não podem ser desmarcados (principal + extras, ex.: menu de origem). */
 export function idsMenuPrincipalTravados(
   principalId: string | null | undefined,

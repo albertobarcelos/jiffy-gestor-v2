@@ -932,6 +932,8 @@ export function useNovoPedidoOrchestrator({
     cancelarNotaFiscalVendaGestor,
     transicaoPedidoDelivery,
     form,
+    catalogoProdutosPorId,
+    produtosList,
     setInternalDialogOpen,
     totalProdutos,
     totalPagamentosLancados,

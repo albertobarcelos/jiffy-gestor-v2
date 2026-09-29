@@ -102,6 +102,8 @@ export function pedidoDeliverySummaryParaUnifiedRecord(
     ),
     previsaoEntregaEm: summary.previsaoEntregaEm,
     tempoTotalEstimadoSegundos: summary.tempoTotalEstimadoSegundos,
+    dataInicioPreparo: summary.dataInicioPreparo,
+    dataFinalizacaoPreparo: summary.dataFinalizacaoPreparo,
     fluxoPagamentoEntrega: derivarFluxoPagamentoEntregaDeliverySummary(
       summary.totalFaltaPagar,
       summary.cobrancas

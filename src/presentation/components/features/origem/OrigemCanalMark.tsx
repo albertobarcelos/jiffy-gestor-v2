@@ -1,21 +1,33 @@
-import { temSeloCanalMarketplace } from '@/src/domain/policies/pedido/origemCanalMarketplace'
+import {
+  canalSeloOrigem,
+  type CanalSeloOrigem,
+  temSeloCanalOrigem,
+} from '@/src/domain/policies/pedido/origemCanalMarketplace'
+import { colors } from '@/src/shared/theme/colors'
 import { cn } from '@/src/shared/utils/cn'
 
-type CanalLogoMarketplace = 'AIQFOME' | 'IFOOD'
-
-const LOGO_CANAL: Record<
-  CanalLogoMarketplace,
-  { src: string; alt: string; bg: string }
-> = {
-  AIQFOME: { src: '/images/aiqfome.png', alt: 'Aiqfome', bg: '#5C0D8A' },
-  IFOOD: { src: '/images/ifood.png', alt: 'iFood', bg: '#EA1D2C' },
+type LogoOrigemConfig = {
+  src: string
+  alt: string
+  bg: string
+  borderColor?: string
+  /** Ícone quadrado (cardápio); marketplaces usam faixa horizontal. */
+  square?: boolean
+  /** Escala do desenho dentro do selo (0–1). */
+  imageScale?: number
 }
 
-function logoDoCanal(origem: string | null | undefined): CanalLogoMarketplace | null {
-  const canal = String(origem ?? '').trim().toUpperCase()
-  if (canal === 'IFOOD') return 'IFOOD'
-  if (canal === 'AIQFOME') return 'AIQFOME'
-  return null
+const LOGO_ORIGEM: Record<CanalSeloOrigem, LogoOrigemConfig> = {
+  AIQFOME: { src: '/images/aiqfome.png', alt: 'Aiqfome', bg: '#5C0D8A' },
+  IFOOD: { src: '/images/ifood.png', alt: 'iFood', bg: '#EA1D2C' },
+  JIFFY_DELIVERY: {
+    src: '/images/cardapio-online.png',
+    alt: 'Cardápio online',
+    bg: '#FFFFFF',
+    borderColor: colors.primary,
+    square: true,
+    imageScale: 0.88,
+  },
 }
 
 export function OrigemCanalMark({
@@ -29,29 +41,42 @@ export function OrigemCanalMark({
   width?: number
   className?: string
 }) {
-  if (!temSeloCanalMarketplace(origem)) return null
-  const canal = logoDoCanal(origem)
-  if (!canal) return null
+  if (!temSeloCanalOrigem(origem)) return null
 
-  const logo = LOGO_CANAL[canal]
+  const canal = canalSeloOrigem(origem)
+  if (!canal) return null
+  const logo = LOGO_ORIGEM[canal]
+  const imageScale = logo.imageScale ?? 1
 
   return (
     <span
       title={logo.alt}
       className={cn(
-        'inline-flex shrink-0 overflow-hidden rounded-md border border-gray-300',
+        'inline-flex shrink-0 items-center justify-center overflow-hidden rounded-md border border-gray-300',
         className
       )}
       style={{
-        width: width ?? Math.round(size * 1.45),
+        width: width ?? (logo.square ? size : Math.round(size * 1.45)),
         height: size,
         backgroundColor: logo.bg,
+        ...(logo.borderColor
+          ? { borderColor: logo.borderColor, borderWidth: 2, borderStyle: 'solid' as const }
+          : {}),
       }}
     >
       <img
         src={logo.src}
         alt={logo.alt}
-        className="h-full w-full object-cover object-center"
+        className={logo.square ? 'object-contain' : 'h-full w-full object-cover object-center'}
+        style={
+          logo.square
+            ? {
+                height: `${Math.round(imageScale * 100)}%`,
+                width: 'auto',
+                maxWidth: '92%',
+              }
+            : undefined
+        }
       />
     </span>
   )

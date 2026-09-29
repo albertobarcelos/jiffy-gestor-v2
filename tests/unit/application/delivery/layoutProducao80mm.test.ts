@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   dotsEntreModificadoresProducao,
+  cupomMostraQrWhatsappCliente,
+  expedicaoDestacaItensPedido,
+  fonteItensExpedicaoPx,
   identidadePrimariaEhTipoAvulso,
+  detalheLinhasItemPedido,
   linhaComplementoProducao,
   linhaItemProducao,
   montarModeloProducao80mm,
@@ -39,6 +43,25 @@ describe('layoutProducao80mm', () => {
     ).toBe('    * 1 MOLHO')
   })
 
+  it('imprime gratuitos antes dos adicionais, sem seguir a ordem do lançamento', () => {
+    const detalhe = detalheLinhasItemPedido({
+      nomeProduto: 'Burger',
+      quantidade: 1,
+      complementos: [
+        { nome: 'Bacon', quantidade: 1, tipoImpactoPreco: 'aumenta' },
+        { nome: 'Alface', quantidade: 1, tipoImpactoPreco: 'nenhum' },
+        { nome: 'Queijo', quantidade: 1, tipoImpactoPreco: 'aumenta' },
+        { nome: 'Cebola', quantidade: 1, tipoImpactoPreco: 'nenhum' },
+      ],
+    })
+    expect(detalhe.complementos.map(c => c.origem.nome)).toEqual([
+      'Alface',
+      'Cebola',
+      'Bacon',
+      'Queijo',
+    ])
+  })
+
   it('abre mais o vão na virada de modificador sem ação para com ação', () => {
     expect(dotsEntreModificadoresProducao('    * 1 ALFACE', '    + 1 QUEIJO')).toBe(32)
     expect(dotsEntreModificadoresProducao('    + 1 QUEIJO', '    + 1 BACON')).toBe(16)
@@ -50,7 +73,7 @@ describe('layoutProducao80mm', () => {
       codigoVenda: '1842',
       identificacao: 'JOAO',
     })
-    expect(curta.primaria).toBe('BALCAO #1842 | JOAO')
+    expect(curta.primaria).toBe('BALCAO#1842 | JOAO')
     expect(curta.secundaria).toBeNull()
 
     const longa = textosIdentidadeProducao({
@@ -58,7 +81,7 @@ describe('layoutProducao80mm', () => {
       codigoVenda: '1842',
       identificacao: 'JOAO DA SILVA COSTA',
     })
-    expect(longa.primaria).toBe('BALCAO #1842')
+    expect(longa.primaria).toBe('BALCAO#1842')
     expect(longa.secundaria).toBe('JOAO DA SILVA COSTA')
 
     const enche = textosIdentidadeProducao({
@@ -66,9 +89,21 @@ describe('layoutProducao80mm', () => {
       codigoVenda: '1842',
       identificacao: 'MARIA DA CONCEICAO OLIVEIRA SANTOS PEREIRA',
     })
-    expect(enche.primaria).toBe('BALCAO #1842')
+    expect(enche.primaria).toBe('BALCAO#1842')
     expect(enche.secundaria).toBe('MARIA DA CONCEICAO')
     expect((enche.secundaria ?? '').length).toBeLessThanOrEqual(26)
+  })
+
+  it('junta número e código na mesma pílula de identidade', () => {
+    const modelo = montarModeloProducao80mm({
+      tipoVenda: 'entrega',
+      codigoVenda: 'SIXWMAWDD',
+      numeroVenda: 12,
+      identificacao: 'PRISCILA',
+    })
+    expect(modelo.identidade.primaria).toBe('ENTREGA#12 #SIXWMAWDD')
+    expect(modelo.identidade.secundaria).toBe('PRISCILA')
+    expect(modelo.rodape[0]).toContain('Venda #SIXWMAWDD')
   })
 
   it('omite o codigo da identidade na via unitaria', () => {
@@ -80,9 +115,23 @@ describe('layoutProducao80mm', () => {
     expect(id.primaria).toBe('ENTREGA')
   })
 
+  it('QR de WhatsApp só na entrega, não na retirada', () => {
+    expect(cupomMostraQrWhatsappCliente('entrega', 'entrega')).toBe(true)
+    expect(cupomMostraQrWhatsappCliente('entrega', 'retirada')).toBe(false)
+    expect(cupomMostraQrWhatsappCliente('retirada', null)).toBe(false)
+  })
+
+  it('itens da expedição de retirada ficam um pouco maiores', () => {
+    expect(expedicaoDestacaItensPedido('entrega', 'retirada')).toBe(true)
+    expect(expedicaoDestacaItensPedido('entrega', 'entrega')).toBe(false)
+    expect(fonteItensExpedicaoPx(13, true)).toBe(16)
+    expect(fonteItensExpedicaoPx(13, false)).toBe(13)
+    expect(fonteItensExpedicaoPx(17, true)).toBe(18)
+  })
+
   it('identidade com código usa destaque; tipo sozinho não', () => {
     expect(identidadePrimariaEhTipoAvulso('ENTREGA')).toBe(true)
-    expect(identidadePrimariaEhTipoAvulso('ENTREGA #1842')).toBe(false)
+    expect(identidadePrimariaEhTipoAvulso('ENTREGA#1842')).toBe(false)
     expect(identidadePrimariaEhTipoAvulso('MESA 12')).toBe(false)
   })
 
@@ -124,7 +173,7 @@ describe('layoutProducao80mm', () => {
         { nomeProduto: 'Coca Lata', quantidade: 1 },
       ],
     })
-    expect(modelo.identidade.primaria).toBe('ENTREGA #1842 | JOAO')
+    expect(modelo.identidade.primaria).toBe('ENTREGA#1842 | JOAO')
     expect(modelo.itens[0]?.produto).toBe('  2x X-BURGER')
     expect(modelo.itens[0]?.extras[0]).toBe('       + 1 QUEIJO')
     expect(modelo.itens[0]?.extras[2]).toBe('       Obs: sem cebola')

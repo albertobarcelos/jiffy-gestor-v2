@@ -518,8 +518,13 @@ export class CarregarVendaDetalheUseCase {
         fetchClienteDelivery: telefone =>
           this.vendaDetalheRepo.fetchClienteDeliveryByTelefone(telefone, token),
       })
-      if (enderecoResolvido !== undefined) {
-        detalhesEntrega = { ...detalhesEntrega, enderecoEntrega: enderecoResolvido }
+      detalhesEntrega = {
+        ...detalhesEntrega,
+        enderecoEntrega: enderecoResolvido.enderecoEntrega,
+        clienteCpfCnpj:
+          detalhesEntrega.clienteCpfCnpj?.trim() ||
+          enderecoResolvido.documentoClienteDelivery ||
+          null,
       }
 
       const entregadorIdVenda = String(vendaData.entregadorId ?? '').trim()

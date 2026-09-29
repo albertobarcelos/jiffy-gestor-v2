@@ -56,6 +56,9 @@ export type UseNovoPedidoGestorActionsParams = {
     | 'setProdutoTabsModalState'
     | 'setIsSavingPagamentoEntrega'
   >
+  /** Catálogo do pedido — traz grupoId/nomeGrupo que a linha do carrinho não tem. */
+  catalogoProdutosPorId?: Record<string, Produto>
+  produtosList?: Produto[]
   setInternalDialogOpen: (open: boolean) => void
   totalProdutos: number
   totalPagamentosLancados: number
@@ -79,6 +82,8 @@ export function useNovoPedidoGestorActions({
   cancelarNotaFiscalVendaGestor,
   transicaoPedidoDelivery,
   form,
+  catalogoProdutosPorId = {},
+  produtosList = [],
   setInternalDialogOpen,
   totalProdutos,
   totalPagamentosLancados,
@@ -220,23 +225,35 @@ export function useNovoPedidoGestorActions({
         showToast.error('Não foi possível abrir a edição: produto sem ID.')
         return
       }
+
+      const doCatalogo =
+        catalogoProdutosPorId[id] ?? produtosList.find(p => p.getId() === id)
       const produtoPedido = produtos.find(p => p.produtoId === id)
-      const produtoParaEditar = Produto.create(
-        id,
-        '',
-        produtoPedido?.nome || 'Produto',
-        produtoPedido?.valorUnitario || 0,
-        true
-      )
+
+      const produtoParaEditar =
+        doCatalogo ??
+        Produto.create(
+          id,
+          '',
+          produtoPedido?.nome || 'Produto',
+          produtoPedido?.valorUnitario || 0,
+          true
+        )
+
+      const grupoId =
+        doCatalogo?.getGrupoId()?.trim() ||
+        undefined
+
       setProdutoTabsModalState({
         open: true,
         tab: 'produto',
         mode: 'edit',
         produto: produtoParaEditar,
+        grupoId,
         initialStepProduto: options?.initialStepProduto ?? 2,
       })
     },
-    [produtos, setProdutoTabsModalState]
+    [produtos, catalogoProdutosPorId, produtosList, setProdutoTabsModalState]
   )
 
   const handleFecharProdutoTabsModal = useCallback(() => {

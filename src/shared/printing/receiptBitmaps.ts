@@ -1,4 +1,8 @@
 import QRCode from 'qrcode'
+import {
+  TRACEJADO_PRODUCAO,
+  type EstiloTracejado,
+} from '@/src/shared/printing/cupomTracejado'
 
 function qrModules(data: string) {
   return QRCode.create(data, { errorCorrectionLevel: 'H' }).modules
@@ -58,16 +62,6 @@ function renderQrSvgMarkup(
   parts.push('</svg>')
   return parts.join('')
 }
-
-export type EstiloTracejado = {
-  thick?: number
-  dash?: number
-  gap?: number
-  padY?: number
-}
-
-/** Tracejado entre produtos da via de produção — médio, com folga em cima e embaixo. */
-export const TRACEJADO_PRODUCAO = { thick: 4, dash: 12, gap: 6, padY: 10 } as const
 
 function desenharTracejadoCanvas(
   widthPx: number,

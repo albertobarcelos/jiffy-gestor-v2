@@ -78,6 +78,27 @@ POST cotação/pedido/cliente: `no-store`.
 
 Publicar design/cardápio no Gestor pode levar até 30s para aparecer no celular. Aberto/fechado idem.
 
+## SEO / Google (por loja)
+
+Não existe um cardápio global. Cada `/{slug}` precisa de título, cidade e JSON-LD próprios.
+
+| Arquivo | Papel |
+|---------|--------|
+| `app/robots.ts` | `Allow: /` — **não** deixar `/robots.txt` cair no `[slug]` |
+| `app/sitemap.ts` | só `GET /api/v1/delivery/slugs-publicos` (1h). Sem env. |
+| `generateMetadata` em `/{slug}` | `{nome} \| Delivery em {cidade}` |
+| JSON-LD `FoodEstablishment` | endereço + geo daquela empresa |
+
+Carrinho e pedido: `noindex`. Visibilidade na cidade do cliente também depende do Google Perfil da Empresa apontar para `cardapio.jiffy.run/{slug}`.
+
+Contrato do sitemap (Wilcker):
+
+```http
+GET /api/v1/delivery/slugs-publicos
+```
+
+Sem auth. Só lojas com delivery ativo e slug publicado. Corpo: `{ "slugs": ["nexsyn", "outra-loja"] }`. Sem id, telefone ou endereço.
+
 ## Imagens (mobile first)
 
 `next/image` recorta capa, logo e cards. Só a **capa** leva `priority` (LCP no 4G). Logo e produtos entram lazy para não competir com a capa. Hosts conhecidos (S3, CloudFront, R2) passam pelo otimizador; CDN próprio da loja cai no original (`unoptimized`).

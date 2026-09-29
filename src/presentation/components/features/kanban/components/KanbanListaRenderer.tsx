@@ -12,8 +12,9 @@ import {
   rotuloTipoAtendimentoKanban,
   tipoAtendimentoKanban,
 } from '../utils/kanbanPedidoIdentidade'
-import { relogioPedidoKanban } from '../utils/kanbanPedidoTempo'
+import { deveExibirCronometroPreparoKanban, relogioPedidoKanban } from '../utils/kanbanPedidoTempo'
 import { useAgoraKanban } from '../hooks/useAgoraKanban'
+import { useTempoPreparoKanbanMinutos } from '../hooks/useTempoPreparoKanban'
 import { classeBordaEsquerdaColunaKanban } from '../rules/vendasKanban.rules'
 import type { ColunaKanbanId, FiltroStatusEntreguesKanban, KanbanColumn, Venda } from '../types'
 import { OPCOES_FILTRO_STATUS_ENTREGUES } from '../utils/kanbanDeliveryColumnConfig'
@@ -52,8 +53,10 @@ export function KanbanListaRenderer(props: KanbanBoardRendererProps) {
     balcaoKanban,
     filtroStatusFiscalComNf,
     onFiltroStatusFiscalComNfChange,
+    timestampsEtapaEntregaLocal,
   } = props
-  const agoraMs = useAgoraKanban()
+  const agoraMs = useAgoraKanban(1000)
+  const slaPreparoMinutos = useTempoPreparoKanbanMinutos()
   const [abertos, setAbertos] = useState<Record<string, boolean>>(() =>
     blocoInicialmenteAberto(columns, vendasPorColuna)
   )
@@ -168,7 +171,11 @@ export function KanbanListaRenderer(props: KanbanBoardRendererProps) {
                     </thead>
                     <tbody>
                       {vendas.map((venda: Venda) => {
-                        const relogio = relogioPedidoKanban(venda, agoraMs)
+                        const relogio = relogioPedidoKanban(venda, agoraMs, {
+                          colunaId: colId,
+                          slaPreparoMinutos,
+                          ancoraPreparoIso: timestampsEtapaEntregaLocal[venda.id],
+                        })
                         const tipo = tipoAtendimentoKanban(venda.tipoAtendimento())
                         const cancelada = venda.isCancelada()
                         return (
@@ -199,8 +206,12 @@ export function KanbanListaRenderer(props: KanbanBoardRendererProps) {
                                 {rotuloTipoAtendimentoKanban(tipo)}
                               </span>
                             </td>
-                            <td className={`px-3 py-3 text-sm ${classeTomTempo(relogio.tom)}`}>
-                              {relogio.rotuloAtraso ?? relogio.rotuloHa ?? '—'}
+                            <td
+                              className={`px-3 py-3 text-sm ${classeTomTempo(
+                                deveExibirCronometroPreparoKanban(colId, venda) ? relogio.tom : 'ok'
+                              )}`}
+                            >
+                              {relogio.rotuloHa ?? '—'}
                             </td>
                             <td className="px-3 py-3">
                               <span
@@ -227,6 +238,16 @@ export function KanbanListaRenderer(props: KanbanBoardRendererProps) {
                                   colunaAtual={colId}
                                   avancando={Boolean(avancandoEtapaIds[venda.id])}
                                   onAvancar={onAvancarEtapa}
+                                  cronometroRotulo={
+                                    deveExibirCronometroPreparoKanban(colId, venda)
+                                      ? relogio.rotuloDecorrido
+                                      : null
+                                  }
+                                  cronometroTom={
+                                    deveExibirCronometroPreparoKanban(colId, venda)
+                                      ? relogio.tom
+                                      : undefined
+                                  }
                                 />
                               )}
                             </td>

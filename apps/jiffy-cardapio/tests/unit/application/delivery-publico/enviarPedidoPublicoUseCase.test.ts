@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
 import type { ClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { EnviarPedidoPublicoUseCase } from '@/src/application/use-cases/delivery-publico/EnviarPedidoPublicoUseCase'
+import { MSG_PAGAMENTO_OBRIGATORIO_PEDIDO_PUBLICO } from '@/src/domain/policies/PagamentoObrigatorioPedidoPublico'
 import { GarantirClienteDeliveryPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirClienteDeliveryPublicoUseCase'
 import { GarantirEnderecoEntregaPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirEnderecoEntregaPublicoUseCase'
 import {
@@ -66,7 +67,6 @@ function criarEnviarUseCase(
 ) {
   return new EnviarPedidoPublicoUseCase(
     publicDeliveryPedidoAdapter,
-    publicDeliveryClienteAdapter,
     garantir,
     garantirCliente
   )
@@ -161,18 +161,11 @@ describe('EnviarPedidoPublicoUseCase', () => {
     expect(etapas).toEqual(['salvando_endereco', 'enviando_pedido'])
   })
 
-  it('faz PATCH de CPF quando cliente existe sem CPF', async () => {
+  it('envia CPF só no documento do pedido, sem PATCH no cadastro', async () => {
     vi.mocked(publicDeliveryApi.buscarClienteDeliveryPublico).mockResolvedValue({
       telefone: '11999999999',
       nome: 'Cliente',
       cpf: null,
-      clienteIdVinculado: null,
-      enderecos: [],
-    })
-    vi.mocked(publicDeliveryApi.atualizarClienteDeliveryPublico).mockResolvedValue({
-      telefone: '11999999999',
-      nome: 'Cliente',
-      cpf: '12345678909',
       clienteIdVinculado: null,
       enderecos: [],
     })
@@ -190,38 +183,10 @@ describe('EnviarPedidoPublicoUseCase', () => {
     })
 
     expect(result.ok).toBe(true)
-    if (!result.ok) return
-    expect(publicDeliveryApi.atualizarClienteDeliveryPublico).toHaveBeenCalledWith(
-      '11999999999',
-      { cpf: '12345678909' }
-    )
-    expect(result.clienteAtualizado?.cpf).toBe('12345678909')
-    expect(publicDeliveryApi.criarPedidoPublico).toHaveBeenCalledOnce()
-  })
-
-  it('não faz PATCH se cliente já tem CPF', async () => {
-    vi.mocked(publicDeliveryApi.buscarClienteDeliveryPublico).mockResolvedValue({
-      telefone: '11999999999',
-      nome: 'Cliente',
-      cpf: '11144477735',
-      clienteIdVinculado: null,
-      enderecos: [],
-    })
-
-    const useCase = criarEnviarUseCase()
-    await useCase.execute({
-      slug: 'loja',
-      telefoneApi: '11999999999',
-      nomeEfetivo: 'Cliente',
-      itens: [item],
-      total: 20,
-      form: formBase({ cpfNotaFiscal: '12345678909' }),
-      clienteLookup: null,
-      tokenCotacao,
-    })
-
     expect(publicDeliveryApi.atualizarClienteDeliveryPublico).not.toHaveBeenCalled()
-    expect(publicDeliveryApi.criarPedidoPublico).toHaveBeenCalledOnce()
+    expect(publicDeliveryApi.criarPedidoPublico).toHaveBeenCalledWith(
+      expect.objectContaining({ documentoCpfCnpj: '12345678909' })
+    )
   })
 
   it('garante endereço antes do create em entrega', async () => {
@@ -267,6 +232,47 @@ describe('EnviarPedidoPublicoUseCase', () => {
     })
     expect(result).toEqual({ ok: false, error: 'Informe um telefone válido' })
     expect(publicDeliveryApi.criarPedidoPublico).not.toHaveBeenCalled()
+  })
+
+  it('bloqueia envio sem pagamento', async () => {
+    const useCase = criarEnviarUseCase()
+    const result = await useCase.execute({
+      slug: 'loja',
+      telefoneApi: '11999999999',
+      nomeEfetivo: 'Cliente',
+      itens: [item],
+      total: 20,
+      form: formBase({ pagamentos: [] }),
+      clienteLookup: null,
+      tokenCotacao,
+    })
+    expect(result).toEqual({
+      ok: false,
+      error: MSG_PAGAMENTO_OBRIGATORIO_PEDIDO_PUBLICO,
+    })
+    expect(publicDeliveryApi.criarPedidoPublico).not.toHaveBeenCalled()
+    expect(publicDeliveryApi.criarClienteDeliveryPublico).not.toHaveBeenCalled()
+  })
+
+  it('bloqueia envio sem CPF quando exigeCpfVenda é true', async () => {
+    const useCase = criarEnviarUseCase()
+    const result = await useCase.execute({
+      slug: 'loja',
+      telefoneApi: '11999999999',
+      nomeEfetivo: 'Cliente',
+      itens: [item],
+      total: 20,
+      form: formBase({ cpfNotaFiscal: '' }),
+      clienteLookup: null,
+      tokenCotacao,
+      exigeCpfVenda: true,
+    })
+    expect(result).toEqual({
+      ok: false,
+      error: 'Informe o CPF para finalizar o pedido',
+    })
+    expect(publicDeliveryApi.criarPedidoPublico).not.toHaveBeenCalled()
+    expect(publicDeliveryApi.criarClienteDeliveryPublico).not.toHaveBeenCalled()
   })
 })
 

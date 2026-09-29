@@ -33,10 +33,6 @@ function measureReceipt(receipt: HTMLElement, fallbackWidth: number) {
   }
 }
 
-export function graphicRasterScale(larguraMm: 58 | 80): number {
-  return larguraMm === 58 ? 384 / 220 : 576 / 300
-}
-
 async function fotografarComMotorDoNavegador(
   receipt: HTMLElement,
   width: number,

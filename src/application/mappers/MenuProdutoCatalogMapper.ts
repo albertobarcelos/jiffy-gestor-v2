@@ -336,6 +336,20 @@ export function mergeProdutoComSnapshotMenu(base: Produto, snapshot: MenuProduto
   )
 }
 
+export function normalizeMenuProduto(item: MenuProduto): MenuProduto {
+  const valorPromocionalRaw = (item as MenuProduto & { valorPromocional?: unknown })
+    .valorPromocional
+  const valorPromocional =
+    typeof valorPromocionalRaw === 'number' && Number.isFinite(valorPromocionalRaw)
+      ? Math.max(0, valorPromocionalRaw)
+      : 0
+  return {
+    ...item,
+    valorPromocional,
+    promocaoAtiva: item.promocaoAtiva === true,
+  }
+}
+
 export function unwrapMenuProdutoPayload(raw: unknown): MenuProduto | null {
   if (!raw || typeof raw !== 'object') return null
   const obj = raw as Record<string, unknown>
@@ -343,5 +357,5 @@ export function unwrapMenuProdutoPayload(raw: unknown): MenuProduto | null {
   if (!data || typeof data !== 'object') return null
   const item = data as MenuProduto
   if (!item.produtoId && !item.id) return null
-  return item
+  return normalizeMenuProduto(item)
 }

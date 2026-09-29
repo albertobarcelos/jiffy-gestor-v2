@@ -178,6 +178,8 @@ export interface VendaGestorTicketsResponse {
   senha?: string | number | null
   codigoTerminal?: string | null
   dataPedido: string
+  /** Quando o pedido entrou em Em preparo (mesmo instante do cronômetro do card). */
+  dataInicioPreparo?: string | null
   dataPrevista: string
   tiradoPor?: VendaGestorTicketsUsuarioPedido | null
   entregador?: VendaGestorTicketsEntregador | string | null

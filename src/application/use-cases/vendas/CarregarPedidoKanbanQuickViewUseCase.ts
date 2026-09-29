@@ -29,6 +29,7 @@ import {
 } from '@/src/shared/helpers/observacaoPedido'
 
 export interface ProdutoKanbanQuickView {
+  produtoId: string
   nome: string
   quantidade: number
   observacao?: string
@@ -107,8 +108,9 @@ function mapearProdutosKanbanQuickView(
         })
 
       const observacao = textoObservacaoProdutoApi(prod) || undefined
+      const produtoId = String(prod.produtoId ?? prod.id ?? '').trim()
 
-      return { nome, quantidade, observacao, complementos }
+      return { produtoId, nome, quantidade, observacao, complementos }
     })
 }
 
@@ -222,8 +224,13 @@ export class CarregarPedidoKanbanQuickViewUseCase {
       fetchClienteDelivery: telefone =>
         this.repo.fetchClienteDeliveryByTelefone(telefone, token),
     })
-    if (enderecoResolvido !== undefined) {
-      detalhesEntrega = { ...detalhesEntrega, enderecoEntrega: enderecoResolvido }
+    detalhesEntrega = {
+      ...detalhesEntrega,
+      enderecoEntrega: enderecoResolvido.enderecoEntrega,
+      clienteCpfCnpj:
+        detalhesEntrega.clienteCpfCnpj?.trim() ||
+        enderecoResolvido.documentoClienteDelivery ||
+        null,
     }
 
     let nomeEntregador = detalhesEntrega.entregadorNome?.trim() || ''

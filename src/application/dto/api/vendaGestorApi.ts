@@ -88,7 +88,7 @@ export interface CriarVendaGestorApiRequest {
   pagamentos?: unknown[]
   pagamento?: CriarVendaGestorPagamentoApi
   observacoes?: string[]
-  /** Obrigatório em POST /gestor/vendas. Estação deste PC. */
+  /** Estação deste PC (caixa / impressão). Enviar no create de balcão. */
   estacaoId?: string
 }
 
