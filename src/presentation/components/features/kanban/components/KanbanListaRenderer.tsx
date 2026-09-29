@@ -14,6 +14,7 @@ import {
 } from '../utils/kanbanPedidoIdentidade'
 import { relogioPedidoKanban } from '../utils/kanbanPedidoTempo'
 import { useAgoraKanban } from '../hooks/useAgoraKanban'
+import { useTempoPreparoKanbanMinutos } from '../hooks/useTempoPreparoKanban'
 import { classeBordaEsquerdaColunaKanban } from '../rules/vendasKanban.rules'
 import type { ColunaKanbanId, FiltroStatusEntreguesKanban, KanbanColumn, Venda } from '../types'
 import { OPCOES_FILTRO_STATUS_ENTREGUES } from '../utils/kanbanDeliveryColumnConfig'
@@ -52,8 +53,10 @@ export function KanbanListaRenderer(props: KanbanBoardRendererProps) {
     balcaoKanban,
     filtroStatusFiscalComNf,
     onFiltroStatusFiscalComNfChange,
+    timestampsEtapaEntregaLocal,
   } = props
-  const agoraMs = useAgoraKanban()
+  const agoraMs = useAgoraKanban(1000)
+  const slaPreparoMinutos = useTempoPreparoKanbanMinutos()
   const [abertos, setAbertos] = useState<Record<string, boolean>>(() =>
     blocoInicialmenteAberto(columns, vendasPorColuna)
   )
@@ -168,7 +171,11 @@ export function KanbanListaRenderer(props: KanbanBoardRendererProps) {
                     </thead>
                     <tbody>
                       {vendas.map((venda: Venda) => {
-                        const relogio = relogioPedidoKanban(venda, agoraMs)
+                        const relogio = relogioPedidoKanban(venda, agoraMs, {
+                          colunaId: colId,
+                          slaPreparoMinutos,
+                          ancoraPreparoIso: timestampsEtapaEntregaLocal[venda.id],
+                        })
                         const tipo = tipoAtendimentoKanban(venda.tipoAtendimento())
                         const cancelada = venda.isCancelada()
                         return (
@@ -227,6 +234,14 @@ export function KanbanListaRenderer(props: KanbanBoardRendererProps) {
                                   colunaAtual={colId}
                                   avancando={Boolean(avancandoEtapaIds[venda.id])}
                                   onAvancar={onAvancarEtapa}
+                                  cronometroRotulo={
+                                    colId === 'EM_PREPARO' ||
+                                    colId === 'PRONTO_ENTREGA' ||
+                                    colId === 'EM_ROTA'
+                                      ? relogio.rotuloDecorrido
+                                      : null
+                                  }
+                                  cronometroTom={relogio.tom}
                                 />
                               )}
                             </td>

@@ -112,6 +112,17 @@ describe('PedidoDeliveryListMapper — origem e financeiro', () => {
 })
 
 describe('PedidoDeliveryListMapper — summary → VendaUnificadaDTO', () => {
+  it('carrega início e fim do preparo no card do quadro', () => {
+    const dto = mapPedidoDeliverySummaryParaVendaUnificadaDTO(
+      criarSummary({
+        dataInicioPreparo: '2026-06-15T10:05:00.000Z',
+        dataFinalizacaoPreparo: '2026-06-15T10:18:00.000Z',
+      })
+    )
+    expect(dto.dataInicioPreparo).toBe('2026-06-15T10:05:00.000Z')
+    expect(dto.dataFinalizacaoPreparo).toBe('2026-06-15T10:18:00.000Z')
+  })
+
   it('mantém tipoVenda delivery e tipoEntrega separados', () => {
     const record = pedidoDeliverySummaryParaUnifiedRecord(
       criarSummary({ tipoVenda: 'delivery', tipoEntrega: 'retirada' })

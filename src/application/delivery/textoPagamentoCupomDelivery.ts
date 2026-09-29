@@ -68,13 +68,30 @@ export function linhasResumoPagamentoCupom(
   return []
 }
 
+/** COBRAR é o valor a receber, não a cédula. Se o meio ainda trouxer 145 com troco 100, mostra 45. */
+function valorLinhaCobrar(
+  meio: MeioCupomLinha,
+  pagamento: VendaGestorTicketsPagamento | null | undefined
+): number {
+  const troco = numeroFinito(pagamento?.trocoParaLevar)
+  const receber = numeroFinito(pagamento?.valorCobrarNaEntrega)
+  if (troco <= 0.005) return meio.valor
+  const devidoPelaCedula = Math.round((meio.valor - troco) * 100) / 100
+  if (devidoPelaCedula > 0.005 && meio.valor > troco + 0.005) {
+    if (receber > 0.005 && receber <= devidoPelaCedula + 0.02) return receber
+    return devidoPelaCedula
+  }
+  return meio.valor
+}
+
 function linhasCobrarFormaValor(
   meios: MeioCupomLinha[],
+  pagamento: VendaGestorTicketsPagamento | null | undefined,
   formatarValor: (valor: number) => string
 ): Array<{ left: string; right: string }> {
   return meios.map(m => ({
     left: `COBRAR ${m.nome.toUpperCase()}`,
-    right: formatarValor(m.valor),
+    right: formatarValor(valorLinhaCobrar(m, pagamento)),
   }))
 }
 
@@ -90,7 +107,7 @@ export function avisoCobrancaEntregadorCupom(
     pagamento?.meioPagamento?.trim() || pagamento?.formaPagamento?.trim() || 'pagamento'
 
   if (meios.length > 0) {
-    return { linhas: linhasCobrarFormaValor(meios, formatarValor) }
+    return { linhas: linhasCobrarFormaValor(meios, pagamento, formatarValor) }
   }
 
   if (receber > 0) {

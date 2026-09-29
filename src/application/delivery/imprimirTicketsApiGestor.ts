@@ -81,6 +81,7 @@ export type ImprimirTicketsApiGestorDeps = {
   mapTicketToGraphicPrintDocument: MapTicketToGraphicPrintDocument
   enviarCupom: EnviarCupomPrintJob
   gerarJobId: GerarPrintJobId
+  obterVersaoJiffyPrint?: () => Promise<string | null>
 }
 
 export type ImprimirTicketsApiGestorParams = {
@@ -118,6 +119,7 @@ export function criarImprimirTicketsApiGestor(
     omitirAvisoSemVinculoPc,
   } = params
   const reimpressao = jobNamePrefix.toLowerCase().includes('reimpress')
+  const versaoJiffyPrint = (await deps.obterVersaoJiffyPrint?.())?.trim() || undefined
 
   logImpressao('imprimirLote.inicio', {
     jobNamePrefix,
@@ -183,6 +185,7 @@ export function criarImprimirTicketsApiGestor(
         if (ticket.tipoCupom === 'producao') {
           document = mapTicketToProducaoHibridoDocument(response, ticket, {
             reimpressao,
+            versao: versaoJiffyPrint,
             nomeEmpresa,
             mostrarLogoTexto: cupomTemplate?.mostrarLogoTexto,
             desenharPilula: deps.desenharPilula,

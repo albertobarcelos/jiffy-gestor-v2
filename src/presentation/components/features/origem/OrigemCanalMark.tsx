@@ -56,7 +56,7 @@ export function OrigemCanalMark({
         className
       )}
       style={{
-        width: logo.square ? size : width ?? Math.round(size * 1.45),
+        width: width ?? (logo.square ? size : Math.round(size * 1.45)),
         height: size,
         backgroundColor: logo.bg,
         ...(logo.borderColor
@@ -71,8 +71,9 @@ export function OrigemCanalMark({
         style={
           logo.square
             ? {
-                width: `${Math.round(imageScale * 100)}%`,
                 height: `${Math.round(imageScale * 100)}%`,
+                width: 'auto',
+                maxWidth: '92%',
               }
             : undefined
         }

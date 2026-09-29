@@ -5,6 +5,7 @@ import { MdWarningAmber } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { contarPendenciasExpedicao, montarLayoutExpedicao } from '../utils/kanbanExpedicaoLayout'
 import { useAgoraKanban } from '../hooks/useAgoraKanban'
+import { useTempoPreparoKanbanMinutos } from '../hooks/useTempoPreparoKanban'
 import type { ColunaKanbanId, FiltroStatusEntreguesKanban, KanbanColumn, Venda } from '../types'
 import { OPCOES_FILTRO_STATUS_ENTREGUES } from '../utils/kanbanDeliveryColumnConfig'
 import type { KanbanBoardRendererProps } from './KanbanBoardRenderer'
@@ -86,8 +87,10 @@ export function KanbanExpedicaoRenderer(props: KanbanBoardRendererProps) {
     isModoDeliveryKanban,
     filtroStatusFiscalComNf,
     onFiltroStatusFiscalComNfChange,
+    timestampsEtapaEntregaLocal,
   } = props
-  const agoraMs = useAgoraKanban()
+  const agoraMs = useAgoraKanban(1000)
+  const slaPreparoMinutos = useTempoPreparoKanbanMinutos()
   const { primaria, laterais, arquivo } = montarLayoutExpedicao(columns)
 
   if (mostrarLoadingLista) {
@@ -118,6 +121,8 @@ export function KanbanExpedicaoRenderer(props: KanbanBoardRendererProps) {
         venda={venda}
         colunaId={colId}
         agoraMs={agoraMs}
+        slaPreparoMinutos={slaPreparoMinutos}
+        ancoraPreparoIso={timestampsEtapaEntregaLocal[venda.id]}
         avancando={Boolean(avancandoEtapaIds[venda.id])}
         onViewDetails={onViewDetails}
         onAvancarEtapa={onAvancarEtapa}

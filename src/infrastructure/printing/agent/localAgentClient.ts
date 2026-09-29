@@ -22,6 +22,20 @@ export function marcarDownloadJiffyPrintIniciado(): void {
   }
 }
 
+export async function fetchJiffyPrintVersion(): Promise<string | null> {
+  try {
+    const res = await fetch(`${printAgentBaseUrl()}/v1/version`, {
+      signal: AbortSignal.timeout(800),
+    })
+    if (!res.ok) return null
+    const data = (await res.json()) as { version?: unknown }
+    const version = String(data.version ?? '').trim()
+    return version || null
+  } catch {
+    return null
+  }
+}
+
 export function jaPediuDownloadJiffyPrint(): boolean {
   try {
     return Boolean(sessionStorage.getItem(STORAGE_JIFFY_PRINT_DOWNLOAD))

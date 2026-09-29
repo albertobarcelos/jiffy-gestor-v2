@@ -327,23 +327,37 @@ const STATUS_OPERACIONAL_POR_COLUNA_DESTINO: Partial<Record<ColunaKanbanId, stri
  * Garante que o patch carregue a etapa operacional do destino quando a resposta da transição
  * não devolve `statusDelivery`. Sem a etapa, o card sai da coluna operacional.
  */
+function completarTimestampsPreparoNoPatch(
+  patch: KanbanVendaCachePatch,
+  colunaDestino?: ColunaKanbanId | null
+): KanbanVendaCachePatch {
+  if (colunaDestino === 'EM_PREPARO' && !patch.dataInicioPreparo) {
+    return { ...patch, dataInicioPreparo: new Date().toISOString() }
+  }
+  if (colunaDestino === 'PRONTO_ENTREGA' && !patch.dataFinalizacaoPreparo) {
+    return { ...patch, dataFinalizacaoPreparo: new Date().toISOString() }
+  }
+  return patch
+}
+
 function aplicarStatusDestinoNoPatch(
   patch: KanbanVendaCachePatch,
   colunaDestino?: ColunaKanbanId | null
 ): KanbanVendaCachePatch {
-  if (!colunaDestino) return patch
-  if (String(patch.statusEtapaOperacional ?? '').trim()) return patch
+  const comPreparo = completarTimestampsPreparoNoPatch(patch, colunaDestino)
+  if (!colunaDestino) return comPreparo
+  if (String(comPreparo.statusEtapaOperacional ?? '').trim()) return comPreparo
 
   const statusDestino = STATUS_OPERACIONAL_POR_COLUNA_DESTINO[colunaDestino]
-  if (!statusDestino) return patch
+  if (!statusDestino) return comPreparo
 
   const ehFinalizado = statusDestino === 'FINALIZADO'
   return {
-    ...patch,
+    ...comPreparo,
     statusEtapaOperacional: statusDestino,
     dataFinalizacao: ehFinalizado
-      ? (patch.dataFinalizacao ?? new Date().toISOString())
-      : patch.dataFinalizacao,
+      ? (comPreparo.dataFinalizacao ?? new Date().toISOString())
+      : comPreparo.dataFinalizacao,
   }
 }
 

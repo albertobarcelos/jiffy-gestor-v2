@@ -65,8 +65,9 @@ export function valorComplementoParaExibicaoCupom(comp: {
   } else if (finalRaw != null) {
     magnitudeUnit = Math.abs(finalRaw) / qtd
   }
+  if (tipo === 'nenhum') return 0
   if (magnitudeUnit == null) return null
-  if (tipo === 'nenhum' || magnitudeUnit < 0.0005) return null
+  if (magnitudeUnit < 0.0005) return 0
   if (tipo === 'diminui') return -magnitudeUnit * qtd
   return magnitudeUnit * qtd
 }

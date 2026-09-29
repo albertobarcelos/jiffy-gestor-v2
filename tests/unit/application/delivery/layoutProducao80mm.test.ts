@@ -5,6 +5,7 @@ import {
   expedicaoDestacaItensPedido,
   fonteItensExpedicaoPx,
   identidadePrimariaEhTipoAvulso,
+  detalheLinhasItemPedido,
   linhaComplementoProducao,
   linhaItemProducao,
   montarModeloProducao80mm,
@@ -40,6 +41,25 @@ describe('layoutProducao80mm', () => {
         impacto: 'nenhum',
       })
     ).toBe('    * 1 MOLHO')
+  })
+
+  it('imprime gratuitos antes dos adicionais, sem seguir a ordem do lançamento', () => {
+    const detalhe = detalheLinhasItemPedido({
+      nomeProduto: 'Burger',
+      quantidade: 1,
+      complementos: [
+        { nome: 'Bacon', quantidade: 1, tipoImpactoPreco: 'aumenta' },
+        { nome: 'Alface', quantidade: 1, tipoImpactoPreco: 'nenhum' },
+        { nome: 'Queijo', quantidade: 1, tipoImpactoPreco: 'aumenta' },
+        { nome: 'Cebola', quantidade: 1, tipoImpactoPreco: 'nenhum' },
+      ],
+    })
+    expect(detalhe.complementos.map(c => c.origem.nome)).toEqual([
+      'Alface',
+      'Cebola',
+      'Bacon',
+      'Queijo',
+    ])
   })
 
   it('abre mais o vão na virada de modificador sem ação para com ação', () => {

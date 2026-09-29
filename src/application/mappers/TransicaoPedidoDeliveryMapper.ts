@@ -85,6 +85,13 @@ export function extrairPatchOperacionalKanbanDeStatusDelivery(raw: unknown): Kan
   const dataFinalizacao = inferirDataFinalizacaoPatch(status, isoDeCampoApi(o.dataFinalizacao))
   const patch: KanbanVendaCachePatch = {
     dataUltimaModificacao: isoDeCampoApi(o.dataUltimaModificacao) ?? undefined,
+    dataInicioPreparo:
+      isoDeCampoApi(o.dataInicioPreparo) ?? isoDeCampoApi(o.data_inicio_preparo) ?? undefined,
+    dataFinalizacaoPreparo:
+      isoDeCampoApi(o.dataFinalizacaoPreparo) ??
+      isoDeCampoApi(o.data_finalizacao_preparo) ??
+      isoDeCampoApi(o.dataPronto) ??
+      undefined,
   }
   if (status) {
     patch.statusEtapaOperacional = status
@@ -152,6 +159,8 @@ export function extrairPatchKanbanDeTransicaoDelivery(data: unknown): KanbanVend
     return {
       statusEtapaOperacional,
       dataUltimaModificacao: card.dataUltimaModificacao ?? null,
+      dataInicioPreparo: card.dataInicioPreparo ?? null,
+      dataFinalizacaoPreparo: card.dataFinalizacaoPreparo ?? null,
       dataFinalizacao: inferirDataFinalizacaoPatch(statusEtapaOperacional, card.dataFinalizacao),
       statusFinanceiro: card.statusFinanceiro ?? null,
       valorFinal: card.valorFinal,

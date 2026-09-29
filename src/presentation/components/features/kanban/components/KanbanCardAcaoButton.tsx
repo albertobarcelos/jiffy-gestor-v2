@@ -13,20 +13,22 @@ export function KanbanCardAcaoButton(props: {
   disabled?: boolean
   loading?: boolean
   startIcon?: ReactNode
+  endAdornment?: ReactNode
 }) {
-  const { children, onClick, disabled, loading, startIcon } = props
+  const { children, onClick, disabled, loading, startIcon, endAdornment } = props
   const bloqueado = Boolean(disabled || loading)
 
   return (
     <Button
       size="sm"
       variant="contained"
-      className="flex-1 min-w-0 !bg-[#003366] !text-white hover:!bg-[#003366] hover:!text-white"
+      className="flex-1 !bg-[#003366] !text-white hover:!bg-[#003366] hover:!text-white"
       sx={{
         backgroundColor: `${KANBAN_CARD_ACAO_COLOR} !important`,
         py: 0.75,
         px: 1.25,
         display: 'inline-flex',
+        justifyContent: endAdornment ? 'space-between' : undefined,
         minHeight: 36,
         fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
         fontSize: '13px',
@@ -35,8 +37,10 @@ export function KanbanCardAcaoButton(props: {
         boxShadow: 'none',
         color: '#ffffff',
         WebkitTextFillColor: '#ffffff',
+        whiteSpace: 'nowrap',
         '& .MuiButton-startIcon': {
           color: '#ffffff',
+          marginRight: '6px',
         },
         '&:hover': {
           backgroundColor: `${KANBAN_CARD_ACAO_COLOR} !important`,
@@ -64,7 +68,8 @@ export function KanbanCardAcaoButton(props: {
       disabled={bloqueado}
       aria-busy={loading || undefined}
     >
-      {children}
+      <span className={endAdornment ? 'whitespace-nowrap text-left' : undefined}>{children}</span>
+      {endAdornment}
     </Button>
   )
 }

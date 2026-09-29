@@ -17,6 +17,12 @@ export const PRODUCAO_80MM = {
   raioPilulaPx: 2,
   /** Folga até a faca. 4 linhas ≈ 12 mm para o rodapé não ser cortado. */
   linhasAntesDoCorte: 4,
+  /** Vão entre o pontilhado e o rodapé (ITENS / v / terminal). */
+  linhasAposPontilhadoRodape: 2,
+  /** Vão entre o contorno do código e o nome do cliente. */
+  linhasAposCodigoIdentidade: 1,
+  /** Vão entre o nome do cliente e o primeiro produto. */
+  linhasAposNomeCliente: 1,
   /** Vão fino entre modificadores do mesmo tipo (ESC J, ~2 mm). */
   dotsEntreExtras: 16,
   /** Vão na virada * (sem ação) ↔ +/− (com ação). */
@@ -294,6 +300,16 @@ export type DetalheLinhasItemPedido = {
   observacao: string | null
 }
 
+/** Gratuito (`*`) primeiro; adicionais (`+`/`-`) depois. Mantém a ordem relativa em cada grupo. */
+export function compararComplementosImpressao(
+  a: Pick<OrigemComplementoItemPedido, 'tipoImpactoPreco'>,
+  b: Pick<OrigemComplementoItemPedido, 'tipoImpactoPreco'>
+): number {
+  const rank = (tipo: string | null | undefined) =>
+    impactoComplementoProducao(tipo) === 'nenhum' ? 0 : 1
+  return rank(a.tipoImpactoPreco) - rank(b.tipoImpactoPreco)
+}
+
 export function detalheLinhasItemPedido(
   item: OrigemLinhaItemPedido,
   options?: { permitirQuantidadeZero?: boolean; recuoBloco?: boolean }
@@ -303,8 +319,10 @@ export function detalheLinhasItemPedido(
   const recuoBloco = Boolean(options?.recuoBloco)
   const recuo = recuoComplementoEspacos(qtd, recuoBloco)
   const complementos: DetalheLinhasItemPedido['complementos'] = []
-  for (const comp of item.complementos ?? []) {
-    if (!comp) continue
+  const origemOrdenada = [...(item.complementos ?? [])]
+    .filter((comp): comp is NonNullable<typeof comp> => Boolean(comp))
+    .sort(compararComplementosImpressao)
+  for (const comp of origemOrdenada) {
     const texto = linhaComplementoProducao({
       recuo,
       nome: String(comp.nome || comp.descricao || ''),

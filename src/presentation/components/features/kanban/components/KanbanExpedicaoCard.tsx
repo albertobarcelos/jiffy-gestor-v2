@@ -6,20 +6,16 @@ import {
   rotuloTipoAtendimentoKanban,
   tipoAtendimentoKanban,
 } from '../utils/kanbanPedidoIdentidade'
-import { relogioPedidoKanban, type TomTempoPedidoKanban } from '../utils/kanbanPedidoTempo'
+import { relogioPedidoKanban } from '../utils/kanbanPedidoTempo'
 import type { ColunaKanbanId, Venda } from '../types'
 import { KanbanAvancarEtapaCompacto } from './KanbanAvancarEtapaCompacto'
-
-const TOM_PILL: Record<TomTempoPedidoKanban, string> = {
-  ok: 'bg-slate-100 text-slate-600',
-  alerta: 'bg-orange-400 text-orange-950',
-  atraso: 'bg-red-600 text-white',
-}
 
 export interface KanbanExpedicaoCardProps {
   venda: Venda
   colunaId: ColunaKanbanId
   agoraMs: number
+  slaPreparoMinutos: number
+  ancoraPreparoIso?: string | null
   avancando: boolean
   onViewDetails: (venda: Venda) => void
   onAvancarEtapa: (venda: Venda, colunaAtual: ColunaKanbanId) => void
@@ -35,19 +31,27 @@ export function KanbanExpedicaoCard({
   venda,
   colunaId,
   agoraMs,
+  slaPreparoMinutos,
+  ancoraPreparoIso,
   avancando,
   onViewDetails,
   onAvancarEtapa,
 }: KanbanExpedicaoCardProps) {
   const tipo = tipoAtendimentoKanban(venda.tipoAtendimento())
-  const relogio = relogioPedidoKanban(venda, agoraMs)
+  const relogio = relogioPedidoKanban(venda, agoraMs, {
+    colunaId,
+    slaPreparoMinutos,
+    ancoraPreparoIso,
+  })
   const cancelada = venda.isCancelada()
   const finalizada = colunaId === 'FINALIZADAS'
   const cobrar = venda.precisaConfirmarPagamentoParaFinalizar()
-  const atrasado = Boolean(relogio.rotuloAtraso)
-  const tempo = atrasado
-    ? relogio.rotuloAtraso?.replace(/^Atraso\s+/i, '')
-    : relogio.rotuloDecorrido
+  const cronometroRotulo =
+    colunaId === 'EM_PREPARO' ||
+    colunaId === 'PRONTO_ENTREGA' ||
+    colunaId === 'EM_ROTA'
+      ? relogio.rotuloDecorrido
+      : null
 
   return (
     <article
@@ -81,22 +85,11 @@ export function KanbanExpedicaoCard({
           >
             {cancelada ? 'Cancelado' : 'Concluído'}
           </span>
-        ) : (
-          <div className="mt-2 flex flex-col items-start gap-1">
-            {tempo ? (
-              <span
-                className={`rounded-md px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${TOM_PILL[relogio.tom]}`}
-              >
-                {atrasado ? `Atraso ${tempo}` : tempo}
-              </span>
-            ) : null}
-            {cobrar ? (
-              <span className="inline-flex rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-amber-950">
-                Cobrar na entrega
-              </span>
-            ) : null}
-          </div>
-        )}
+        ) : cobrar ? (
+          <span className="mt-2 inline-flex rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-amber-950">
+            Cobrar na entrega
+          </span>
+        ) : null}
       </button>
 
       {finalizada ? null : (
@@ -107,6 +100,8 @@ export function KanbanExpedicaoCard({
             avancando={avancando}
             onAvancar={onAvancarEtapa}
             destaque
+            cronometroRotulo={cronometroRotulo}
+            cronometroTom={relogio.tom}
           />
         </div>
       )}

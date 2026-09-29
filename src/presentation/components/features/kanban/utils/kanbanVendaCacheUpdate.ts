@@ -62,6 +62,13 @@ export function extrairPatchKanbanDeTransicaoGestor(data: unknown): KanbanVendaC
       isoDeCampoApi(registro.data_ultima_modificacao),
     dataFinalizacao:
       isoDeCampoApi(registro.dataFinalizacao) ?? isoDeCampoApi(registro.data_finalizacao),
+    dataInicioPreparo:
+      isoDeCampoApi(registro.dataInicioPreparo) ?? isoDeCampoApi(registro.data_inicio_preparo),
+    dataFinalizacaoPreparo:
+      isoDeCampoApi(registro.dataFinalizacaoPreparo) ??
+      isoDeCampoApi(registro.data_finalizacao_preparo) ??
+      isoDeCampoApi(registro.dataPronto) ??
+      isoDeCampoApi(registro.data_pronto),
   }
 }
 
@@ -164,7 +171,11 @@ export function cloneVendaUnificadaDTO(
       : venda.entregador,
     venda.contextoEntrega,
     patch.etapaKanbanBalcao !== undefined ? patch.etapaKanbanBalcao : venda.etapaKanbanBalcao,
-    venda.tipoEntrega
+    venda.tipoEntrega,
+    patch.dataInicioPreparo !== undefined ? patch.dataInicioPreparo : venda.dataInicioPreparo,
+    patch.dataFinalizacaoPreparo !== undefined
+      ? patch.dataFinalizacaoPreparo
+      : venda.dataFinalizacaoPreparo
   )
 }
 
