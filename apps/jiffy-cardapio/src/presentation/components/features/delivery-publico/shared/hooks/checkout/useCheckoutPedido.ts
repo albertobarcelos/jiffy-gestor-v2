@@ -7,6 +7,8 @@ import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/Ch
 import {
   enriquecerMensagemErroComNomesProdutos,
   isErroCoberturaEntregaPublica,
+  resolverProdutoIndisponivelDoErro,
+  type ProdutoIndisponivelCarrinho,
 } from '@/src/application/errors/publicDeliveryErrors'
 import { enviarPedidoPublicoUseCase } from '@/src/infrastructure/di/deliveryPublicoUseCases'
 import type { EtapaEnvioPedidoPublico } from '@/src/application/use-cases/delivery-publico/EnviarPedidoPublicoUseCase'
@@ -41,6 +43,7 @@ type UseCheckoutPedidoParams = {
     chaveAuto?: string
   }) => Promise<RecotarPedidoResult>
   setForaCoberturaDialogAberto: (open: boolean) => void
+  setProdutoIndisponivel: (info: ProdutoIndisponivelCarrinho | null) => void
 }
 
 export type EtapaEnvioCheckout = 'validando' | EtapaEnvioPedidoPublico
@@ -59,6 +62,7 @@ export function useCheckoutPedido({
   telefoneDigitsRef,
   recotarPedido,
   setForaCoberturaDialogAberto,
+  setProdutoIndisponivel,
 }: UseCheckoutPedidoParams) {
   const [enviando, setEnviando] = useState(false)
   const [etapaEnvio, setEtapaEnvio] = useState<EtapaEnvioCheckout | null>(null)
@@ -157,9 +161,17 @@ export function useCheckoutPedido({
           if (isErroCoberturaEntregaPublica(resultado.error)) {
             setForaCoberturaDialogAberto(true)
           } else {
-            showToast.error(
-              enriquecerMensagemErroComNomesProdutos(resultado.error, itens)
+            const indisponivel = resolverProdutoIndisponivelDoErro(
+              resultado.error,
+              itens
             )
+            if (indisponivel) {
+              setProdutoIndisponivel(indisponivel)
+            } else {
+              showToast.error(
+                enriquecerMensagemErroComNomesProdutos(resultado.error, itens)
+              )
+            }
           }
         }
         return { ok: false }
@@ -179,7 +191,12 @@ export function useCheckoutPedido({
     } catch (error) {
       console.error(error)
       const msg = error instanceof Error ? error.message : 'Erro ao enviar pedido'
-      showToast.error(enriquecerMensagemErroComNomesProdutos(msg, itens))
+      const indisponivel = resolverProdutoIndisponivelDoErro(msg, itens)
+      if (indisponivel) {
+        setProdutoIndisponivel(indisponivel)
+      } else {
+        showToast.error(enriquecerMensagemErroComNomesProdutos(msg, itens))
+      }
       return { ok: false }
     } finally {
       setEnviando(false)
@@ -198,6 +215,7 @@ export function useCheckoutPedido({
     telefoneDigitsRef,
     setClienteLookup,
     setForaCoberturaDialogAberto,
+    setProdutoIndisponivel,
   ])
 
   return {

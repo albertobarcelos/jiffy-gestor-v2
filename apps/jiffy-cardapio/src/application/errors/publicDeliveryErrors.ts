@@ -133,6 +133,76 @@ export function enriquecerMensagemErroComNomesProdutos(
   return out
 }
 
+export type ProdutoIndisponivelCarrinho = {
+  produtoIds: string[]
+  nomes: string[]
+}
+
+/** Erros de cotação/pedido quando o item do carrinho não pode mais ser vendido. */
+export function isErroProdutoIndisponivelCheckout(message: string): boolean {
+  const m = message.toLowerCase()
+  return (
+    m.includes('não está ativo') ||
+    m.includes('nao esta ativo') ||
+    m.includes('não encontrado no menu') ||
+    m.includes('nao encontrado no menu')
+  )
+}
+
+/**
+ * Identifica produtos do carrinho citados no erro da API
+ * (pausado no menu, soft delete ou base inativo).
+ */
+export function resolverProdutoIndisponivelDoErro(
+  message: string,
+  produtos: ReadonlyArray<{ produtoId: string; produtoNome: string }>
+): ProdutoIndisponivelCarrinho | null {
+  if (!isErroProdutoIndisponivelCheckout(message) || produtos.length === 0) {
+    return null
+  }
+
+  const porId = new Map<string, string>()
+  for (const p of produtos) {
+    const id = p.produtoId.trim()
+    const nome = p.produtoNome.trim()
+    if (id) porId.set(id, nome || id)
+  }
+
+  const idsEncontrados: string[] = []
+  for (const id of [...porId.keys()].sort((a, b) => b.length - a.length)) {
+    if (message.includes(id)) idsEncontrados.push(id)
+  }
+
+  if (idsEncontrados.length === 0) {
+    for (const [id, nome] of porId) {
+      if (nome && message.includes(nome)) idsEncontrados.push(id)
+    }
+  }
+
+  if (idsEncontrados.length === 0) {
+    const match =
+      message.match(/Produto não está ativo(?: no menu)?:\s*(.+)$/i) ??
+      message.match(/Produto\s+(.+?)\s+n[aã]o encontrado no menu/i)
+    const token = match?.[1]?.trim()
+    if (token) {
+      for (const [id, nome] of porId) {
+        if (id === token || nome === token) idsEncontrados.push(id)
+      }
+      if (idsEncontrados.length === 0) {
+        return { produtoIds: [], nomes: [token] }
+      }
+    }
+  }
+
+  if (idsEncontrados.length === 0) return null
+
+  const unicos = [...new Set(idsEncontrados)]
+  return {
+    produtoIds: unicos,
+    nomes: unicos.map(id => porId.get(id) ?? id),
+  }
+}
+
 /** Mensagens amigáveis para falhas na cotação pública (inclui rate limit 429). */
 export function formatarMensagemErroCotacaoPublica(
   status: number,
