@@ -25,8 +25,9 @@ function somaLancamentos(pagamentos: LancamentoPagamentoPedidoPublico[]): number
 }
 
 /**
- * Gate de finalização: lista vazia ou soma que não cobre o total.
- * Troco de dinheiro é validado no passo de pagamento; aqui exige cobertura sem overpay “cego”.
+ * Gate de finalização: lista vazia ou soma abaixo do total.
+ * Soma acima do total é cédula (troco); o backend exige cobranças >= valor da venda.
+ * Overpay de PIX/cartão é barrado no passo de pagamento, não aqui.
  */
 export function validarPagamentosPedidoPublico(
   pagamentos: LancamentoPagamentoPedidoPublico[],
@@ -36,7 +37,8 @@ export function validarPagamentosPedidoPublico(
     return { ok: false, error: MSG_PAGAMENTO_OBRIGATORIO_PEDIDO_PUBLICO }
   }
   const soma = somaLancamentos(pagamentos)
-  if (!pagamentosCobremTotalPedido(total, soma, 0)) {
+  const trocoImplicito = soma > total ? soma - total : 0
+  if (!pagamentosCobremTotalPedido(total, soma, trocoImplicito)) {
     return { ok: false, error: MSG_PAGAMENTO_INCOMPLETO_PEDIDO_PUBLICO }
   }
   return { ok: true }
