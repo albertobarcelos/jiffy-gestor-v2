@@ -10,6 +10,7 @@ import { NotificacoesWhatsAppDeliveryTab } from '@/src/presentation/components/f
 import { DeliveryNomeCardapioView } from './DeliveryNomeCardapioView'
 import { DeliveryAgendaView } from './DeliveryAgendaView'
 import { DeliveryDesignEtapaView } from './DeliveryDesignEtapaView'
+import { DeliveryIntegracoesView } from './DeliveryIntegracoesView'
 
 function DeliveryEtapaPainel({ children }: { children: ReactNode }) {
   return (
@@ -77,6 +78,14 @@ export function AgendaDeliveryEtapa() {
   return (
     <DeliveryEtapaPainel>
       <DeliveryAgendaView />
+    </DeliveryEtapaPainel>
+  )
+}
+
+export function IntegracoesDeliveryEtapa() {
+  return (
+    <DeliveryEtapaPainel>
+      <DeliveryIntegracoesView />
     </DeliveryEtapaPainel>
   )
 }

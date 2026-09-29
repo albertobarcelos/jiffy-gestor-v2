@@ -18,6 +18,7 @@ export type DeliveryHubPreviewFatoId =
   | 'entregadores'
   | 'meios'
   | 'impressoras'
+  | 'integracoes'
 
 export type DeliveryHubPreviewFato = {
   id: DeliveryHubPreviewFatoId
@@ -123,6 +124,15 @@ export function fatosPreviewHub(
     ]
   }
 
+  if (passo.id === 'delivery-integracoes') {
+    return [
+      {
+        id: 'integracoes',
+        texto: 'Aiqfome pronto para conectar nesta empresa.',
+      },
+    ]
+  }
+
   return [{ id: 'descricao', texto: passo.descricao }]
 }
 
@@ -133,6 +143,7 @@ export function ctaPrimarioPreviewHub(
   if (passo.id === 'delivery-notificacoes') {
     return passo.concluido ? 'Editar notificações' : 'Conectar WhatsApp'
   }
+  if (passo.id === 'delivery-integracoes') return 'Iniciar integração'
   if (passo.cta === 'Editar') return `Editar ${passo.titulo.toLowerCase()}`
   return passo.cta
 }
