@@ -987,6 +987,7 @@ export function DeliveryPublicoCarrinhoScreen({
             observacaoPedido={form.observacaoPedido}
             cpfNotaFiscal={form.cpfNotaFiscal}
             exigeCpfVenda={exigeCpfVenda}
+            cpfClienteCadastrado={clienteLookup.cliente?.cpf ?? null}
             enviando={enviando}
             etapaEnvio={etapaEnvio}
             onClose={fecharCheckout}

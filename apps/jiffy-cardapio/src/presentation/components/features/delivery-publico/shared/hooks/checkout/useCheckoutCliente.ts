@@ -48,6 +48,11 @@ type UseCheckoutClienteParams = {
   cotacaoSeqRef: MutableRefObject<number>
   setCotacao: Dispatch<SetStateAction<DeliveryCheckoutCotacaoState | null>>
   setCotacaoLoading: Dispatch<SetStateAction<boolean>>
+  /**
+   * Só pré-preenche `cpfNotaFiscal` no lookup quando a loja exige CPF.
+   * Com flag false, o CPF do cadastro fica para a revisão (se o cliente pedir NF).
+   */
+  exigeCpfVenda?: boolean
 }
 
 export function useCheckoutCliente({
@@ -59,6 +64,7 @@ export function useCheckoutCliente({
   cotacaoSeqRef,
   setCotacao,
   setCotacaoLoading,
+  exigeCpfVenda = false,
 }: UseCheckoutClienteParams) {
   const [clienteLookup, setClienteLookup] = useState<ClienteLookupState>(createInitialLookup)
   const lookupSeqRef = useRef(0)
@@ -142,7 +148,9 @@ export function useCheckoutCliente({
         const nome = nomeApi || prev.nome.trim() || ''
         const cpfDigits = cliente?.cpf?.replace(/\D/g, '').slice(0, 11) ?? ''
         const cpfNotaFiscal =
-          cpfDigits.length === 11 ? formatarCpfCnpjInput(cpfDigits) : ''
+          exigeCpfVenda && cpfDigits.length === 11
+            ? formatarCpfCnpjInput(cpfDigits)
+            : ''
 
         if (preferirNovoEnderecoRef.current) {
           return {
@@ -173,7 +181,7 @@ export function useCheckoutCliente({
         }
       })
     },
-    [setForm]
+    [exigeCpfVenda, setForm]
   )
 
   useEffect(() => {
@@ -182,7 +190,7 @@ export function useCheckoutCliente({
     if (!cliente) return
     const nomeApi = cliente.nome?.trim() ?? ''
     const cpfDigits = cliente.cpf?.replace(/\D/g, '').slice(0, 11) ?? ''
-    if (!nomeApi && cpfDigits.length !== 11) return
+    if (!nomeApi && !(exigeCpfVenda && cpfDigits.length === 11)) return
     const telConsultado = clienteLookup.telefoneConsultado
     if (!telConsultado) return
     const telForm = comporTelefoneApi(
@@ -196,7 +204,7 @@ export function useCheckoutCliente({
     setForm(prev => {
       const nextNome = prev.nome.trim() ? prev.nome : nomeApi
       const nextCpf =
-        cpfDigits.length === 11
+        exigeCpfVenda && cpfDigits.length === 11
           ? formatarCpfCnpjInput(cpfDigits)
           : prev.cpfNotaFiscal
       if (nextNome === prev.nome && nextCpf === prev.cpfNotaFiscal) return prev
@@ -206,6 +214,7 @@ export function useCheckoutCliente({
     clienteLookup.status,
     clienteLookup.cliente,
     clienteLookup.telefoneConsultado,
+    exigeCpfVenda,
     formRef,
     setForm,
   ])

@@ -7,6 +7,7 @@ import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/Ch
 import type { CotacaoPedidoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { ClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import {
+  enriquecerMensagemErroComNomesProdutos,
   formatarMensagemErroCotacaoPublica,
   isErroCoberturaEntregaPublica,
 } from '@/src/application/errors/publicDeliveryErrors'
@@ -178,7 +179,9 @@ export function useCheckoutCotacao({
 
           const exibirToast = !options?.silencioso || resultado.httpStatus === 429
           if (exibirToast) {
-            showToast.error(resultado.error)
+            showToast.error(
+              enriquecerMensagemErroComNomesProdutos(resultado.error, itens)
+            )
           }
           return {
             ok: false,
@@ -213,7 +216,7 @@ export function useCheckoutCotacao({
           return { ok: false, reason: 'fora_cobertura' }
         }
         if (!options?.silencioso) {
-          showToast.error(msg)
+          showToast.error(enriquecerMensagemErroComNomesProdutos(msg, itens))
         }
         return { ok: false, reason: 'erro' }
       } finally {

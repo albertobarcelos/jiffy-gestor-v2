@@ -114,6 +114,7 @@ export function useDeliveryCheckout(slug: string, options?: UseDeliveryCheckoutO
     cotacaoSeqRef: cotacaoApi.cotacaoSeqRef,
     setCotacao: cotacaoApi.setCotacao,
     setCotacaoLoading: cotacaoApi.setCotacaoLoading,
+    exigeCpfVenda: options?.exigeCpfVenda === true,
   })
 
   const {

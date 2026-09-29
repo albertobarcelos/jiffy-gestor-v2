@@ -103,6 +103,36 @@ export function isPublicDeliverySlugNotFound(error: unknown): boolean {
   )
 }
 
+/**
+ * Troca IDs de produto na mensagem da API pelos nomes do carrinho
+ * (ex.: "Produto não está ativo: cuid…" → "…: X-BACON").
+ * Sem alterar o backend — só melhora o toast no cardápio.
+ */
+export function enriquecerMensagemErroComNomesProdutos(
+  message: string,
+  produtos: ReadonlyArray<{ produtoId: string; produtoNome: string }>
+): string {
+  const msg = message.trim()
+  if (!msg || produtos.length === 0) return message
+
+  const porId = new Map<string, string>()
+  for (const p of produtos) {
+    const id = p.produtoId.trim()
+    const nome = p.produtoNome.trim()
+    if (id && nome) porId.set(id, nome)
+  }
+  if (porId.size === 0) return message
+
+  let out = message
+  // IDs mais longos primeiro evita colisão parcial improvável.
+  const ids = [...porId.keys()].sort((a, b) => b.length - a.length)
+  for (const id of ids) {
+    if (!out.includes(id)) continue
+    out = out.split(id).join(porId.get(id)!)
+  }
+  return out
+}
+
 /** Mensagens amigáveis para falhas na cotação pública (inclui rate limit 429). */
 export function formatarMensagemErroCotacaoPublica(
   status: number,

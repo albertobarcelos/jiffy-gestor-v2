@@ -4,7 +4,10 @@ import { useCallback, useMemo, useState } from 'react'
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
 import { isIdentificacaoCheckoutCompleta } from '../../../public/components/checkout/deliveryCheckoutProgress'
 import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
-import { isErroCoberturaEntregaPublica } from '@/src/application/errors/publicDeliveryErrors'
+import {
+  enriquecerMensagemErroComNomesProdutos,
+  isErroCoberturaEntregaPublica,
+} from '@/src/application/errors/publicDeliveryErrors'
 import { enviarPedidoPublicoUseCase } from '@/src/infrastructure/di/deliveryPublicoUseCases'
 import type { EtapaEnvioPedidoPublico } from '@/src/application/use-cases/delivery-publico/EnviarPedidoPublicoUseCase'
 import { usePublicDeliveryMeiosPagamento } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
@@ -154,7 +157,9 @@ export function useCheckoutPedido({
           if (isErroCoberturaEntregaPublica(resultado.error)) {
             setForaCoberturaDialogAberto(true)
           } else {
-            showToast.error(resultado.error)
+            showToast.error(
+              enriquecerMensagemErroComNomesProdutos(resultado.error, itens)
+            )
           }
         }
         return { ok: false }
@@ -173,7 +178,8 @@ export function useCheckoutPedido({
       return { ok: true, pedido: resultado.pedido }
     } catch (error) {
       console.error(error)
-      showToast.error(error instanceof Error ? error.message : 'Erro ao enviar pedido')
+      const msg = error instanceof Error ? error.message : 'Erro ao enviar pedido'
+      showToast.error(enriquecerMensagemErroComNomesProdutos(msg, itens))
       return { ok: false }
     } finally {
       setEnviando(false)
