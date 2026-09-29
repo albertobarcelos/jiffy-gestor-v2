@@ -152,9 +152,10 @@ function relogioCronometroPreparo(
   slaPreparoMinutos: number
 ): RelogioPedidoKanban {
   const minutosDecorridos = Math.floor(segundosDecorridos / 60)
-  const atrasoPreparo = minutosDecorridos > slaPreparoMinutos ? minutosDecorridos - slaPreparoMinutos : 0
+  const atrasoPreparo =
+    minutosDecorridos >= slaPreparoMinutos ? minutosDecorridos - slaPreparoMinutos : 0
   const tom: TomTempoPedidoKanban =
-    atrasoPreparo > 0
+    minutosDecorridos >= slaPreparoMinutos
       ? 'atraso'
       : minutosDecorridos >= slaPreparoMinutos - TEMPO_PREPARO_ALERTA_RESTANTE_MIN
         ? 'alerta'

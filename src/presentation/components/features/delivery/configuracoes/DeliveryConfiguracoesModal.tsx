@@ -487,7 +487,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
                   Tempo de preparo no quadro
                 </label>
                 <CupomCampoInfo
-                  texto="Prazo da coluna Em preparo. O cartão mostra o tempo restante e muda de cor quando falta pouco ou quando atrasa."
+                  texto="Prazo da coluna Em preparo. Laranja nos 10 minutos finais; vermelho ao chegar no prazo."
                   ariaLabel="Tempo de preparo no quadro"
                 />
               </div>

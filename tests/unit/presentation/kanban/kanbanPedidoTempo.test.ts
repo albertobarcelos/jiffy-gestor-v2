@@ -41,7 +41,7 @@ describe('relogioPedidoKanban — cronômetro de preparo', () => {
     const agoraMs = INICIO + 8 * 60_000
     const relogio = relogioPedidoKanban(venda, agoraMs, {
       colunaId: 'EM_PREPARO',
-      slaPreparoMinutos: 20,
+      slaPreparoMinutos: 30,
     })
     expect(relogio.rotuloDecorrido).toBe('08:00')
     expect(relogio.rotuloHa).toBe('08:00')
@@ -49,15 +49,21 @@ describe('relogioPedidoKanban — cronômetro de preparo', () => {
     expect(relogio.tom).toBe('ok')
   })
 
-  it('alerta quando o cronômetro chega perto do prazo da loja', () => {
+  it('fica laranja aos 20 minutos e vermelho ao chegar em 30', () => {
     const venda = criarVenda({ dataInicioPreparo: '2026-06-15T10:00:00.000Z' })
-    const agoraMs = INICIO + 16 * 60_000
-    const relogio = relogioPedidoKanban(venda, agoraMs, {
+    const alerta = relogioPedidoKanban(venda, INICIO + 20 * 60_000, {
       colunaId: 'EM_PREPARO',
-      slaPreparoMinutos: 20,
+      slaPreparoMinutos: 30,
     })
-    expect(relogio.rotuloDecorrido).toBe('16:00')
-    expect(relogio.tom).toBe('alerta')
+    expect(alerta.rotuloDecorrido).toBe('20:00')
+    expect(alerta.tom).toBe('alerta')
+
+    const atraso = relogioPedidoKanban(venda, INICIO + 30 * 60_000, {
+      colunaId: 'EM_PREPARO',
+      slaPreparoMinutos: 30,
+    })
+    expect(atraso.rotuloDecorrido).toBe('30:00')
+    expect(atraso.tom).toBe('atraso')
   })
 
   it('em Pronto congela o tempo entre início e fim do preparo', () => {
@@ -69,7 +75,7 @@ describe('relogioPedidoKanban — cronômetro de preparo', () => {
     const agoraMs = INICIO + 50 * 60_000
     const relogio = relogioPedidoKanban(venda, agoraMs, {
       colunaId: 'PRONTO_ENTREGA',
-      slaPreparoMinutos: 20,
+      slaPreparoMinutos: 30,
     })
     expect(relogio.rotuloDecorrido).toBe('12:00')
     expect(relogio.rotuloHa).toBe('12:00')
@@ -81,7 +87,7 @@ describe('relogioPedidoKanban — cronômetro de preparo', () => {
     const agoraMs = INICIO + 6 * 60_000 + 14_000
     const relogio = relogioPedidoKanban(venda, agoraMs, {
       colunaId: 'EM_PREPARO',
-      slaPreparoMinutos: 20,
+      slaPreparoMinutos: 30,
     })
     expect(relogio.rotuloDecorrido).toBe('06:14')
     expect(formatarCronometroMmSs(3661)).toBe('1:01:01')
@@ -102,7 +108,7 @@ describe('relogioPedidoKanban — cronômetro de preparo', () => {
     const agoraMs = INICIO + 50 * 60_000
     const relogio = relogioPedidoKanban(venda, agoraMs, {
       colunaId: 'PRONTO_ENTREGA',
-      slaPreparoMinutos: 20,
+      slaPreparoMinutos: 30,
     })
     expect(relogio.rotuloDecorrido).toBe('10min')
     expect(deveExibirCronometroPreparoKanban('PRONTO_ENTREGA', venda)).toBe(false)
