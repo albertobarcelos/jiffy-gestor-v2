@@ -97,7 +97,7 @@ describe('montarPedidoPublico + CreatePedidoPublicoInputSchema', () => {
     expect(result.payload.documentoCpfCnpj).toBeUndefined()
   })
 
-  it('sincroniza quantidade de complemento com a do produto no payload', () => {
+  it('expande receita de complemento para contrato UN no payload', () => {
     const result = montarPedidoPublico({
       slug: 'loja',
       itens: [

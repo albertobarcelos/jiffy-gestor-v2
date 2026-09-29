@@ -26,7 +26,8 @@ export type CarrinhoItemPublico = DeliveryCarrinhoItem
 
 type CarrinhosPorSlug = Record<string, DeliveryCarrinhoItem[]>
 
-const STORAGE_KEY = 'jiffy:delivery-publico-carrinhos'
+const STORAGE_KEY = 'jiffy:delivery-publico-carrinhos-v2'
+const PREVIOUS_STORAGE_KEY = 'jiffy:delivery-publico-carrinhos'
 const LEGACY_STORAGE_KEY = 'cardapio-publico-carrinhos'
 
 const CARRINHO_VAZIO: DeliveryCarrinhoItem[] = []
@@ -88,18 +89,59 @@ function montarItemNovo(
   }
 }
 
+function receitaAposSyncLegado<T extends { quantidade: number }>(
+  complementos: T[],
+  quantidadeProduto: number
+): T[] {
+  const qtdProd = Math.max(1, Math.floor(quantidadeProduto))
+  if (qtdProd <= 1 || complementos.length === 0) return complementos
+  return complementos.map(c => {
+    const qtdComp = Math.max(1, Math.floor(c.quantidade))
+    return qtdComp === qtdProd ? { ...c, quantidade: 1 } : c
+  })
+}
+
+function migrarPersistenciaCarrinhoV1(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw) as { state?: { carrinhos?: CarrinhosPorSlug } }
+    const carrinhos = parsed.state?.carrinhos
+    if (!carrinhos) return raw
+    const next: CarrinhosPorSlug = {}
+    for (const [slug, itens] of Object.entries(carrinhos)) {
+      next[slug] = itens.map(item => ({
+        ...item,
+        complementos: receitaAposSyncLegado(item.complementos ?? [], item.quantidade),
+      }))
+    }
+    return JSON.stringify({
+      ...parsed,
+      state: { ...parsed.state, carrinhos: next },
+    })
+  } catch {
+    return raw
+  }
+}
+
 const deliveryCarrinhoStorage: StateStorage = {
   getItem: name => {
     if (typeof window === 'undefined') return null
     const current = localStorage.getItem(name)
     if (current) return current
 
+    const previous = localStorage.getItem(PREVIOUS_STORAGE_KEY)
+    if (previous) {
+      const migrated = migrarPersistenciaCarrinhoV1(previous)
+      localStorage.setItem(name, migrated)
+      localStorage.removeItem(PREVIOUS_STORAGE_KEY)
+      return migrated
+    }
+
     const legacy = localStorage.getItem(LEGACY_STORAGE_KEY)
     if (!legacy) return null
 
-    localStorage.setItem(name, legacy)
+    localStorage.setItem(name, migrarPersistenciaCarrinhoV1(legacy))
     localStorage.removeItem(LEGACY_STORAGE_KEY)
-    return legacy
+    return localStorage.getItem(name)
   },
   setItem: (name, value) => {
     localStorage.setItem(name, value)

@@ -8,7 +8,10 @@ import {
   isErroCoberturaEntregaPublica,
   MSG_FORA_COBERTURA_ENTREGA_PUBLICA,
 } from '@/src/domain/policies/CoberturaEntregaPublica'
-import { calcularTotalComplementos } from '@/src/domain/services/pedido/CalculadoraPedido'
+import {
+  calcularTotalComplementos,
+  calcularTotalProduto,
+} from '@/src/domain/services/pedido/CalculadoraPedido'
 
 describe('LimiteEnderecosClienteDelivery', () => {
   it('bloqueia a partir do máximo', () => {
@@ -65,5 +68,26 @@ describe('CalculadoraPedido', () => {
       ],
     })
     expect(total).toBe(4)
+  })
+
+  it('cobra impacto da receita × quantidade do produto sem alterar a receita', () => {
+    const produto = {
+      produtoId: 'p1',
+      nome: 'Burger',
+      quantidade: 2,
+      valorUnitario: 39.9,
+      complementos: [
+        {
+          id: 'c1',
+          grupoId: 'g1',
+          nome: 'Farinha',
+          valor: 10,
+          quantidade: 1,
+          tipoImpactoPreco: 'diminui' as const,
+        },
+      ],
+    }
+    expect(calcularTotalComplementos(produto)).toBe(-10)
+    expect(calcularTotalProduto(produto)).toBeCloseTo(59.8, 5)
   })
 })

@@ -2,7 +2,6 @@ import {
   calcularTotalComplementos,
   calcularTotalProduto,
 } from '@/src/domain/services/pedido/CalculadoraPedido'
-import { sincronizarComplementosCarrinho } from '@/src/domain/policies/pedido/SincronizarComplementosQuantidadeProduto'
 import { itemCarrinhoParaProdutoSelecionado } from '@/src/application/mappers/CarrinhoDeliveryMapper'
 import { normalizeTipoImpactoPreco } from '@/src/shared/utils/normalizeTipoImpactoPreco'
 import type {
@@ -52,8 +51,8 @@ export function valorUnitarioBaseProduto(item: DeliveryCarrinhoItem): number {
 
 /**
  * Modelo canônico da linha: `valorUnitario` = base do produto;
- * quantidades de complemento absolutas na linha (sincronizadas com qtd do produto);
- * `valorTotal` = base×qtd + impacto dos complementos.
+ * quantidade do complemento = receita por unidade (não sobe com a qtd do produto);
+ * `valorTotal` = (base + impacto da receita) × qtd do produto.
  */
 export function recalcularLinhaCarrinho(
   item: Omit<DeliveryCarrinhoItem, 'id' | 'adicionadoEm' | 'valorUnitario' | 'valorTotal'> & {
@@ -61,7 +60,7 @@ export function recalcularLinhaCarrinho(
   }
 ): Omit<DeliveryCarrinhoItem, 'id' | 'adicionadoEm'> {
   const quantidade = Math.max(1, Math.floor(item.quantidade))
-  const complementos = sincronizarComplementosCarrinho(item.complementos, quantidade).map(c => ({
+  const complementos = item.complementos.map(c => ({
     ...c,
     valor: Math.abs(Number(c.valor) || 0),
     tipoImpactoPreco: normalizeTipoImpactoPreco(c.tipoImpactoPreco),

@@ -44,7 +44,7 @@ describe('calcularTotalComplementos', () => {
 })
 
 describe('sincronizarComplementosQuantidadeProduto', () => {
-  it('iguala complementos à qtd do produto quando > 1', () => {
+  it('expande receita para contrato UN só no payload (não no carrinho)', () => {
     const comps = sincronizarComplementosQuantidadeProduto(
       [{ id: 'c1', quantidade: 1 }],
       2
@@ -59,10 +59,18 @@ describe('sincronizarComplementosQuantidadeProduto', () => {
     )
     expect(comps[0].quantidade).toBe(2)
   })
+
+  it('multiplica a receita pela qtd do produto (não substitui)', () => {
+    const comps = sincronizarComplementosQuantidadeProduto(
+      [{ id: 'c1', quantidade: 2 }],
+      3
+    )
+    expect(comps[0].quantidade).toBe(6)
+  })
 })
 
 describe('recalcularLinhaCarrinho / legado', () => {
-  it('migra linha legada per-unit e mantém total com diminui', () => {
+  it('migra linha legada per-unit e mantém receita do complemento', () => {
     const legado: DeliveryCarrinhoItem = {
       id: '1',
       produtoId: 'prod-1',
@@ -88,11 +96,11 @@ describe('recalcularLinhaCarrinho / legado', () => {
     expect(valorUnitarioBaseProduto(legado)).toBeCloseTo(39.9, 5)
     const normalizado = normalizarItemCarrinho(legado)
     expect(normalizado.valorUnitario).toBeCloseTo(39.9, 5)
-    expect(normalizado.complementos[0].quantidade).toBe(2)
+    expect(normalizado.complementos[0].quantidade).toBe(1)
     expect(normalizado.valorTotal).toBeCloseTo(59.8, 5)
   })
 
-  it('monta linha nova com valor base e complemento absoluto', () => {
+  it('mantém receita do complemento ao recalcular com qtd do produto > 1', () => {
     const linha = recalcularLinhaCarrinho({
       produtoId: 'prod-1',
       produtoNome: 'BIG GOMES',
@@ -111,7 +119,7 @@ describe('recalcularLinhaCarrinho / legado', () => {
       ],
       valorUnitarioBase: 39.9,
     })
-    expect(linha.complementos[0].quantidade).toBe(2)
+    expect(linha.complementos[0].quantidade).toBe(1)
     expect(linha.valorTotal).toBeCloseTo(59.8, 5)
   })
 })
@@ -137,7 +145,7 @@ describe('deliveryCarrinhoStore atualizarQuantidade', () => {
     useDeliveryCarrinhoStore.setState({ carrinhos: {} })
   })
 
-  it('ao aumentar qtd sincroniza complemento e mantém diminui no total', () => {
+  it('ao aumentar qtd do produto não altera a receita do complemento', () => {
     const store = useDeliveryCarrinhoStore.getState()
     store.adicionarItem(slug, {
       produtoId: 'prod-1',
@@ -164,7 +172,7 @@ describe('deliveryCarrinhoStore atualizarQuantidade', () => {
 
     const [atualizado] = useDeliveryCarrinhoStore.getState().getItens(slug)
     expect(atualizado.quantidade).toBe(2)
-    expect(atualizado.complementos[0].quantidade).toBe(2)
+    expect(atualizado.complementos[0].quantidade).toBe(1)
     expect(atualizado.valorTotal).toBeCloseTo(59.8, 5)
   })
 })

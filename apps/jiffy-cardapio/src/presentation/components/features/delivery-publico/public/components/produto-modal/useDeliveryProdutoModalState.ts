@@ -3,7 +3,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CatalogoPublicoProdutoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { calcularTotalProduto } from '@/src/domain/services/pedido/CalculadoraPedido'
-import { sincronizarComplementosQuantidadeProduto } from '@/src/domain/policies/pedido/SincronizarComplementosQuantidadeProduto'
 import { itemCarrinhoParaProdutoSelecionado } from '@/src/application/mappers/CarrinhoDeliveryMapper'
 import { showToast } from '@/src/shared/utils/toast'
 import { useProdutoComplementos } from '../../../shared/hooks/useProdutoComplementos'
@@ -102,10 +101,6 @@ export function useDeliveryProdutoModalState({
   } = useProdutoComplementos(slug, produto, complementosIniciaisModal)
 
   const valorBaseProduto = resolverPrecosDeliveryProduto(produto).preco
-  const complementosParaLinha = sincronizarComplementosQuantidadeProduto(
-    complementosSelecionados,
-    quantidade
-  )
   const valorUnitario = valorBaseProduto
   const valorTotal = calcularTotalProduto(
     itemCarrinhoParaProdutoSelecionado(
@@ -115,7 +110,7 @@ export function useDeliveryProdutoModalState({
         quantidade,
         valorUnitario,
         observacoes: [],
-        complementos: complementosParaLinha,
+        complementos: complementosSelecionados,
       },
       { quantidade, valorUnitario }
     )
@@ -188,7 +183,7 @@ export function useDeliveryProdutoModalState({
         valorUnitario,
         valorTotal,
         observacoes,
-        complementos: complementosParaLinha,
+        complementos: complementosSelecionados,
       }
 
       if (itemEdicao) {

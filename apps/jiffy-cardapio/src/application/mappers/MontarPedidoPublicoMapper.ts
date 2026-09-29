@@ -112,6 +112,7 @@ function montarComposicaoPedidoPublico({
 
   const produtos = itens.map(item => {
     const quantidade = Math.max(1, Math.floor(item.quantidade))
+    // Carrinho guarda receita; cotação/UN cobra impacto × qtd do produto.
     const complementos = sincronizarComplementosQuantidadeProduto(
       item.complementos,
       quantidade

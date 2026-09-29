@@ -14,6 +14,7 @@ export function obterTotalComplemento(complemento: ComplementoSelecionado): numb
   return magnitudeValorComplemento(complemento.valor) * complemento.quantidade
 }
 
+/** Impacto da receita de complementos por 1 unidade do produto. */
 export function calcularTotalComplementos(produto: ProdutoSelecionado): number {
   return produto.complementos.reduce((sum, comp) => {
     const tipo = comp.tipoImpactoPreco || 'nenhum'
@@ -30,8 +31,9 @@ export function calcularTotalComplementos(produto: ProdutoSelecionado): number {
 }
 
 export function calcularTotalProduto(produto: ProdutoSelecionado): number {
-  const valorProduto = produto.valorUnitario * produto.quantidade
-  const valorComplementos = calcularTotalComplementos(produto)
+  const quantidade = Number.isFinite(produto.quantidade) ? produto.quantidade : 0
+  const valorProduto = produto.valorUnitario * quantidade
+  const valorComplementos = calcularTotalComplementos(produto) * quantidade
   const subtotal = valorProduto + valorComplementos
 
   let valorDesconto = 0

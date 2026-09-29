@@ -1,8 +1,9 @@
 import type { ItemCarrinhoComplemento } from '@/src/domain/types/carrinho'
 
 /**
- * Cardápio público é sempre UN: com qtd do produto > 1, cada complemento
- * na linha deve ter a mesma quantidade (contrato alinhado ao PDV / cotação).
+ * Expande a receita por unidade para o contrato UN do backend/cotação.
+ * Não usar no carrinho nem no modal: lá a quantidade do complemento é receita
+ * e não sobe com a quantidade do produto.
  */
 export function sincronizarComplementosQuantidadeProduto<T extends { quantidade: number }>(
   complementos: T[],
@@ -13,7 +14,7 @@ export function sincronizarComplementosQuantidadeProduto<T extends { quantidade:
   if (qtdProd <= 1) return complementos
   return complementos.map(comp => ({
     ...comp,
-    quantidade: qtdProd,
+    quantidade: Math.max(1, Math.floor(comp.quantidade)) * qtdProd,
   }))
 }
 
