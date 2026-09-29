@@ -31,7 +31,7 @@ import {
 import type { CotacaoPedidoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { DELIVERY_PAIS_TELEFONE_PADRAO } from '@/src/shared/constants/deliveryPaisesTelefone'
 import { findCatalogoProdutoById } from '../../shared/utils/findCatalogoProdutoById'
-import { resolverProdutosAusentesDoCatalogo } from '../../shared/utils/resolverProdutosAusentesDoCatalogo'
+import { resolverProdutosAusentesDoCatalogo } from '@/src/domain/policies/ProdutoIndisponivelCheckoutPublico'
 import { itemSemComplemento } from '../../shared/utils/deliveryCarrinhoItemUtils'
 import {
   avaliarComplementosItemCarrinho,
@@ -290,6 +290,16 @@ export function DeliveryPublicoCarrinhoScreen({
     [catalogQuery.data?.pages]
   )
 
+  const idsProdutosCatalogo = useMemo(() => {
+    const ids = new Set<string>()
+    for (const grupo of grupos) {
+      for (const produto of grupo.produtos) {
+        if (produto.id) ids.add(produto.id)
+      }
+    }
+    return ids
+  }, [grupos])
+
   const produtoEdicao = useMemo(() => {
     if (!itemEditando) return null
     return findCatalogoProdutoById(grupos, itemEditando.produtoId)
@@ -479,13 +489,13 @@ export function DeliveryPublicoCarrinhoScreen({
     if (catalogQuery.isLoading || catalogQuery.isFetchingNextPage || catalogQuery.hasNextPage) {
       return
     }
-    if (grupos.length === 0) return
-    const ausentes = resolverProdutosAusentesDoCatalogo(itens, grupos)
+    if (idsProdutosCatalogo.size === 0) return
+    const ausentes = resolverProdutosAusentesDoCatalogo(itens, idsProdutosCatalogo)
     if (ausentes) setProdutoIndisponivel(ausentes)
   }, [
     produtoIndisponivel,
     itens,
-    grupos,
+    idsProdutosCatalogo,
     catalogQuery.isLoading,
     catalogQuery.isFetchingNextPage,
     catalogQuery.hasNextPage,

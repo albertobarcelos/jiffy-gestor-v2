@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   isErroProdutoIndisponivelCheckout,
   resolverProdutoIndisponivelDoErro,
-} from '@/src/application/errors/publicDeliveryErrors'
+  resolverProdutosAusentesDoCatalogo,
+} from '@/src/domain/policies/ProdutoIndisponivelCheckoutPublico'
 
-describe('resolverProdutoIndisponivelDoErro', () => {
+describe('ProdutoIndisponivelCheckoutPublico', () => {
   const itens = [
     { produtoId: 'cmt78pfra00chpb01xoms3k05', produtoNome: 'X-BACON' },
     { produtoId: 'outro-id', produtoNome: 'Água' },
@@ -49,5 +50,29 @@ describe('resolverProdutoIndisponivelDoErro', () => {
   it('retorna null para outros erros', () => {
     expect(resolverProdutoIndisponivelDoErro('Telefone inválido', itens)).toBeNull()
     expect(isErroProdutoIndisponivelCheckout('Telefone inválido')).toBe(false)
+  })
+
+  it('lista itens do carrinho ausentes do catálogo', () => {
+    expect(
+      resolverProdutosAusentesDoCatalogo(
+        [
+          { produtoId: 'ativo-1', produtoNome: 'Burger' },
+          { produtoId: 'pausado-2', produtoNome: 'X-BACON' },
+        ],
+        new Set(['ativo-1'])
+      )
+    ).toEqual({
+      produtoIds: ['pausado-2'],
+      nomes: ['X-BACON'],
+    })
+  })
+
+  it('retorna null quando todos estão no catálogo', () => {
+    expect(
+      resolverProdutosAusentesDoCatalogo(
+        [{ produtoId: 'ativo-1', produtoNome: 'Burger' }],
+        new Set(['ativo-1'])
+      )
+    ).toBeNull()
   })
 })
