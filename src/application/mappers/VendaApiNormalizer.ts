@@ -62,7 +62,7 @@ export function rotuloOrigemParaExibicao(origem: OrigemVenda | null, origemBruta
 
 export function normalizeTipoImpactoPreco(raw: unknown): 'aumenta' | 'diminui' | 'nenhum' {
   if (!raw) return 'nenhum'
-  const tipo = String(raw).toLowerCase()
+  const tipo = String(raw).trim().toLowerCase()
   if (tipo === 'aumenta' || tipo === 'increase') return 'aumenta'
   if (tipo === 'diminui' || tipo === 'decrease') return 'diminui'
   return 'nenhum'

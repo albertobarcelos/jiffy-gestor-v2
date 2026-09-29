@@ -27,4 +27,10 @@ describe('validarPagamentosPedidoPublico', () => {
       validarPagamentosPedidoPublico([{ meioPagamentoId: 'pix', valor: 40 }], 40)
     ).toEqual({ ok: true })
   })
+
+  it('aceita cédula acima do total (troco)', () => {
+    expect(
+      validarPagamentosPedidoPublico([{ meioPagamentoId: 'dinheiro', valor: 50 }], 30.5)
+    ).toEqual({ ok: true })
+  })
 })

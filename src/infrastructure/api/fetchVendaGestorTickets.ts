@@ -1,7 +1,7 @@
-import { carregarPayloadTicketsImpressaoDelivery } from '@/src/infrastructure/delivery/carregarPayloadTicketsImpressaoDelivery'
+import { carregarPayloadTicketsImpressaoDelivery } from '@/src/infrastructure/printing/criarCarregarPayloadTicketsImpressaoDelivery'
 import type { PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
 import type { VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
-import type { EmpresaMeResumo } from '@/src/presentation/hooks/useEmpresaMe'
+import type { EmpresaMeResumo } from '@/src/application/dto/EmpresaMeDTO'
 
 export type FetchVendaGestorTicketsResult =
   | { ok: true; data: VendaGestorTicketsResponse }

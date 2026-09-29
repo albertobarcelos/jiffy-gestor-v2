@@ -1,36 +1,52 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { MdAdd, MdCheck, MdComputer, MdDeliveryDining, MdEdit } from 'react-icons/md'
-import type { EstacaoImpressaoResumo } from '@/src/infrastructure/api/estacoesImpressaoApi'
-import { nomeEstacaoImpressaoPadrao } from '@/src/infrastructure/api/estacoesImpressaoApi'
+import Tooltip from '@mui/material/Tooltip'
+import { MdAdd, MdCheck, MdComputer, MdDeliveryDining, MdEdit, MdInfo } from 'react-icons/md'
+import type { EstacaoImpressaoResumo } from '@/src/domain/estacao-impressao/EstacaoImpressao'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { cn } from '@/src/shared/utils/cn'
-import { CupomCampoInfo } from './DeliveryModoPapelToggle'
+import { nomeEstacaoImpressaoPadrao } from './nomeEstacaoImpressaoPadrao'
 
-type DeliveryEstacaoDestePcCamposProps = {
+function CampoInfo({ texto, ariaLabel }: { texto: string; ariaLabel: string }) {
+  return (
+    <Tooltip title={texto} arrow placement="top">
+      <span
+        className="inline-flex cursor-help text-secondary-text transition-colors hover:text-primary-text"
+        aria-label={ariaLabel}
+      >
+        <MdInfo className="h-4 w-4" aria-hidden />
+      </span>
+    </Tooltip>
+  )
+}
+
+type EstacaoDestePcCamposProps = {
   estacoes: EstacaoImpressaoResumo[]
   estacaoId: string
-  receptoraEstacaoId: string | null
+  receptoraEstacaoId?: string | null
+  /** Coluna Principal do delivery. No balcão fica oculta. */
+  mostrarReceptora?: boolean
   disabled?: boolean
   ocupado?: boolean
-  onReceptoraChange: (estacaoId: string | null) => void
+  onReceptoraChange?: (estacaoId: string | null) => void
   onSelecionar: (estacaoId: string) => void
-  onCriar: (nome: string) => Promise<void>
+  onCriar: (nome: string) => Promise<EstacaoImpressaoResumo | void | undefined>
   onRenomear: (nome: string) => Promise<void>
 }
 
-export function DeliveryEstacaoDestePcCampos({
+export function EstacaoDestePcCampos({
   estacoes,
   estacaoId,
-  receptoraEstacaoId,
+  receptoraEstacaoId = null,
+  mostrarReceptora = true,
   disabled = false,
   ocupado = false,
   onReceptoraChange,
   onSelecionar,
   onCriar,
   onRenomear,
-}: DeliveryEstacaoDestePcCamposProps) {
+}: EstacaoDestePcCamposProps) {
   const [modoCriar, setModoCriar] = useState(false)
   const [modoRenomear, setModoRenomear] = useState(false)
   const [nomeNovo, setNomeNovo] = useState('')
@@ -60,7 +76,7 @@ export function DeliveryEstacaoDestePcCampos({
   }
 
   const handleToggleReceptora = (id: string, next: boolean) => {
-    if (bloqueado) return
+    if (bloqueado || !onReceptoraChange) return
     if (next) {
       onReceptoraChange(id)
       return
@@ -68,20 +84,24 @@ export function DeliveryEstacaoDestePcCampos({
     if (receptoraEstacaoId === id) onReceptoraChange(null)
   }
 
+  const gradeEstacao = mostrarReceptora
+    ? 'grid-cols-[minmax(0,1fr)_3.75rem_5.75rem]'
+    : 'grid-cols-[minmax(0,1fr)_3.75rem]'
+  const textoAjuda = mostrarReceptora
+    ? 'Em Deste PC, marque qual estação este computador configura. Em Principal, escolha a estação do delivery (só uma por loja). Salve para aplicar.'
+    : 'Delivery e balcão usam esta estação para registrar os lançamentos do caixa.'
+
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-1.5">
         <p className="text-sm font-semibold text-primary-text">Estações de impressão</p>
-        <CupomCampoInfo
-          texto="Em Deste PC, marque qual estação este computador configura. Em Principal, escolha a estação do delivery (só uma por loja). Salve para aplicar."
-          ariaLabel="Estações de impressão"
-        />
+        <CampoInfo texto={textoAjuda} ariaLabel="Estações de impressão" />
       </div>
 
       {modoCriar ? (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <input
-            id="delivery-estacao-nome-novo"
+            id="estacao-deste-pc-nome-novo"
             type="text"
             value={nomeNovo}
             disabled={bloqueado}
@@ -115,22 +135,23 @@ export function DeliveryEstacaoDestePcCampos({
         <>
           {estacoes.length > 0 ? (
             <div className="overflow-hidden rounded-lg border border-gray-200 bg-gray-100 p-0.5">
-              <div className="grid grid-cols-[minmax(0,1fr)_3.25rem_5.75rem] items-center gap-x-1 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-secondary-text">
+              <div
+                className={cn(
+                  'grid items-center gap-x-1 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-secondary-text',
+                  gradeEstacao
+                )}
+              >
                 <span>Estação</span>
-                <span className="flex items-center justify-center gap-0.5">
-                  Deste PC
-                  <CupomCampoInfo
-                    texto="Marca qual estação este computador configura. Impressoras físicas, caixa e vínculos abaixo valem só para a estação selecionada."
-                    ariaLabel="Estação deste computador"
-                  />
-                </span>
-                <span className="flex items-center justify-center gap-0.5">
-                  Principal
-                  <CupomCampoInfo
-                    texto="Estação principal do delivery: pedidos finalizados, caixa e impressão. Só uma por loja — ao ligar em uma, a outra desliga. Salve alterações para aplicar."
-                    ariaLabel="Estação principal do delivery"
-                  />
-                </span>
+                <span className="whitespace-nowrap text-center">Deste PC</span>
+                {mostrarReceptora ? (
+                  <span className="flex items-center justify-center gap-0.5">
+                    Principal
+                    <CampoInfo
+                      texto="Estação principal do delivery: pedidos finalizados, caixa e impressão. Só uma por loja — ao ligar em uma, a outra desliga. Salve alterações para aplicar."
+                      ariaLabel="Estação principal do delivery"
+                    />
+                  </span>
+                ) : null}
               </div>
               <div role="radiogroup" aria-label="Estação de impressão deste PC" className="space-y-0.5">
                 {estacoes.map(estacao => {
@@ -140,21 +161,22 @@ export function DeliveryEstacaoDestePcCampos({
                     <div
                       key={estacao.id}
                       className={cn(
-                        'grid grid-cols-[minmax(0,1fr)_3.25rem_5.75rem] items-center gap-x-1 rounded-md border transition-all',
+                        'grid items-center gap-x-1 rounded-md border px-3 transition-all',
+                        gradeEstacao,
                         ativa
                           ? 'border-secondary/30 bg-white shadow-sm ring-1 ring-secondary/20'
                           : 'border-transparent bg-transparent opacity-80'
                       )}
                     >
                       <button
-                        id={ativa ? 'delivery-estacao-select' : undefined}
+                        id={ativa ? 'estacao-deste-pc-select' : undefined}
                         type="button"
                         role="radio"
                         aria-checked={ativa}
                         disabled={bloqueado}
                         onClick={() => onSelecionar(estacao.id)}
                         className={cn(
-                          'flex min-w-0 items-center gap-2 truncate px-3 py-2 text-left text-sm transition-colors',
+                          'flex min-w-0 items-center gap-2 truncate py-2 pr-2 text-left text-sm transition-colors',
                           ativa
                             ? 'font-semibold text-primary-text'
                             : 'text-secondary-text hover:text-primary-text'
@@ -170,7 +192,7 @@ export function DeliveryEstacaoDestePcCampos({
                           {!estacao.ativo ? ' (inativa)' : ''}
                         </span>
                       </button>
-                      <div className="flex items-center justify-center py-1">
+                      <div className="flex items-center justify-center">
                         <button
                           type="button"
                           role="radio"
@@ -188,28 +210,30 @@ export function DeliveryEstacaoDestePcCampos({
                           {ativa ? <MdCheck className="h-4 w-4" aria-hidden /> : null}
                         </button>
                       </div>
-                      <div
-                        className="flex items-center justify-end gap-1 py-1 pr-1"
-                        onClick={e => e.stopPropagation()}
-                      >
-                        <JiffyIconSwitch
-                          checked={ehReceptora}
-                          onChange={e => handleToggleReceptora(estacao.id, e.target.checked)}
-                          disabled={bloqueado}
-                          size="xs"
-                          inputProps={{
-                            'aria-label': `${estacao.nome || 'Estação'} como principal do delivery`,
-                          }}
-                        />
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center">
-                          {ehReceptora ? (
-                            <MdDeliveryDining
-                              className="h-5 w-5 text-secondary"
-                              aria-hidden
-                            />
-                          ) : null}
-                        </span>
-                      </div>
+                      {mostrarReceptora ? (
+                        <div
+                          className="flex items-center justify-end gap-1 py-1 pr-1"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <JiffyIconSwitch
+                            checked={ehReceptora}
+                            onChange={e => handleToggleReceptora(estacao.id, e.target.checked)}
+                            disabled={bloqueado}
+                            size="xs"
+                            inputProps={{
+                              'aria-label': `${estacao.nome || 'Estação'} como principal do delivery`,
+                            }}
+                          />
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+                            {ehReceptora ? (
+                              <MdDeliveryDining
+                                className="h-5 w-5 text-secondary"
+                                aria-hidden
+                              />
+                            ) : null}
+                          </span>
+                        </div>
+                      ) : null}
                     </div>
                   )
                 })}
@@ -223,9 +247,19 @@ export function DeliveryEstacaoDestePcCampos({
             <div className="flex items-start gap-2 rounded-lg border border-secondary/25 bg-secondary/[0.06] px-3 py-2.5">
               <MdComputer className="mt-0.5 h-4 w-4 shrink-0 text-secondary" aria-hidden />
               <p className="text-xs leading-relaxed text-primary-text">
-                Você está configurando{' '}
-                <span className="font-semibold text-secondary">{selecionada.nome}</span> neste
-                computador. Os vínculos de impressora abaixo valem só para esta estação.
+                {mostrarReceptora ? (
+                  <>
+                    Você está configurando{' '}
+                    <span className="font-semibold text-secondary">{selecionada.nome}</span> neste
+                    computador. Os vínculos de impressora abaixo valem só para esta estação.
+                  </>
+                ) : (
+                  <>
+                    Este computador está na estação{' '}
+                    <span className="font-semibold text-secondary">{selecionada.nome}</span>.
+                    Delivery e balcão usam esta estação para registrar os lançamentos do caixa.
+                  </>
+                )}
               </p>
             </div>
           ) : null}
@@ -261,7 +295,7 @@ export function DeliveryEstacaoDestePcCampos({
       {estacaoId && selecionada && modoRenomear && !modoCriar ? (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <input
-            id="delivery-estacao-nome-edicao"
+            id="estacao-deste-pc-nome-edicao"
             type="text"
             value={nomeEdicao}
             disabled={bloqueado}

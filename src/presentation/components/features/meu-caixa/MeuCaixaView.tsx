@@ -21,9 +21,9 @@ import {
 import { useFecharCaixaEstacao } from '@/src/presentation/components/features/meu-caixa/hooks/useFecharCaixaEstacao'
 import { MovimentacaoCaixaHistorico } from './MovimentacaoCaixaHistorico'
 import {
-  useDeliveryConfigEstacaoImpressao,
-  useDeliveryConfigEstacoesImpressao,
-} from '@/src/presentation/hooks/useDeliveryConfigImpressaoQueries'
+  useEstacaoImpressaoDestePc,
+  useEstacoesImpressao,
+} from '@/src/presentation/hooks/useEstacaoImpressaoQueries'
 import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { imprimirFechamentoCaixaEstacaoPorId } from '@/src/infrastructure/printing/imprimirCupomFechamentoCaixaEstacao'
@@ -93,8 +93,8 @@ export function MeuCaixaView({
   onAbrirConfiguracaoEstacao?: () => void
 }) {
   const { estacaoId, lembrarNome } = useEstacaoDestePc()
-  const estacoesQuery = useDeliveryConfigEstacoesImpressao(Boolean(estacaoId))
-  const estacaoImpressaoQuery = useDeliveryConfigEstacaoImpressao(Boolean(estacaoId))
+  const estacoesQuery = useEstacoesImpressao(Boolean(estacaoId))
+  const estacaoImpressaoQuery = useEstacaoImpressaoDestePc(Boolean(estacaoId))
   const { preferenciasImpressaoDelivery } = usePreferenciasImpressaoDelivery()
   const atual = useCaixaEstacaoAtual(estacaoId)
   const aberta = atual.data?.aberta === true

@@ -7,7 +7,12 @@ import type {
   ItemCarrinhoDelivery,
 } from '@/src/domain/types/carrinho'
 import { generateUuid } from '@/src/shared/utils/generateUuid'
-import { encontrarItemIgual } from '../utils/deliveryCarrinhoItemUtils'
+import {
+  encontrarItemIgual,
+  normalizarItemCarrinho,
+  recalcularLinhaCarrinho,
+  valorUnitarioBaseProduto,
+} from '../utils/deliveryCarrinhoItemUtils'
 
 /** Alias de presentation sobre o tipo canônico de domínio. */
 export type DeliveryCarrinhoComplemento = ItemCarrinhoComplemento
@@ -21,7 +26,8 @@ export type CarrinhoItemPublico = DeliveryCarrinhoItem
 
 type CarrinhosPorSlug = Record<string, DeliveryCarrinhoItem[]>
 
-const STORAGE_KEY = 'jiffy:delivery-publico-carrinhos'
+const STORAGE_KEY = 'jiffy:delivery-publico-carrinhos-v2'
+const PREVIOUS_STORAGE_KEY = 'jiffy:delivery-publico-carrinhos'
 const LEGACY_STORAGE_KEY = 'cardapio-publico-carrinhos'
 
 const CARRINHO_VAZIO: DeliveryCarrinhoItem[] = []
@@ -39,19 +45,85 @@ function gerarIdItem(): string {
 function mesclarQuantidade(
   existente: DeliveryCarrinhoItem,
   quantidadeExtra: number,
-  valorUnitario: number,
+  valorUnitarioBase: number,
   extras?: Pick<DeliveryCarrinhoItem, 'precoRegular' | 'descontoPercentual'>
 ): DeliveryCarrinhoItem {
-  const quantidade = existente.quantidade + quantidadeExtra
-  return {
-    ...existente,
-    valorUnitario,
-    quantidade,
-    valorTotal: valorUnitario * quantidade,
+  const normalizado = normalizarItemCarrinho(existente)
+  const recalculado = recalcularLinhaCarrinho({
+    produtoId: normalizado.produtoId,
+    produtoNome: normalizado.produtoNome,
+    produtoImagemUrl: normalizado.produtoImagemUrl,
+    quantidade: normalizado.quantidade + quantidadeExtra,
+    observacoes: normalizado.observacoes,
+    complementos: normalizado.complementos,
+    valorUnitarioBase,
     precoRegular: extras?.precoRegular ?? existente.precoRegular,
     descontoPercentual: extras?.descontoPercentual ?? existente.descontoPercentual,
+  })
+  return {
+    ...recalculado,
+    id: normalizado.id,
     // Último lançamento — miniaturas do footer seguem esta ordem.
     adicionadoEm: new Date().toISOString(),
+  }
+}
+
+function montarItemNovo(
+  item: Omit<DeliveryCarrinhoItem, 'id' | 'adicionadoEm'>
+): DeliveryCarrinhoItem {
+  const base = valorUnitarioBaseProduto({
+    ...item,
+    id: 'tmp',
+    adicionadoEm: '',
+  })
+  const recalculado = recalcularLinhaCarrinho({
+    produtoId: item.produtoId,
+    produtoNome: item.produtoNome,
+    produtoImagemUrl: item.produtoImagemUrl,
+    quantidade: item.quantidade,
+    observacoes: item.observacoes,
+    complementos: item.complementos,
+    valorUnitarioBase: base,
+    precoRegular: item.precoRegular,
+    descontoPercentual: item.descontoPercentual,
+  })
+  return {
+    ...recalculado,
+    id: gerarIdItem(),
+    adicionadoEm: new Date().toISOString(),
+  }
+}
+
+function receitaAposSyncLegado<T extends { quantidade: number }>(
+  complementos: T[],
+  quantidadeProduto: number
+): T[] {
+  const qtdProd = Math.max(1, Math.floor(quantidadeProduto))
+  if (qtdProd <= 1 || complementos.length === 0) return complementos
+  return complementos.map(c => {
+    const qtdComp = Math.max(1, Math.floor(c.quantidade))
+    return qtdComp === qtdProd ? { ...c, quantidade: 1 } : c
+  })
+}
+
+function migrarPersistenciaCarrinhoV1(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw) as { state?: { carrinhos?: CarrinhosPorSlug } }
+    const carrinhos = parsed.state?.carrinhos
+    if (!carrinhos) return raw
+    const next: CarrinhosPorSlug = {}
+    for (const [slug, itens] of Object.entries(carrinhos)) {
+      next[slug] = itens.map(item => ({
+        ...item,
+        complementos: receitaAposSyncLegado(item.complementos ?? [], item.quantidade),
+      }))
+    }
+    return JSON.stringify({
+      ...parsed,
+      state: { ...parsed.state, carrinhos: next },
+    })
+  } catch {
+    return raw
   }
 }
 
@@ -61,12 +133,20 @@ const deliveryCarrinhoStorage: StateStorage = {
     const current = localStorage.getItem(name)
     if (current) return current
 
+    const previous = localStorage.getItem(PREVIOUS_STORAGE_KEY)
+    if (previous) {
+      const migrated = migrarPersistenciaCarrinhoV1(previous)
+      localStorage.setItem(name, migrated)
+      localStorage.removeItem(PREVIOUS_STORAGE_KEY)
+      return migrated
+    }
+
     const legacy = localStorage.getItem(LEGACY_STORAGE_KEY)
     if (!legacy) return null
 
-    localStorage.setItem(name, legacy)
+    localStorage.setItem(name, migrarPersistenciaCarrinhoV1(legacy))
     localStorage.removeItem(LEGACY_STORAGE_KEY)
-    return legacy
+    return localStorage.getItem(name)
   },
   setItem: (name, value) => {
     localStorage.setItem(name, value)
@@ -138,14 +218,23 @@ export const useDeliveryCarrinhoStore = create<DeliveryCarrinhoState>()(
       adicionarItem: (slug, item) =>
         set(state => {
           const atuais = state.carrinhos[slug] ?? []
-          const igual = encontrarItemIgual(atuais, item)
+          const candidato = {
+            ...item,
+            quantidade: Math.max(1, Math.floor(item.quantidade)),
+          }
+          const igual = encontrarItemIgual(atuais, candidato)
           if (igual) {
+            const base = valorUnitarioBaseProduto({
+              ...candidato,
+              id: 'tmp',
+              adicionadoEm: '',
+            })
             return {
               carrinhos: {
                 ...state.carrinhos,
                 [slug]: atuais.map(existing =>
                   existing.id === igual.id
-                    ? mesclarQuantidade(existing, item.quantidade, item.valorUnitario, {
+                    ? mesclarQuantidade(existing, candidato.quantidade, base, {
                         precoRegular: item.precoRegular,
                         descontoPercentual: item.descontoPercentual,
                       })
@@ -155,23 +244,34 @@ export const useDeliveryCarrinhoStore = create<DeliveryCarrinhoState>()(
             }
           }
 
-          const novo: DeliveryCarrinhoItem = {
-            ...item,
-            id: gerarIdItem(),
-            adicionadoEm: new Date().toISOString(),
-          }
           return {
-            carrinhos: { ...state.carrinhos, [slug]: [...atuais, novo] },
+            carrinhos: { ...state.carrinhos, [slug]: [...atuais, montarItemNovo(candidato)] },
           }
         }),
 
       atualizarQuantidade: (slug, itemId, quantidade) =>
         set(state => {
           const atuais = state.carrinhos[slug] ?? []
+          const qtd = Math.max(1, Math.floor(quantidade))
           const itens = atuais.map(item => {
             if (item.id !== itemId) return item
-            const valorTotal = item.valorUnitario * quantidade
-            return { ...item, quantidade, valorTotal }
+            const normalizado = normalizarItemCarrinho(item)
+            const recalculado = recalcularLinhaCarrinho({
+              produtoId: normalizado.produtoId,
+              produtoNome: normalizado.produtoNome,
+              produtoImagemUrl: normalizado.produtoImagemUrl,
+              quantidade: qtd,
+              observacoes: normalizado.observacoes,
+              complementos: normalizado.complementos,
+              valorUnitarioBase: normalizado.valorUnitario,
+              precoRegular: normalizado.precoRegular,
+              descontoPercentual: normalizado.descontoPercentual,
+            })
+            return {
+              ...recalculado,
+              id: normalizado.id,
+              adicionadoEm: normalizado.adicionadoEm,
+            }
           })
           return { carrinhos: { ...state.carrinhos, [slug]: itens } }
         }),
@@ -187,10 +287,19 @@ export const useDeliveryCarrinhoStore = create<DeliveryCarrinhoState>()(
       substituirItem: (slug, itemId, item) =>
         set(state => {
           const atuais = state.carrinhos[slug] ?? []
-          const igual = encontrarItemIgual(atuais, item, itemId)
+          const candidato = {
+            ...item,
+            quantidade: Math.max(1, Math.floor(item.quantidade)),
+          }
+          const base = valorUnitarioBaseProduto({
+            ...candidato,
+            id: 'tmp',
+            adicionadoEm: '',
+          })
+          const igual = encontrarItemIgual(atuais, candidato, itemId)
 
           if (igual) {
-            const mesclado = mesclarQuantidade(igual, item.quantidade, item.valorUnitario, {
+            const mesclado = mesclarQuantidade(igual, candidato.quantidade, base, {
               precoRegular: item.precoRegular,
               descontoPercentual: item.descontoPercentual,
             })
@@ -204,10 +313,21 @@ export const useDeliveryCarrinhoStore = create<DeliveryCarrinhoState>()(
             }
           }
 
+          const recalculado = recalcularLinhaCarrinho({
+            produtoId: candidato.produtoId,
+            produtoNome: candidato.produtoNome,
+            produtoImagemUrl: candidato.produtoImagemUrl,
+            quantidade: candidato.quantidade,
+            observacoes: candidato.observacoes,
+            complementos: candidato.complementos,
+            valorUnitarioBase: base,
+            precoRegular: candidato.precoRegular,
+            descontoPercentual: candidato.descontoPercentual,
+          })
           const itens = atuais.map(existing => {
             if (existing.id !== itemId) return existing
             return {
-              ...item,
+              ...recalculado,
               id: existing.id,
               adicionadoEm: existing.adicionadoEm,
             }
@@ -225,6 +345,14 @@ export const useDeliveryCarrinhoStore = create<DeliveryCarrinhoState>()(
       name: STORAGE_KEY,
       storage: createJSONStorage(() => deliveryCarrinhoStorage),
       partialize: state => ({ carrinhos: state.carrinhos }),
+      onRehydrateStorage: () => state => {
+        if (!state?.carrinhos) return
+        const next: CarrinhosPorSlug = {}
+        for (const [slug, itens] of Object.entries(state.carrinhos)) {
+          next[slug] = itens.map(normalizarItemCarrinho)
+        }
+        state.carrinhos = next
+      },
     }
   )
 )

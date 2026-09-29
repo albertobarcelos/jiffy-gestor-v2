@@ -11,7 +11,7 @@ import {
   useCancelarNotaFiscalVendaGestor,
   useTransicaoPedidoDelivery,
 } from '@/src/presentation/hooks/useVendas'
-import { getEstacaoImpressaoId } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
+import { estacaoDestePcStore } from '@/src/presentation/hooks/estacao-impressao/criarEstacaoDestePcUseCases'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { useMenuDeliveryId } from '@/src/presentation/hooks/useMenuDeliveryId'
@@ -109,7 +109,7 @@ export function useNovoPedidoOrchestrator({
       void invalidateCaixaEstacaoAtualQueries(
         queryClient,
         empresaId,
-        getEstacaoImpressaoId()
+        estacaoDestePcStore().obterId()
       )
     }
     onSuccess()
@@ -865,7 +865,7 @@ export function useNovoPedidoOrchestrator({
       meiosPagamento,
       nomesMeiosPagamentoPedido,
       telefoneCliente: telefoneBuscadoEntrega ?? undefined,
-      estacaoId: getEstacaoImpressaoId() ?? undefined,
+      estacaoId: estacaoDestePcStore().obterId() ?? undefined,
     },
     validacao: {
       pedidoDeliveryGestor,

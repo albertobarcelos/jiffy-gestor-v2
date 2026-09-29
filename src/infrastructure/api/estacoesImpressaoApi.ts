@@ -5,31 +5,13 @@ import {
   normalizarListaEstacoesImpressao,
 } from '@/src/infrastructure/api/normalizarEstacaoImpressaoResumo'
 import { normalizarListaMapeamentosEstacao } from '@/src/infrastructure/api/normalizarEstacaoImpressaoMapeamentos'
-import type { ModoImpressaoImpressora } from '@/src/domain/types/modoImpressaoImpressora'
-import type { EstacaoImpressaoMapeamento } from '@/src/shared/types/estacaoImpressao'
-import {
-  getEstacaoImpressaoId,
-  limparEstacaoImpressaoId,
-} from '@/src/infrastructure/printing/estacaoImpressaoStorage'
-
-export interface EstacaoImpressaoResumo {
-  id: string
-  nome: string
-  ativo: boolean
-  /** Quando true, esta estação recebe PEDIDO_DELIVERY_IMPRESSAO_SOLICITADA via Socket.IO. */
-  gestorDelivery: boolean
-}
-
-export type AtualizarEstacaoImpressaoPatch = {
-  nome?: string
-  ativo?: boolean
-  gestorDelivery?: boolean
-}
-
-export interface ImpressoraLogica {
-  id: string
-  nome: string
-}
+import type {
+  AtualizarEstacaoImpressaoPatch,
+  EstacaoImpressaoMapeamento,
+  EstacaoImpressaoResumo,
+  ImpressoraLogica,
+  MapeamentoEstacaoParaSalvar,
+} from '@/src/domain/estacao-impressao/EstacaoImpressao'
 
 export class EstacaoImpressaoApiError extends Error {
   constructor(
@@ -192,11 +174,7 @@ export async function buscarMapeamentosEstacao(
 export async function salvarMapeamentosEstacao(
   token: string,
   estacaoId: string,
-  mapeamentos: Array<{
-    impressoraId: string
-    nomeImpressoraWindows: string
-    modoImpressao: ModoImpressaoImpressora
-  }>
+  mapeamentos: MapeamentoEstacaoParaSalvar[]
 ): Promise<EstacaoImpressaoMapeamento[]> {
   const data = normalizarListaMapeamentosEstacao(
     await requestJson<unknown>(
@@ -211,76 +189,4 @@ export async function salvarMapeamentosEstacao(
   const id = estacaoId.trim()
   if (id) MAPEAMENTOS_ESTACAO_CACHE.set(id, data)
   return data
-}
-
-export interface EstacaoImpressaoConfigResolvida {
-  estacaoId: string
-  gestorDelivery: boolean
-  mapeamentos: EstacaoImpressaoMapeamento[]
-}
-
-async function resolverGestorDeliveryDaEstacao(
-  token: string,
-  estacaoId: string
-): Promise<boolean> {
-  const estacoes = await listarEstacoesImpressao(token).catch(() => [])
-  const encontrada = estacoes.find(e => e.id === estacaoId)
-  return encontrada?.gestorDelivery === true
-}
-
-/** Nome sugerido ao criar estação local (browser + data). */
-export function nomeEstacaoImpressaoPadrao(): string {
-  if (typeof window === 'undefined') return 'Estação Gestor'
-  const userAgent = window.navigator.userAgent
-  const browser =
-    userAgent.includes('Edg') ? 'Edge'
-    : userAgent.includes('Chrome') ? 'Chrome'
-    : userAgent.includes('Firefox') ? 'Firefox'
-    : 'Navegador'
-  return `Estação ${browser} - ${new Date().toLocaleDateString('pt-BR')}`
-}
-
-const CONFIG_VAZIA: EstacaoImpressaoConfigResolvida = {
-  estacaoId: '',
-  gestorDelivery: false,
-  mapeamentos: [],
-}
-
-/**
- * Carrega a estação escolhida neste PC (`localStorage`) e os mapeamentos.
- * Não cria estação automaticamente — o operador cadastra/seleciona no painel.
- */
-export async function resolverEstacaoImpressaoConfig(
-  token: string
-): Promise<EstacaoImpressaoConfigResolvida> {
-  const estacaoId = getEstacaoImpressaoId()
-  if (!estacaoId) return CONFIG_VAZIA
-
-  try {
-    const [mapeamentos, gestorDelivery] = await Promise.all([
-      buscarMapeamentosEstacao(token, estacaoId),
-      resolverGestorDeliveryDaEstacao(token, estacaoId),
-    ])
-    return { estacaoId, gestorDelivery, mapeamentos }
-  } catch (error) {
-    if (!isEstacaoImpressaoNotFoundError(error)) throw error
-    limparEstacaoImpressaoId()
-    return CONFIG_VAZIA
-  }
-}
-
-/**
- * Resolve a estação para o create da venda gestor.
- * Com token, revalida no backend e limpa ID inválido do storage.
- */
-export async function resolverEstacaoIdParaCriarVendaGestor(
-  token?: string | null
-): Promise<string | null> {
-  const access = token?.trim()
-  if (access) {
-    const cfg = await resolverEstacaoImpressaoConfig(access)
-    const id = cfg.estacaoId.trim()
-    return id || null
-  }
-  return getEstacaoImpressaoId()
 }

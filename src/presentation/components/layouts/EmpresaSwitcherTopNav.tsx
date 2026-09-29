@@ -64,7 +64,7 @@ export function EmpresaSwitcherTopNav({ variant }: EmpresaSwitcherTopNavProps) {
 
   return (
     <div
-      className="min-w-0 max-w-[7rem] px-2 py-1.5 sm:max-w-[9rem] sm:px-3 lg:max-w-[12rem] xl:max-w-[18rem] 2xl:max-w-[24rem]"
+      className="min-w-0 max-w-[6.5rem] px-2 py-1.5 sm:max-w-[8rem] sm:px-3 lg:max-w-[9rem] xl:max-w-[11rem] 2xl:max-w-[16rem]"
       title={nomeExibicao}
     >
       <span className="block truncate whitespace-nowrap border-l border-gray-200 pl-2 text-xs font-semibold text-primary-text sm:pl-3 sm:text-sm">

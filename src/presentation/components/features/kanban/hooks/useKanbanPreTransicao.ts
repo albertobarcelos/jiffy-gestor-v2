@@ -8,7 +8,7 @@ import { useImpressaoDelivery } from '../../delivery/hooks/useImpressaoDelivery'
 import { confirmarCobrancaPendentePedidoDeliveryUseCase } from '@/src/infrastructure/composition/pedidoUseCases'
 import { invalidarPedidoKanbanQuickViewCache } from '../../delivery/kanban-panels/carregarPedidoKanbanQuickView'
 import { validarImpressaoAntesTransicaoKanban } from '@/src/application/delivery/validarImpressaoAntesTransicaoKanban'
-import { carregarPayloadTicketsImpressaoDelivery } from '@/src/infrastructure/delivery/carregarPayloadTicketsImpressaoDelivery'
+import { carregarPayloadTicketsImpressaoDelivery } from '@/src/infrastructure/printing/criarCarregarPayloadTicketsImpressaoDelivery'
 import {
   extrairPatchKanbanDeRespostaTransicao,
   extrairVendaUnificadaDeRespostaDeliverySummary,

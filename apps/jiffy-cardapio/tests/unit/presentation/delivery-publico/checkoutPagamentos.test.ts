@@ -283,7 +283,7 @@ describe('montarPedidoPublico cobrancas', () => {
     ).toBe(false)
   })
 
-  it('envia CPF no cliente e em documentoCpfCnpj quando completo', () => {
+  it('envia CPF só em documentoCpfCnpj quando completo', () => {
     const result = montarPedidoPublico({
       slug: 'loja',
       itens: [itemCarrinho],

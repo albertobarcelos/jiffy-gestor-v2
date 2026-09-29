@@ -6,8 +6,8 @@ import { resolverTaxaEntregaValorSync } from '@/src/application/mappers/VendaDet
 import { resolverTrocoLevarPedidoEntrega } from '@/src/application/mappers/resolverTrocoLevarPedidoEntrega'
 import type { EnderecoEntregaDetalhe } from '@/src/domain/types/vendaDetalhe'
 import type { PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
-import { isTcpPrinterRef } from '@/src/domain/printing/tcpPrinterRef'
-import type { EstacaoImpressaoMapeamento } from '@/src/shared/types/estacaoImpressao'
+import type { EstacaoImpressaoMapeamento } from '@/src/domain/estacao-impressao/EstacaoImpressao'
+import { isTcpPrinterRef } from '@/src/domain/estacao-impressao/tcpPrinterRef'
 import type { InstrucoesImpressaoResponse } from '@/src/shared/types/instrucoesImpressao'
 import type {
   VendaGestorTicket,
@@ -25,9 +25,14 @@ import {
   type ModoImpressaoImpressora,
 } from '@/src/domain/types/modoImpressaoImpressora'
 import {
+  magnitudeValorComplementoLancamento,
+  valorAssinadoComplementoImpressao,
+} from '@/src/application/delivery/valorComplementoImpressao'
+import {
   planejarTicketsProducaoImpressora,
   ticketIdViaProducao,
 } from '@/src/application/delivery/planejarTicketsProducaoImpressora'
+import { normalizeTipoImpactoPreco } from '@/src/application/mappers/VendaApiNormalizer'
 import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
 
 function asRecord(v: unknown): Record<string, unknown> | null {
@@ -123,17 +128,23 @@ function produtoLancadoAtivo(pl: Record<string, unknown>): boolean {
 
 function mapComplemento(c: Record<string, unknown>): VendaGestorTicketItemComplemento {
   const quantidade = numeroFinito(c.quantidade) || 1
-  const valorUnitario = numeroFinito(c.valorUnitario)
+  const tipoImpactoPreco = normalizeTipoImpactoPreco(c.tipoImpactoPreco)
+  const magnitude = magnitudeValorComplementoLancamento(c)
+  const { valorUnitario, valorFinal } = valorAssinadoComplementoImpressao(
+    tipoImpactoPreco,
+    magnitude,
+    quantidade
+  )
   return {
     nome: asStr(c.nomeComplemento) || asStr(c.nome),
     quantidade,
     complementoId: asStr(c.complementoId) || asStr(c.id) || undefined,
-    tipoImpactoPreco: asStr(c.tipoImpactoPreco) || undefined,
+    tipoImpactoPreco,
     impressao: {
       quantidade,
       valorUnitario,
-      valorFinal: quantidade * valorUnitario,
-      valorTotal: quantidade * valorUnitario,
+      valorFinal,
+      valorTotal: valorFinal,
     },
   }
 }
@@ -181,7 +192,12 @@ function buildResumoPedido(
         const r = asRecord(c)
         if (!r) return ss
         const q = numeroFinito(r.quantidade) || 1
-        return ss + q * numeroFinito(r.valorUnitario)
+        const { valorFinal } = valorAssinadoComplementoImpressao(
+          r.tipoImpactoPreco,
+          magnitudeValorComplementoLancamento(r),
+          q
+        )
+        return ss + valorFinal
       }, 0)
     )
   }, 0)

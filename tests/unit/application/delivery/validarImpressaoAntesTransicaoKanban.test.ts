@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { CarregarPayloadTicketsImpressao } from '@/src/application/delivery/carregarPayloadTicketsImpressaoDelivery'
 import { validarImpressaoAntesTransicaoKanban } from '@/src/application/delivery/validarImpressaoAntesTransicaoKanban'
-import type { CarregarPayloadTicketsImpressaoDelivery } from '@/src/application/delivery/carregarPayloadTicketsImpressaoDelivery'
 import {
   TOAST_IMPRESSORA_PRODUCAO_MAPEAMENTO_WINDOWS,
   TOAST_QUADRO_SEGUE_SEM_EXPEDICAO_ESCOLHIDA,
@@ -8,7 +8,7 @@ import {
 import type { PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
 import type { VendaGestorTicket, VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
 
-const carregarMock = vi.fn<CarregarPayloadTicketsImpressaoDelivery>()
+const carregarMock = vi.fn<CarregarPayloadTicketsImpressao>()
 
 const prefsSeparado: PreferenciasImpressaoDelivery = {
   modo: 'separado',

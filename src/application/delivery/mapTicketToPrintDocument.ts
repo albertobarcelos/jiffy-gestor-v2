@@ -25,6 +25,7 @@ import {
   sectionFeedLines,
   telefoneWhatsappE164,
 } from '@/src/application/delivery/cupomPrintLayout'
+import { valorComplementoParaExibicaoCupom } from '@/src/application/delivery/valorComplementoImpressao'
 import {
   detalheLinhasItemPedido,
   textoEscPosProducao,
@@ -91,13 +92,16 @@ function valorItem(item: VendaGestorTicketItem): number | null {
 }
 
 function valorComplemento(comp: {
+  tipoImpactoPreco?: string | null
+  quantidade?: number | null
   impressao?: {
     valorFinal?: number | null
     valorTotal?: number | null
     valorUnitario?: number | null
+    quantidade?: number | null
   } | null
 } | null): number | null {
-  return numeroFinito(comp?.impressao?.valorFinal ?? comp?.impressao?.valorTotal ?? comp?.impressao?.valorUnitario)
+  return valorComplementoParaExibicaoCupom(comp)
 }
 
 function nomeEmpresa(root: VendaGestorTicketsResponse, fallback: string): string {

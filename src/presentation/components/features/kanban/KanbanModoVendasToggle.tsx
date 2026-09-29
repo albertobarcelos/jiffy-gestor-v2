@@ -20,13 +20,13 @@ export function KanbanModoVendasToggle({
     <div
       role="group"
       aria-label="Modo de visualização do quadro de vendas"
-      className={`inline-flex rounded-lg border border-gray-200 bg-gray-100 p-0.5 shadow-sm ${className}`}
+      className={`inline-flex min-w-max shrink-0 rounded-lg border border-gray-200 bg-gray-100 p-0.5 shadow-sm ${className}`}
     >
       <button
         type="button"
         aria-pressed={value === 'delivery'}
         onClick={() => onChange('delivery')}
-        className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+        className={`min-w-max shrink-0 whitespace-nowrap rounded-md px-3.5 py-1.5 text-xs font-semibold transition-colors ${
           value === 'delivery'
             ? 'bg-white text-primary shadow-sm'
             : 'text-gray-600 hover:text-gray-900'
@@ -38,7 +38,7 @@ export function KanbanModoVendasToggle({
         type="button"
         aria-pressed={value === 'balcao'}
         onClick={() => onChange('balcao')}
-        className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+        className={`min-w-max shrink-0 whitespace-nowrap rounded-md px-3.5 py-1.5 text-xs font-semibold transition-colors ${
           value === 'balcao'
             ? 'bg-white text-primary shadow-sm'
             : 'text-gray-600 hover:text-gray-900'

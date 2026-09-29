@@ -31,7 +31,6 @@ export const cotarPedidoPublicoUseCase = new CotarPedidoPublicoUseCase(
 
 export const enviarPedidoPublicoUseCase = new EnviarPedidoPublicoUseCase(
   publicDeliveryPedidoAdapter,
-  publicDeliveryClienteAdapter,
   garantirEnderecoEntregaPublicoUseCase,
   garantirClienteDeliveryPublicoUseCase
 )

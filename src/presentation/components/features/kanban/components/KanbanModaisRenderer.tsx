@@ -136,7 +136,7 @@ export function KanbanModaisRenderer({
   return (
     <>
       {deliveryConfiguracoesOpen ? (
-        configuracaoEstacaoCaixa || modoKanbanVendas === 'delivery' ? (
+        modoKanbanVendas === 'delivery' ? (
           <DeliveryConfiguracoesModal open onClose={onCloseDeliveryConfiguracoes} />
         ) : (
           <KanbanBalcaoConfiguracoesModal open onClose={onCloseDeliveryConfiguracoes} />
