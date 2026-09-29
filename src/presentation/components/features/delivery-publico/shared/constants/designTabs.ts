@@ -1,7 +1,11 @@
 import type { IconType } from 'react-icons'
 import {
+  MdCategory,
+  MdDashboard,
   MdImage,
   MdMenuBook,
+  MdPalette,
+  MdTextFields,
   MdViewModule,
 } from 'react-icons/md'
 import { deliveryHubEtapaPath } from '@/src/shared/constants/configuracoesRoutes'
@@ -26,11 +30,38 @@ export const DESIGN_MODELOS_ABA_QUERY_KEY = 'aba'
 
 export type DesignModelosAbaId = 'layout' | 'cores' | 'tipografias' | 'categorias'
 
-export const DESIGN_MODELOS_ABAS: { id: DesignModelosAbaId; label: string }[] = [
-  { id: 'layout', label: 'Layout' },
-  { id: 'cores', label: 'Cores' },
-  { id: 'tipografias', label: 'Tipografias' },
-  { id: 'categorias', label: 'Categorias' },
+export type DesignModelosAbaDefinition = {
+  id: DesignModelosAbaId
+  label: string
+  descricao: string
+  icon: IconType
+}
+
+export const DESIGN_MODELOS_ABAS: DesignModelosAbaDefinition[] = [
+  {
+    id: 'layout',
+    label: 'Layout',
+    descricao: 'Estrutura do catálogo na loja pública.',
+    icon: MdDashboard,
+  },
+  {
+    id: 'cores',
+    label: 'Cores',
+    descricao: 'Paleta de cores do cardápio.',
+    icon: MdPalette,
+  },
+  {
+    id: 'tipografias',
+    label: 'Tipografias',
+    descricao: 'Fontes dos títulos e dos textos.',
+    icon: MdTextFields,
+  },
+  {
+    id: 'categorias',
+    label: 'Categorias',
+    descricao: 'Ordem e aparência dos grupos do cardápio.',
+    icon: MdCategory,
+  },
 ]
 
 export type DeliveryDesignSectionTabId =
@@ -41,7 +72,7 @@ export type DeliveryDesignSectionTabId =
   | 'delivery-design-tipografias'
   | 'delivery-design-categorias'
 
-/** Seções do lobby/submenu (Cores, Tipografias e Categorias ficam como abas em Modelos). */
+/** Seções do lobby/submenu de Personalizar Loja. Modelos abre um lobby próprio. */
 export const DESIGN_TABS: DesignTabDefinition[] = [
   {
     id: 'cardapio',
@@ -151,9 +182,9 @@ export function deliveryHubDesignSectionPath(section: DesignTabId): string {
   return `${deliveryHubDesignPath()}?${DESIGN_SECTION_QUERY_KEY}=${section}`
 }
 
-/** Path de Modelos com aba opcional (`layout` omitido na URL). */
-export function deliveryHubDesignModelosPath(aba: DesignModelosAbaId = 'layout'): string {
+/** Lobby de Modelos, ou uma opção (`layout`, `cores`, `tipografias`, `categorias`). */
+export function deliveryHubDesignModelosPath(aba?: DesignModelosAbaId): string {
   const base = `${deliveryHubDesignPath()}?${DESIGN_SECTION_QUERY_KEY}=modelos`
-  if (aba === 'layout') return base
+  if (!aba) return base
   return `${base}&${DESIGN_MODELOS_ABA_QUERY_KEY}=${aba}`
 }

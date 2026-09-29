@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   DESIGN_MODELOS_ABA_QUERY_KEY,
+  DESIGN_MODELOS_ABAS,
   DESIGN_SECTION_QUERY_KEY,
   DESIGN_TABS,
   designSectionFromTabId,
@@ -37,6 +38,12 @@ describe('designTabs — lobby de cards e seções', () => {
     expect(DESIGN_TABS.find(tab => tab.id === 'modelos')?.labelMenu).toBe(
       'Modelos de Layout'
     )
+    expect(DESIGN_MODELOS_ABAS.map(aba => aba.id)).toEqual([
+      'layout',
+      'cores',
+      'tipografias',
+      'categorias',
+    ])
     expect(isDesignNavSectionId('categorias')).toBe(false)
     expect(isDesignTabId('categorias')).toBe(true)
     expect(isDesignTabId('cores')).toBe(true)
@@ -60,11 +67,14 @@ describe('designTabs — lobby de cards e seções', () => {
     expect(deliveryHubDesignSectionPath('categorias')).toBe(
       `/config/delivery/design?${DESIGN_SECTION_QUERY_KEY}=modelos&${DESIGN_MODELOS_ABA_QUERY_KEY}=categorias`
     )
-    expect(deliveryHubDesignModelosPath('tipografias')).toBe(
-      `/config/delivery/design?${DESIGN_SECTION_QUERY_KEY}=modelos&${DESIGN_MODELOS_ABA_QUERY_KEY}=tipografias`
+    expect(deliveryHubDesignModelosPath()).toBe(
+      `/config/delivery/design?${DESIGN_SECTION_QUERY_KEY}=modelos`
     )
     expect(deliveryHubDesignModelosPath('layout')).toBe(
-      `/config/delivery/design?${DESIGN_SECTION_QUERY_KEY}=modelos`
+      `/config/delivery/design?${DESIGN_SECTION_QUERY_KEY}=modelos&${DESIGN_MODELOS_ABA_QUERY_KEY}=layout`
+    )
+    expect(deliveryHubDesignModelosPath('tipografias')).toBe(
+      `/config/delivery/design?${DESIGN_SECTION_QUERY_KEY}=modelos&${DESIGN_MODELOS_ABA_QUERY_KEY}=tipografias`
     )
     expect(isDesignModelosAbaId('categorias')).toBe(true)
     expect(isDesignModelosAbaId('foo')).toBe(false)

@@ -2,6 +2,7 @@
 
 import { DESIGN_TABS } from '../../shared/constants/designTabs'
 import type { DesignTabId } from '../../shared/types/deliveryPublicoDesignConfig'
+import { DesignLobbyCard } from './DesignLobbyCard'
 
 type DesignSecoesCardsProps = {
   onAbrirSecao: (section: DesignTabId) => void
@@ -18,23 +19,12 @@ export function DesignSecoesCards({ onAbrirSecao }: DesignSecoesCardsProps) {
       <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {DESIGN_TABS.map(tab => (
           <li key={tab.id}>
-            <button
-              type="button"
+            <DesignLobbyCard
+              icon={tab.icon}
+              title={tab.label}
+              description={tab.descricao}
               onClick={() => onAbrirSecao(tab.id)}
-              className="group flex h-full w-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-center shadow-sm transition-all hover:border-alternate/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alternate/40"
-            >
-              <span className="flex min-h-[9rem] w-full items-center justify-center bg-alternate/20 text-alternate transition-colors group-hover:bg-alternate/30">
-                <tab.icon className="h-16 w-16" aria-hidden />
-              </span>
-              <span className="flex flex-1 flex-col justify-center gap-1.5 px-4 py-5">
-                <span className="block text-base font-bold text-primary-text group-hover:text-alternate">
-                  {tab.label}
-                </span>
-                <span className="block text-sm leading-snug text-secondary-text">
-                  {tab.descricao}
-                </span>
-              </span>
-            </button>
+            />
           </li>
         ))}
       </ul>

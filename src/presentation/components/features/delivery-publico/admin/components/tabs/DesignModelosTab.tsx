@@ -1,18 +1,9 @@
 'use client'
 
-import { useCallback, type Dispatch, type SetStateAction } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import type { Dispatch, SetStateAction } from 'react'
 import type { DeliveryPublicoDesignConfig } from '../../../shared/types/deliveryPublicoDesignConfig'
 import type { DesignCategoriaGrupo } from '../../../shared/types/designCategoriaGrupo'
-import {
-  DESIGN_MODELOS_ABA_QUERY_KEY,
-  DESIGN_MODELOS_ABAS,
-  deliveryHubDesignModelosPath,
-  isDesignModelosAbaId,
-  type DesignModelosAbaId,
-} from '../../../shared/constants/designTabs'
-import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
-import { cn } from '@/src/shared/utils/cn'
+import type { DesignModelosAbaId } from '../../../shared/constants/designTabs'
 import { LAYOUT_MODELS } from '../../../shared/constants/layoutModels'
 import { DesignSelectableCard } from '../DesignSelectableCard'
 import { LayoutModelWireframe } from '../LayoutModelWireframe'
@@ -21,6 +12,7 @@ import { DesignTipografiasTab } from './DesignTipografiasTab'
 import { DesignCategoriasTab } from './DesignCategoriasTab'
 
 type DesignModelosTabProps = {
+  aba: DesignModelosAbaId
   config: DeliveryPublicoDesignConfig
   onChange: (updater: (current: DeliveryPublicoDesignConfig) => DeliveryPublicoDesignConfig) => void
   previewCategoriasGrupos: DesignCategoriaGrupo[]
@@ -60,6 +52,7 @@ function LayoutModelosPanel({
 }
 
 export function DesignModelosTab({
+  aba,
   config,
   onChange,
   previewCategoriasGrupos,
@@ -69,74 +62,25 @@ export function DesignModelosTab({
   categoriasGruposLoading,
   categoriasGruposError,
 }: DesignModelosTabProps) {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const { toGestao } = useGestaoPath()
-
-  const abaParam = searchParams.get(DESIGN_MODELOS_ABA_QUERY_KEY)
-  const activeAba: DesignModelosAbaId = isDesignModelosAbaId(abaParam)
-    ? abaParam
-    : 'layout'
-
-  const setAba = useCallback(
-    (aba: DesignModelosAbaId) => {
-      router.replace(toGestao(deliveryHubDesignModelosPath(aba)))
-    },
-    [router, toGestao]
-  )
-
+  if (aba === 'layout') {
+    return <LayoutModelosPanel config={config} onChange={onChange} />
+  }
+  if (aba === 'cores') {
+    return <DesignCoresTab config={config} onChange={onChange} />
+  }
+  if (aba === 'tipografias') {
+    return <DesignTipografiasTab config={config} onChange={onChange} />
+  }
   return (
-    <div className="space-y-4">
-      <div
-        role="tablist"
-        aria-label="Opções de modelos"
-        className="flex flex-wrap gap-1 border-b border-gray-200"
-      >
-        {DESIGN_MODELOS_ABAS.map(aba => {
-          const selected = activeAba === aba.id
-          return (
-            <button
-              key={aba.id}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              onClick={() => setAba(aba.id)}
-              className={cn(
-                '-mb-px border-b-2 px-3 py-2 text-sm font-semibold transition-colors',
-                selected
-                  ? 'border-alternate text-alternate'
-                  : 'border-transparent text-secondary-text hover:text-primary'
-              )}
-            >
-              {aba.label}
-            </button>
-          )
-        })}
-      </div>
-
-      <div role="tabpanel">
-        {activeAba === 'layout' ? (
-          <LayoutModelosPanel config={config} onChange={onChange} />
-        ) : null}
-        {activeAba === 'cores' ? (
-          <DesignCoresTab config={config} onChange={onChange} />
-        ) : null}
-        {activeAba === 'tipografias' ? (
-          <DesignTipografiasTab config={config} onChange={onChange} />
-        ) : null}
-        {activeAba === 'categorias' ? (
-          <DesignCategoriasTab
-            config={config}
-            grupos={previewCategoriasGrupos}
-            menuId={menuDeliveryId}
-            hasMenu={hasMenu}
-            isLoading={categoriasGruposLoading}
-            isError={categoriasGruposError}
-            onChange={onChange}
-            onGruposChange={setPreviewCategoriasGrupos}
-          />
-        ) : null}
-      </div>
-    </div>
+    <DesignCategoriasTab
+      config={config}
+      grupos={previewCategoriasGrupos}
+      menuId={menuDeliveryId}
+      hasMenu={hasMenu}
+      isLoading={categoriasGruposLoading}
+      isError={categoriasGruposError}
+      onChange={onChange}
+      onGruposChange={setPreviewCategoriasGrupos}
+    />
   )
 }

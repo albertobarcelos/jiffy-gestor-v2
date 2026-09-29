@@ -14,10 +14,14 @@ import {
   type DeliveryEtapaId,
 } from './deliveryHubEtapas'
 import {
+  DESIGN_MODELOS_ABA_QUERY_KEY,
   DESIGN_SECTION_QUERY_KEY,
+  deliveryHubDesignModelosPath,
   deliveryHubDesignPath,
   deliveryHubDesignSectionPath,
+  isDesignModelosAbaId,
   isDesignTabId,
+  type DesignModelosAbaId,
 } from '@/src/presentation/components/features/delivery-publico/shared/constants/designTabs'
 import type { DesignTabId } from '@/src/presentation/components/features/delivery-publico/shared/types/deliveryPublicoDesignConfig'
 import { calcularDeliveryHubProgresso } from './deliveryHubProgresso'
@@ -38,6 +42,7 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
     etapaId && etapaId !== 'delivery-loja' ? etapaId : null
 
   const secaoParam = searchParams.get(DESIGN_SECTION_QUERY_KEY)
+  const abaParam = searchParams.get(DESIGN_MODELOS_ABA_QUERY_KEY)
   const rawDesignSection: DesignTabId | null =
     activeEtapaId === 'delivery-design' && isDesignTabId(secaoParam) ? secaoParam : null
   /** Cores/Tipografias legadas destacam Modelos no submenu. */
@@ -47,6 +52,14 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
     rawDesignSection === 'categorias'
       ? 'modelos'
       : rawDesignSection
+  const activeDesignModelosAba: DesignModelosAbaId | null =
+    rawDesignSection === 'cores' ||
+    rawDesignSection === 'tipografias' ||
+    rawDesignSection === 'categorias'
+      ? rawDesignSection
+      : activeDesignSection === 'modelos' && isDesignModelosAbaId(abaParam)
+        ? abaParam
+        : null
 
   const empresaDelivery = empresaDeliveryQuery.data
   const configurado = empresaDelivery != null
@@ -138,12 +151,41 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
 
   const abrirDesignSecao = useCallback(
     (section: DesignTabId) => {
+      if (section === 'modelos') {
+        if (
+          activeEtapaId === 'delivery-design' &&
+          activeDesignSection === 'modelos' &&
+          activeDesignModelosAba == null
+        ) {
+          return
+        }
+        pedirSaida(() => {
+          router.push(toGestao(deliveryHubDesignSectionPath('modelos')))
+        })
+        return
+      }
       if (activeEtapaId === 'delivery-design' && activeDesignSection === section) return
       pedirSaida(() => {
         router.push(toGestao(deliveryHubDesignSectionPath(section)))
       })
     },
-    [activeDesignSection, activeEtapaId, pedirSaida, router, toGestao]
+    [activeDesignModelosAba, activeDesignSection, activeEtapaId, pedirSaida, router, toGestao]
+  )
+
+  const abrirModelosAba = useCallback(
+    (aba: DesignModelosAbaId) => {
+      if (
+        activeEtapaId === 'delivery-design' &&
+        activeDesignSection === 'modelos' &&
+        activeDesignModelosAba === aba
+      ) {
+        return
+      }
+      pedirSaida(() => {
+        router.push(toGestao(deliveryHubDesignModelosPath(aba)))
+      })
+    },
+    [activeDesignModelosAba, activeDesignSection, activeEtapaId, pedirSaida, router, toGestao]
   )
 
   if (
@@ -199,8 +241,10 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
       passosExtras={passosExtras}
       activeEtapaId={activeEtapaId}
       activeDesignSection={activeDesignSection}
+      activeDesignModelosAba={activeDesignModelosAba}
       onAbrirEtapa={abrirEtapa}
       onAbrirDesignSecao={abrirDesignSecao}
+      onAbrirModelosAba={abrirModelosAba}
       panel={panel}
     />
   )

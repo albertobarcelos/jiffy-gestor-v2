@@ -16,18 +16,23 @@ import {
 } from '../../shared/constants/designPublishRules'
 import {
   DESIGN_LEGACY_SECTIONS_TO_MODELOS_ABA,
+  DESIGN_MODELOS_ABA_QUERY_KEY,
+  DESIGN_MODELOS_ABAS,
   DESIGN_SECTION_QUERY_KEY,
   DESIGN_TABS,
   deliveryHubDesignPath,
   deliveryHubDesignModelosPath,
   deliveryHubDesignSectionPath,
+  isDesignModelosAbaId,
   isDesignTabId,
+  type DesignModelosAbaId,
 } from '../../shared/constants/designTabs'
 import { useDeliveryDesignDraft } from '../../shared/hooks/useDeliveryDesignDraft'
 import { useDesignCategoriaGrupos } from '../../shared/hooks/useDesignCategoriaGrupos'
 import type { DesignCategoriaGrupo } from '../../shared/types/designCategoriaGrupo'
 import { mergeDesignCategoriaGrupos } from '../../shared/utils/mergeDesignCategoriaGrupos'
 import { DeliveryMobilePreviewFrame } from '../components/DeliveryMobilePreviewFrame'
+import { DesignModelosCards } from '../components/DesignModelosCards'
 import { DesignSecoesCards } from '../components/DesignSecoesCards'
 import { DesignCabecalhoTab } from '../components/tabs/DesignCabecalhoTab'
 import { DesignModelosTab } from '../components/tabs/DesignModelosTab'
@@ -35,6 +40,7 @@ import { DeliveryNomeCardapioView } from '@/src/presentation/components/features
 
 function DesignSectionForm({
   activeSection,
+  modelosAba,
   draft,
   slug,
   hasEmpresaDelivery,
@@ -47,6 +53,7 @@ function DesignSectionForm({
   categoriasGruposError,
 }: {
   activeSection: DesignTabId
+  modelosAba: DesignModelosAbaId | null
   draft: ReturnType<typeof useDeliveryDesignDraft>['draft']
   slug: string | undefined
   hasEmpresaDelivery: boolean
@@ -71,8 +78,10 @@ function DesignSectionForm({
       />
     )
   }
+  if (!modelosAba) return null
   return (
     <DesignModelosTab
+      aba={modelosAba}
       config={draft}
       onChange={updateDraft}
       previewCategoriasGrupos={previewCategoriasGrupos}
@@ -94,6 +103,7 @@ export function DeliveryDesignCustomizerScreen() {
   const { data: empresaDelivery, isLoading: deliveryLoading } = useEmpresaDeliveryMe()
 
   const secaoParam = searchParams.get(DESIGN_SECTION_QUERY_KEY)
+  const abaParam = searchParams.get(DESIGN_MODELOS_ABA_QUERY_KEY)
   const activeSection: DesignTabId | null = isDesignTabId(secaoParam) ? secaoParam : null
   const isLobby = activeSection == null
   const resolvedSectionId: DesignTabId | null =
@@ -102,6 +112,18 @@ export function DeliveryDesignCustomizerScreen() {
     activeSection === 'categorias'
       ? 'modelos'
       : activeSection
+  const modelosAba: DesignModelosAbaId | null =
+    activeSection === 'cores' ||
+    activeSection === 'tipografias' ||
+    activeSection === 'categorias'
+      ? activeSection
+      : activeSection === 'modelos' && isDesignModelosAbaId(abaParam)
+        ? abaParam
+        : null
+  const isModelosLobby = activeSection === 'modelos' && modelosAba == null
+  const modelosAbaMeta = modelosAba
+    ? DESIGN_MODELOS_ABAS.find(aba => aba.id === modelosAba)
+    : undefined
 
   const { draft, hydrated, isDirty, updateDraft, publish } = useDeliveryDesignDraft({
     empresaId: empresa?.id,
@@ -146,6 +168,14 @@ export function DeliveryDesignCustomizerScreen() {
     }
   }, [router, secaoParam, toGestao])
 
+  /** ?secao=modelos&aba=invalida → lobby de Modelos. */
+  useEffect(() => {
+    if (secaoParam !== 'modelos') return
+    if (abaParam != null && abaParam !== '' && !isDesignModelosAbaId(abaParam)) {
+      router.replace(toGestao(deliveryHubDesignModelosPath()))
+    }
+  }, [abaParam, router, secaoParam, toGestao])
+
   const canSave = canPublishDesign(draft)
   const sectionMeta = resolvedSectionId
     ? DESIGN_TABS.find(tab => tab.id === resolvedSectionId)
@@ -157,13 +187,24 @@ export function DeliveryDesignCustomizerScreen() {
     showToast.success('Design salvo! As alterações já valem no cardápio público.')
   }, [draft, publish])
 
-  const voltarAoLobbyCards = useCallback(() => {
+  const voltar = useCallback(() => {
+    if (modelosAba) {
+      router.push(toGestao(deliveryHubDesignModelosPath()))
+      return
+    }
     router.push(toGestao(deliveryHubDesignPath()))
-  }, [router, toGestao])
+  }, [modelosAba, router, toGestao])
 
   const abrirSecao = useCallback(
     (section: DesignTabId) => {
       router.push(toGestao(deliveryHubDesignSectionPath(section)))
+    },
+    [router, toGestao]
+  )
+
+  const abrirModelosAba = useCallback(
+    (aba: DesignModelosAbaId) => {
+      router.push(toGestao(deliveryHubDesignModelosPath(aba)))
     },
     [router, toGestao]
   )
@@ -189,7 +230,7 @@ export function DeliveryDesignCustomizerScreen() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <button
                   type="button"
-                  onClick={voltarAoLobbyCards}
+                  onClick={voltar}
                   className="inline-flex items-center gap-1 text-sm font-semibold text-primary-text transition-colors hover:text-primary"
                 >
                   <MdArrowBack className="h-4 w-4" aria-hidden />
@@ -214,13 +255,19 @@ export function DeliveryDesignCustomizerScreen() {
               </div>
 
               <h1 className="mt-1 pb-3 text-xl font-bold text-primary">
-                {sectionMeta?.label ?? 'Personalizar Loja'}
+                {modelosAbaMeta?.label ?? sectionMeta?.label ?? 'Personalizar Loja'}
               </h1>
             </header>
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-3 md:p-4">
+            <div
+              className={`min-h-0 flex-1 overflow-y-auto ${isModelosLobby ? 'p-4 md:p-6' : 'p-3 md:p-4'}`}
+            >
+              {isModelosLobby ? (
+                <DesignModelosCards onAbrirAba={abrirModelosAba} />
+              ) : (
               <DesignSectionForm
-                activeSection={activeSection}
+                activeSection={activeSection ?? 'modelos'}
+                modelosAba={modelosAba}
                 draft={draft}
                 slug={empresaDelivery?.slug}
                 hasEmpresaDelivery={Boolean(empresaDelivery)}
@@ -232,6 +279,7 @@ export function DeliveryDesignCustomizerScreen() {
                 categoriasGruposLoading={categoriasGruposLoading}
                 categoriasGruposError={categoriasGruposError}
               />
+              )}
             </div>
           </>
         )}

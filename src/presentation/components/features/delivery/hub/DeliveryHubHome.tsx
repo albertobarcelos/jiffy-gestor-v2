@@ -5,7 +5,9 @@ import { MdCheck, MdChevronLeft, MdChevronRight, MdExpandLess, MdExpandMore } fr
 import { cn } from '@/src/shared/utils/cn'
 import type { DeliveryEtapaId } from '@/src/shared/constants/configuracoesRoutes'
 import {
+  DESIGN_MODELOS_ABAS,
   DESIGN_TABS,
+  type DesignModelosAbaId,
 } from '@/src/presentation/components/features/delivery-publico/shared/constants/designTabs'
 import type { DesignTabId } from '@/src/presentation/components/features/delivery-publico/shared/types/deliveryPublicoDesignConfig'
 import type { DeliveryHubProgresso } from './deliveryHubProgresso'
@@ -22,8 +24,11 @@ type DeliveryHubHomeProps = {
   activeEtapaId: DeliveryEtapaId | null
   /** Seção ativa de Personalizar Loja (`?secao=`), ou null no lobby. */
   activeDesignSection?: DesignTabId | null
+  /** Opção aberta dentro de Modelos de Layout, ou null no lobby de cards. */
+  activeDesignModelosAba?: DesignModelosAbaId | null
   onAbrirEtapa: (etapaId: DeliveryEtapaId) => void
   onAbrirDesignSecao?: (section: DesignTabId) => void
+  onAbrirModelosAba?: (aba: DesignModelosAbaId) => void
   panel: ReactNode
 }
 
@@ -87,24 +92,119 @@ function MenuItemButton({
   )
 }
 
+function ModelosMenuItem({
+  active,
+  activeAba,
+  expanded,
+  onToggleExpand,
+  onAbrirLobby,
+  onAbrirAba,
+}: {
+  active: boolean
+  activeAba: DesignModelosAbaId | null
+  expanded: boolean
+  onToggleExpand: () => void
+  onAbrirLobby: () => void
+  onAbrirAba: (aba: DesignModelosAbaId) => void
+}) {
+  const lobbyActive = active && activeAba == null
+  const tab = DESIGN_TABS.find(item => item.id === 'modelos')
+  if (!tab) return null
+
+  return (
+    <li>
+      <div
+        className={cn(
+          'relative flex items-center rounded-lg text-xs transition-colors',
+          lobbyActive
+            ? 'bg-primary/10 font-semibold text-primary'
+            : active
+              ? 'text-primary'
+              : 'text-secondary-text hover:bg-primary/5 hover:text-primary'
+        )}
+      >
+        <button
+          type="button"
+          onClick={onAbrirLobby}
+          aria-current={lobbyActive ? 'page' : undefined}
+          className="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-1.5 text-left"
+        >
+          <tab.icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          <span className="truncate">{tab.labelMenu ?? tab.label}</span>
+        </button>
+        <button
+          type="button"
+          onClick={e => {
+            e.stopPropagation()
+            onToggleExpand()
+          }}
+          title={expanded ? 'Ocultar opções' : 'Mostrar opções'}
+          aria-label={expanded ? 'Ocultar opções de modelos' : 'Mostrar opções de modelos'}
+          aria-expanded={expanded}
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-secondary-text transition-colors hover:bg-primary/10 hover:text-primary"
+        >
+          {expanded ? (
+            <MdExpandLess className="h-3.5 w-3.5" aria-hidden />
+          ) : (
+            <MdExpandMore className="h-3.5 w-3.5" aria-hidden />
+          )}
+        </button>
+      </div>
+      {expanded ? (
+        <ul className="ml-3 mt-0.5 flex flex-col gap-0.5 border-l border-gray-200 pl-2" role="list">
+          {DESIGN_MODELOS_ABAS.map(aba => {
+            const selected = active && activeAba === aba.id
+            return (
+              <li key={aba.id}>
+                <button
+                  type="button"
+                  onClick={() => onAbrirAba(aba.id)}
+                  aria-current={selected ? 'page' : undefined}
+                  className={cn(
+                    'flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs transition-colors',
+                    selected
+                      ? 'bg-primary/10 font-semibold text-primary'
+                      : 'text-secondary-text hover:bg-primary/5 hover:text-primary'
+                  )}
+                >
+                  <aba.icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <span className="truncate">{aba.label}</span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      ) : null}
+    </li>
+  )
+}
+
 function DesignMenuItem({
   passo,
   activeEtapa,
   activeSection,
+  activeModelosAba,
   collapsed,
   expanded,
+  modelosExpanded,
   onToggleExpand,
+  onToggleModelosExpand,
   onAbrirLobby,
   onAbrirSecao,
+  onAbrirModelosAba,
 }: {
   passo: DeliveryHubPassoUi
   activeEtapa: boolean
   activeSection: DesignTabId | null
+  activeModelosAba: DesignModelosAbaId | null
   collapsed: boolean
   expanded: boolean
+  modelosExpanded: boolean
   onToggleExpand: () => void
+  onToggleModelosExpand: () => void
   onAbrirLobby: () => void
   onAbrirSecao: (section: DesignTabId) => void
+  onAbrirModelosAba: (aba: DesignModelosAbaId) => void
 }) {
   const lobbyActive = activeEtapa && activeSection == null
 
@@ -177,6 +277,19 @@ function DesignMenuItem({
       {expanded ? (
         <ul className="ml-3 flex flex-col gap-0.5 border-l border-gray-200 pl-2" role="list">
           {DESIGN_TABS.map(tab => {
+            if (tab.id === 'modelos') {
+              return (
+                <ModelosMenuItem
+                  key={tab.id}
+                  active={activeEtapa && activeSection === 'modelos'}
+                  activeAba={activeModelosAba}
+                  expanded={modelosExpanded}
+                  onToggleExpand={onToggleModelosExpand}
+                  onAbrirLobby={() => onAbrirSecao('modelos')}
+                  onAbrirAba={onAbrirModelosAba}
+                />
+              )
+            }
             const sectionActive = activeEtapa && activeSection === tab.id
             return (
               <li key={tab.id}>
@@ -208,21 +321,29 @@ function MenuGroup({
   passos,
   activeEtapaId,
   activeDesignSection,
+  activeDesignModelosAba,
   collapsed,
   designSubmenuExpanded,
+  modelosSubmenuExpanded,
   onToggleDesignSubmenu,
+  onToggleModelosSubmenu,
   onAbrirEtapa,
   onAbrirDesignSecao,
+  onAbrirModelosAba,
 }: {
   title: string
   passos: DeliveryHubPassoUi[]
   activeEtapaId: DeliveryEtapaId | null
   activeDesignSection: DesignTabId | null
+  activeDesignModelosAba: DesignModelosAbaId | null
   collapsed: boolean
   designSubmenuExpanded: boolean
+  modelosSubmenuExpanded: boolean
   onToggleDesignSubmenu: () => void
+  onToggleModelosSubmenu: () => void
   onAbrirEtapa: (etapaId: DeliveryEtapaId) => void
   onAbrirDesignSecao: (section: DesignTabId) => void
+  onAbrirModelosAba: (aba: DesignModelosAbaId) => void
 }) {
   return (
     <div className={cn(collapsed ? 'mb-2' : 'mb-4')}>
@@ -242,11 +363,15 @@ function MenuGroup({
               passo={passo}
               activeEtapa={activeEtapaId === 'delivery-design'}
               activeSection={activeDesignSection}
+              activeModelosAba={activeDesignModelosAba}
               collapsed={collapsed}
               expanded={designSubmenuExpanded}
+              modelosExpanded={modelosSubmenuExpanded}
               onToggleExpand={onToggleDesignSubmenu}
+              onToggleModelosExpand={onToggleModelosSubmenu}
               onAbrirLobby={() => onAbrirEtapa('delivery-design')}
               onAbrirSecao={onAbrirDesignSecao}
+              onAbrirModelosAba={onAbrirModelosAba}
             />
           ) : (
             <MenuItemButton
@@ -271,13 +396,18 @@ export function DeliveryHubHome({
   passosExtras,
   activeEtapaId,
   activeDesignSection = null,
+  activeDesignModelosAba = null,
   onAbrirEtapa,
   onAbrirDesignSecao,
+  onAbrirModelosAba,
   panel,
 }: DeliveryHubHomeProps) {
   const [menuCollapsed, setMenuCollapsed] = useState(false)
   const [designSubmenuExpanded, setDesignSubmenuExpanded] = useState(
     () => activeEtapaId === 'delivery-design'
+  )
+  const [modelosSubmenuExpanded, setModelosSubmenuExpanded] = useState(
+    () => activeDesignSection === 'modelos'
   )
 
   const loja = useMemo(
@@ -299,9 +429,24 @@ export function DeliveryHubHome({
     setDesignSubmenuExpanded(false)
   }, [activeEtapaId, activeDesignSection])
 
+  useEffect(() => {
+    if (activeEtapaId === 'delivery-design' && activeDesignSection === 'modelos') {
+      setModelosSubmenuExpanded(true)
+      return
+    }
+    setModelosSubmenuExpanded(false)
+  }, [activeDesignSection, activeEtapaId])
+
   const handleAbrirDesignSecao = (section: DesignTabId) => {
     setDesignSubmenuExpanded(true)
+    if (section === 'modelos') setModelosSubmenuExpanded(true)
     onAbrirDesignSecao?.(section)
+  }
+
+  const handleAbrirModelosAba = (aba: DesignModelosAbaId) => {
+    setDesignSubmenuExpanded(true)
+    setModelosSubmenuExpanded(true)
+    onAbrirModelosAba?.(aba)
   }
 
   return (
@@ -345,22 +490,30 @@ export function DeliveryHubHome({
           passos={loja}
           activeEtapaId={activeEtapaId}
           activeDesignSection={activeDesignSection}
+          activeDesignModelosAba={activeDesignModelosAba}
           collapsed={menuCollapsed}
           designSubmenuExpanded={designSubmenuExpanded}
+          modelosSubmenuExpanded={modelosSubmenuExpanded}
           onToggleDesignSubmenu={() => setDesignSubmenuExpanded(prev => !prev)}
+          onToggleModelosSubmenu={() => setModelosSubmenuExpanded(prev => !prev)}
           onAbrirEtapa={onAbrirEtapa}
           onAbrirDesignSecao={handleAbrirDesignSecao}
+          onAbrirModelosAba={handleAbrirModelosAba}
         />
         <MenuGroup
           title="Operações"
           passos={operacao}
           activeEtapaId={activeEtapaId}
           activeDesignSection={activeDesignSection}
+          activeDesignModelosAba={activeDesignModelosAba}
           collapsed={menuCollapsed}
           designSubmenuExpanded={designSubmenuExpanded}
+          modelosSubmenuExpanded={modelosSubmenuExpanded}
           onToggleDesignSubmenu={() => setDesignSubmenuExpanded(prev => !prev)}
+          onToggleModelosSubmenu={() => setModelosSubmenuExpanded(prev => !prev)}
           onAbrirEtapa={onAbrirEtapa}
           onAbrirDesignSecao={handleAbrirDesignSecao}
+          onAbrirModelosAba={handleAbrirModelosAba}
         />
       </aside>
 
