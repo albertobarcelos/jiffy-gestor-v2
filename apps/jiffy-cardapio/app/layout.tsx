@@ -25,6 +25,10 @@ export const metadata: Metadata = {
     template: '%s',
   },
   description: 'Peça online no cardápio da loja.',
+  icons: {
+    icon: [{ url: '/images/jiffy-favicon.png', type: 'image/png' }],
+    apple: '/images/jiffy-favicon.png',
+  },
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {
