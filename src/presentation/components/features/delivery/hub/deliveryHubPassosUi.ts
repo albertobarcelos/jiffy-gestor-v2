@@ -6,6 +6,7 @@ import {
   DELIVERY_LOJA_CARD_IDS,
   DELIVERY_OPERACAO_ETAPA_IDS,
   getDeliveryEtapaById,
+  isDeliveryEtapaId,
 } from '@/src/presentation/components/features/delivery/hub/deliveryHubEtapas'
 import type { DeliveryHubPassosExtras } from '@/src/presentation/components/features/delivery/hub/deliveryHubCadastros'
 
@@ -43,12 +44,12 @@ function montarPassoUi(
   extras?: DeliveryHubPassosExtras
 ): DeliveryHubPassoUi | null {
   const etapa = getDeliveryEtapaById(etapaId)
-  if (!etapa || etapa.id === 'delivery-loja') return null
-  const doProgresso = progresso?.passos.find(passo => passo.id === etapa.id)
-  const recomendada = concluidoEtapaRecomendada(etapa.id, extras)
+  if (!etapa || etapaId === 'delivery-loja') return null
+  const doProgresso = progresso?.passos.find(passo => passo.id === etapaId)
+  const recomendada = concluidoEtapaRecomendada(etapaId, extras)
   const concluido = recomendada ?? doProgresso?.concluido ?? false
   return {
-    id: etapa.id,
+    id: etapaId,
     numero: etapa.step,
     titulo: etapa.title,
     descricao: etapa.descricao,
@@ -56,7 +57,7 @@ function montarPassoUi(
     concluido,
     obrigatoria: etapa.obrigatoria,
     href: etapa.path,
-    etapaId: etapa.id,
+    etapaId,
     cta: !etapa.obrigatoria && concluido ? 'Editar' : etapa.cta,
   }
 }
@@ -66,9 +67,10 @@ export function montarPassosHubDelivery(
   progresso: DeliveryHubProgresso,
   extras?: DeliveryHubPassosExtras
 ): DeliveryHubPassoUi[] {
-  return DELIVERY_HUB_ETAPAS.map(etapa => {
+  return DELIVERY_HUB_ETAPAS.flatMap(etapa => {
+    if (!isDeliveryEtapaId(etapa.id)) return []
     const passo = montarPassoUi(etapa.id, progresso, extras)
-    return passo!
+    return passo ? [passo] : []
   })
 }
 
