@@ -67,7 +67,6 @@ function criarEnviarUseCase(
 ) {
   return new EnviarPedidoPublicoUseCase(
     publicDeliveryPedidoAdapter,
-    publicDeliveryClienteAdapter,
     garantir,
     garantirCliente
   )
@@ -162,18 +161,11 @@ describe('EnviarPedidoPublicoUseCase', () => {
     expect(etapas).toEqual(['salvando_endereco', 'enviando_pedido'])
   })
 
-  it('faz PATCH de CPF quando cliente existe sem CPF', async () => {
+  it('envia CPF só no documento do pedido, sem PATCH no cadastro', async () => {
     vi.mocked(publicDeliveryApi.buscarClienteDeliveryPublico).mockResolvedValue({
       telefone: '11999999999',
       nome: 'Cliente',
       cpf: null,
-      clienteIdVinculado: null,
-      enderecos: [],
-    })
-    vi.mocked(publicDeliveryApi.atualizarClienteDeliveryPublico).mockResolvedValue({
-      telefone: '11999999999',
-      nome: 'Cliente',
-      cpf: '12345678909',
       clienteIdVinculado: null,
       enderecos: [],
     })
@@ -191,38 +183,10 @@ describe('EnviarPedidoPublicoUseCase', () => {
     })
 
     expect(result.ok).toBe(true)
-    if (!result.ok) return
-    expect(publicDeliveryApi.atualizarClienteDeliveryPublico).toHaveBeenCalledWith(
-      '11999999999',
-      { cpf: '12345678909' }
-    )
-    expect(result.clienteAtualizado?.cpf).toBe('12345678909')
-    expect(publicDeliveryApi.criarPedidoPublico).toHaveBeenCalledOnce()
-  })
-
-  it('não faz PATCH se cliente já tem CPF', async () => {
-    vi.mocked(publicDeliveryApi.buscarClienteDeliveryPublico).mockResolvedValue({
-      telefone: '11999999999',
-      nome: 'Cliente',
-      cpf: '11144477735',
-      clienteIdVinculado: null,
-      enderecos: [],
-    })
-
-    const useCase = criarEnviarUseCase()
-    await useCase.execute({
-      slug: 'loja',
-      telefoneApi: '11999999999',
-      nomeEfetivo: 'Cliente',
-      itens: [item],
-      total: 20,
-      form: formBase({ cpfNotaFiscal: '12345678909' }),
-      clienteLookup: null,
-      tokenCotacao,
-    })
-
     expect(publicDeliveryApi.atualizarClienteDeliveryPublico).not.toHaveBeenCalled()
-    expect(publicDeliveryApi.criarPedidoPublico).toHaveBeenCalledOnce()
+    expect(publicDeliveryApi.criarPedidoPublico).toHaveBeenCalledWith(
+      expect.objectContaining({ documentoCpfCnpj: '12345678909' })
+    )
   })
 
   it('garante endereço antes do create em entrega', async () => {

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import { PublicDeliveryApiError } from '@/src/application/errors/publicDeliveryErrors'
 import { GarantirClienteDeliveryPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirClienteDeliveryPublicoUseCase'
 import { publicDeliveryClienteAdapter } from '@/src/infrastructure/api/adapters/PublicDeliveryApiAdapter'
 import * as publicDeliveryApi from '@/src/infrastructure/api/publicDeliveryApi'
@@ -53,5 +54,24 @@ describe('GarantirClienteDeliveryPublicoUseCase', () => {
       telefone: '11999999999',
       nome: 'Cliente',
     })
+  })
+
+  it('se o GET falhar e o create der 409, segue com o telefone já cadastrado', async () => {
+    vi.mocked(publicDeliveryApi.buscarClienteDeliveryPublico).mockRejectedValue(
+      new PublicDeliveryApiError('Erro interno do servidor', 500)
+    )
+    vi.mocked(publicDeliveryApi.criarClienteDeliveryPublico).mockRejectedValue(
+      new PublicDeliveryApiError('Cliente já existe', 409)
+    )
+
+    const useCase = new GarantirClienteDeliveryPublicoUseCase(publicDeliveryClienteAdapter)
+    const result = await useCase.execute({
+      telefone: '11999999999',
+      nome: 'Cliente',
+      clienteLookup: null,
+    })
+
+    expect(result.telefone).toBe('11999999999')
+    expect(result.nome).toBe('Cliente')
   })
 })

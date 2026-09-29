@@ -29,6 +29,7 @@ import {
   ticketIdViaProducao,
 } from '@/src/application/delivery/planejarTicketsProducaoImpressora'
 import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
+import { normalizeTipoImpactoPreco } from '@/src/application/mappers/VendaApiNormalizer'
 
 function asRecord(v: unknown): Record<string, unknown> | null {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return null
@@ -121,9 +122,36 @@ function produtoLancadoAtivo(pl: Record<string, unknown>): boolean {
   return true
 }
 
+/**
+ * Tipo `nenhum` zera o impacto mesmo com valor de cadastro persistido.
+ * Sem tipo no payload, mantém o valor (registros antigos).
+ */
+function valoresImpressaoComplemento(c: Record<string, unknown>): {
+  valorUnitario: number
+  valorFinal: number
+} {
+  const quantidade = numeroFinito(c.quantidade) || 1
+  const tipoInformado = asStr(c.tipoImpactoPreco)
+  if (tipoInformado && normalizeTipoImpactoPreco(tipoInformado) === 'nenhum') {
+    return { valorUnitario: 0, valorFinal: 0 }
+  }
+  const valorUnitario = numeroFinito(c.valorUnitario ?? c.valor)
+  const valorFinalPersistido = numeroOpcional(c.valorFinal)
+  const valorFinal = valorFinalPersistido != null ? valorFinalPersistido : quantidade * valorUnitario
+  return { valorUnitario, valorFinal }
+}
+
+function impactoAssinadoComplemento(c: Record<string, unknown>): number {
+  const tipoInformado = asStr(c.tipoImpactoPreco)
+  const tipo = tipoInformado ? normalizeTipoImpactoPreco(tipoInformado) : 'aumenta'
+  if (tipo === 'nenhum') return 0
+  const { valorFinal } = valoresImpressaoComplemento(c)
+  return tipo === 'diminui' ? -valorFinal : valorFinal
+}
+
 function mapComplemento(c: Record<string, unknown>): VendaGestorTicketItemComplemento {
   const quantidade = numeroFinito(c.quantidade) || 1
-  const valorUnitario = numeroFinito(c.valorUnitario)
+  const { valorUnitario, valorFinal } = valoresImpressaoComplemento(c)
   return {
     nome: asStr(c.nomeComplemento) || asStr(c.nome),
     quantidade,
@@ -132,8 +160,8 @@ function mapComplemento(c: Record<string, unknown>): VendaGestorTicketItemComple
     impressao: {
       quantidade,
       valorUnitario,
-      valorFinal: quantidade * valorUnitario,
-      valorTotal: quantidade * valorUnitario,
+      valorFinal,
+      valorTotal: valorFinal,
     },
   }
 }
@@ -180,8 +208,7 @@ function buildResumoPedido(
       comps.reduce((ss, c) => {
         const r = asRecord(c)
         if (!r) return ss
-        const q = numeroFinito(r.quantidade) || 1
-        return ss + q * numeroFinito(r.valorUnitario)
+        return ss + impactoAssinadoComplemento(r)
       }, 0)
     )
   }, 0)
