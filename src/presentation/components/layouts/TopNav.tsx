@@ -767,7 +767,7 @@ export function TopNav() {
             </Link>
 
             <div
-              className="hidden min-w-0 max-w-[14rem] flex-col items-end justify-center border-l border-gray-200 px-2 py-1.5 text-right 2xl:flex"
+              className="flex min-w-0 max-w-[14rem] flex-col items-end justify-center border-l border-gray-200 px-2 py-1.5 text-right"
               title={
                 isHydrated
                   ? `${user?.getName() || 'Usuário'}${user?.getEmail() ? ` • ${user.getEmail()}` : ''}`
