@@ -94,7 +94,7 @@ export function DeliveryProdutoComplementosLista({
                     size="sm"
                     value={qtdComp}
                     min={0}
-                    disabledDecrease={qtdComp <= 0}
+                    hideDecreaseWhenMin
                     decreaseLabel={`Diminuir quantidade de ${comp.nome}`}
                     increaseLabel={`Aumentar quantidade de ${comp.nome}`}
                     onDecrease={() => ajustarQuantidadeComplemento(grupo, comp.id, -1)}
