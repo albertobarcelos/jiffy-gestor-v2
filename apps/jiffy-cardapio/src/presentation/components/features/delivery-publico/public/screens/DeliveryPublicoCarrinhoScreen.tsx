@@ -31,6 +31,7 @@ import {
 import type { CotacaoPedidoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { DELIVERY_PAIS_TELEFONE_PADRAO } from '@/src/shared/constants/deliveryPaisesTelefone'
 import { findCatalogoProdutoById } from '../../shared/utils/findCatalogoProdutoById'
+import { resolverProdutosAusentesDoCatalogo } from '@/src/domain/policies/ProdutoIndisponivelCheckoutPublico'
 import { itemSemComplemento } from '../../shared/utils/deliveryCarrinhoItemUtils'
 import {
   avaliarComplementosItemCarrinho,
@@ -162,6 +163,13 @@ const DeliveryCheckoutForaCoberturaDialog = dynamic(
     }))
 )
 
+const DeliveryProdutoIndisponivelDialog = dynamic(
+  () =>
+    import('../components/checkout/DeliveryProdutoIndisponivelDialog').then(m => ({
+      default: m.DeliveryProdutoIndisponivelDialog,
+    }))
+)
+
 type DeliveryPublicoCarrinhoScreenProps = {
   slug: string
   lojaAberta?: boolean
@@ -247,6 +255,9 @@ export function DeliveryPublicoCarrinhoScreen({
     limparCarrinhoAposPedido,
     foraCoberturaDialogAberto,
     fecharForaCoberturaDialog,
+    produtoIndisponivel,
+    setProdutoIndisponivel,
+    fecharProdutoIndisponivelDialog,
     podeCriarNovoEndereco,
   } = useDeliveryCheckout(slug, {
     fetchMeiosPagamento: true,
@@ -278,6 +289,16 @@ export function DeliveryPublicoCarrinhoScreen({
     () => (catalogQuery.data?.pages ? flattenCatalogoGrupos(catalogQuery.data.pages) : []),
     [catalogQuery.data?.pages]
   )
+
+  const idsProdutosCatalogo = useMemo(() => {
+    const ids = new Set<string>()
+    for (const grupo of grupos) {
+      for (const produto of grupo.produtos) {
+        if (produto.id) ids.add(produto.id)
+      }
+    }
+    return ids
+  }, [grupos])
 
   const produtoEdicao = useMemo(() => {
     if (!itemEditando) return null
@@ -459,6 +480,49 @@ export function DeliveryPublicoCarrinhoScreen({
     catalogQuery.isLoading,
     catalogQuery.isFetchingNextPage,
     catalogQuery.hasNextPage,
+  ])
+
+  /** Carrinho com item pausado/removido do menu — avisa antes da cotação. */
+  useEffect(() => {
+    if (produtoIndisponivel) return
+    if (itens.length === 0) return
+    if (catalogQuery.isLoading || catalogQuery.isFetchingNextPage || catalogQuery.hasNextPage) {
+      return
+    }
+    if (idsProdutosCatalogo.size === 0) return
+    const ausentes = resolverProdutosAusentesDoCatalogo(itens, idsProdutosCatalogo)
+    if (ausentes) setProdutoIndisponivel(ausentes)
+  }, [
+    produtoIndisponivel,
+    itens,
+    idsProdutosCatalogo,
+    catalogQuery.isLoading,
+    catalogQuery.isFetchingNextPage,
+    catalogQuery.hasNextPage,
+    setProdutoIndisponivel,
+  ])
+
+  const handleConfirmarProdutoIndisponivel = useCallback(() => {
+    const ids = new Set(produtoIndisponivel?.produtoIds ?? [])
+    const nomes = new Set(
+      (produtoIndisponivel?.nomes ?? []).map(n => n.trim().toLowerCase()).filter(Boolean)
+    )
+    fecharProdutoIndisponivelDialog()
+    for (const item of itens) {
+      const porId = ids.has(item.produtoId)
+      const porNome = nomes.has(item.produtoNome.trim().toLowerCase())
+      if (porId || (ids.size === 0 && porNome)) {
+        removerItem(slug, item.id)
+      }
+    }
+    limparCotacao()
+  }, [
+    produtoIndisponivel,
+    fecharProdutoIndisponivelDialog,
+    itens,
+    removerItem,
+    slug,
+    limparCotacao,
   ])
 
   const concluirAposSucesso = () => {
@@ -987,6 +1051,7 @@ export function DeliveryPublicoCarrinhoScreen({
             observacaoPedido={form.observacaoPedido}
             cpfNotaFiscal={form.cpfNotaFiscal}
             exigeCpfVenda={exigeCpfVenda}
+            cpfClienteCadastrado={clienteLookup.cliente?.cpf ?? null}
             enviando={enviando}
             etapaEnvio={etapaEnvio}
             onClose={fecharCheckout}
@@ -1059,6 +1124,12 @@ export function DeliveryPublicoCarrinhoScreen({
           fecharForaCoberturaDialog()
           handleContinuarCheckoutFlow()
         }}
+      />
+
+      <DeliveryProdutoIndisponivelDialog
+        open={produtoIndisponivel != null}
+        nomes={produtoIndisponivel?.nomes ?? []}
+        onConfirmar={handleConfirmarProdutoIndisponivel}
       />
 
       {alertaComplementos ? (

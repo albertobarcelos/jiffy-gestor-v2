@@ -7,8 +7,11 @@ import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/Ch
 import type { CotacaoPedidoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { ClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import {
+  enriquecerMensagemErroComNomesProdutos,
   formatarMensagemErroCotacaoPublica,
   isErroCoberturaEntregaPublica,
+  resolverProdutoIndisponivelDoErro,
+  type ProdutoIndisponivelCarrinho,
 } from '@/src/application/errors/publicDeliveryErrors'
 import { cotarPedidoPublicoUseCase } from '@/src/infrastructure/di/deliveryPublicoUseCases'
 import {
@@ -49,6 +52,8 @@ export function useCheckoutCotacao({
   const [cotacao, setCotacao] = useState<DeliveryCheckoutCotacaoState | null>(null)
   const [cotacaoLoading, setCotacaoLoading] = useState(false)
   const [foraCoberturaDialogAberto, setForaCoberturaDialogAberto] = useState(false)
+  const [produtoIndisponivel, setProdutoIndisponivel] =
+    useState<ProdutoIndisponivelCarrinho | null>(null)
 
   const cotacaoSeqRef = useRef(0)
   const cotacaoRef = useRef(cotacao)
@@ -176,9 +181,20 @@ export function useCheckoutCotacao({
             return { ok: false, reason: 'fora_cobertura' }
           }
 
+          const indisponivel = resolverProdutoIndisponivelDoErro(
+            resultado.error,
+            itens
+          )
+          if (indisponivel) {
+            setProdutoIndisponivel(indisponivel)
+            return { ok: false, reason: 'produto_indisponivel' }
+          }
+
           const exibirToast = !options?.silencioso || resultado.httpStatus === 429
           if (exibirToast) {
-            showToast.error(resultado.error)
+            showToast.error(
+              enriquecerMensagemErroComNomesProdutos(resultado.error, itens)
+            )
           }
           return {
             ok: false,
@@ -212,8 +228,13 @@ export function useCheckoutCotacao({
           setForaCoberturaDialogAberto(true)
           return { ok: false, reason: 'fora_cobertura' }
         }
+        const indisponivel = resolverProdutoIndisponivelDoErro(msg, itens)
+        if (indisponivel) {
+          setProdutoIndisponivel(indisponivel)
+          return { ok: false, reason: 'produto_indisponivel' }
+        }
         if (!options?.silencioso) {
-          showToast.error(msg)
+          showToast.error(enriquecerMensagemErroComNomesProdutos(msg, itens))
         }
         return { ok: false, reason: 'erro' }
       } finally {
@@ -247,5 +268,8 @@ export function useCheckoutCotacao({
     foraCoberturaDialogAberto,
     fecharForaCoberturaDialog: () => setForaCoberturaDialogAberto(false),
     setForaCoberturaDialogAberto,
+    produtoIndisponivel,
+    setProdutoIndisponivel,
+    fecharProdutoIndisponivelDialog: () => setProdutoIndisponivel(null),
   }
 }

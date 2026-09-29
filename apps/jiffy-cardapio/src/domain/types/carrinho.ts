@@ -22,4 +22,11 @@ export type ItemCarrinhoDelivery = {
   observacoes: string[]
   complementos: ItemCarrinhoComplemento[]
   adicionadoEm: string
+  /**
+   * Preço normal riscado na UI (quando havia promoção vigente ao adicionar).
+   * Não entra no cálculo do pedido — só exibição no card do carrinho.
+   */
+  precoRegular?: number | null
+  /** % OFF derivado ao adicionar — só exibição; cobrança usa valorUnitario. */
+  descontoPercentual?: number | null
 }

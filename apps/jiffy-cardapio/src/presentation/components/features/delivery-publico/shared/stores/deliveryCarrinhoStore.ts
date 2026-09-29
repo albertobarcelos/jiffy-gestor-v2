@@ -45,7 +45,8 @@ function gerarIdItem(): string {
 function mesclarQuantidade(
   existente: DeliveryCarrinhoItem,
   quantidadeExtra: number,
-  valorUnitarioBase: number
+  valorUnitarioBase: number,
+  extras?: Pick<DeliveryCarrinhoItem, 'precoRegular' | 'descontoPercentual'>
 ): DeliveryCarrinhoItem {
   const normalizado = normalizarItemCarrinho(existente)
   const recalculado = recalcularLinhaCarrinho({
@@ -56,6 +57,8 @@ function mesclarQuantidade(
     observacoes: normalizado.observacoes,
     complementos: normalizado.complementos,
     valorUnitarioBase,
+    precoRegular: extras?.precoRegular ?? existente.precoRegular,
+    descontoPercentual: extras?.descontoPercentual ?? existente.descontoPercentual,
   })
   return {
     ...recalculado,
@@ -81,6 +84,8 @@ function montarItemNovo(
     observacoes: item.observacoes,
     complementos: item.complementos,
     valorUnitarioBase: base,
+    precoRegular: item.precoRegular,
+    descontoPercentual: item.descontoPercentual,
   })
   return {
     ...recalculado,
@@ -229,7 +234,10 @@ export const useDeliveryCarrinhoStore = create<DeliveryCarrinhoState>()(
                 ...state.carrinhos,
                 [slug]: atuais.map(existing =>
                   existing.id === igual.id
-                    ? mesclarQuantidade(existing, candidato.quantidade, base)
+                    ? mesclarQuantidade(existing, candidato.quantidade, base, {
+                        precoRegular: item.precoRegular,
+                        descontoPercentual: item.descontoPercentual,
+                      })
                     : existing
                 ),
               },
@@ -256,6 +264,8 @@ export const useDeliveryCarrinhoStore = create<DeliveryCarrinhoState>()(
               observacoes: normalizado.observacoes,
               complementos: normalizado.complementos,
               valorUnitarioBase: normalizado.valorUnitario,
+              precoRegular: normalizado.precoRegular,
+              descontoPercentual: normalizado.descontoPercentual,
             })
             return {
               ...recalculado,
@@ -289,7 +299,10 @@ export const useDeliveryCarrinhoStore = create<DeliveryCarrinhoState>()(
           const igual = encontrarItemIgual(atuais, candidato, itemId)
 
           if (igual) {
-            const mesclado = mesclarQuantidade(igual, candidato.quantidade, base)
+            const mesclado = mesclarQuantidade(igual, candidato.quantidade, base, {
+              precoRegular: item.precoRegular,
+              descontoPercentual: item.descontoPercentual,
+            })
             return {
               carrinhos: {
                 ...state.carrinhos,
@@ -308,6 +321,8 @@ export const useDeliveryCarrinhoStore = create<DeliveryCarrinhoState>()(
             observacoes: candidato.observacoes,
             complementos: candidato.complementos,
             valorUnitarioBase: base,
+            precoRegular: candidato.precoRegular,
+            descontoPercentual: candidato.descontoPercentual,
           })
           const itens = atuais.map(existing => {
             if (existing.id !== itemId) return existing

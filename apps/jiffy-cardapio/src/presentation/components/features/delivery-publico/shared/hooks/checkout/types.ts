@@ -15,7 +15,15 @@ export type EnviarPedidoCheckoutResult =
 
 export type RecotarPedidoResult =
   | { ok: true }
-  | { ok: false; reason?: 'fora_cobertura' | 'rate_limit' | 'bloqueado' | 'erro' }
+  | {
+      ok: false
+      reason?:
+        | 'fora_cobertura'
+        | 'rate_limit'
+        | 'bloqueado'
+        | 'erro'
+        | 'produto_indisponivel'
+    }
 
 export type ClienteLookupStatus =
   | 'idle'
