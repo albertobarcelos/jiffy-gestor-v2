@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { derivarTipoVendaCardKanban } from '@/src/presentation/components/features/kanban/utils/kanbanVendaCardViewModel'
+import {
+  derivarTipoVendaCardKanban,
+  exibirSeloCanalMarketplace,
+} from '@/src/presentation/components/features/kanban/utils/kanbanVendaCardViewModel'
 import type { Venda } from '@/src/presentation/components/features/kanban/types'
 
 function vendaGestor(
@@ -36,6 +39,12 @@ describe('derivarTipoVendaCardKanban', () => {
     const view = derivarTipoVendaCardKanban(vendaGestor('delivery', null))
     expect(view.tipoVendaExibicao).toBe('delivery')
     expect(view.prefixoLinhaOrigemCard).toBe('Delivery')
+  })
+
+  it('selo no card distingue site Jiffy de pedido manual', () => {
+    expect(exibirSeloCanalMarketplace('JIFFY_DELIVERY')).toBe(true)
+    expect(exibirSeloCanalMarketplace('GESTOR')).toBe(false)
+    expect(exibirSeloCanalMarketplace('AIQFOME')).toBe(true)
   })
 
   it('mostra Balcão só para venda gestor que não é delivery', () => {

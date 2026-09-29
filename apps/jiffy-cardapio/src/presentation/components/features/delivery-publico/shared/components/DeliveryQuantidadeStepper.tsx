@@ -18,6 +18,8 @@ type DeliveryQuantidadeStepperProps = {
    */
   removeAtMin?: boolean
   removeLabel?: string
+  /** Esconde − e o número quando `value <= min` (ex.: complemento ainda não escolhido). */
+  hideDecreaseWhenMin?: boolean
 }
 
 export function DeliveryQuantidadeStepper({
@@ -31,14 +33,37 @@ export function DeliveryQuantidadeStepper({
   disabledDecrease,
   removeAtMin = false,
   removeLabel = 'Remover item',
+  hideDecreaseWhenMin = false,
 }: DeliveryQuantidadeStepperProps) {
   const btnSize = size === 'sm' ? 'h-8 w-8' : 'h-9 w-9'
   const iconSize = size === 'sm' ? 'h-4 w-4' : 'h-4 w-4'
   const valueMinWidth = size === 'sm' ? 'min-w-[1.75rem]' : 'min-w-[2rem]'
   const showRemove = removeAtMin && value <= min
+  const somenteAumentar = hideDecreaseWhenMin && !showRemove && value <= min
   const decreaseDisabled = showRemove
     ? false
     : (disabledDecrease ?? value <= min)
+  const btnPrimario = {
+    backgroundColor: 'var(--delivery-primary-dark)',
+    color: 'var(--delivery-btn-text)',
+  }
+
+  if (somenteAumentar) {
+    return (
+      <button
+        type="button"
+        onClick={onIncrease}
+        aria-label={increaseLabel}
+        className={`flex ${btnSize} items-center justify-center rounded-lg border transition-colors`}
+        style={{
+          ...btnPrimario,
+          borderColor: 'var(--delivery-border)',
+        }}
+      >
+        <MdAdd className={iconSize} />
+      </button>
+    )
+  }
 
   return (
     <div
@@ -57,10 +82,7 @@ export function DeliveryQuantidadeStepper({
                 backgroundColor: 'transparent',
                 color: '#ef4444',
               }
-            : {
-                backgroundColor: 'var(--delivery-primary-dark)',
-                color: 'var(--delivery-btn-text)',
-              }
+            : btnPrimario
         }
       >
         {showRemove ? (
@@ -81,10 +103,7 @@ export function DeliveryQuantidadeStepper({
         onClick={onIncrease}
         aria-label={increaseLabel}
         className={`flex ${btnSize} items-center justify-center transition-colors`}
-        style={{
-          backgroundColor: 'var(--delivery-primary-dark)',
-          color: 'var(--delivery-btn-text)',
-        }}
+        style={btnPrimario}
       >
         <MdAdd className={iconSize} />
       </button>

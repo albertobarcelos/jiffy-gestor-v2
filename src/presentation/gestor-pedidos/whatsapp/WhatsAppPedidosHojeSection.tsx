@@ -27,6 +27,8 @@ import {
   usePedidosDeliveryInfinite,
 } from '@/src/presentation/components/features/kanban/hooks/usePedidosDeliveryInfinite'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { invalidateCaixaEstacaoAtualQueries } from '@/src/presentation/components/features/meu-caixa/hooks/caixaEstacaoCache'
+import { useEstacaoDestePc } from '@/src/presentation/hooks/useEstacaoDestePc'
 import { intervaloPresetKanbanFiltroData } from '@/src/presentation/components/features/kanban/utils/kanbanFiltroDataPresets'
 import { KANBAN_DELIVERY_DELTA_POLL_INTERVAL_MS } from '@/src/presentation/components/features/kanban/utils/kanbanVendasListagem'
 import { getKanbanColumnsConfig } from '@/src/presentation/components/features/kanban/utils/kanbanColumnsConfig'
@@ -48,6 +50,7 @@ type Props = {
 export function WhatsAppPedidosHojeSection({ telefone, clienteNome, onOverlayAberto }: Props) {
   const queryClient = useQueryClient()
   const empresaId = useTenantEmpresaId()
+  const { estacaoId } = useEstacaoDestePc()
   const { timezoneAgregacao, empresa } = useEmpresaMe()
   const { preferenciasImpressaoDelivery } = usePreferenciasImpressaoDelivery()
   const q = termoBuscaKanbanParaApi(telefone || clienteNome || '')
@@ -168,6 +171,9 @@ export function WhatsAppPedidosHojeSection({ telefone, clienteNome, onOverlayAbe
       void preTransicao.processarAposTransicoes(venda, acoesExecutadas, ticketsPreload, {
         omitirAvisoSemVinculoPc: true,
       })
+      if (acoesExecutadas.includes('finalizar') && empresaId) {
+        void invalidateCaixaEstacaoAtualQueries(queryClient, empresaId, estacaoId)
+      }
       void query.refetch()
     },
     verificarImpressaoAntesTransicoes: preTransicao.verificarImpressaoAntesTransicoes,

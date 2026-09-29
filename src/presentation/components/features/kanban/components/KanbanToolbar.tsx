@@ -1,17 +1,9 @@
 'use client'
 
-import { useState } from 'react'
-import { FormControl, InputLabel, MenuItem, Select } from '@mui/material'
-import {
-  MdAdd,
-  MdFilterAltOff,
-  MdFilterList,
-  MdRefresh,
-  MdSearch,
-  MdSettings,
-} from 'react-icons/md'
-import { FredySomPedidosToggle } from '@/src/presentation/gestor-pedidos/som/FredySomPedidosToggle'
-import { KanbanModoVendasToggle, type ModoKanbanVendas } from '../KanbanModoVendasToggle'
+import { MdFilterAltOff, MdFilterList } from 'react-icons/md'
+import { useKanbanToolbarQuebra } from '../hooks/useKanbanToolbarQuebra'
+import { montarChaveConteudoToolbar } from '../utils/montarChaveConteudoToolbar'
+import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
 import type {
   ColunaKanbanFiltroExtra,
   ColunaKanbanId,
@@ -21,15 +13,12 @@ import type {
   TipoEntregaFiltro,
 } from '../types'
 import type { ModoVisualizacaoKanban } from '../utils/kanbanModoVisualizacao'
-import { CompartilharCardapioPublicoButton } from './CompartilharCardapioPublicoButton'
-import { KanbanColunasMenu } from './KanbanColunasMenu'
-import { KanbanModoVisualizacaoSelect } from './KanbanModoVisualizacaoSelect'
-import { LojaAbertaToggle } from '@/src/presentation/components/features/delivery/LojaAbertaToggle'
+import type { KanbanFiltroDataPreset } from '../utils/kanbanFiltroDataPresets'
 import type { SuperficieQuadroPedidos } from '@/src/presentation/gestor-pedidos/superficieQuadroPedidos'
-import {
-  KANBAN_FILTRO_DATA_PRESET_OPCOES,
-  type KanbanFiltroDataPreset,
-} from '../utils/kanbanFiltroDataPresets'
+import { KanbanToolbarAcoesOperacao } from './KanbanToolbarAcoesOperacao'
+import { KanbanToolbarAcoesPrincipais } from './KanbanToolbarAcoesPrincipais'
+import { KanbanToolbarFiltros } from './KanbanToolbarFiltros'
+import { KANBAN_BUTTON_COLOR } from './kanbanToolbarTheme'
 
 export interface KanbanToolbarProps {
   searchInput: string
@@ -39,12 +28,10 @@ export interface KanbanToolbarProps {
   onToggleFiltrosMobile: () => void
   origemFilter: OrigemFiltro
   onOrigemFilterChange: (value: OrigemFiltro) => void
-  /** Canal unificado (`tipo` na API) — modo balcão. */
   tipoCanalFilter: TipoCanalFiltro
   onTipoCanalFilterChange: (value: TipoCanalFiltro) => void
   tipoEntregaFilter: TipoEntregaFiltro
   onTipoEntregaFilterChange: (value: TipoEntregaFiltro) => void
-  /** Filtro extra balcão: Emitidas / Pendentes / Rejeitadas / Todas (`colunaKanban`). */
   colunaKanbanFiltro?: ColunaKanbanFiltroExtra
   onColunaKanbanFiltroChange?: (value: ColunaKanbanFiltroExtra) => void
   terminalFilter: string
@@ -63,6 +50,8 @@ export interface KanbanToolbarProps {
   modoVisualizacao: ModoVisualizacaoKanban
   onModoVisualizacaoChange: (value: ModoVisualizacaoKanban) => void
   onAbrirConfiguracoesDelivery: () => void
+  onAbrirCaixaEstacao: () => void
+  caixaAberta?: boolean | null
   onAbrirNovoPedido: () => void
   colunasDoModo: KanbanColumn[]
   colunasOcultas: readonly ColunaKanbanId[]
@@ -71,414 +60,121 @@ export interface KanbanToolbarProps {
   superficie: SuperficieQuadroPedidos
 }
 
-const KANBAN_BUTTON_COLOR = '#530CA3'
-
-const sxKanbanFiltroSelect = {
-  minWidth: 140,
-  '& .MuiOutlinedInput-root': {
-    height: 32,
-    minHeight: 32,
-    borderRadius: '8px',
-    backgroundColor: 'var(--color-info)',
-    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
-    '& .MuiOutlinedInput-notchedOutline': {
-      borderColor: 'rgba(0, 0, 0, 0.23)',
-      borderWidth: 1,
-    },
-    '&:hover .MuiOutlinedInput-notchedOutline': {
-      borderColor: 'rgba(0, 0, 0, 0.23)',
-    },
-    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-      borderColor: 'var(--color-primary)',
-      borderWidth: 1,
-    },
-  },
-  '& .MuiInputLabel-root': {
-    color: 'var(--color-secondary-text)',
-    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
-    fontSize: '0.875rem',
-    fontWeight: 300,
-  },
-  '& .MuiInputLabel-root.Mui-focused, & .MuiInputLabel-root.MuiInputLabel-shrink': {
-    color: 'var(--color-secondary-text)',
-    fontWeight: 300,
-  },
-} as const
-
-const MESES_ABREV = [
-  'jan',
-  'fev',
-  'mar',
-  'abr',
-  'mai',
-  'jun',
-  'jul',
-  'ago',
-  'set',
-  'out',
-  'nov',
-  'dez',
-] as const
-
-function formatarDataHoraFiltroCurta(date: Date): string {
-  const dia = String(date.getDate()).padStart(2, '0')
-  const mes = MESES_ABREV[date.getMonth()]
-  const h = String(date.getHours()).padStart(2, '0')
-  const min = String(date.getMinutes()).padStart(2, '0')
-  return `${dia}-${mes} ${h}:${min}`
-}
-
-function PeriodoSelecionadoResumo({
-  inicio,
-  fim,
-}: {
-  inicio: Date
-  fim: Date
-}) {
-  return (
-    <div className="flex shrink-0 flex-col gap-0 text-[11px] leading-snug text-primary/85 sm:text-xs">
-      <span className="whitespace-nowrap">Dt. Ini.: {formatarDataHoraFiltroCurta(inicio)}</span>
-      <span className="whitespace-nowrap">Dt. Fim: {formatarDataHoraFiltroCurta(fim)}</span>
-    </div>
-  )
-}
-
-function FiltroDataPresetSelect({
-  labelId,
-  label,
-  preset,
-  onPresetChange,
-  periodoResumo,
-}: {
-  labelId: string
-  label: string
-  preset: KanbanFiltroDataPreset
-  onPresetChange: (preset: KanbanFiltroDataPreset) => void
-  periodoResumo?: { inicio: Date; fim: Date } | null
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-2">
-        <FormControl
-          size="small"
-          variant="outlined"
-          sx={{ ...sxKanbanFiltroSelect, minWidth: 168 }}
-        >
-          <InputLabel id={labelId} shrink>
-            {label}
-          </InputLabel>
-          <Select
-            labelId={labelId}
-            label={label}
-            value={preset}
-            onChange={e => onPresetChange(e.target.value as KanbanFiltroDataPreset)}
-            className=""
-          >
-            {KANBAN_FILTRO_DATA_PRESET_OPCOES.map(opcao => (
-              <MenuItem key={opcao.value} value={opcao.value}>
-                {opcao.label}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        {preset === 'por_data' && periodoResumo ? (
-          <PeriodoSelecionadoResumo inicio={periodoResumo.inicio} fim={periodoResumo.fim} />
-        ) : null}
-      </div>
-    </div>
-  )
-}
-
 export function KanbanToolbar(props: KanbanToolbarProps) {
-  const {
-    searchInput,
-    onSearchInputChange,
-    onRefresh,
-    filtrosVisiveisMobile,
-    onToggleFiltrosMobile,
-    origemFilter,
-    onOrigemFilterChange,
-    tipoCanalFilter,
-    onTipoCanalFilterChange,
-    tipoEntregaFilter,
-    onTipoEntregaFilterChange,
-    colunaKanbanFiltro: colunaKanbanFiltroProp,
-    onColunaKanbanFiltroChange,
-    terminalFilter,
-    onTerminalFilterChange,
-    terminais,
-    isLoadingTerminais,
-    origemFilterDisabled = false,
-    tipoCanalFilterDisabled = false,
-    periodoPreset,
-    onPeriodoPresetChange,
-    periodoInicio,
-    periodoFim,
-    onClearFilters,
-    modoKanbanVendas,
-    onModoKanbanVendasChange,
-    modoVisualizacao,
-    onModoVisualizacaoChange,
-    onAbrirConfiguracoesDelivery,
-    onAbrirNovoPedido,
-    colunasDoModo,
-    colunasOcultas,
-    onSetColunaVisivel,
-    contagemPorColuna,
-    superficie,
-  } = props
-
-  const isModoDelivery = modoKanbanVendas === 'delivery'
-  const [refreshSpinning, setRefreshSpinning] = useState(false)
-  const colunaKanbanFiltro = colunaKanbanFiltroProp ?? ''
-  const onColunaKanbanFiltro = onColunaKanbanFiltroChange ?? (() => undefined)
-  const noFredy = superficie === 'fredy'
+  const colunaKanbanFiltro = props.colunaKanbanFiltro ?? ''
+  const onColunaKanbanFiltro = props.onColunaKanbanFiltroChange ?? (() => undefined)
+  const isModoDelivery = props.modoKanbanVendas === 'delivery'
+  const noFredy = props.superficie === 'fredy'
+  const { containerRef, filtrosRef, acoesCimaRef, acoesBaixoRef, quebra } =
+    useKanbanToolbarQuebra(
+      montarChaveConteudoToolbar({
+        periodoPreset: props.periodoPreset,
+        periodoInicioMs: props.periodoInicio?.getTime() ?? '',
+        periodoFimMs: props.periodoFim?.getTime() ?? '',
+        origem: props.origemFilter,
+        tipoEntrega: props.tipoEntregaFilter,
+        tipoCanal: props.tipoCanalFilter,
+        terminal: props.terminalFilter,
+        coluna: colunaKanbanFiltro,
+        modo: props.modoKanbanVendas,
+      })
+    )
 
   return (
     <div className="bg-primary-background mt-2 flex-shrink-0 rounded-b-lg rounded-t-lg pb-0">
       <div className="flex justify-end py-2 sm:hidden">
         <button
           type="button"
-          onClick={onToggleFiltrosMobile}
+          onClick={props.onToggleFiltrosMobile}
           className="flex items-center gap-2 rounded-md px-3 py-1 text-sm text-white shadow-sm"
           style={{ backgroundColor: KANBAN_BUTTON_COLOR }}
-          aria-expanded={filtrosVisiveisMobile}
+          aria-expanded={props.filtrosVisiveisMobile}
         >
-          {filtrosVisiveisMobile ? <MdFilterAltOff size={18} /> : <MdFilterList size={18} />}
-          <span>{filtrosVisiveisMobile ? 'Ocultar filtros' : 'Mostrar filtros'}</span>
+          {props.filtrosVisiveisMobile ? <MdFilterAltOff size={18} /> : <MdFilterList size={18} />}
+          <span>{props.filtrosVisiveisMobile ? 'Ocultar filtros' : 'Mostrar filtros'}</span>
         </button>
       </div>
 
       <div
-        className={`flex flex-wrap items-end justify-center gap-x-1 gap-y-4 rounded-t-lg bg-custom-2 px-1 pb-2 pt-1.5 md:justify-start ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
+        ref={containerRef}
+        className={`min-w-0 rounded-t-lg bg-custom-2 px-1 py-1.5 ${
+          props.filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'
+        } flex-row flex-nowrap items-center gap-1.5`}
       >
         <div
+          ref={filtrosRef}
+          className={`flex items-center gap-1 ${
+            quebra ? 'min-w-0 flex-1 flex-wrap' : 'shrink-0 flex-nowrap'
+          }`}
+        >
+          <KanbanToolbarFiltros
+            isModoDelivery={isModoDelivery}
+            noFredy={noFredy}
+            searchInput={props.searchInput}
+            onSearchInputChange={props.onSearchInputChange}
+            onRefresh={props.onRefresh}
+            origemFilter={props.origemFilter}
+            onOrigemFilterChange={props.onOrigemFilterChange}
+            tipoCanalFilter={props.tipoCanalFilter}
+            onTipoCanalFilterChange={props.onTipoCanalFilterChange}
+            tipoEntregaFilter={props.tipoEntregaFilter}
+            onTipoEntregaFilterChange={props.onTipoEntregaFilterChange}
+            colunaKanbanFiltro={colunaKanbanFiltro}
+            onColunaKanbanFiltro={onColunaKanbanFiltro}
+            terminalFilter={props.terminalFilter}
+            onTerminalFilterChange={props.onTerminalFilterChange}
+            terminais={props.terminais}
+            isLoadingTerminais={props.isLoadingTerminais}
+            origemFilterDisabled={props.origemFilterDisabled ?? false}
+            tipoCanalFilterDisabled={props.tipoCanalFilterDisabled ?? false}
+            periodoPreset={props.periodoPreset}
+            onPeriodoPresetChange={props.onPeriodoPresetChange}
+            periodoInicio={props.periodoInicio}
+            periodoFim={props.periodoFim}
+            onClearFilters={props.onClearFilters}
+            modoKanbanVendas={props.modoKanbanVendas}
+            colunasDoModo={props.colunasDoModo}
+            colunasOcultas={props.colunasOcultas}
+            onSetColunaVisivel={props.onSetColunaVisivel}
+            contagemPorColuna={props.contagemPorColuna}
+          />
+        </div>
+        <div
           className={
-            noFredy
-              ? 'flex min-w-[18rem] flex-[1_1_18rem] items-end gap-0.5 sm:max-w-2xl'
-              : 'flex w-[13.5rem] shrink-0 flex-col gap-1'
+            quebra
+              ? 'ml-auto flex shrink-0 flex-col items-end justify-center gap-1'
+              : 'contents'
           }
         >
-          <div className="relative min-w-0 w-full flex-1 px-1">
-            <MdSearch
-              className="absolute left-2 top-1/2 -translate-y-1/2 text-secondary-text"
-              size={20}
-            />
-            <input
-              type="text"
-              placeholder={noFredy ? 'Código, cliente ou telefone' : 'Buscar pedido'}
-              value={searchInput}
-              onChange={e => onSearchInputChange(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && onRefresh()}
-              className="h-8 w-full rounded-lg border bg-info pl-6 pr-3 text-sm shadow-sm"
-              aria-label={noFredy ? 'Código, cliente ou telefone' : 'Buscar pedido'}
+          <div
+            ref={acoesCimaRef}
+            className={`flex shrink-0 items-center justify-end gap-1 ${
+              quebra ? '' : 'order-3'
+            }`}
+          >
+            <KanbanToolbarAcoesPrincipais
+              isModoDelivery={isModoDelivery}
+              onAbrirConfiguracoesDelivery={props.onAbrirConfiguracoesDelivery}
+              onAbrirNovoPedido={props.onAbrirNovoPedido}
             />
           </div>
-          {noFredy ? (
-            <KanbanColunasMenu
-              variante="discreto"
-              colunasDoModo={colunasDoModo}
-              ocultas={colunasOcultas}
-              onSetColunaVisivel={onSetColunaVisivel}
-              contagemPorColuna={contagemPorColuna}
+          <div
+            ref={acoesBaixoRef}
+            className={`flex shrink-0 items-center justify-end gap-1 ${
+              quebra ? '' : 'order-2 ml-auto'
+            }`}
+          >
+            <KanbanToolbarAcoesOperacao
+              noFredy={noFredy}
+              onRefresh={props.onRefresh}
+              onAbrirCaixaEstacao={props.onAbrirCaixaEstacao}
+              caixaAberta={props.caixaAberta}
+              modoKanbanVendas={props.modoKanbanVendas}
+              onModoKanbanVendasChange={props.onModoKanbanVendasChange}
+              modoVisualizacao={props.modoVisualizacao}
+              onModoVisualizacaoChange={props.onModoVisualizacaoChange}
             />
-          ) : null}
-        </div>
-
-        {!isModoDelivery ? (
-        <div className="flex flex-col gap-1">
-          <FormControl size="small" variant="outlined" sx={sxKanbanFiltroSelect}>
-            <InputLabel id="kanban-filtro-tipo-canal-label" shrink>
-              Canal
-            </InputLabel>
-            <Select
-              labelId="kanban-filtro-tipo-canal-label"
-              label="Canal"
-              value={tipoCanalFilter}
-              onChange={e => onTipoCanalFilterChange(e.target.value as TipoCanalFiltro)}
-              displayEmpty
-              disabled={tipoCanalFilterDisabled}
-              className=""
-            >
-              <MenuItem value="">Todos</MenuItem>
-              <MenuItem value="PDV">POS</MenuItem>
-              <MenuItem value="GESTOR">Balcão</MenuItem>
-            </Select>
-          </FormControl>
-        </div>
-        ) : null}
-
-        <div className="flex flex-col gap-1">
-          <FormControl size="small" variant="outlined" sx={sxKanbanFiltroSelect}>
-            <InputLabel id="kanban-filtro-origem-label" shrink>
-              Origem
-            </InputLabel>
-            <Select
-              labelId="kanban-filtro-origem-label"
-              label="Origem"
-              value={origemFilter}
-              onChange={e => onOrigemFilterChange(e.target.value as OrigemFiltro)}
-              displayEmpty
-              disabled={origemFilterDisabled}
-              className=""
-            >
-              <MenuItem value="">Todas</MenuItem>
-              {!isModoDelivery ? <MenuItem value="PDV">POS</MenuItem> : null}
-              <MenuItem value="GESTOR">
-                {isModoDelivery ? 'Gestor Delivery' : 'Gestor'}
-              </MenuItem>
-              <MenuItem value="JIFFY_DELIVERY">Jiffy Delivery</MenuItem>
-              <MenuItem value="AIQFOME">Aiqfome</MenuItem>
-              <MenuItem value="IFOOD">iFood</MenuItem>
-            </Select>
-          </FormControl>
-        </div>
-
-        {isModoDelivery ? (
-        <div className="flex flex-col gap-1">
-          <FormControl size="small" variant="outlined" sx={sxKanbanFiltroSelect}>
-            <InputLabel id="kanban-filtro-tipo-entrega-label" shrink>
-              Tipo de entrega
-            </InputLabel>
-            <Select
-              labelId="kanban-filtro-tipo-entrega-label"
-              label="Tipo de entrega"
-              value={tipoEntregaFilter}
-              onChange={e => onTipoEntregaFilterChange(e.target.value as TipoEntregaFiltro)}
-              displayEmpty
-              className=""
-            >
-              <MenuItem value="">Todos</MenuItem>
-              <MenuItem value="entrega">Entrega</MenuItem>
-              <MenuItem value="retirada">Retirada</MenuItem>
-            </Select>
-          </FormControl>
-        </div>
-        ) : null}
-
-        {modoKanbanVendas === 'balcao' ? (
-        <div className="flex flex-col gap-1">
-          <FormControl size="small" variant="outlined" sx={sxKanbanFiltroSelect}>
-            <InputLabel id="kanban-filtro-coluna-fiscal-label" shrink>
-              Filtro
-            </InputLabel>
-            <Select
-              labelId="kanban-filtro-coluna-fiscal-label"
-              label="Filtro"
-              value={colunaKanbanFiltro}
-              onChange={e =>
-                onColunaKanbanFiltro(e.target.value as ColunaKanbanFiltroExtra)
-              }
-              displayEmpty
-              className=""
-            >
-              <MenuItem value="">Emitidas</MenuItem>
-              <MenuItem value="PENDENTE_EMISSAO">Pendentes</MenuItem>
-              <MenuItem value="REJEITADAS">Rejeitadas</MenuItem>
-              <MenuItem value="TODAS">Todas</MenuItem>
-            </Select>
-          </FormControl>
-        </div>
-        ) : null}
-
-        {modoKanbanVendas === 'balcao' ? (
-        <div className="flex flex-col gap-1">
-          <FormControl
-            size="small"
-            variant="outlined"
-            sx={{ ...sxKanbanFiltroSelect, minWidth: 160 }}
-          >
-            <InputLabel id="kanban-filtro-terminal-label" shrink>
-              Terminal
-            </InputLabel>
-            <Select
-              labelId="kanban-filtro-terminal-label"
-              label="Terminal"
-              value={terminalFilter}
-              onChange={e => onTerminalFilterChange(e.target.value)}
-              displayEmpty
-              disabled={isLoadingTerminais}
-              className=""
-            >
-              <MenuItem value="">Todos</MenuItem>
-              {terminais.map(terminal => (
-                <MenuItem key={terminal.id} value={terminal.id}>
-                  {terminal.nome}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </div>
-        ) : null}
-
-        <FiltroDataPresetSelect
-          labelId="kanban-filtro-periodo-label"
-          label="Filtrar por Período"
-          preset={periodoPreset}
-          onPresetChange={onPeriodoPresetChange}
-          periodoResumo={
-            periodoInicio && periodoFim ? { inicio: periodoInicio, fim: periodoFim } : null
-          }
-        />
-
-        <button
-          onClick={onClearFilters}
-          className="flex h-8 items-center justify-center gap-1 rounded-lg border px-1 text-sm transition-colors"
-          style={{ borderColor: KANBAN_BUTTON_COLOR, color: KANBAN_BUTTON_COLOR }}
-        >
-          <MdFilterAltOff size={16} />
-          Limpar
-        </button>
-
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
-          <button
-            type="button"
-            onClick={() => {
-              setRefreshSpinning(true)
-              void Promise.resolve(onRefresh()).finally(() => setRefreshSpinning(false))
-            }}
-            className="rounded-lg border border-gray-200 bg-white p-1.5 text-gray-600 shadow-sm transition-colors hover:bg-gray-50 hover:text-primary"
-            title="Atualizar listagem"
-            aria-label="Atualizar listagem do kanban"
-          >
-            <MdRefresh className={`h-5 w-5 ${refreshSpinning ? 'animate-spin' : ''}`} />
-          </button>
-          <CompartilharCardapioPublicoButton />
-          {noFredy ? <FredySomPedidosToggle /> : null}
-          {noFredy ? (
-            <KanbanModoVisualizacaoSelect
-              value={modoVisualizacao}
-              onChange={onModoVisualizacaoChange}
-            />
-          ) : null}
-          {noFredy ? null : (
-            <KanbanModoVendasToggle value={modoKanbanVendas} onChange={onModoKanbanVendasChange} />
-          )}
-          {isModoDelivery ? <LojaAbertaToggle /> : null}
-          <button
-            type="button"
-            onClick={onAbrirConfiguracoesDelivery}
-            className="rounded-lg border border-gray-200 bg-white p-1.5 text-gray-600 shadow-sm transition-colors hover:bg-gray-50 hover:text-primary"
-            title={
-              isModoDelivery ? 'Configurações do delivery' : 'Cardápio do balcão'
-            }
-            aria-label={
-              isModoDelivery
-                ? 'Abrir configurações do delivery'
-                : 'Escolher cardápio do balcão'
-            }
-          >
-            <MdSettings className="h-5 w-5" />
-          </button>
-          <button
-            type="button"
-            onClick={onAbrirNovoPedido}
-            className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-white transition-colors"
-            style={{ backgroundColor: KANBAN_BUTTON_COLOR }}
-          >
-            <MdAdd className="h-4 w-4" />
-            Pedido
-          </button>
+          </div>
         </div>
       </div>
     </div>

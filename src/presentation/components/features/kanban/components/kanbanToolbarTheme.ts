@@ -1,0 +1,1 @@
+export const KANBAN_BUTTON_COLOR = '#530CA3'

@@ -2,20 +2,22 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode, type SelectHTMLAttributes } from 'react'
 import { MdKeyboardArrowDown } from 'react-icons/md'
-import type { ImpressoraLogica } from '@/src/infrastructure/api/estacoesImpressaoApi'
+import type { ImpressoraLogica } from '@/src/domain/estacao-impressao/EstacaoImpressao'
 import {
   jaPediuDownloadJiffyPrint,
   marcarDownloadJiffyPrintIniciado,
   mensagemJiffyPrintIndisponivel,
+} from '@/src/infrastructure/printing/agent/localAgentClient'
+import {
   nomeFicheiroInstaladorJiffyPrint,
   urlInstaladorJiffyPrint,
-} from '@/src/infrastructure/printing/agent/localAgentClient'
+} from '@/src/shared/constants/jiffyPrintSetup'
 import { fetchAgentSystemPrinters } from '@/src/infrastructure/printing/agent/systemPrintersClient'
 import {
   formatTcpPrinterRef,
   isTcpPrinterRef,
   parseTcpPrinterRef,
-} from '@/src/infrastructure/printing/tcpPrinterRef'
+} from '@/src/domain/estacao-impressao/tcpPrinterRef'
 import {
   MODO_IMPRESSAO_IMPRESSORA_OPCOES,
   parseModoImpressaoImpressora,

@@ -9,7 +9,7 @@ import {
   jaImprimiuDeliveryRecentemente,
   marcarImpressaoDeliveryRecente,
 } from '@/src/application/delivery/impressaoDeliveryDedupe'
-import { fetchVendaGestorTickets } from '@/src/infrastructure/api/fetchVendaGestorTickets'
+import type { CarregarPayloadTicketsImpressao } from '@/src/application/delivery/carregarPayloadTicketsImpressaoDelivery'
 import type { DeliveryCupomTemplateConfig } from '@/src/shared/types/deliveryCupomTemplate'
 import type { PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
 import type { EmpresaMeResumo } from '@/src/application/dto/EmpresaMeDTO'
@@ -32,6 +32,7 @@ export type ImprimirPorComandoRealtimeParams = {
   onErro?: (mensagem: string) => void
   onAviso?: (mensagem: string) => void
   imprimirTickets: ImprimirTicketsApiGestor
+  carregarPayload: CarregarPayloadTicketsImpressao
 }
 
 /**
@@ -56,7 +57,9 @@ export async function imprimirPorComandoRealtime(
     return 'sem_token'
   }
 
-  const ticketsFetch = await fetchVendaGestorTickets(vendaId, token, {
+  const ticketsFetch = await params.carregarPayload({
+    vendaId,
+    accessToken: token,
     prefs: params.prefs,
     empresa: params.empresa,
   })

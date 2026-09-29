@@ -14,11 +14,6 @@ export interface CriarVendaGestorInputDTO {
   tipoInicioPedido: 'balcao' | 'delivery'
   origem: OrigemVenda
   status: StatusVenda
-  /**
-   * Estação deste PC (caixa). Obrigatória no create balcão — resolvida no submit
-   * a partir do storage / config deste computador.
-   */
-  estacaoId?: string
   produtos: ProdutoSelecionado[]
   pagamentos: PagamentoSelecionado[]
   totalProdutos: number
@@ -47,6 +42,11 @@ export interface CriarVendaGestorInputDTO {
   meiosPagamento: Array<{ getId(): string; getNome(): string }>
   nomesMeiosPagamentoPedido: Record<string, string>
   observacaoPedido?: string
+  /**
+   * Estação deste PC (`gestor-estacao-impressao-id`).
+   * Obrigatória no create de balcão — resolvida no submit.
+   */
+  estacaoId?: string
 }
 
 export type { CriarVendaGestorApiRequest as CriarVendaGestorPayload } from '@/src/application/dto/api/vendaGestorApi'

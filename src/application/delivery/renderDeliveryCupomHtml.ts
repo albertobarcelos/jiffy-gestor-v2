@@ -10,31 +10,40 @@ import {
   type DeliveryCupomModeloFonteConfig,
   type DeliveryCupomTemplateConfig,
 } from '@/src/shared/types/deliveryCupomTemplate'
-import {
-  renderDashSeparatorHtml,
-  renderQrSvg,
-  TRACEJADO_PRODUCAO,
-} from '@/src/infrastructure/printing/receiptBitmaps'
+import { TRACEJADO_PRODUCAO } from '@/src/shared/printing/cupomTracejado'
+import { renderDashSeparatorHtml, renderQrSvg } from '@/src/shared/printing/receiptBitmaps'
 import {
   avisoCobrancaEntregadorCupom,
   deveCobrarNaEntregaCupom,
   linhasResumoPagamentoCupom,
 } from '@/src/application/delivery/textoPagamentoCupomDelivery'
-import { fonteProdutoEscPosA22Px } from '@/src/application/delivery/cupomPrintLayout'
 import {
+  fonteEmpresaEscPosA11Px,
+  fonteProdutoEscPosA22Px,
+} from '@/src/application/delivery/cupomPrintLayout'
+import {
+  cupomMostraQrWhatsappCliente,
   detalheLinhasItemPedido,
+  expedicaoDestacaItensPedido,
+  fonteItensExpedicaoPx,
   grupoModificadorProducao,
   identidadePrimariaEhTipoAvulso,
   montarModeloProducao80mm,
+  textosIdentidadeProducao,
 } from '@/src/application/delivery/layoutProducao80mm'
 import { origemModeloProducaoDeTicket } from '@/src/application/delivery/origemModeloProducao'
-import { ESCPOS_FONT_A_FACE_CSS } from '@/src/infrastructure/printing/escposFontAFace'
+import { valorComplementoParaExibicaoCupom } from '@/src/application/delivery/valorComplementoImpressao'
+import { ESCPOS_FONT_A_FACE_CSS } from '@/src/shared/printing/escposFontAFaceCss'
 
 export interface RenderDeliveryCupomHtmlInput {
   root: VendaGestorTicketsResponse
   ticket: VendaGestorTicket
   nomeEmpresa?: string
   template?: DeliveryCupomTemplateConfig
+  /** Nome da empresa sai em ESC/POS (igual produção); o HTML não pinta de novo. */
+  omitirNomeEmpresa?: boolean
+  /** Pílula RETIRADA/ENTREGA sai no PNG da produção; o HTML não pinta de novo. */
+  omitirIdentidade?: boolean
 }
 
 let cupomInnerWidthPx = 280
@@ -167,18 +176,13 @@ function formatEnderecoPrincipal(ent: VendaGestorTicketsResponse['enderecoEntreg
     .join(', ')
 }
 
-function normalizarTipoVenda(root: VendaGestorTicketsResponse): string {
-  const raw = String(root.tipoVenda || '').trim().toLowerCase()
-  if (!raw) return 'Entrega'
-  if (raw.includes('balc')) return 'Balcão'
-  if (raw.includes('retir') || raw.includes('pickup') || raw.includes('take')) return 'Retirada'
-  if (raw.includes('entrega') || raw.includes('delivery')) return 'Entrega'
-  return raw.charAt(0).toUpperCase() + raw.slice(1)
-}
-
-function codigoPedido(root: VendaGestorTicketsResponse): string {
-  const codigo = root.codigoVenda || root.rastreamento?.codigoVenda || ''
-  return codigo ? `#${codigo}` : ''
+function identidadeCabecalho(root: VendaGestorTicketsResponse): string {
+  return textosIdentidadeProducao({
+    tipoVenda: root.tipoVenda,
+    tipoEntrega: root.tipoEntrega,
+    codigoVenda: root.codigoVenda || root.rastreamento?.codigoVenda,
+    numeroVenda: root.numeroVenda,
+  }).primaria
 }
 
 function nomeEmpresa(root: VendaGestorTicketsResponse, fallback: string): string {
@@ -248,13 +252,16 @@ function valorItem(item: VendaGestorTicketItem): number | null {
 }
 
 function valorComplemento(comp: {
+  tipoImpactoPreco?: string | null
+  quantidade?: number | null
   impressao?: {
     valorFinal?: number | null
     valorTotal?: number | null
     valorUnitario?: number | null
+    quantidade?: number | null
   } | null
 } | null): number | null {
-  return numeroFinito(comp?.impressao?.valorFinal ?? comp?.impressao?.valorTotal ?? comp?.impressao?.valorUnitario)
+  return valorComplementoParaExibicaoCupom(comp)
 }
 
 function marcarSinalComplementoHtml(texto: string): string {
@@ -315,26 +322,21 @@ function resumoPedido(root: VendaGestorTicketsResponse, ticket: VendaGestorTicke
   }
 }
 
-function rotuloNumeroPedido(root: VendaGestorTicketsResponse): string {
-  const numero = root.numeroVenda
-  if (numero === undefined || numero === null || String(numero).trim() === '') return ''
-  return `Pedido <strong>#${escapeHtml(String(numero))}</strong>`
-}
-
 function renderCabecalho(
   root: VendaGestorTicketsResponse,
   template: DeliveryCupomTemplateConfig,
   empresa: string,
-  cabecalhoExtra: string
+  cabecalhoExtra: string,
+  omitirNomeEmpresa?: boolean,
+  omitirIdentidade?: boolean
 ): string {
-  const tipoVenda = normalizarTipoVenda(root)
-  const codigo = codigoPedido(root)
-  const pedido = rotuloNumeroPedido(root)
+  const identidade = identidadeCabecalho(root)
+  const mostrarEmpresa = Boolean(template.mostrarLogoTexto && empresa && !omitirNomeEmpresa)
+  const mostrarIdentidade = Boolean(identidade && !omitirIdentidade)
 
   return `<div class="header">
-    ${template.mostrarLogoTexto ? `<div class="brand">${escapeHtml(empresa)}</div>` : ''}
-    <div class="method">${pedido ? `${pedido} ` : ''}${escapeHtml(tipoVenda)}</div>
-    ${codigo ? `<div class="codigo-destaque">${escapeHtml(codigo)}</div>` : ''}
+    ${mostrarEmpresa ? `<div class="prod-brand">${escapeHtml(empresa)}</div>` : ''}
+    ${mostrarIdentidade ? `<div class="codigo-destaque">${escapeHtml(identidade)}</div>` : ''}
     ${cabecalhoExtra}
   </div>
   ${htmlSeparator()}`
@@ -376,11 +378,16 @@ function htmlPilulaProducao(texto: string, classe: string): string {
 
 function renderProducao(
   input: RenderDeliveryCupomHtmlInput,
-  _template: DeliveryCupomTemplateConfig,
+  template: DeliveryCupomTemplateConfig,
   _cabecalhoExtra: string,
   _rodapeExtra: string
 ): string {
-  const modelo = montarModeloProducao80mm(origemModeloProducaoDeTicket(input.root, input.ticket))
+  const modelo = montarModeloProducao80mm(
+    origemModeloProducaoDeTicket(input.root, input.ticket, {
+      nomeEmpresa: input.nomeEmpresa,
+      mostrarLogoTexto: template.mostrarLogoTexto,
+    })
+  )
   const itens = modelo.itens
     .map(item => {
       const extras = item.extras
@@ -396,6 +403,7 @@ function renderProducao(
 
   return `<div class="prod-80">
     ${modelo.reimpressao ? '<div class="prod-banner">** REIMPRESSAO **</div>' : ''}
+    ${modelo.empresa ? `<div class="prod-brand">${escapeHtml(modelo.empresa)}</div>` : ''}
     ${modelo.senha ? htmlPilulaProducao(modelo.senha, 'prod-pill-senha') : ''}
     ${modelo.conferencia ? '<div class="prod-banner">*** VIA DE CONFERENCIA ***</div>' : ''}
     ${modelo.unidade ? htmlPilulaProducao(modelo.unidade, 'prod-pill-codigo') : ''}
@@ -534,7 +542,14 @@ function renderExpedicao(
     (typeof cr?.celular === 'string' && cr.celular.trim()) ||
     ''
   const telefoneFormatado = tel ? formatTelefone(tel) : ''
-  return `${renderCabecalho(root, template, empresa, cabecalhoExtra)}
+  return `${renderCabecalho(
+    root,
+    template,
+    empresa,
+    cabecalhoExtra,
+    input.omitirNomeEmpresa,
+    input.omitirIdentidade
+  )}
   ${renderMetaPedido(root, { incluirDatas: true, incluirEntregador: false })}
   ${htmlSeparator()}
   <div class="section customer-section" style="white-space: normal; word-wrap: break-word; overflow-wrap: break-word; word-break: normal;">
@@ -542,7 +557,7 @@ function renderExpedicao(
     ${template.mostrarTelefoneCliente && telefoneFormatado ? `<div style="margin-bottom: 1px;"><strong>TELEFONE:</strong> ${escapeHtml(telefoneFormatado)}</div>` : ''}
   </div>
   ${renderEnderecoExpedicao(root, template)}
-  ${renderWhatsappQr(tel)}
+  ${cupomMostraQrWhatsappCliente(root.tipoVenda, root.tipoEntrega) ? renderWhatsappQr(tel) : ''}
   ${htmlSeparator()}
   ${renderTituloItensPedido(ticket)}
   ${renderItens(ticket, template, { mostrarValores: template.mostrarValores })}
@@ -589,11 +604,16 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
     fontesModelo.tamanhoFonteClienteEndereco ?? template.tamanhoFonteClienteEndereco,
     fonteBase
   )
-  const fonteItens = fonteBloco(
+  const fonteItensBase = fonteBloco(
     fontesModelo.tamanhoFonteItens ?? template.tamanhoFonteItens,
     fonteBase
   )
+  const destacaItensRetirada =
+    ticket.tipoCupom !== 'producao' &&
+    expedicaoDestacaItensPedido(input.root.tipoVenda, input.root.tipoEntrega)
+  const fonteItens = fonteItensExpedicaoPx(fonteItensBase, destacaItensRetirada)
   const fonteProduto = fonteProdutoEscPosA22Px(template.larguraMm)
+  const fonteEmpresa = fonteEmpresaEscPosA11Px(template.larguraMm)
   const fonteResumo = fonteBloco(
     fontesModelo.tamanhoFonteResumo ?? template.tamanhoFonteResumo,
     fonteBase
@@ -613,7 +633,10 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
   const negritoCabecalho = ehProducao && (fontesModelo.negritoCabecalho ?? dFontes.negritoCabecalho)
   const negritoPedido = fontesModelo.negritoPedido ?? dFontes.negritoPedido
   const negritoCliente = ehProducao && (fontesModelo.negritoClienteEndereco ?? dFontes.negritoClienteEndereco)
-  const negritoItens = ehProducao && (fontesModelo.negritoItens ?? dFontes.negritoItens)
+  const negritoItens =
+    (ehProducao && (fontesModelo.negritoItens ?? dFontes.negritoItens)) || destacaItensRetirada
+  const pesoItens = destacaItensRetirada ? '700' : peso(negritoItens)
+  const itemRowPyItens = destacaItensRetirada ? Math.max(itemRowPy, 2) : itemRowPy
   const negritoResumo = ehProducao && (fontesModelo.negritoResumo ?? dFontes.negritoResumo)
   const negritoPagamento = fontesModelo.negritoPagamento ?? dFontes.negritoPagamento
   const negritoRodape = fontesModelo.negritoRodape ?? dFontes.negritoRodape
@@ -635,9 +658,8 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
   .receipt[data-tipo="expedicao"] { -webkit-text-stroke:0.35px #000; }
   .header { text-align:center; padding-bottom:${headerGap}px; margin-bottom:${headerGap}px; font-size:${fonteCabecalho}px; font-weight:${peso(negritoCabecalho)}; }
   .header strong { font-weight:inherit; }
-  .brand { font-weight:inherit; font-size:${fonteCabecalho + 1}px; letter-spacing:.02em; }
   .method { display:inline-block; margin-top:${methodMt}px; padding:5px 12px 7px; font-weight:${negritoCabecalho ? 700 : pesoCorpo}; font-size:${Math.max(fonteCabecalho + 8, 17)}px; border:2px solid #000; border-radius:4px; line-height:1.05; }
-  .codigo-destaque { box-sizing:border-box; display:block; width:100%; margin-top:6px; padding:10px 4px 12px; background:#fff; color:#000; border:3px dashed #000; border-radius:4px; font-weight:700; font-size:${Math.max(fonteCabecalho + 14, 26)}px; letter-spacing:.16em; line-height:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .codigo-destaque { box-sizing:border-box; display:block; width:100%; margin-top:6px; padding:6px 4px 8px; background:#fff; color:#000; border:3px dashed #000; border-radius:4px; font-weight:800; font-size:${Math.max(fonteCabecalho + 4, 15)}px; letter-spacing:0; line-height:1.15; white-space:normal; overflow-wrap:anywhere; }
   .section { margin:${padding}px 0; }
   .meta-section, .meta-section strong { font-size:${fontePedido}px; font-weight:${peso(negritoPedido)}; }
   .customer-section, .address-section { font-size:${fonteClienteEndereco}px; font-weight:${pesoCorpo}; }
@@ -649,13 +671,13 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
   .whatsapp-qr div { max-width:130px; text-align:left; }
   .separator { width:100%; margin:${separatorPy}px 0; padding:0; border:0; line-height:0; }
   .separator img { display:block; width:100%; height:auto; image-rendering:pixelated; image-rendering:crisp-edges; }
-  .items-title { margin:${padding}px 0 ${template.densidade === 'compacto' ? 1 : 3}px; font-weight:${peso(negritoItens)}; font-size:${fonteItens}px; }
+  .items-title { margin:${padding}px 0 ${template.densidade === 'compacto' ? 1 : 3}px; font-weight:${pesoItens}; font-size:${fonteItens}px; }
   .items-title-inline { font-weight:${pesoCorpo}; white-space:nowrap; width:max-content; max-width:100%; }
   .items-title-label { display:inline-block; vertical-align:middle; font-weight:${pesoCorpo}; font-size:${Math.max(8, fonteItens - 3)}px; margin-right:6px; line-height:1.2; }
   .items-qty { display:inline-block; vertical-align:middle; box-sizing:border-box; min-width:1.15em; padding:1px 5px 4px; border:2px solid #000; border-radius:3px; line-height:1; text-align:center; overflow:visible; }
   .items-qty-n { display:inline-block; transform:translateY(-2px); font-weight:600; font-size:${Math.max(8, fonteItens - 2)}px; line-height:1; white-space:nowrap; }
-  .item-row { padding:${itemRowPy}px 0; font-size:${fonteItens}px; }
-  .item-title, .item-title .label, .item-title .value { font-weight:${peso(negritoItens)}; font-size:${fonteItens}px; line-height:1.15; }
+  .item-row { padding:${itemRowPyItens}px 0; font-size:${fonteItens}px; }
+  .item-title, .item-title .label, .item-title .value { font-weight:${pesoItens}; font-size:${fonteItens}px; line-height:1.15; }
   .row-line { display:flex; justify-content:space-between; align-items:baseline; gap:8px; width:100%; max-width:100%; box-sizing:border-box; overflow:hidden; }
   .row-line .label { flex:1 1 0; min-width:0; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .row-line .value { flex:0 0 auto; text-align:right; white-space:nowrap; }
@@ -679,12 +701,14 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
   .footer { margin-top:${footerMt}px; font-size:${fonteRodape}px; text-align:center; font-weight:${peso(negritoRodape)}; }
   .printed-at { color:#000; }
   .prod-80 { font-family:'EscPosFontA', ui-monospace, monospace; padding-bottom:48px; }
+  .prod-brand { text-align:center; font-family:'EscPosFontA', ui-monospace, monospace; font-weight:400; font-size:${fonteEmpresa}px; letter-spacing:0; margin:0 0 6px; line-height:1; -webkit-font-smoothing:none; -webkit-text-stroke:0; text-shadow:none; }
+  .receipt[data-tipo="expedicao"] .prod-brand { -webkit-text-stroke:0; text-shadow:none; }
   .prod-80 .separator { margin:6px 0; }
   .prod-banner { text-align:center; font-weight:800; font-size:${fontePedido}px; line-height:1.1; }
   .prod-pill { background:#fff; color:#000; border:3px dashed #000; border-radius:2px; text-align:center; font-family:Arial, Tahoma, sans-serif; font-weight:800; margin:0 4px 6px; line-height:1.1; -webkit-font-smoothing:none; }
   .prod-pill-senha { font-size:${Math.max(16, Math.round((40 * w) / 576))}px; padding:2px 16px; letter-spacing:.08em; }
   .prod-pill-id { font-size:${Math.max(16, Math.round((34 * w) / 576))}px; padding:3px 12px; }
-  .prod-pill-codigo { font-size:${Math.max(24, Math.round((46 * w) / 576))}px; padding:6px 8px 8px; letter-spacing:.04em; }
+  .prod-pill-codigo { font-size:${Math.max(16, Math.round((30 * w) / 576))}px; padding:4px 6px 6px; letter-spacing:0; }
   .prod-meta { text-align:center; font-weight:800; font-size:${Math.max(9, fonteRodape)}px; letter-spacing:.08em; }
   .prod-80 .prod-item { font-family:'EscPosFontA', ui-monospace, monospace; font-weight:800; font-size:${fonteProduto}px; line-height:1; white-space:pre-wrap; -webkit-font-smoothing:none; }
   .prod-80 .prod-extra { font-family:'EscPosFontA', ui-monospace, monospace; font-weight:800; font-size:${Math.max(12, Math.round(fonteProduto * 0.72))}px; line-height:1.05; white-space:pre; margin-top:2px; }
@@ -699,7 +723,7 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
   .prod-rodape { margin-top:8px; padding-bottom:8px; }
 </style>
 </head><body>
-<div class="receipt" data-densidade="${template.densidade}" data-tipo="${ticket.tipoCupom}">
+<div class="receipt" data-densidade="${template.densidade}" data-tipo="${ticket.tipoCupom}"${destacaItensRetirada ? ' data-atendimento="retirada"' : ''}>
   ${
     ticket.tipoCupom === 'producao'
       ? renderProducao(input, template, cabecalhoExtra, rodapeExtra)

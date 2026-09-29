@@ -1,6 +1,20 @@
 import type { ClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import { PublicDeliveryApiError } from '@/src/application/errors/publicDeliveryErrors'
 import { normalizarClienteDeliveryPublico } from '@/src/application/mappers/ClienteDeliveryPublicoMapper'
 import type { IClienteDeliveryPublicoPort } from '@/src/application/ports/delivery-publico'
+
+function clienteMinimo(
+  telefone: string,
+  nome?: string | null
+): ClienteDeliveryPublicoDTO {
+  return {
+    telefone,
+    nome: nome?.trim() || null,
+    cpf: null,
+    clienteIdVinculado: null,
+    enderecos: [],
+  }
+}
 
 export type GarantirClienteDeliveryPublicoInput = {
   telefone: string
@@ -36,7 +50,12 @@ export class GarantirClienteDeliveryPublicoUseCase {
       return lookup
     }
 
-    const existenteRaw = await this.clientePort.buscarPorTelefone(telefone)
+    let existenteRaw: ClienteDeliveryPublicoDTO | null
+    try {
+      existenteRaw = await this.clientePort.buscarPorTelefone(telefone)
+    } catch {
+      existenteRaw = null
+    }
     const existente = existenteRaw
       ? normalizarClienteDeliveryPublico(existenteRaw)
       : null
@@ -44,14 +63,21 @@ export class GarantirClienteDeliveryPublicoUseCase {
       return existente
     }
 
-    const criadoRaw = await this.clientePort.criar({
-      telefone,
-      nome: input.nome?.trim() || null,
-    })
-    const criado = normalizarClienteDeliveryPublico(criadoRaw)
-    if (!criado) {
-      throw new Error('Não foi possível cadastrar o cliente delivery')
+    try {
+      const criadoRaw = await this.clientePort.criar({
+        telefone,
+        nome: input.nome?.trim() || null,
+      })
+      const criado = normalizarClienteDeliveryPublico(criadoRaw)
+      if (!criado) {
+        throw new Error('Não foi possível cadastrar o cliente delivery')
+      }
+      return criado
+    } catch (error) {
+      if (error instanceof PublicDeliveryApiError && error.status === 409) {
+        return clienteMinimo(telefone, input.nome)
+      }
+      throw error
     }
-    return criado
   }
 }

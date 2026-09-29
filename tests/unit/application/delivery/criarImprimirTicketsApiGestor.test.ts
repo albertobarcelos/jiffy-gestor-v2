@@ -9,6 +9,7 @@ describe('criarImprimirTicketsApiGestor', () => {
     const desenharPilula = vi.fn().mockReturnValue(null)
     const imprimir = criarImprimirTicketsApiGestor({
       desenharPilula,
+      mapTicketToGraphicPrintDocument: vi.fn(),
       enviarCupom,
       gerarJobId,
     })
@@ -45,5 +46,36 @@ describe('criarImprimirTicketsApiGestor', () => {
         copies: 1,
       })
     )
+  })
+
+  it('avisa e não envia job quando o ticket não tem impressora deste PC', async () => {
+    const enviarCupom = vi.fn()
+    const onAviso = vi.fn()
+    const imprimir = criarImprimirTicketsApiGestor({
+      desenharPilula: vi.fn().mockReturnValue(null),
+      mapTicketToGraphicPrintDocument: vi.fn(),
+      enviarCupom,
+      gerarJobId: vi.fn(),
+    })
+
+    const ticket = {
+      tipoCupom: 'producao',
+      copias: 1,
+      impressoraId: 'imp-cozinha',
+      impressoraNome: 'COZINHA',
+      nomeImpressoraWindows: null,
+      impressora: { nome: 'COZINHA', nomeImpressoraWindows: null },
+      itens: [{ nomeProduto: 'X-Burger', quantidade: 1 }],
+    } as unknown as VendaGestorTicket
+
+    await imprimir({
+      response: { vendaId: 'venda-1', numeroVenda: 12, tickets: [ticket] } as VendaGestorTicketsResponse,
+      ticketsAImprimir: [ticket],
+      jobNamePrefix: 'Reimpressão',
+      onAviso,
+    })
+
+    expect(enviarCupom).not.toHaveBeenCalled()
+    expect(onAviso).toHaveBeenCalledWith(expect.stringContaining('COZINHA'))
   })
 })

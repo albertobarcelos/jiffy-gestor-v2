@@ -29,6 +29,16 @@ export function fonteProdutoEscPosA22Px(larguraMm: 58 | 80): number {
   return Math.max(16, Math.round((48 * cssLargura) / dotsLargura))
 }
 
+/** CSS px de Font A 1/1 (24 dots) — nome da empresa no header. */
+export function fonteEmpresaEscPosA11Px(larguraMm: 58 | 80): number {
+  return Math.max(12, Math.round(fonteProdutoEscPosA22Px(larguraMm) / 2))
+}
+
+/** Escala HTML → dots da térmica no cupom gráfico (58 mm / 80 mm). */
+export function graphicRasterScale(larguraMm: 58 | 80): number {
+  return larguraMm === 58 ? 384 / 220 : 576 / 300
+}
+
 export function sectionFeedLines(densidade: DeliveryCupomTemplateConfig['densidade']): number {
   if (densidade === 'espacoso') return 2
   if (densidade === 'compacto') return 0

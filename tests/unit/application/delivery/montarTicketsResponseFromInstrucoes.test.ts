@@ -649,4 +649,89 @@ describe('montarTicketsResponseFromInstrucoes', () => {
     expect(producao[0].itens).toHaveLength(1)
     expect(producao[0].itens[0].quantidade).toBe(2)
   })
+
+  it('tipo nenhum zera valor de impressão mesmo com valorUnitario de cadastro', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      modo: 'unificado' as const,
+      impressoraExpedicaoId: 'imp-exp',
+    }
+
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: {
+        mapeamentos: [
+          {
+            impressoraId: 'imp-exp',
+            impressoraNome: 'Expedição',
+            nomeImpressoraWindows: 'EPSON_EXP',
+            produtosLancadosIds: ['pl-1'],
+          },
+        ],
+        warnings: [],
+      },
+      pedido: {
+        ...pedidoBase,
+        valorFinal: 20,
+        produtosLancados: [
+          {
+            id: 'pl-1',
+            produtoId: 'p-1',
+            nomeProduto: 'Hambúrguer',
+            quantidade: 1,
+            valorUnitario: 20,
+            valorFinal: 20,
+            removido: false,
+            complementos: [
+              {
+                id: 'c-alface',
+                nomeComplemento: 'Alface',
+                quantidade: 2,
+                valorUnitario: 3.5,
+                valorFinal: 7,
+                tipoImpactoPreco: 'nenhum',
+              },
+              {
+                id: 'c-bacon',
+                nomeComplemento: 'Bacon',
+                quantidade: 1,
+                valorUnitario: 4,
+                valorFinal: 4,
+                tipoImpactoPreco: 'aumenta',
+              },
+              {
+                id: 'c-sem-cebola',
+                nomeComplemento: 'Sem cebola',
+                quantidade: 1,
+                valorUnitario: 1,
+                valorFinal: 1,
+                tipoImpactoPreco: 'diminui',
+              },
+            ],
+            observacoes: [],
+          },
+        ],
+      },
+      prefs,
+    })
+
+    const item = result.tickets[0].itens[0]
+    const alface = item.complementos.find(c => c.nome === 'Alface')
+    const bacon = item.complementos.find(c => c.nome === 'Bacon')
+    const semCebola = item.complementos.find(c => c.nome === 'Sem cebola')
+
+    expect(alface?.impressao).toEqual({
+      quantidade: 2,
+      valorUnitario: 0,
+      valorFinal: 0,
+      valorTotal: 0,
+    })
+    expect(bacon?.impressao).toEqual({
+      quantidade: 1,
+      valorUnitario: 4,
+      valorFinal: 4,
+      valorTotal: 4,
+    })
+    expect(semCebola?.impressao?.valorFinal).toBe(-1)
+    expect(result.resumoPedido?.valorAdicionais).toBe(3)
+  })
 })

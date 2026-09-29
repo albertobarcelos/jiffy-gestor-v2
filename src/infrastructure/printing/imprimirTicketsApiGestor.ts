@@ -1,18 +1,18 @@
 import { criarImprimirTicketsApiGestor } from '@/src/application/delivery/imprimirTicketsApiGestor'
 import { buildPrintJobId } from '@/src/infrastructure/printing/agent/printJobId'
-import { desenharPilulaProducaoPng } from '@/src/infrastructure/printing/pilulaProducaoPng'
-import { desenharSeparadorTracejadoPng } from '@/src/infrastructure/printing/receiptBitmaps'
+import { mapTicketToGraphicPrintDocument } from '@/src/infrastructure/printing/mapTicketToGraphicPrintDocument'
+import {
+  desenharMolduraIdentidadePng,
+  desenharPilulaProducaoPng,
+} from '@/src/infrastructure/printing/pilulaProducaoPng'
 import { printDeliveryCupom } from '@/src/infrastructure/printing/printDeliveryCupom'
-
-export {
-  notificarWarningsTickets,
-  type ImprimirTicketsApiGestorDeps,
-  type ImprimirTicketsApiGestorParams,
-} from '@/src/application/delivery/imprimirTicketsApiGestor'
+import { desenharSeparadorTracejadoPng } from '@/src/shared/printing/receiptBitmaps'
 
 export const imprimirTicketsApiGestor = criarImprimirTicketsApiGestor({
   desenharPilula: desenharPilulaProducaoPng,
+  desenharMolduraIdentidade: desenharMolduraIdentidadePng,
   desenharSeparador: desenharSeparadorTracejadoPng,
+  mapTicketToGraphicPrintDocument,
   enviarCupom: printDeliveryCupom,
   gerarJobId: buildPrintJobId,
 })

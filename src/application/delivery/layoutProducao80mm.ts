@@ -144,30 +144,73 @@ export function baseIdentidadeProducao(
   const atendimento = String(tipoEntrega ?? '').trim().toLowerCase()
   if (venda.includes('mesa')) return 'MESA'
   if (venda.includes('balc') || venda === 'gestor') return 'BALCAO'
-  if (atendimento === 'retirada') return 'RETIRADA'
+  if (atendimento === 'retirada' || venda === 'retirada') return 'RETIRADA'
   return 'ENTREGA'
+}
+
+/** QR de WhatsApp só faz sentido na via do entregador. */
+export function cupomMostraQrWhatsappCliente(
+  tipoVenda?: string | null,
+  tipoEntrega?: string | null
+): boolean {
+  return baseIdentidadeProducao(tipoVenda, tipoEntrega) !== 'RETIRADA'
+}
+
+/** No balcão, o bloco de itens da retirada precisa saltar mais que na entrega. */
+export function expedicaoDestacaItensPedido(
+  tipoVenda?: string | null,
+  tipoEntrega?: string | null
+): boolean {
+  return baseIdentidadeProducao(tipoVenda, tipoEntrega) === 'RETIRADA'
+}
+
+export function fonteItensExpedicaoPx(fonteItens: number, destaca: boolean): number {
+  return destaca ? Math.min(18, fonteItens + 3) : fonteItens
+}
+
+export function numeroPedidoProducao(valor?: string | number | null): string {
+  if (valor == null || valor === '') return ''
+  const n = typeof valor === 'number' ? valor : Number(String(valor).trim())
+  if (!Number.isFinite(n) || n <= 0) return ''
+  return String(Math.floor(n))
+}
+
+/** `#12 #SIXWMAWDD` quando os dois existem e são diferentes; senão um só. */
+export function destaqueIdentidadeProducao(params: {
+  codigoVenda?: string | null
+  numeroVenda?: string | number | null
+}): string {
+  const codigo = textoEscPosProducao(String(params.codigoVenda ?? '')).toUpperCase()
+  const numero = numeroPedidoProducao(params.numeroVenda)
+  if (numero && codigo && numero !== codigo) return `#${numero} #${codigo}`
+  if (numero) return `#${numero}`
+  if (codigo) return `#${codigo}`
+  return ''
 }
 
 export function textosIdentidadeProducao(params: {
   tipoVenda?: string | null
   tipoEntrega?: string | null
   codigoVenda?: string | null
+  numeroVenda?: string | number | null
   numeroMesa?: string | number | null
   identificacao?: string | null
   viaUnitaria?: boolean
 }): { primaria: string; secundaria: string | null } {
   const base = baseIdentidadeProducao(params.tipoVenda, params.tipoEntrega)
   const codigo = textoEscPosProducao(String(params.codigoVenda ?? '')).toUpperCase()
+  const numero = numeroPedidoProducao(params.numeroVenda)
+  const destaque = destaqueIdentidadeProducao(params)
   const mesa = textoEscPosProducao(String(params.numeroMesa ?? ''))
   const ident = textoEscPosProducao(params.identificacao ?? '').toUpperCase()
 
   let primaria = ''
   if (base === 'MESA') {
-    primaria = mesa ? `MESA ${mesa}` : codigo ? `MESA #${codigo}` : 'MESA'
+    primaria = mesa ? `MESA ${mesa}` : destaque ? `MESA ${destaque}` : 'MESA'
   } else if (params.viaUnitaria && codigo) {
-    primaria = base
+    primaria = numero && numero !== codigo ? `${base}#${numero}` : base
   } else {
-    primaria = codigo ? `${base} #${codigo}` : base
+    primaria = destaque ? `${base}${destaque}` : base
   }
 
   if (!ident) return { primaria, secundaria: null }
@@ -294,6 +337,7 @@ export function montarLinhasItemPedido(
 
 export type ModeloProducao80mm = {
   reimpressao: boolean
+  empresa: string | null
   senha: string | null
   conferencia: boolean
   unidade: string | null
@@ -305,9 +349,11 @@ export type ModeloProducao80mm = {
 }
 
 export type OrigemModeloProducao80mm = {
+  empresa?: string | null
   tipoVenda?: string | null
   tipoEntrega?: 'entrega' | 'retirada' | null
   codigoVenda?: string | null
+  numeroVenda?: string | number | null
   numeroMesa?: string | number | null
   identificacao?: string | null
   senha?: string | number | null
@@ -373,6 +419,7 @@ export function montarModeloProducao80mm(origem: OrigemModeloProducao80mm): Mode
 
   return {
     reimpressao: Boolean(origem.reimpressao),
+    empresa: textoEscPosProducao(origem.empresa ?? '') || null,
     senha: senhaTexto || null,
     conferencia: viaKind === 'conference',
     unidade,
@@ -380,6 +427,7 @@ export function montarModeloProducao80mm(origem: OrigemModeloProducao80mm): Mode
       tipoVenda: origem.tipoVenda,
       tipoEntrega: origem.tipoEntrega,
       codigoVenda: codigo,
+      numeroVenda: origem.numeroVenda,
       numeroMesa: origem.numeroMesa,
       identificacao: identificacao || null,
       viaUnitaria,

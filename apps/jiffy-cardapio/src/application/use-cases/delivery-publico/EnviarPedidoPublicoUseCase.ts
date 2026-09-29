@@ -13,16 +13,12 @@ import {
   isCotacaoDesatualizadaError,
   isEmpresaDeliveryFechadaError,
 } from '@/src/application/errors/publicDeliveryErrors'
-import { normalizarClienteDeliveryPublico } from '@/src/application/mappers/ClienteDeliveryPublicoMapper'
 import {
   montarPedidoPublico,
   validarCpfPedidoPublico,
 } from '@/src/application/mappers/MontarPedidoPublicoMapper'
 import { validarPagamentosPedidoPublico } from '@/src/domain/policies/PagamentoObrigatorioPedidoPublico'
-import type {
-  IClienteDeliveryPublicoPort,
-  IPedidoPublicoPort,
-} from '@/src/application/ports/delivery-publico'
+import type { IPedidoPublicoPort } from '@/src/application/ports/delivery-publico'
 import { GarantirClienteDeliveryPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirClienteDeliveryPublicoUseCase'
 import {
   GarantirEnderecoEntregaPublicoUseCase,
@@ -62,12 +58,12 @@ export type EnviarPedidoPublicoResult =
 
 /**
  * Orquestra envio do pedido público:
- * garante cliente (retirada) ou endereço (entrega) → monta payload → PATCH CPF se necessário → create.
+ * garante cliente (retirada) ou endereço (entrega) → monta payload → create.
+ * CPF da nota vai em `documentoCpfCnpj`; o cadastro do cliente não é atualizado aqui.
  */
 export class EnviarPedidoPublicoUseCase {
   constructor(
     private readonly pedidoPort: IPedidoPublicoPort,
-    private readonly clientePort: IClienteDeliveryPublicoPort,
     private readonly garantirEndereco: GarantirEnderecoEntregaPublicoUseCase,
     private readonly garantirCliente: GarantirClienteDeliveryPublicoUseCase
   ) {}
@@ -179,23 +175,10 @@ export class EnviarPedidoPublicoUseCase {
     }
     const payload: CreatePedidoPublicoInput = parsed.data
 
-    let clienteAtualizado: ClienteDeliveryPublicoDTO | null = null
-    const cpfPedido = payload.documentoCpfCnpj?.replace(/\D/g, '') ?? ''
-    if (cpfPedido.length === 11) {
-      const rawAtual = await this.clientePort.buscarPorTelefone(tel)
-      const cpfAtual = rawAtual?.cpf?.replace(/\D/g, '') ?? ''
-      if (rawAtual && !cpfAtual) {
-        const atualizadoRaw = await this.clientePort.atualizar(tel, {
-          cpf: cpfPedido,
-        })
-        clienteAtualizado = normalizarClienteDeliveryPublico(atualizadoRaw)
-      }
-    }
-
     try {
       input.onEtapa?.('enviando_pedido')
       const pedido = await this.pedidoPort.criar(payload)
-      return { ok: true, clienteAtualizado: clienteAtualizado ?? clienteLookup, pedido }
+      return { ok: true, clienteAtualizado: clienteLookup, pedido }
     } catch (error) {
       if (isCotacaoDesatualizadaError(error)) {
         return {

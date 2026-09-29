@@ -1,0 +1,20 @@
+---
+description: Plano e ordem de trabalho do caixa do Gestor neste worktree
+alwaysApply: true
+---
+
+# Worktree Caixa do Gestor
+
+Esta pasta (`JIFFY-GESTOR-CAIXA`, branch `feat/caixa-gestor`) é só o caixa da estação do Gestor (delivery + balcão). Não misture com o WIP do Hub em `JIFFY-GESTOR-OFICIAL`.
+
+Siga o plano em [docs/features/caixa-gestor-plano.md](../../docs/features/caixa-gestor-plano.md).
+
+Ordem obrigatória:
+
+1. Estudo autenticado da API de homologação (`/api/v1/caixa/operacao-caixa-estacao`). Registrar em `docs/features/caixa-gestor-estudo-api.md`.
+2. Só depois BFF, use cases e telas.
+3. Não inventar `POST` de abrir caixa. Abertura é implícita (suprimento/sangria e, se o estudo confirmar, venda).
+4. Não usar endpoints de `/caixa/operacao-caixa-terminal` (PDV). Histórico de terminal já existe em `/historico-fechamento`.
+5. A chave é `estacaoGestorId` (mesmo id de `gestor-estacao-impressao-id` no localStorage). Delivery e balcão deste PC entram no mesmo caixa.
+
+Dev: porta 5552. API: `https://jiffy-backend-hom.nexsyn.com.br`.

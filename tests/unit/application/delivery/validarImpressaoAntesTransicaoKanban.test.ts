@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { CarregarPayloadTicketsImpressao } from '@/src/application/delivery/carregarPayloadTicketsImpressaoDelivery'
 import { validarImpressaoAntesTransicaoKanban } from '@/src/application/delivery/validarImpressaoAntesTransicaoKanban'
-import { carregarPayloadTicketsImpressaoDelivery } from '@/src/application/delivery/carregarPayloadTicketsImpressaoDelivery'
 import {
   TOAST_IMPRESSORA_PRODUCAO_MAPEAMENTO_WINDOWS,
   TOAST_QUADRO_SEGUE_SEM_EXPEDICAO_ESCOLHIDA,
@@ -8,11 +8,7 @@ import {
 import type { PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
 import type { VendaGestorTicket, VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
 
-vi.mock('@/src/application/delivery/carregarPayloadTicketsImpressaoDelivery', () => ({
-  carregarPayloadTicketsImpressaoDelivery: vi.fn(),
-}))
-
-const carregarMock = vi.mocked(carregarPayloadTicketsImpressaoDelivery)
+const carregarMock = vi.fn<CarregarPayloadTicketsImpressao>()
 
 const prefsSeparado: PreferenciasImpressaoDelivery = {
   modo: 'separado',
@@ -56,6 +52,7 @@ describe('validarImpressaoAntesTransicaoKanban', () => {
       token: 't',
       prefs: prefsSeparado,
       acoes: ['iniciar_preparo'],
+      carregarPayload: carregarMock,
     })
 
     expect(resultado.podeAvancar).toBe(true)
@@ -75,6 +72,7 @@ describe('validarImpressaoAntesTransicaoKanban', () => {
       token: 't',
       prefs: { ...prefsSeparado, impressoraExpedicaoId: null },
       acoes: ['marcar_pronto'],
+      carregarPayload: carregarMock,
     })
 
     expect(resultado.podeAvancar).toBe(true)
