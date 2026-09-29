@@ -1,17 +1,23 @@
 import type { ComplementoSelecionado, ProdutoSelecionado } from '@/src/domain/types/pedido'
 
+/** Magnitude do valor do complemento — o sinal vem só de `tipoImpactoPreco`. */
+function magnitudeValorComplemento(valor: number): number {
+  if (!Number.isFinite(valor)) return 0
+  return Math.abs(valor)
+}
+
 export function obterTotalComplemento(complemento: ComplementoSelecionado): number {
   const tipo = complemento.tipoImpactoPreco || 'nenhum'
   if (tipo === 'nenhum') {
     return 0
   }
-  return complemento.valor * complemento.quantidade
+  return magnitudeValorComplemento(complemento.valor) * complemento.quantidade
 }
 
 export function calcularTotalComplementos(produto: ProdutoSelecionado): number {
   return produto.complementos.reduce((sum, comp) => {
     const tipo = comp.tipoImpactoPreco || 'nenhum'
-    const valorTotal = comp.valor * comp.quantidade
+    const valorTotal = magnitudeValorComplemento(comp.valor) * comp.quantidade
 
     if (tipo === 'aumenta') {
       return sum + valorTotal

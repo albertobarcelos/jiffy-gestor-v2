@@ -12,6 +12,7 @@ import {
   telefoneNacionalValido,
 } from '@/src/shared/utils/deliveryTelefonePais'
 import { validarPagamentosPedidoPublico } from '@/src/domain/policies/PagamentoObrigatorioPedidoPublico'
+import { sincronizarComplementosQuantidadeProduto } from '@/src/domain/policies/pedido/SincronizarComplementosQuantidadeProduto'
 
 export type MontarPedidoPublicoParams = {
   slug: string
@@ -109,16 +110,24 @@ function montarComposicaoPedidoPublico({
   const cpfResult = extrairCpfPedido(form.cpfNotaFiscal, exigeCpfVenda)
   if (!cpfResult.ok) return cpfResult
 
-  const produtos = itens.map(item => ({
-    produtoId: item.produtoId,
-    quantidade: item.quantidade,
-    observacoes: item.observacoes,
-    complementos: item.complementos.map(c => ({
+  const produtos = itens.map(item => {
+    const quantidade = Math.max(1, Math.floor(item.quantidade))
+    const complementos = sincronizarComplementosQuantidadeProduto(
+      item.complementos,
+      quantidade
+    ).map(c => ({
       complementoId: c.complementoId,
       grupoComplementoId: c.grupoComplementoId,
-      quantidade: c.quantidade,
-    })),
-  }))
+      quantidade: Math.max(1, Math.floor(c.quantidade)),
+    }))
+
+    return {
+      produtoId: item.produtoId,
+      quantidade,
+      observacoes: item.observacoes,
+      complementos,
+    }
+  })
 
   const cliente: ComposicaoPedidoPublico['cliente'] = {
     telefone: tel,

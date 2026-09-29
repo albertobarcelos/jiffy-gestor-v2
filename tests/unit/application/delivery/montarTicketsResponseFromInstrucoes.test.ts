@@ -731,7 +731,7 @@ describe('montarTicketsResponseFromInstrucoes', () => {
       valorFinal: 4,
       valorTotal: 4,
     })
-    expect(semCebola?.impressao?.valorFinal).toBe(1)
+    expect(semCebola?.impressao?.valorFinal).toBe(-1)
     expect(result.resumoPedido?.valorAdicionais).toBe(3)
   })
 })

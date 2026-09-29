@@ -25,11 +25,15 @@ import {
   type ModoImpressaoImpressora,
 } from '@/src/domain/types/modoImpressaoImpressora'
 import {
+  magnitudeValorComplementoLancamento,
+  valorAssinadoComplementoImpressao,
+} from '@/src/application/delivery/valorComplementoImpressao'
+import {
   planejarTicketsProducaoImpressora,
   ticketIdViaProducao,
 } from '@/src/application/delivery/planejarTicketsProducaoImpressora'
-import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
 import { normalizeTipoImpactoPreco } from '@/src/application/mappers/VendaApiNormalizer'
+import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
 
 function asRecord(v: unknown): Record<string, unknown> | null {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return null
@@ -122,41 +126,20 @@ function produtoLancadoAtivo(pl: Record<string, unknown>): boolean {
   return true
 }
 
-/**
- * Tipo `nenhum` zera o impacto mesmo com valor de cadastro persistido.
- * Sem tipo no payload, mantém o valor (registros antigos).
- */
-function valoresImpressaoComplemento(c: Record<string, unknown>): {
-  valorUnitario: number
-  valorFinal: number
-} {
-  const quantidade = numeroFinito(c.quantidade) || 1
-  const tipoInformado = asStr(c.tipoImpactoPreco)
-  if (tipoInformado && normalizeTipoImpactoPreco(tipoInformado) === 'nenhum') {
-    return { valorUnitario: 0, valorFinal: 0 }
-  }
-  const valorUnitario = numeroFinito(c.valorUnitario ?? c.valor)
-  const valorFinalPersistido = numeroOpcional(c.valorFinal)
-  const valorFinal = valorFinalPersistido != null ? valorFinalPersistido : quantidade * valorUnitario
-  return { valorUnitario, valorFinal }
-}
-
-function impactoAssinadoComplemento(c: Record<string, unknown>): number {
-  const tipoInformado = asStr(c.tipoImpactoPreco)
-  const tipo = tipoInformado ? normalizeTipoImpactoPreco(tipoInformado) : 'aumenta'
-  if (tipo === 'nenhum') return 0
-  const { valorFinal } = valoresImpressaoComplemento(c)
-  return tipo === 'diminui' ? -valorFinal : valorFinal
-}
-
 function mapComplemento(c: Record<string, unknown>): VendaGestorTicketItemComplemento {
   const quantidade = numeroFinito(c.quantidade) || 1
-  const { valorUnitario, valorFinal } = valoresImpressaoComplemento(c)
+  const tipoImpactoPreco = normalizeTipoImpactoPreco(c.tipoImpactoPreco)
+  const magnitude = magnitudeValorComplementoLancamento(c)
+  const { valorUnitario, valorFinal } = valorAssinadoComplementoImpressao(
+    tipoImpactoPreco,
+    magnitude,
+    quantidade
+  )
   return {
     nome: asStr(c.nomeComplemento) || asStr(c.nome),
     quantidade,
     complementoId: asStr(c.complementoId) || asStr(c.id) || undefined,
-    tipoImpactoPreco: asStr(c.tipoImpactoPreco) || undefined,
+    tipoImpactoPreco,
     impressao: {
       quantidade,
       valorUnitario,
@@ -208,7 +191,13 @@ function buildResumoPedido(
       comps.reduce((ss, c) => {
         const r = asRecord(c)
         if (!r) return ss
-        return ss + impactoAssinadoComplemento(r)
+        const q = numeroFinito(r.quantidade) || 1
+        const { valorFinal } = valorAssinadoComplementoImpressao(
+          r.tipoImpactoPreco,
+          magnitudeValorComplementoLancamento(r),
+          q
+        )
+        return ss + valorFinal
       }, 0)
     )
   }, 0)
