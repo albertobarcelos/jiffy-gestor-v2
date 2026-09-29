@@ -92,10 +92,27 @@ export function modeloToProducaoHibridoContent(
   }
   if (modelo.unidade) pushPilula(content, modelo.unidade, 'codigo', desenharPilula)
   if (modelo.identidade.primaria) {
-    content.push(...headerIdentidadeComContorno(modelo.identidade.primaria, desenharMolduraIdentidade))
+    const primariaComCliente = modelo.identidade.primaria.includes(' | ')
+    if (primariaComCliente) {
+      pushTexto(content, textoEscPosProducao(modelo.identidade.primaria), {
+        align: 'center',
+        bold: true,
+        size: 'double-b',
+      })
+    } else {
+      content.push(...headerIdentidadeComContorno(modelo.identidade.primaria, desenharMolduraIdentidade))
+    }
   }
   if (modelo.identidade.secundaria) {
-    content.push(...headerIdentidadeComContorno(modelo.identidade.secundaria, desenharMolduraIdentidade))
+    content.push({ type: 'feed', lines: PRODUCAO_80MM.linhasAposCodigoIdentidade })
+    pushTexto(content, textoEscPosProducao(modelo.identidade.secundaria), {
+      align: 'center',
+      bold: true,
+      size: 'double-b',
+    })
+    content.push({ type: 'feed', lines: PRODUCAO_80MM.linhasAposNomeCliente })
+  } else if (modelo.identidade.primaria.includes(' | ')) {
+    content.push({ type: 'feed', lines: PRODUCAO_80MM.linhasAposNomeCliente })
   }
   for (const item of modelo.itens) {
     pushTexto(content, item.produto, { align: 'left', bold: true, size: 'double' })
@@ -120,6 +137,7 @@ export function modeloToProducaoHibridoContent(
     })
     pushSeparador(content, desenharSeparador)
   }
+  content.push({ type: 'feed', lines: PRODUCAO_80MM.linhasAposPontilhadoRodape })
   pushTexto(content, textoEscPosProducao(modelo.resumo), {
     align: 'center',
     bold: true,

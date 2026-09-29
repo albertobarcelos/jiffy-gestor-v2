@@ -151,6 +151,44 @@ describe('mapTicketToPrintDocument', () => {
     ).toBe(true)
   })
 
+  it('expedição imprime 0,00 no complemento gratuito e ordena * antes dos adicionais', () => {
+    const doc = mapTicketToPrintDocument(root, {
+      ...ticketExpedicao,
+      itens: [
+        {
+          nomeProduto: 'X-Bacon',
+          quantidade: 1,
+          valorFinal: 40,
+          complementos: [
+            { nome: 'Bacon extra', quantidade: 1, tipoImpactoPreco: 'aumenta', impressao: { valorFinal: 4 } },
+            { nome: 'Alface', quantidade: 1, tipoImpactoPreco: 'nenhum' },
+          ],
+        },
+      ],
+    })
+    const linhas = doc.content.filter(b => b.type === 'row' || b.type === 'text')
+    const idxAlface = linhas.findIndex(
+      b =>
+        (b.type === 'row' && (b.left ?? '').includes('ALFACE')) ||
+        (b.type === 'text' && (b.text ?? '').includes('ALFACE'))
+    )
+    const idxBacon = linhas.findIndex(
+      b =>
+        (b.type === 'row' && (b.left ?? '').includes('BACON EXTRA')) ||
+        (b.type === 'text' && (b.text ?? '').includes('BACON EXTRA'))
+    )
+    expect(idxAlface).toBeGreaterThanOrEqual(0)
+    expect(idxBacon).toBeGreaterThan(idxAlface)
+    expect(
+      doc.content.some(
+        b =>
+          b.type === 'row' &&
+          (b.left ?? '').includes('ALFACE') &&
+          (b.right ?? '').includes('0,00')
+      )
+    ).toBe(true)
+  })
+
   it('58 mm reduz colunas', () => {
     const doc = mapTicketToPrintDocument(root, ticketExpedicao, {
       template: { ...DEFAULT_DELIVERY_CUPOM_TEMPLATE, larguraMm: 58 },

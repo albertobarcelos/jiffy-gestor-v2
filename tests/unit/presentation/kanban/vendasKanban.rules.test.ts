@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   classeBordaEsquerdaColunaKanban,
   getCardBorderEFundoKanban,
+  getLinhaTempoPedidoEntregaKanban,
   vendaElegivelParaReemissaoAutomaticaLote,
   fiscalKanbanPodeReemitirAposCooldown,
   rotuloBotaoAvancarEtapaKanban,
@@ -26,6 +27,7 @@ function makeVenda(
       | 'tabelaOrigem'
       | 'tipoVenda'
       | 'statusEtapaOperacional'
+      | 'dataInicioPreparo'
     >
   > = {}
 ): VendaUnificadaDTO {
@@ -217,5 +219,33 @@ describe('getCardBorderEFundoKanban', () => {
       getCardBorderEFundoKanban('COM_FISCAL', venda, SEM_ACAO_EM_ANDAMENTO, 'delivery')
         .borderClass
     ).toBe('border-l-green-500')
+  })
+})
+
+describe('getLinhaTempoPedidoEntregaKanban', () => {
+  it('em Em preparo usa dataInicioPreparo, não a última modificação', () => {
+    const venda = makeVenda({
+      tabelaOrigem: 'venda_gestor',
+      tipoVenda: 'delivery',
+      dataInicioPreparo: '2026-06-15T10:00:00.000Z',
+      dataUltimaModificacao: '2026-06-15T10:40:00.000Z',
+    })
+    expect(getLinhaTempoPedidoEntregaKanban('EM_PREPARO', venda)).toEqual({
+      prefixo: 'Desde:',
+      iso: '2026-06-15T10:00:00.000Z',
+    })
+  })
+
+  it('em Pronto continua usando a entrada na etapa (última modificação)', () => {
+    const venda = makeVenda({
+      tabelaOrigem: 'venda_gestor',
+      tipoVenda: 'delivery',
+      dataInicioPreparo: '2026-06-15T10:00:00.000Z',
+      dataUltimaModificacao: '2026-06-15T10:12:00.000Z',
+    })
+    expect(getLinhaTempoPedidoEntregaKanban('PRONTO_ENTREGA', venda)).toEqual({
+      prefixo: 'Desde:',
+      iso: '2026-06-15T10:12:00.000Z',
+    })
   })
 })

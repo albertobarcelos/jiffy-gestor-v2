@@ -53,7 +53,9 @@ function makeVenda(overrides: {
     /* 33 entregador              */ undefined,
     /* 34 contextoEntrega         */ undefined,
     /* 35 etapaKanbanBalcao       */ overrides.etapaKanbanBalcao ?? null,
-    /* 36 tipoEntrega             */ overrides.tipoEntrega ?? null
+    /* 36 tipoEntrega             */ overrides.tipoEntrega ?? null,
+    /* 37 dataInicioPreparo       */ undefined,
+    /* 38 dataFinalizacaoPreparo  */ undefined
   )
 }
 

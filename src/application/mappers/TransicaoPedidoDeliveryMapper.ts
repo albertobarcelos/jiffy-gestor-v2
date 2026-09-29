@@ -1,3 +1,4 @@
+import { isoTimestampPreparoValido } from '@/src/application/kanban/timestampPreparoKanban'
 import { extrairStatusFinanceiroPedidoDelivery } from '@/src/application/mappers/PedidoDeliveryDetalheAdapter'
 import {
   mapPedidoDeliverySummaryParaVendaUnificadaDTO,
@@ -85,6 +86,13 @@ export function extrairPatchOperacionalKanbanDeStatusDelivery(raw: unknown): Kan
   const dataFinalizacao = inferirDataFinalizacaoPatch(status, isoDeCampoApi(o.dataFinalizacao))
   const patch: KanbanVendaCachePatch = {
     dataUltimaModificacao: isoDeCampoApi(o.dataUltimaModificacao) ?? undefined,
+    dataInicioPreparo:
+      isoDeCampoApi(o.dataInicioPreparo) ?? isoDeCampoApi(o.data_inicio_preparo) ?? undefined,
+    dataFinalizacaoPreparo:
+      isoDeCampoApi(o.dataFinalizacaoPreparo) ??
+      isoDeCampoApi(o.data_finalizacao_preparo) ??
+      isoDeCampoApi(o.dataPronto) ??
+      undefined,
   }
   if (status) {
     patch.statusEtapaOperacional = status
@@ -152,6 +160,12 @@ export function extrairPatchKanbanDeTransicaoDelivery(data: unknown): KanbanVend
     return {
       statusEtapaOperacional,
       dataUltimaModificacao: card.dataUltimaModificacao ?? null,
+      dataInicioPreparo: isoTimestampPreparoValido(card.dataInicioPreparo)
+        ? card.dataInicioPreparo
+        : undefined,
+      dataFinalizacaoPreparo: isoTimestampPreparoValido(card.dataFinalizacaoPreparo)
+        ? card.dataFinalizacaoPreparo
+        : undefined,
       dataFinalizacao: inferirDataFinalizacaoPatch(statusEtapaOperacional, card.dataFinalizacao),
       statusFinanceiro: card.statusFinanceiro ?? null,
       valorFinal: card.valorFinal,
@@ -230,6 +244,17 @@ export function extrairPatchKanbanDeRespostaTransicao(data: unknown): KanbanVend
       delivery.dataFinalizacao ??
       isoDeCampoApi(registro.dataFinalizacao) ??
       isoDeCampoApi(registro.data_finalizacao),
+    dataInicioPreparo:
+      delivery.dataInicioPreparo ??
+      isoDeCampoApi(registro.dataInicioPreparo) ??
+      isoDeCampoApi(registro.data_inicio_preparo) ??
+      undefined,
+    dataFinalizacaoPreparo:
+      delivery.dataFinalizacaoPreparo ??
+      isoDeCampoApi(registro.dataFinalizacaoPreparo) ??
+      isoDeCampoApi(registro.data_finalizacao_preparo) ??
+      isoDeCampoApi(registro.dataPronto) ??
+      undefined,
     statusFinanceiro: delivery.statusFinanceiro,
     observacoes: delivery.observacoes,
   }

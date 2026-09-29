@@ -60,16 +60,20 @@ describe('mapTicketToProducaoHibridoDocument', () => {
       type: 'text',
       text: expect.stringContaining('+ 1 BACON'),
     })
+    const idxResumo = doc.content.findIndex(
+      b => b.type === 'text' && (b.text ?? '').includes('Atend: Carlos')
+    )
+    expect(doc.content[idxResumo - 1]).toEqual({ type: 'feed', lines: 2 })
     expect(doc.content.at(-2)).toEqual({ type: 'feed', lines: 4 })
     expect(doc.content.at(-1)?.type).toBe('cut')
     const textosDoc = textos(doc)
     const idxItem = textosDoc.indexOf('  2x X-BURGER')
     const idxObs = textosDoc.indexOf('OBSERVACAO DO PEDIDO')
-    const idxResumo = textosDoc.findIndex(
+    const idxResumoTxt = textosDoc.findIndex(
       t => t.includes('Cozinha') && t.includes('Atend: Carlos')
     )
     expect(idxObs).toBeGreaterThan(idxItem)
-    expect(idxResumo).toBeGreaterThan(idxObs)
+    expect(idxResumoTxt).toBeGreaterThan(idxObs)
     expect(textosDoc).toContain('Manda canudo')
     expect(doc.content.some(b => b.type === 'text' && b.text.includes('Atend: Carlos') && b.align === 'center')).toBe(
       true
@@ -148,5 +152,15 @@ describe('mapTicketToProducaoHibridoDocument', () => {
     const doc = mapTicketToProducaoHibridoDocument(root, ticket, { reimpressao: true })
     expect(textos(doc)[0]).toBe('** REIMPRESSAO **')
     expect(doc.content[0]).toMatchObject({ type: 'text', bold: true, size: 'normal', align: 'center' })
+  })
+
+  it('imprime a hora da entrada em Em preparo, não a criação do pedido', () => {
+    const doc = mapTicketToProducaoHibridoDocument(
+      { ...root, dataPedido: '2026-09-18T15:00:00-04:00', dataInicioPreparo: '2026-09-18T15:41:00-04:00' },
+      ticket
+    )
+    const resumo = textos(doc).find(t => t.includes('Atend: Carlos'))
+    expect(resumo).toMatch(/15:41/)
+    expect(resumo).not.toMatch(/15:00/)
   })
 })

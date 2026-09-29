@@ -409,15 +409,21 @@ function renderProducao(
     ${modelo.unidade ? htmlPilulaProducao(modelo.unidade, 'prod-pill-codigo') : ''}
     ${
       modelo.identidade.primaria
-        ? htmlPilulaProducao(
-            modelo.identidade.primaria,
-            identidadePrimariaEhTipoAvulso(modelo.identidade.primaria)
-              ? 'prod-pill-id'
-              : 'prod-pill-codigo'
-          )
+        ? modelo.identidade.primaria.includes(' | ')
+          ? `<div class="prod-cliente">${escapeHtml(modelo.identidade.primaria)}</div>`
+          : htmlPilulaProducao(
+              modelo.identidade.primaria,
+              identidadePrimariaEhTipoAvulso(modelo.identidade.primaria)
+                ? 'prod-pill-id'
+                : 'prod-pill-codigo'
+            )
         : ''
     }
-    ${modelo.identidade.secundaria ? htmlPilulaProducao(modelo.identidade.secundaria, 'prod-pill-id') : ''}
+    ${
+      modelo.identidade.secundaria
+        ? `<div class="prod-cliente">${escapeHtml(modelo.identidade.secundaria)}</div>`
+        : ''
+    }
     ${itens}
     ${
       modelo.observacaoPedido
@@ -718,8 +724,9 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
   .prod-obs { margin:6px 4px; padding:4px 8px 8px; border:2px solid #000; border-radius:4px; text-align:center; }
   .prod-obs-title { font-weight:800; font-size:${Math.max(10, fontePedido)}px; letter-spacing:.04em; }
   .prod-obs-text { margin-top:2px; font-weight:800; font-size:${Math.max(12, fonteItens + 1)}px; overflow-wrap:anywhere; }
+  .prod-cliente { text-align:center; font-weight:800; font-size:${Math.max(14, Math.round((22 * w) / 576))}px; margin:14px 0 16px; }
   .prod-resumo, .prod-rodape { text-align:center; font-weight:800; letter-spacing:.08em; font-size:${Math.max(9, fonteRodape)}px; }
-  .prod-resumo { margin-top:2px; }
+  .prod-resumo { margin-top:18px; }
   .prod-rodape { margin-top:8px; padding-bottom:8px; }
 </style>
 </head><body>

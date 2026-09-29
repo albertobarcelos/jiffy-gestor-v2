@@ -19,6 +19,8 @@ import type { usePedidosDeliveryKanbanColumns } from '../hooks/usePedidosDeliver
 import type { useVendasUnificadasKanbanColumns } from '../hooks/useVendasUnificadasKanbanColumns'
 import type { useReemissaoFiscalEmLote } from '../hooks/useReemissaoFiscalEmLote'
 import { classesKanbanQuadroFaixa, classesKanbanQuadroRow } from '../utils/kanbanQuadroLayout'
+import { useAgoraKanban } from '../hooks/useAgoraKanban'
+import { useTempoPreparoKanbanMinutos } from '../hooks/useTempoPreparoKanban'
 import type { SuperficieQuadroPedidos } from '@/src/presentation/gestor-pedidos/superficieQuadroPedidos'
 
 type DeliveryKanbanReturn = ReturnType<typeof usePedidosDeliveryKanbanColumns>
@@ -98,6 +100,8 @@ export function KanbanBoardRenderer({
   reemissaoEmLote,
   superficie,
 }: KanbanBoardRendererProps) {
+  const agoraMs = useAgoraKanban(1000)
+  const slaPreparoMinutos = useTempoPreparoKanbanMinutos()
   return (
     <div className={classesKanbanQuadroFaixa(superficie)}>
       {mostrarLoadingLista ? (
@@ -179,6 +183,8 @@ export function KanbanBoardRenderer({
                       acaoFiscalEmAndamentoPorVenda={acaoFiscalEmAndamentoPorVenda}
                       avancandoEtapaIds={avancandoEtapaIds}
                       timestampsEtapaEntregaLocal={timestampsEtapaEntregaLocal}
+                      agoraMs={agoraMs}
+                      slaPreparoMinutos={slaPreparoMinutos}
                       onViewDetails={onViewDetails}
                       onEditarProdutos={onEditarProdutos}
                       onAvancarEtapa={onAvancarEtapa}

@@ -30,6 +30,22 @@ describe('valorComplementoImpressao', () => {
     })
   })
 
+  it('exibe 0,00 no cupom quando o complemento é gratuito', () => {
+    expect(
+      valorComplementoParaExibicaoCupom({
+        tipoImpactoPreco: 'nenhum',
+        quantidade: 1,
+        impressao: { valorUnitario: 10, valorFinal: 10 },
+      })
+    ).toBe(0)
+    expect(
+      valorComplementoParaExibicaoCupom({
+        tipoImpactoPreco: 'nenhum',
+        quantidade: 1,
+      })
+    ).toBe(0)
+  })
+
   it('exibe diminui negativo mesmo com impressao.valorFinal positivo legado', () => {
     expect(
       valorComplementoParaExibicaoCupom({

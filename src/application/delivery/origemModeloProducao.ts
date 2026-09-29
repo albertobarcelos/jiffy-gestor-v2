@@ -2,15 +2,24 @@ import {
   identificacaoClienteProducao,
   textoEscPosProducao,
 } from '@/src/application/delivery/layoutProducao80mm'
+import { JIFFY_PRINT_VERSION_FALLBACK } from '@/src/shared/constants/jiffyPrintSetup'
 import type { VendaGestorTicket, VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
 
-export const VERSAO_CUPOM_GESTOR = '0.1.0'
+/** Versão no rodapé da produção: a do Jiffy Print, não a do Gestor. */
+export const VERSAO_CUPOM_GESTOR = JIFFY_PRINT_VERSION_FALLBACK
 
 export interface OrigemModeloProducaoDeTicketOptions {
   reimpressao?: boolean
   versao?: string
   nomeEmpresa?: string | null
   mostrarLogoTexto?: boolean
+}
+
+/** Hora impressa na produção: entrada em Em preparo, igual ao card. */
+export function isoHoraProducaoDoPedido(root: VendaGestorTicketsResponse): string {
+  const inicioEtapa = root.dataInicioPreparo?.trim()
+  if (inicioEtapa) return inicioEtapa
+  return root.dataPedido?.trim() || root.rastreamento?.geradoEm?.trim() || ''
 }
 
 export function origemModeloProducaoDeTicket(
@@ -40,7 +49,7 @@ export function origemModeloProducaoDeTicket(
     numeroMesa: root.numeroMesa,
     identificacao: identificacao || null,
     senha: root.senha ?? null,
-    dataPedido: root.dataPedido || root.rastreamento?.geradoEm,
+    dataPedido: isoHoraProducaoDoPedido(root),
     atendente: root.tiradoPor?.nome ?? '',
     codigoTerminal: root.codigoTerminal,
     versao: options?.versao ?? VERSAO_CUPOM_GESTOR,
