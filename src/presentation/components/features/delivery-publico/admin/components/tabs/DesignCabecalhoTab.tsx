@@ -1,7 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { MdImage, MdLink, MdShare, MdStorefront, type IconType } from 'react-icons/md'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { MdImage, MdLink, MdShare, MdStorefront } from 'react-icons/md'
+import { DeliveryOpcaoCard } from '@/src/presentation/components/features/delivery/configuracoes/DeliveryOpcaoCard'
 import type { DeliveryPublicoDesignConfig } from '../../../shared/types/deliveryPublicoDesignConfig'
 import { DeliveryImageUploadField } from '@/src/presentation/components/ui/DeliveryImageUploadField'
 import {
@@ -31,35 +32,6 @@ type DesignCabecalhoTabProps = {
   slug?: string
   hasEmpresaDelivery: boolean
   onChange: (updater: (current: DeliveryPublicoDesignConfig) => DeliveryPublicoDesignConfig) => void
-}
-
-function CabecalhoOpcaoCard({
-  icon: Icon,
-  title,
-  description,
-  children,
-}: {
-  icon: IconType
-  title: string
-  description?: string
-  children: ReactNode
-}) {
-  return (
-    <section className="flex overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex w-24 shrink-0 items-center justify-center bg-alternate/20 text-alternate sm:w-28">
-        <Icon className="h-10 w-10 sm:h-12 sm:w-12" aria-hidden />
-      </div>
-      <div className="min-w-0 flex-1 space-y-3 p-4 md:p-5">
-        <div>
-          <h2 className="text-base font-bold text-primary-text">{title}</h2>
-          {description ? (
-            <p className="mt-0.5 text-sm text-secondary-text">{description}</p>
-          ) : null}
-        </div>
-        {children}
-      </div>
-    </section>
-  )
 }
 
 export function DesignCabecalhoTab({
@@ -185,7 +157,7 @@ export function DesignCabecalhoTab({
 
   return (
     <div className="space-y-4">
-      <CabecalhoOpcaoCard
+      <DeliveryOpcaoCard
         icon={MdLink}
         title="Link público da loja"
         description="Apenas letras minúsculas, números e hífens (mínimo 3 caracteres)."
@@ -239,9 +211,9 @@ export function DesignCabecalhoTab({
             </button>
           ) : null}
         </div>
-      </CabecalhoOpcaoCard>
+      </DeliveryOpcaoCard>
 
-      <CabecalhoOpcaoCard
+      <DeliveryOpcaoCard
         icon={MdStorefront}
         title="Nome da sua Loja Delivery"
         description="Nome fantasia da empresa, conforme cadastro (até 20 caracteres no cabeçalho)."
@@ -255,7 +227,7 @@ export function DesignCabecalhoTab({
           title="Nome vindo do cadastro da empresa"
           className="w-full cursor-not-allowed rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-primary-text outline-none"
         />
-      </CabecalhoOpcaoCard>
+      </DeliveryOpcaoCard>
 
       {!canUpload ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -263,7 +235,7 @@ export function DesignCabecalhoTab({
         </p>
       ) : null}
 
-      <CabecalhoOpcaoCard
+      <DeliveryOpcaoCard
         icon={MdImage}
         title="Logo e capa"
         description="Imagens do cabeçalho no cardápio público."
@@ -328,7 +300,7 @@ export function DesignCabecalhoTab({
             />
           </div>
         </div>
-      </CabecalhoOpcaoCard>
+      </DeliveryOpcaoCard>
     </div>
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { MdMenuBook, MdStorefront, type IconType } from 'react-icons/md'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { MdMenuBook, MdStorefront } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
 import {
@@ -11,6 +11,7 @@ import {
 import { useMenuDeliveryId } from '@/src/presentation/hooks/useMenuDeliveryId'
 import { useMenus } from '@/src/presentation/hooks/menus/useMenus'
 import { MenuParametroEmpresaSelect } from '@/src/presentation/components/features/configuracoes/MenuParametroEmpresaSelect'
+import { DeliveryOpcaoCard } from '@/src/presentation/components/features/delivery/configuracoes/DeliveryOpcaoCard'
 import { DeliveryPendenciasAlert } from '@/src/presentation/components/features/delivery/configuracoes/DeliveryPendenciasAlert'
 import { EMPRESA_DELIVERY_PENDENCIA_TYPES } from '@/src/shared/constants/empresaDeliveryPendencias'
 import {
@@ -20,35 +21,6 @@ import {
 import { deliveryHubDesignSectionPath } from '@/src/presentation/components/features/delivery-publico/shared/constants/designTabs'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import Link from 'next/link'
-
-function CardapioOpcaoCard({
-  icon: Icon,
-  title,
-  description,
-  children,
-}: {
-  icon: IconType
-  title: string
-  description?: string
-  children: ReactNode
-}) {
-  return (
-    <section className="flex overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex w-24 shrink-0 items-center justify-center bg-alternate/20 text-alternate sm:w-28">
-        <Icon className="h-10 w-10 sm:h-12 sm:w-12" aria-hidden />
-      </div>
-      <div className="min-w-0 flex-1 space-y-3 p-4 md:p-5">
-        <div>
-          <h2 className="text-base font-bold text-primary-text">{title}</h2>
-          {description ? (
-            <p className="mt-0.5 text-sm text-secondary-text">{description}</p>
-          ) : null}
-        </div>
-        {children}
-      </div>
-    </section>
-  )
-}
 
 export function DeliveryNomeCardapioView({ embedded = false }: { embedded?: boolean }) {
   const { toGestao } = useGestaoPath()
@@ -182,7 +154,7 @@ export function DeliveryNomeCardapioView({ embedded = false }: { embedded?: bool
           </p>
         ) : null}
 
-        <CardapioOpcaoCard
+        <DeliveryOpcaoCard
           icon={MdMenuBook}
           title="Cardápio publicado no delivery"
           description="Produtos, preços e fotos do app público e do delivery manual no Gestor saem deste menu."
@@ -217,7 +189,7 @@ export function DeliveryNomeCardapioView({ embedded = false }: { embedded?: bool
               className="h-4 w-4 shrink-0 rounded border-gray-300 accent-secondary focus:ring-secondary disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
-        </CardapioOpcaoCard>
+        </DeliveryOpcaoCard>
 
         <div className="flex justify-end">
           <button
