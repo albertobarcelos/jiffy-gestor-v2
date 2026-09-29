@@ -6,7 +6,7 @@ import {
   rotuloTipoAtendimentoKanban,
   tipoAtendimentoKanban,
 } from '../utils/kanbanPedidoIdentidade'
-import { relogioPedidoKanban } from '../utils/kanbanPedidoTempo'
+import { deveExibirCronometroPreparoKanban, relogioPedidoKanban } from '../utils/kanbanPedidoTempo'
 import type { ColunaKanbanId, Venda } from '../types'
 import { KanbanAvancarEtapaCompacto } from './KanbanAvancarEtapaCompacto'
 
@@ -46,12 +46,8 @@ export function KanbanExpedicaoCard({
   const cancelada = venda.isCancelada()
   const finalizada = colunaId === 'FINALIZADAS'
   const cobrar = venda.precisaConfirmarPagamentoParaFinalizar()
-  const cronometroRotulo =
-    colunaId === 'EM_PREPARO' ||
-    colunaId === 'PRONTO_ENTREGA' ||
-    colunaId === 'EM_ROTA'
-      ? relogio.rotuloDecorrido
-      : null
+  const exibirCronometro = deveExibirCronometroPreparoKanban(colunaId, venda)
+  const cronometroRotulo = exibirCronometro ? relogio.rotuloDecorrido : null
 
   return (
     <article
@@ -101,7 +97,7 @@ export function KanbanExpedicaoCard({
             onAvancar={onAvancarEtapa}
             destaque
             cronometroRotulo={cronometroRotulo}
-            cronometroTom={relogio.tom}
+            cronometroTom={exibirCronometro ? relogio.tom : undefined}
           />
         </div>
       )}

@@ -99,14 +99,30 @@ export function tomTempoPedidoKanban(
 
 const COLUNAS_PREPARO_CONGELADO = new Set<string>(['PRONTO_ENTREGA', 'EM_ROTA', 'FINALIZADAS'])
 
+/** Compara instantes de verdade, não a string ISO (Z vs offset). */
+export function escolherIsoMaisRecente(
+  a: string | null | undefined,
+  b: string | null | undefined
+): string | null {
+  const ta = a?.trim() || ''
+  const tb = b?.trim() || ''
+  const ma = parseIsoMs(ta)
+  const mb = parseIsoMs(tb)
+  if (ma == null && mb == null) return ta || tb || null
+  if (ma == null) return tb || null
+  if (mb == null) return ta || null
+  return mb >= ma ? tb : ta
+}
+
 export function ancoraEtapaKanban(
   venda: Venda,
   isoLocalTransicao?: string | null
 ): string | null {
-  const ultimaApi = venda.dataUltimaModificacao?.trim() || null
-  const local = isoLocalTransicao?.trim() || null
-  if (local && (!ultimaApi || local > ultimaApi)) return local
-  return ultimaApi || venda.dataCriacao || null
+  return (
+    escolherIsoMaisRecente(venda.dataUltimaModificacao, isoLocalTransicao) ||
+    venda.dataCriacao ||
+    null
+  )
 }
 
 export function ancoraInicioPreparoKanban(
@@ -114,7 +130,7 @@ export function ancoraInicioPreparoKanban(
   isoLocalTransicao?: string | null
 ): string | null {
   const persistido = venda.dataInicioPreparo?.trim()
-  if (persistido) return persistido
+  if (persistido && parseIsoMs(persistido) != null) return persistido
   return ancoraEtapaKanban(venda, isoLocalTransicao)
 }
 
@@ -190,6 +206,18 @@ export function relogioPedidoKanban(
         : null,
     rotuloHa: minutosDecorridos != null ? `há ${formatarMinutosCurto(minutosDecorridos)}` : null,
   }
+}
+
+/** Mesma regra no quadro, na lista e na expedição. */
+export function deveExibirCronometroPreparoKanban(
+  colunaId: string | undefined,
+  venda: Pick<Venda, 'dataInicioPreparo' | 'dataFinalizacaoPreparo'>
+): boolean {
+  if (colunaId === 'EM_PREPARO') return true
+  if (colunaId && COLUNAS_PREPARO_CONGELADO.has(colunaId)) {
+    return segundosPreparoConcluido(venda as Venda) != null
+  }
+  return false
 }
 
 export function pedidoTemPendenciaExpedicao(venda: Venda, agoraMs: number): boolean {

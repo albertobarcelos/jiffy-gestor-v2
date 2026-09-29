@@ -11,7 +11,7 @@ import {
   formatarFormaPagamentoKanbanCard,
   rotuloFormaCobrancaKanbanCard,
 } from '../utils/kanbanDeliveryCardDisplay'
-import { relogioPedidoKanban } from '../utils/kanbanPedidoTempo'
+import { deveExibirCronometroPreparoKanban, relogioPedidoKanban } from '../utils/kanbanPedidoTempo'
 import { OrigemCanalMark } from '@/src/presentation/components/features/origem/OrigemCanalMark'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
 import {
@@ -157,12 +157,7 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
         ancoraPreparoIso: timestampsEtapaEntregaLocal[venda.id],
       })
     : null
-  const exibirCronometroPreparo =
-    colunaAtual === 'EM_PREPARO' ||
-    ((colunaAtual === 'PRONTO_ENTREGA' ||
-      colunaAtual === 'EM_ROTA' ||
-      colunaAtual === 'FINALIZADAS') &&
-      Boolean(venda.dataInicioPreparo && venda.dataFinalizacaoPreparo))
+  const exibirCronometroPreparo = deveExibirCronometroPreparoKanban(colunaAtual, venda)
   const formaCobrancaKanban = exibirMetaDeliveryKanban
     ? rotuloFormaCobrancaKanbanCard(venda.tipoAtendimento(), venda.fluxoPagamentoEntrega)
     : null

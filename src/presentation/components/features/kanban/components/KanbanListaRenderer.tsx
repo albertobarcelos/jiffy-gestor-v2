@@ -12,7 +12,7 @@ import {
   rotuloTipoAtendimentoKanban,
   tipoAtendimentoKanban,
 } from '../utils/kanbanPedidoIdentidade'
-import { relogioPedidoKanban } from '../utils/kanbanPedidoTempo'
+import { deveExibirCronometroPreparoKanban, relogioPedidoKanban } from '../utils/kanbanPedidoTempo'
 import { useAgoraKanban } from '../hooks/useAgoraKanban'
 import { useTempoPreparoKanbanMinutos } from '../hooks/useTempoPreparoKanban'
 import { classeBordaEsquerdaColunaKanban } from '../rules/vendasKanban.rules'
@@ -206,8 +206,12 @@ export function KanbanListaRenderer(props: KanbanBoardRendererProps) {
                                 {rotuloTipoAtendimentoKanban(tipo)}
                               </span>
                             </td>
-                            <td className={`px-3 py-3 text-sm ${classeTomTempo(relogio.tom)}`}>
-                              {relogio.rotuloAtraso ?? relogio.rotuloHa ?? '—'}
+                            <td
+                              className={`px-3 py-3 text-sm ${classeTomTempo(
+                                deveExibirCronometroPreparoKanban(colId, venda) ? relogio.tom : 'ok'
+                              )}`}
+                            >
+                              {relogio.rotuloHa ?? '—'}
                             </td>
                             <td className="px-3 py-3">
                               <span
@@ -235,13 +239,15 @@ export function KanbanListaRenderer(props: KanbanBoardRendererProps) {
                                   avancando={Boolean(avancandoEtapaIds[venda.id])}
                                   onAvancar={onAvancarEtapa}
                                   cronometroRotulo={
-                                    colId === 'EM_PREPARO' ||
-                                    colId === 'PRONTO_ENTREGA' ||
-                                    colId === 'EM_ROTA'
+                                    deveExibirCronometroPreparoKanban(colId, venda)
                                       ? relogio.rotuloDecorrido
                                       : null
                                   }
-                                  cronometroTom={relogio.tom}
+                                  cronometroTom={
+                                    deveExibirCronometroPreparoKanban(colId, venda)
+                                      ? relogio.tom
+                                      : undefined
+                                  }
                                 />
                               )}
                             </td>

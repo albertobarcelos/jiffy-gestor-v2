@@ -1,3 +1,4 @@
+import { isoTimestampPreparoValido } from '@/src/application/kanban/timestampPreparoKanban'
 import { extrairStatusFinanceiroPedidoDelivery } from '@/src/application/mappers/PedidoDeliveryDetalheAdapter'
 import {
   mapPedidoDeliverySummaryParaVendaUnificadaDTO,
@@ -159,8 +160,12 @@ export function extrairPatchKanbanDeTransicaoDelivery(data: unknown): KanbanVend
     return {
       statusEtapaOperacional,
       dataUltimaModificacao: card.dataUltimaModificacao ?? null,
-      dataInicioPreparo: card.dataInicioPreparo ?? null,
-      dataFinalizacaoPreparo: card.dataFinalizacaoPreparo ?? null,
+      dataInicioPreparo: isoTimestampPreparoValido(card.dataInicioPreparo)
+        ? card.dataInicioPreparo
+        : undefined,
+      dataFinalizacaoPreparo: isoTimestampPreparoValido(card.dataFinalizacaoPreparo)
+        ? card.dataFinalizacaoPreparo
+        : undefined,
       dataFinalizacao: inferirDataFinalizacaoPatch(statusEtapaOperacional, card.dataFinalizacao),
       statusFinanceiro: card.statusFinanceiro ?? null,
       valorFinal: card.valorFinal,
@@ -239,6 +244,17 @@ export function extrairPatchKanbanDeRespostaTransicao(data: unknown): KanbanVend
       delivery.dataFinalizacao ??
       isoDeCampoApi(registro.dataFinalizacao) ??
       isoDeCampoApi(registro.data_finalizacao),
+    dataInicioPreparo:
+      delivery.dataInicioPreparo ??
+      isoDeCampoApi(registro.dataInicioPreparo) ??
+      isoDeCampoApi(registro.data_inicio_preparo) ??
+      undefined,
+    dataFinalizacaoPreparo:
+      delivery.dataFinalizacaoPreparo ??
+      isoDeCampoApi(registro.dataFinalizacaoPreparo) ??
+      isoDeCampoApi(registro.data_finalizacao_preparo) ??
+      isoDeCampoApi(registro.dataPronto) ??
+      undefined,
     statusFinanceiro: delivery.statusFinanceiro,
     observacoes: delivery.observacoes,
   }

@@ -21,6 +21,10 @@ import type {
   DirecaoOrdenacaoKanban,
   Venda,
 } from '../types'
+import {
+  ancoraInicioPreparoKanban,
+  escolherIsoMaisRecente,
+} from '../utils/kanbanPedidoTempo'
 
 export const COLUNAS_ENTREGA_OPERACIONAIS: ColunaKanbanId[] = [
   'NOVOS_PEDIDOS',
@@ -74,14 +78,14 @@ export const COLUNAS_KANBAN_DESTINO_PIN = new Set([
 ])
 
 /**
- * Data/hora exibida no card de entrega (gestor) nas colunas operacionais, no mesmo estilo de “Finalizada: …”.
- * - Novos pedidos: quando o pedido entrou (criação).
- * - Demais etapas: `dataUltimaModificacao` da API quando existir (proxy de transição); senão data de criação.
+ * Data/hora exibida no card de entrega (gestor) nas colunas operacionais.
+ * - Novos pedidos: criação.
+ * - Em preparo: mesma âncora do cronômetro (`dataInicioPreparo`).
+ * - Pronto / Em rota: entrada na etapa (`dataUltimaModificacao` / transição local).
  */
 export function getLinhaTempoPedidoEntregaKanban(
   columnId: ColunaKanbanId,
   v: VendaUnificadaDTO,
-  /** Timestamp local de transição (DnD ou botão), tem prioridade sobre `dataUltimaModificacao` da API. */
   isoLocalTransicao?: string
 ): { prefixo: string; iso: string } | null {
   const entregaGestor =
@@ -92,11 +96,13 @@ export function getLinhaTempoPedidoEntregaKanban(
     return { prefixo: 'Recebido em:', iso: v.dataCriacao }
   }
 
-  const ultimaApi = v.dataUltimaModificacao?.trim()
-  const escolhida =
-    isoLocalTransicao && (!ultimaApi || isoLocalTransicao > ultimaApi)
-      ? isoLocalTransicao
-      : ultimaApi
+  if (columnId === 'EM_PREPARO') {
+    const ancora = ancoraInicioPreparoKanban(v, isoLocalTransicao)
+    if (ancora) return { prefixo: 'Desde:', iso: ancora }
+    return { prefixo: 'Pedido em:', iso: v.dataCriacao }
+  }
+
+  const escolhida = escolherIsoMaisRecente(v.dataUltimaModificacao, isoLocalTransicao)
   if (escolhida) {
     return { prefixo: 'Desde:', iso: escolhida }
   }
@@ -384,7 +390,8 @@ function dataOrdenacaoPadraoKanban(v: Venda): string {
 /**
  * Data usada para ordenar o card na coluna, espelhando a data exibida no próprio card:
  * - Novos pedidos → criação ("Recebido em")
- * - Em preparo / Pronto / Em rota → entrada na etapa ("Desde", `dataUltimaModificacao`/transição local)
+ * - Em preparo → início de preparo (mesma âncora do cronômetro)
+ * - Pronto / Em rota → entrada na etapa (`dataUltimaModificacao`/transição local)
  * - Demais colunas → finalização → emissão fiscal → criação
  */
 export function dataOrdenacaoCardKanban(

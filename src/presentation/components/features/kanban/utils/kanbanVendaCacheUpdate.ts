@@ -1,3 +1,4 @@
+import { escolherTimestampPreparo, isoTimestampPreparoValido } from '@/src/application/kanban/timestampPreparoKanban'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import type { InfiniteData, QueryClient } from '@tanstack/react-query'
 import type { KanbanVendaCachePatch } from '@/src/application/dto/TransicaoKanbanDTO'
@@ -172,11 +173,37 @@ export function cloneVendaUnificadaDTO(
     venda.contextoEntrega,
     patch.etapaKanbanBalcao !== undefined ? patch.etapaKanbanBalcao : venda.etapaKanbanBalcao,
     venda.tipoEntrega,
-    patch.dataInicioPreparo !== undefined ? patch.dataInicioPreparo : venda.dataInicioPreparo,
-    patch.dataFinalizacaoPreparo !== undefined
-      ? patch.dataFinalizacaoPreparo
-      : venda.dataFinalizacaoPreparo
+    escolherTimestampPreparo(
+      patch.dataInicioPreparo !== undefined ? patch.dataInicioPreparo : venda.dataInicioPreparo,
+      venda.dataInicioPreparo
+    ),
+    escolherTimestampPreparo(
+      patch.dataFinalizacaoPreparo !== undefined
+        ? patch.dataFinalizacaoPreparo
+        : venda.dataFinalizacaoPreparo,
+      venda.dataFinalizacaoPreparo
+    )
   )
+}
+
+/** Summary sem as datas não zera o par que o cache já tem. */
+export function mesclarTimestampsPreparoNoCard(
+  incoming: VendaUnificadaDTO,
+  existente?: VendaUnificadaDTO | null
+): VendaUnificadaDTO {
+  if (!existente) return incoming
+  const inicio = escolherTimestampPreparo(incoming.dataInicioPreparo, existente.dataInicioPreparo)
+  const fim = escolherTimestampPreparo(
+    incoming.dataFinalizacaoPreparo,
+    existente.dataFinalizacaoPreparo
+  )
+  if (inicio === (incoming.dataInicioPreparo ?? null) && fim === (incoming.dataFinalizacaoPreparo ?? null)) {
+    return incoming
+  }
+  return cloneVendaUnificadaDTO(incoming, {
+    dataInicioPreparo: inicio,
+    dataFinalizacaoPreparo: fim,
+  })
 }
 
 /** Substitui um item inteiro no cache infinito (resposta summary de transicao-status). */
@@ -474,15 +501,18 @@ export async function sincronizarPedidoDeliveryKanbanEmBackground(
 
 /**
  * A listagem GET /delivery/pedidos (summary) não inclui `observacoes`.
- * Ao refetch, preserva observações já presentes no cache do Kanban (patch local ou unificado).
+ * Ao refetch, preserva observações e datas de preparo já presentes no cache
+ * quando a API omite o campo (null não apaga o par início/fim).
  */
 export function preservarObservacoesKanbanCacheNosItems(
   queryClient: QueryClient,
   novosItems: VendaUnificadaDTO[]
 ): VendaUnificadaDTO[] {
   const observacoesPorId = new Map<string, string[]>()
+  const inicioPreparoPorId = new Map<string, string>()
+  const fimPreparoPorId = new Map<string, string>()
 
-  const coletarObservacoes = (
+  const coletarDoCache = (
     queries: [readonly unknown[], InfiniteData<VendasUnificadasResponse> | undefined][]
   ) => {
     for (const [, data] of queries) {
@@ -492,29 +522,58 @@ export function preservarObservacoesKanbanCacheNosItems(
           if (item.observacoes?.length) {
             observacoesPorId.set(item.id, item.observacoes)
           }
+          if (isoTimestampPreparoValido(item.dataInicioPreparo)) {
+            inicioPreparoPorId.set(item.id, item.dataInicioPreparo.trim())
+          }
+          if (isoTimestampPreparoValido(item.dataFinalizacaoPreparo)) {
+            fimPreparoPorId.set(item.id, item.dataFinalizacaoPreparo.trim())
+          }
         }
       }
     }
   }
 
-  coletarObservacoes(
+  coletarDoCache(
     queryClient.getQueriesData<InfiniteData<VendasUnificadasResponse>>(
       kanbanVendasUnificadasInfiniteQueryFilter()
     )
   )
-  coletarObservacoes(
+  coletarDoCache(
     queryClient.getQueriesData<InfiniteData<VendasUnificadasResponse>>(
       kanbanPedidosDeliveryInfiniteQueryFilter()
     )
   )
 
-  if (observacoesPorId.size === 0) return novosItems
+  if (
+    observacoesPorId.size === 0 &&
+    inicioPreparoPorId.size === 0 &&
+    fimPreparoPorId.size === 0
+  ) {
+    return novosItems
+  }
 
   return novosItems.map(item => {
-    if (item.observacoes?.length) return item
-    const cached = observacoesPorId.get(item.id)
-    if (!cached?.length) return item
-    return cloneVendaUnificadaDTO(item, { observacoes: cached })
+    const patch: KanbanVendaCachePatch = {}
+    if (!item.observacoes?.length) {
+      const cachedObs = observacoesPorId.get(item.id)
+      if (cachedObs?.length) patch.observacoes = cachedObs
+    }
+    if (!isoTimestampPreparoValido(item.dataInicioPreparo)) {
+      const cachedInicio = inicioPreparoPorId.get(item.id)
+      if (cachedInicio) patch.dataInicioPreparo = cachedInicio
+    }
+    if (!isoTimestampPreparoValido(item.dataFinalizacaoPreparo)) {
+      const cachedFim = fimPreparoPorId.get(item.id)
+      if (cachedFim) patch.dataFinalizacaoPreparo = cachedFim
+    }
+    if (
+      patch.observacoes === undefined &&
+      patch.dataInicioPreparo === undefined &&
+      patch.dataFinalizacaoPreparo === undefined
+    ) {
+      return item
+    }
+    return cloneVendaUnificadaDTO(item, patch)
   })
 }
 
