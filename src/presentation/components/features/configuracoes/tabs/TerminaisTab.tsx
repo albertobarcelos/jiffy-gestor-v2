@@ -13,6 +13,7 @@ import { CatalogGroupedList } from '@/src/presentation/components/features/catal
 import type { CatalogGroup } from '@/src/presentation/components/features/catalogo/types'
 import type { Menu } from '@/src/shared/types/menus'
 import { JiffyFriendlyAlertDialog } from '@/src/presentation/components/ui/JiffyFriendlyAlertDialog'
+import { formatarDataDetalhePedido } from '@/src/application/mappers/VendaDetalheMapper'
 import { TerminaisGroupMenuSelector } from './TerminaisGroupMenuSelector'
 import { TerminaisTabsModal, TerminaisTabsModalState } from './TerminaisTabsModal'
 
@@ -49,8 +50,11 @@ function TerminaisListColumnHeader() {
       </div>
       <div className={`flex-[2] ${TERMINAIS_COL_HEADER}`}>Nome do Terminal</div>
       <div className={`flex-[2] ${TERMINAIS_COL_HEADER}`}>Modelo Dispositivo</div>
-      <div className={`w-16 shrink-0 text-center leading-tight ${TERMINAIS_COL_HEADER}`}>
+      <div className={`flex-[2] text-center leading-tight ${TERMINAIS_COL_HEADER}`}>
         <span className="block">Versão APK</span>
+      </div>
+      <div className={`flex-[2] hidden md:block leading-tight ${TERMINAIS_COL_HEADER}`}>
+        <span className="block">Data Última Venda</span>
       </div>
       <div className={`flex-[2] hidden md:flex ${TERMINAIS_COL_HEADER}`}>Imp. Finalização</div>
       <div className={`flex-[1.5] text-center ${TERMINAIS_COL_HEADER}`}>Comp. Mesas</div>
@@ -1072,6 +1076,9 @@ export function TerminaisTab() {
       const modelo = rawData?.modeloDispositivo || rawData?.modelo || rawData?.deviceModel || 'Unknown'
       const versao =
         rawData?.versaoApk || rawData?.versao || rawData?.apkVersion || rawData?.version || '1.0.0'
+      const dataUltimaVenda = formatarDataDetalhePedido(
+        rawData?.dataUltimaVenda ?? null
+      )
       const prefs = resolvePreferencesForTerminal(terminal.getId(), preferencesMap)
       const compartilhamentoAtivo = prefs.compartilharMesas
       const fiscalAtivo = prefs.fiscalAtivo
@@ -1098,8 +1105,14 @@ export function TerminaisTab() {
             {nome}
           </div>
           <div className="flex-[2] md:text-sm text-[10px] text-secondary-text">{modelo}</div>
-          <div className="w-14 shrink-0 text-center md:text-sm text-[10px] text-secondary-text">
+          <div className="flex-[2] text-center md:text-sm text-[10px] text-secondary-text">
             {versao}
+          </div>
+          <div
+            className="flex-[2] hidden md:block md:text-sm text-[10px] text-secondary-text"
+            title={dataUltimaVenda}
+          >
+            {dataUltimaVenda}
           </div>
           <div className="flex-[2] md:text-sm text-[10px] text-secondary-text hidden md:flex">
             {preferencesLoaded ? (
