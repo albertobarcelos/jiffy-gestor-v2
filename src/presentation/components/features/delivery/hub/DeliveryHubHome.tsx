@@ -1,55 +1,21 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import {
-  MdCheck,
-  MdCheckCircle,
-  MdChevronRight,
-  MdLightbulbOutline,
-  MdLocationOn,
-  MdMyLocation,
-  MdPayments,
-  MdStorefront,
-} from 'react-icons/md'
-import type { EnderecoEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import { useMemo, type ReactNode } from 'react'
+import { MdCheck, MdCheckCircle } from 'react-icons/md'
+import type { DeliveryEtapaId } from '@/src/shared/constants/configuracoesRoutes'
 import type { DeliveryHubProgresso } from './deliveryHubProgresso'
 import {
   montarPassosHubDelivery,
   type DeliveryHubPassoUi,
 } from './deliveryHubPassosUi'
-import {
-  ctaPrimarioPreviewHub,
-  fatosPreviewHub,
-} from './deliveryHubPreview'
-import type { ResumoCoberturaHub } from './deliveryHubResumoCobertura'
 import type { DeliveryHubPassosExtras } from './deliveryHubCadastros'
 
 type DeliveryHubHomeProps = {
   progresso: DeliveryHubProgresso
-  resumoCobertura: ResumoCoberturaHub
-  endereco: EnderecoEmpresaMe | null
-  nomeEmpresa: string | null
   passosExtras?: DeliveryHubPassosExtras
-  onAbrirPasso: (passo: DeliveryHubPassoUi) => void
-}
-
-function DeliveryHubMapIllustration() {
-  return (
-    <div className="relative mx-auto h-40 w-full max-w-[280px]" aria-hidden>
-      <svg viewBox="0 0 280 160" className="h-full w-full">
-        <rect width="280" height="160" rx="16" fill="#EEF4FB" />
-        <path d="M20 110h240M40 70h80M140 40h90M50 130h70" stroke="#C5D7EA" strokeWidth="6" strokeLinecap="round" />
-        <circle cx="140" cy="78" r="52" fill="#C7D7F5" fillOpacity="0.45" />
-        <circle cx="140" cy="78" r="34" fill="#9BB6EA" fillOpacity="0.4" />
-        <circle cx="140" cy="78" r="16" fill="#5B82C9" fillOpacity="0.45" />
-        <path
-          d="M140 42c-14 0-26 11.2-26 25.2 0 18.8 26 44.8 26 44.8s26-26 26-44.8C166 53.2 154 42 140 42z"
-          fill="#530CA3"
-        />
-        <circle cx="140" cy="66" r="8" fill="#fff" />
-      </svg>
-    </div>
-  )
+  selecionadoId: DeliveryEtapaId | null
+  onSelecionarPasso: (passo: DeliveryHubPassoUi) => void
+  children: ReactNode
 }
 
 function BadgeStatus({ passo }: { passo: DeliveryHubPassoUi }) {
@@ -75,91 +41,24 @@ function BadgeStatus({ passo }: { passo: DeliveryHubPassoUi }) {
   )
 }
 
-function DeliveryHubPreview({
-  passo,
-  resumo,
-  endereco,
-  nomeEmpresa,
-  extras,
-  onAbrirPasso,
-}: {
-  passo: DeliveryHubPassoUi
-  resumo: ResumoCoberturaHub
-  endereco: EnderecoEmpresaMe | null
-  nomeEmpresa: string | null
-  extras?: DeliveryHubPassosExtras
-  onAbrirPasso: (passo: DeliveryHubPassoUi) => void
-}) {
-  const fatos = fatosPreviewHub(passo, resumo, endereco, nomeEmpresa, extras).map(fato => ({
-    ...fato,
-    Icon:
-      fato.id === 'areas' || fato.id === 'endereco'
-        ? MdLocationOn
-        : fato.id === 'raio'
-          ? MdMyLocation
-          : fato.id === 'taxa'
-            ? MdPayments
-            : fato.id === 'empresa'
-              ? MdStorefront
-              : passo.Icon,
-  }))
-  const ctaPrimario = ctaPrimarioPreviewHub(passo)
-
-  return (
-    <div className="flex h-full flex-col rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-      <h3 className="text-lg font-semibold text-primary">{passo.titulo}</h3>
-      {passo.id === 'delivery-cobertura' ? <DeliveryHubMapIllustration /> : null}
-      <ul className="mt-4 space-y-3">
-        {fatos.map(fato => (
-          <li key={fato.texto} className="flex items-start gap-2.5 text-sm text-primary-text">
-            <fato.Icon className="mt-0.5 h-5 w-5 shrink-0 text-secondary" />
-            <span>{fato.texto}</span>
-          </li>
-        ))}
-      </ul>
-      <button
-        type="button"
-        onClick={() => onAbrirPasso(passo)}
-        className="mt-6 w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
-      >
-        {ctaPrimario}
-      </button>
-      {passo.id === 'delivery-cobertura' ? (
-        <button
-          type="button"
-          onClick={() => onAbrirPasso(passo)}
-          className="mt-3 text-center text-sm font-semibold text-primary underline-offset-2 hover:underline"
-        >
-          Visualizar no mapa
-        </button>
-      ) : null}
-      <div className="mt-6 flex items-start gap-2 rounded-xl bg-secondary/10 px-3 py-3 text-xs text-secondary">
-        <MdLightbulbOutline className="mt-0.5 h-4 w-4 shrink-0" />
-        <span>Você pode alterar estas configurações quando quiser.</span>
-      </div>
-    </div>
-  )
-}
-
 export function DeliveryHubHome({
   progresso,
-  resumoCobertura,
-  endereco,
-  nomeEmpresa,
   passosExtras,
-  onAbrirPasso,
+  selecionadoId,
+  onSelecionarPasso,
+  children,
 }: DeliveryHubHomeProps) {
   const passos = useMemo(
     () => montarPassosHubDelivery(progresso, passosExtras),
     [progresso, passosExtras]
   )
-  const [selecionadoId, setSelecionadoId] = useState('delivery-cobertura')
-  const selecionado = passos.find(passo => passo.id === selecionadoId) ?? passos[1] ?? passos[0]
-  const pronto = progresso.totalObrigatorios > 0 && progresso.concluidosObrigatorios === progresso.totalObrigatorios
+  const pronto =
+    progresso.totalObrigatorios > 0 &&
+    progresso.concluidosObrigatorios === progresso.totalObrigatorios
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-gray-50 p-4 sm:p-6">
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-gray-50">
+      <div className="flex shrink-0 flex-col gap-4 px-4 pb-3 pt-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-primary sm:text-3xl">Configurações do Delivery</h1>
           <p className="mt-1 text-sm text-secondary-text">
@@ -190,74 +89,60 @@ export function DeliveryHubHome({
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.9fr)]">
-        <div className="relative flex flex-col rounded-2xl border border-gray-200 bg-white p-2 shadow-sm sm:p-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-4 sm:px-6 lg:flex-row">
+        <nav
+          aria-label="Passos do delivery"
+          className="flex max-h-[42vh] min-h-0 w-full shrink-0 flex-col overflow-y-auto rounded-2xl border border-gray-200 bg-white p-2 shadow-sm sm:p-3 lg:max-h-none lg:w-[22.5rem] lg:self-stretch"
+        >
           {passos.map((passo, index) => {
-            const ativo = passo.id === selecionado.id
+            const ativo = passo.id === selecionadoId
             const ultimo = index === passos.length - 1
             return (
-              <div key={passo.id} className="relative flex gap-3">
-                <div className="flex w-8 shrink-0 flex-col items-center">
+              <div key={passo.id} className="flex gap-3">
+                <div
+                  className={`relative flex w-8 shrink-0 items-center justify-center ${ultimo ? '' : 'mb-2'}`}
+                >
+                  {index > 0 ? (
+                    <span className="absolute left-1/2 top-0 h-1/2 w-px -translate-x-1/2 bg-gray-200" />
+                  ) : null}
+                  {ultimo ? null : (
+                    <span className="absolute left-1/2 top-1/2 h-[calc(50%+0.5rem)] w-px -translate-x-1/2 bg-gray-200" />
+                  )}
                   <span
-                    className={`z-10 flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white ${
+                    className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white ${
                       passo.concluido ? 'bg-emerald-500' : 'bg-primary'
                     }`}
                   >
                     {passo.numero}
                   </span>
-                  {ultimo ? null : <span className="w-px flex-1 bg-gray-200" />}
                 </div>
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setSelecionadoId(passo.id)}
-                  onKeyDown={event => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      setSelecionadoId(passo.id)
-                    }
-                  }}
-                  className={`mb-2 flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors ${
-                    ativo
-                      ? 'border-primary bg-primary/5'
-                      : 'border-transparent hover:bg-gray-50'
-                  }`}
+                <button
+                  type="button"
+                  aria-current={ativo ? 'page' : undefined}
+                  onClick={() => onSelecionarPasso(passo)}
+                  className={`flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors ${
+                    ultimo ? '' : 'mb-2'
+                  } ${ativo ? 'border-primary bg-primary/5' : 'border-transparent hover:bg-gray-50'}`}
                 >
                   <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-secondary/10 text-secondary">
                     <passo.Icon className="h-6 w-6" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold text-primary">{passo.titulo}</span>
+                    <span className="flex items-start justify-between gap-2">
+                      <span className="text-sm font-semibold text-primary">{passo.titulo}</span>
+                      <BadgeStatus passo={passo} />
+                    </span>
                     <span className="mt-0.5 block text-xs text-secondary-text">{passo.descricao}</span>
                   </span>
-                  <span className="hidden shrink-0 flex-col items-end gap-1 sm:flex">
-                    <BadgeStatus passo={passo} />
-                    <button
-                      type="button"
-                      onClick={event => {
-                        event.stopPropagation()
-                        onAbrirPasso(passo)
-                      }}
-                      className="inline-flex items-center text-xs font-semibold text-primary hover:underline"
-                    >
-                      {passo.cta}
-                      <MdChevronRight className="h-4 w-4" />
-                    </button>
-                  </span>
-                </div>
+                </button>
               </div>
             )
           })}
-        </div>
+        </nav>
 
-        <DeliveryHubPreview
-          passo={selecionado}
-          resumo={resumoCobertura}
-          endereco={endereco}
-          nomeEmpresa={nomeEmpresa}
-          extras={passosExtras}
-          onAbrirPasso={onAbrirPasso}
-        />
+        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+          {children}
+        </div>
       </div>
     </div>
   )

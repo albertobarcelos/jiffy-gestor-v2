@@ -1,16 +1,13 @@
 import { notFound } from 'next/navigation'
-import { ConfiguracoesDeliveryScreen } from '@/src/presentation/components/features/configuracoes/ConfiguracoesDeliveryScreen'
 import { deliveryEtapaIdFromSlug } from '@/src/shared/constants/configuracoesRoutes'
 
-/** `/config/delivery/:etapa` — ex.: `/config/delivery/cobertura`. */
+/** `/config/delivery/:etapa` — valida o slug; o layout do hub desenha a tela. */
 export default async function ConfigDeliveryEtapaPage({
   params,
 }: {
   params: Promise<{ etapa: string }>
 }) {
   const { etapa } = await params
-  const etapaId = deliveryEtapaIdFromSlug(etapa)
-  if (!etapaId) notFound()
-
-  return <ConfiguracoesDeliveryScreen etapaId={etapaId} />
+  if (!deliveryEtapaIdFromSlug(etapa)) notFound()
+  return null
 }
