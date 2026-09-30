@@ -10,9 +10,11 @@ import type { DiaDaSemanaApi } from '@/src/application/dto/delivery/Funcionament
 import {
   DIAS_DA_SEMANA_ORDEM_COMPOSER,
   intervaloAgendaEhValido,
+  intervaloCruzaMeiaNoite,
   LABEL_DIA_DA_SEMANA,
   LABEL_DIA_DA_SEMANA_CURTO,
   listarHorariosFuncionamento15Min,
+  textoHintViradaMeiaNoite,
   type GrupoHorarioAgenda,
 } from '@/src/shared/utils/funcionamentoDelivery'
 import { showToast } from '@/src/shared/utils/toast'
@@ -49,6 +51,12 @@ export function HorarioAgendaSidePanel({
   const [fechaComposer, setFechaComposer] = useState<string>(HORARIO_COMPOSER_PADRAO.fechaEm)
 
   const editando = grupoEditando != null
+  const cruzaMeiaNoite = intervaloCruzaMeiaNoite(abreComposer, fechaComposer)
+  const hintVirada = useMemo(() => {
+    if (!cruzaMeiaNoite) return null
+    const unico = diasComposer.size === 1 ? [...diasComposer][0] : null
+    return textoHintViradaMeiaNoite(unico)
+  }, [cruzaMeiaNoite, diasComposer])
 
   useEffect(() => {
     if (!open) return
@@ -182,6 +190,11 @@ export function HorarioAgendaSidePanel({
               ))}
             </select>
           </div>
+          {hintVirada ? (
+            <p className="mt-2 text-xs text-secondary-text" role="status">
+              {hintVirada}.
+            </p>
+          ) : null}
         </div>
       </div>
     </JiffySidePanelModal>

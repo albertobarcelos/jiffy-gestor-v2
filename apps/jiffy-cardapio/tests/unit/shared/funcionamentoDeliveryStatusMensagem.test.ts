@@ -71,6 +71,29 @@ describe('formatarStatusLojaPublica', () => {
       detalheHorario: 'Abriremos amanhã às 09:00',
     })
   })
+
+  it('quando aberta com intervalo que cruza meia-noite, marca dia seguinte', () => {
+    const agora = new Date(2026, 8, 14, 20, 0, 0)
+    const agendaVirada: FuncionamentoPublicoDiaDTO[] = [
+      { diaDaSemana: 'SEGUNDA', intervalos: [{ abreEm: '19:00', fechaEm: '02:00' }] },
+      { diaDaSemana: 'TERCA', intervalos: [] },
+      { diaDaSemana: 'QUARTA', intervalos: [] },
+      { diaDaSemana: 'QUINTA', intervalos: [] },
+      { diaDaSemana: 'SEXTA', intervalos: [] },
+      { diaDaSemana: 'SABADO', intervalos: [] },
+      { diaDaSemana: 'DOMINGO', intervalos: [] },
+    ]
+    expect(
+      formatarStatusLojaPublica({
+        aberta: true,
+        agendaSemanal: agendaVirada,
+        agora,
+      })
+    ).toEqual({
+      mensagem: 'Aberto, faça seu pedido!',
+      detalheHorario: 'até as 02:00 (dia seguinte)',
+    })
+  })
 })
 
 describe('resolverProximaAbertura', () => {
