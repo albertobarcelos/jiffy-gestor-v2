@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   MdDeleteOutline,
+  MdKeyboardArrowDown,
+  MdKeyboardArrowUp,
   MdMap,
   MdMyLocation,
   MdWarning,
@@ -343,6 +345,7 @@ export function CoberturaDeliveryTab() {
   const [rascunhoPaths, setRascunhoPaths] = useState<LatLngLiteral[] | null>(null)
   const [mapaVisivel, setMapaVisivel] = useState(true)
   const [painelAba, setPainelAba] = useState<CoberturaPainelAba>('raios')
+  const [painelRecolhido, setPainelRecolhido] = useState(false)
   const [areaFormaEditandoId, setAreaFormaEditandoId] = useState<string | null>(null)
   const [formaPathsRascunho, setFormaPathsRascunho] = useState<LatLngLiteral[] | null>(null)
   const [formaAlterada, setFormaAlterada] = useState(false)
@@ -842,6 +845,7 @@ export function CoberturaDeliveryTab() {
 
   const handlePinMovido = useCallback(
     (point: GeoJsonPoint) => {
+      setPainelRecolhido(false)
       const centro = centroEnderecoGeo ?? origemGeo
       if (!centro) {
         setPinRascunho(point)
@@ -1321,9 +1325,29 @@ export function CoberturaDeliveryTab() {
         </div>
 
         <div className="pointer-events-none absolute inset-0 z-20 flex items-start p-3 md:p-4">
-          <div className="pointer-events-auto relative mr-14 flex max-h-full w-full max-w-[380px] flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+          <div
+            className={`pointer-events-auto relative mr-14 flex w-full max-w-[380px] flex-col overflow-hidden rounded-2xl bg-white shadow-xl ${
+              painelRecolhido ? '' : 'max-h-full'
+            }`}
+          >
             <div className="shrink-0 px-4 pt-3">
-              <h2 className="text-base font-semibold text-primary-text">Áreas de Entrega</h2>
+              <div className="flex items-start justify-between gap-2">
+                <h2 className="text-base font-semibold text-primary-text">Áreas de Entrega</h2>
+                <button
+                  type="button"
+                  aria-expanded={!painelRecolhido}
+                  aria-controls="cobertura-painel-conteudo"
+                  aria-label={painelRecolhido ? 'Expandir painel' : 'Ocultar painel'}
+                  onClick={() => setPainelRecolhido(recolhido => !recolhido)}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-gray-100 hover:text-primary-text"
+                >
+                  {painelRecolhido ? (
+                    <MdKeyboardArrowDown className="h-5 w-5" aria-hidden />
+                  ) : (
+                    <MdKeyboardArrowUp className="h-5 w-5" aria-hidden />
+                  )}
+                </button>
+              </div>
               <nav
                 className="mt-2 flex flex-wrap gap-3 border-b border-gray-100"
                 aria-label="Painel de cobertura"
@@ -1332,7 +1356,10 @@ export function CoberturaDeliveryTab() {
                   <button
                     key={aba.id}
                     type="button"
-                    onClick={() => setPainelAba(aba.id)}
+                    onClick={() => {
+                      setPainelAba(aba.id)
+                      if (painelRecolhido) setPainelRecolhido(false)
+                    }}
                     className={`-mb-px border-b-2 pb-2 text-xs font-semibold ${
                       painelAba === aba.id
                         ? 'border-primary text-primary'
@@ -1345,6 +1372,15 @@ export function CoberturaDeliveryTab() {
               </nav>
             </div>
 
+            <div
+              id="cobertura-painel-conteudo"
+              className={`flex min-h-0 flex-col overflow-hidden transition-[max-height,opacity] duration-300 ease-out ${
+                painelRecolhido
+                  ? 'max-h-0 opacity-0 pointer-events-none'
+                  : 'max-h-[min(85vh,900px)] flex-1 opacity-100'
+              }`}
+              aria-hidden={painelRecolhido}
+            >
             {setupInicial ? (
               <div className="mx-3 mt-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5">
                 <p className="text-sm font-semibold text-primary-text">Confirme a loja e o alcance</p>
@@ -1813,6 +1849,7 @@ export function CoberturaDeliveryTab() {
                 />
               </div>
             ) : null}
+            </div>
           </div>
         </div>
       </div>
