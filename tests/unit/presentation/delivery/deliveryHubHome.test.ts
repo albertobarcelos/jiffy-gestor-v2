@@ -12,8 +12,8 @@ import { contarItensListaHub } from '@/src/presentation/components/features/deli
 import { isDeliveryEtapaId } from '@/src/shared/constants/configuracoesRoutes'
 
 const IDS_HUB = [
-  'delivery-geolocalizacao',
   'delivery-design',
+  'delivery-geolocalizacao',
   'delivery-agenda',
   'delivery-cobertura',
   'delivery-entregadores',
@@ -81,8 +81,8 @@ describe('montarPassosHubDelivery', () => {
       'delivery-agenda',
       'delivery-cobertura',
     ])
-    expect(passos[0]?.href).toBe('/config/delivery/empresa')
-    expect(passos[1]?.href).toBe('/config/delivery/design')
+    expect(passos[0]?.href).toBe('/config/delivery/design')
+    expect(passos[1]?.href).toBe('/config/delivery/empresa')
     expect(passos[2]?.href).toBe('/config/delivery/agenda')
     expect(passos[3]?.href).toBe('/config/delivery/cobertura')
     expect(passos.every(passo => passo.etapaId === passo.id)).toBe(true)
@@ -140,7 +140,7 @@ describe('montarPassosHubDelivery', () => {
 describe('DELIVERY_HUB_ETAPAS', () => {
   it('expõe sete etapas do hub (nome/cardápio e WhatsApp em Personalizar loja)', () => {
     expect(DELIVERY_HUB_ETAPAS.map(etapa => etapa.step)).toEqual([1, 2, 3, 4, 5, 6, 7])
-    expect(getDeliveryEtapaById('delivery-design')?.step).toBe(2)
+    expect(getDeliveryEtapaById('delivery-design')?.step).toBe(1)
     expect(getDeliveryEtapaById('delivery-meios')?.label).toBe('Pagamento')
     expect(getDeliveryEtapaById('delivery-impressoras')?.component).toBeTypeOf('function')
     expect(getDeliveryEtapaById('delivery-nome-cardapio')).toBeUndefined()

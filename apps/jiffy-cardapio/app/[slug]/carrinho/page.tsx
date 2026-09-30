@@ -3,11 +3,13 @@ import type { Metadata } from 'next'
 import { HydrationBoundary } from '@tanstack/react-query'
 import { DeliveryPublicoHomeScreen } from '@/src/presentation/components/features/delivery-publico/public/screens/DeliveryPublicoHomeScreen'
 import { dehydrateCatalogoPrimeiraPagina } from '@/src/infrastructure/api/dehydrateCatalogoPrimeiraPagina'
-import { metadataCardapioNaoIndexavel } from '@/src/infrastructure/seo/cardapioSlugMetadata'
+import { carregarEmpresaPublicaSeo } from '@/src/infrastructure/seo/carregarEmpresaPublicaSeo'
+import {
+  metadataCardapioNaoIndexavel,
+  metadataCardapioSlug,
+} from '@/src/infrastructure/seo/cardapioSlugMetadata'
 
 export { generateStaticParams } from '../catalogoSlugCache'
-
-export const metadata: Metadata = metadataCardapioNaoIndexavel
 
 /** Precisa ser literal neste arquivo — o Next não lê re-export. */
 export const revalidate = 30
@@ -15,6 +17,17 @@ export const dynamicParams = true
 
 type PageProps = {
   params: Promise<{ slug: string }>
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug: rawSlug } = await params
+  const slug = rawSlug?.trim() ?? ''
+  const empresa = await carregarEmpresaPublicaSeo(slug)
+  if (!empresa) return metadataCardapioNaoIndexavel
+  return {
+    ...metadataCardapioSlug(empresa),
+    robots: { index: false, follow: false },
+  }
 }
 
 function HomeFallback() {

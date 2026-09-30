@@ -14,7 +14,7 @@ import { calcularDeliveryHubProgresso } from './deliveryHubProgresso'
 import { DeliveryHubHome } from './DeliveryHubHome'
 import type { DeliveryHubPassoUi } from './deliveryHubPassosUi'
 
-const ETAPA_PADRAO: DeliveryEtapaId = 'delivery-cobertura'
+const ETAPA_PADRAO: DeliveryEtapaId = 'delivery-design'
 
 /**
  * Hub Delivery: menu à esquerda; o painel da direita renderiza a etapa ativa

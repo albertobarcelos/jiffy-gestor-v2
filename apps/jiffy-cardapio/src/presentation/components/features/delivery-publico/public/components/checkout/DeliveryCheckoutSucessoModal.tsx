@@ -11,6 +11,12 @@ import {
   calcularDistanciaAproximadaDaLoja,
   pontoClienteParaDistancia,
 } from '../../../shared/utils/formatarDistanciaAproximadaDaLoja'
+import { usePwaInstallPrompt } from '../../../shared/hooks/usePwaInstallPrompt'
+import {
+  DeliveryPwaInstallAndroidGuide,
+  DeliveryPwaInstallBanner,
+  DeliveryPwaInstallIosGuide,
+} from '../../../shared/components/DeliveryPwaInstallBanner'
 import {
   DeliveryCheckoutShellFooter,
   DeliveryCheckoutShellHeader,
@@ -18,6 +24,7 @@ import {
 import { DeliveryDistanciaLojaHint } from './DeliveryDistanciaLojaHint'
 
 type DeliveryCheckoutSucessoModalProps = {
+  slug: string
   nomeCliente: string
   tipoEntrega: DeliveryTipoEntrega
   modoTempo: 'imediato' | 'agendado'
@@ -37,6 +44,7 @@ function primeiroNome(nome: string): string {
 }
 
 export function DeliveryCheckoutSucessoModal({
+  slug,
   nomeCliente,
   tipoEntrega,
   modoTempo,
@@ -52,6 +60,7 @@ export function DeliveryCheckoutSucessoModal({
   const isEntrega = tipoEntrega === 'entrega'
   const nomeCurto = primeiroNome(nomeCliente)
   const titulo = nomeCurto ? `Obrigado, ${nomeCurto}!` : 'Pedido enviado!'
+  const pwa = usePwaInstallPrompt({ slug, contexto: 'sucesso' })
 
   const orientacao = isEntrega
     ? 'Seu pedido será preparado e, em breve, chegará no endereço cadastrado.'
@@ -172,8 +181,24 @@ export function DeliveryCheckoutSucessoModal({
               </p>
             </div>
           </div>
+
+          {pwa.visivel ? (
+            <DeliveryPwaInstallBanner
+              nomeLoja={nomeEmpresa}
+              variante="embutido"
+              onInstalar={() => void pwa.instalar()}
+              onAgoraNao={pwa.agoraNao}
+              onNaoMostrarDeNovo={pwa.naoMostrarDeNovo}
+            />
+          ) : null}
         </div>
       </div>
+
+      <DeliveryPwaInstallIosGuide open={pwa.guiaIosAberto} onClose={pwa.fecharGuiaIos} />
+      <DeliveryPwaInstallAndroidGuide
+        open={pwa.guiaAndroidAberto}
+        onClose={pwa.fecharGuiaAndroid}
+      />
 
       <DeliveryCheckoutShellFooter>
         <div className="flex w-full flex-col">

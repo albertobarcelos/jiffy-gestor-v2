@@ -47,20 +47,8 @@ export interface DeliveryEtapaConfig {
 
 export const DELIVERY_HUB_ETAPAS: DeliveryEtapaConfig[] = [
   {
-    id: 'delivery-geolocalizacao',
-    step: 1,
-    title: 'Empresa e endereço',
-    label: 'Empresa',
-    descricao: 'Endereço da loja usado no pin e na entrega.',
-    path: deliveryHubEtapaPath('delivery-geolocalizacao'),
-    component: EmpresaDeliveryEtapa,
-    icon: MdStorefront,
-    cta: 'Editar',
-    obrigatoria: true,
-  },
-  {
     id: 'delivery-design',
-    step: 2,
+    step: 1,
     title: 'Personalizar loja',
     label: 'Design',
     descricao: 'Nome, cardápio, identidade visual e WhatsApp.',
@@ -69,6 +57,18 @@ export const DELIVERY_HUB_ETAPAS: DeliveryEtapaConfig[] = [
     icon: MdPalette,
     cta: 'Design',
     obrigatoria: false,
+  },
+  {
+    id: 'delivery-geolocalizacao',
+    step: 2,
+    title: 'Empresa e endereço',
+    label: 'Empresa',
+    descricao: 'Endereço da loja usado no pin e na entrega.',
+    path: deliveryHubEtapaPath('delivery-geolocalizacao'),
+    component: EmpresaDeliveryEtapa,
+    icon: MdStorefront,
+    cta: 'Editar',
+    obrigatoria: true,
   },
   {
     id: 'delivery-agenda',

@@ -73,6 +73,12 @@ import {
 } from '../../shared/utils/deliveryPublicoRoutes'
 import { lerUltimoPedidoPublicoConfirmado } from '../../shared/utils/pedidoConfirmadoStorage'
 import { showToast } from '@/src/shared/utils/toast'
+import { usePwaInstallPrompt } from '../../shared/hooks/usePwaInstallPrompt'
+import {
+  DeliveryPwaInstallAndroidGuide,
+  DeliveryPwaInstallBanner,
+  DeliveryPwaInstallIosGuide,
+} from '../../shared/components/DeliveryPwaInstallBanner'
 
 type DeliveryPublicoHomeScreenProps = {
   slug: string
@@ -429,7 +435,41 @@ export function DeliveryPublicoHomeScreen({
         nomeLoja={empresa?.nomeFantasia}
         visible={!carrinhoAberto}
       />
+      <DeliveryPwaInstallHomeSlot
+        slug={slug}
+        nomeLoja={empresa?.nomeFantasia ?? null}
+        permitido={!carrinhoAberto && !produtoIdAberto}
+      />
     </DeliveryThemeScope>
+  )
+}
+
+function DeliveryPwaInstallHomeSlot({
+  slug,
+  nomeLoja,
+  permitido,
+}: {
+  slug: string
+  nomeLoja: string | null
+  permitido: boolean
+}) {
+  const pwa = usePwaInstallPrompt({ slug, contexto: 'home', permitido })
+  if (!pwa.visivel) return null
+  return (
+    <>
+      <DeliveryPwaInstallBanner
+        nomeLoja={nomeLoja}
+        variante="flutuante"
+        onInstalar={() => void pwa.instalar()}
+        onAgoraNao={pwa.agoraNao}
+        onNaoMostrarDeNovo={pwa.naoMostrarDeNovo}
+      />
+      <DeliveryPwaInstallIosGuide open={pwa.guiaIosAberto} onClose={pwa.fecharGuiaIos} />
+      <DeliveryPwaInstallAndroidGuide
+        open={pwa.guiaAndroidAberto}
+        onClose={pwa.fecharGuiaAndroid}
+      />
+    </>
   )
 }
 

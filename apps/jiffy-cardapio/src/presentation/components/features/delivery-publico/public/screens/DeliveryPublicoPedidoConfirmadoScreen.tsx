@@ -123,6 +123,7 @@ export function DeliveryPublicoPedidoConfirmadoScreen({
           >
             {view === 'sucesso' ? (
               <DeliveryCheckoutSucessoModal
+                slug={slug}
                 nomeCliente={snapshot.nome}
                 tipoEntrega={snapshot.tipoEntrega}
                 modoTempo={snapshot.modoTempo}

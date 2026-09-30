@@ -3,6 +3,7 @@
 import { type ReactNode, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Toaster } from 'react-hot-toast'
+import { DeliveryPwaServiceWorkerRegister } from '../../shared/components/DeliveryPwaServiceWorkerRegister'
 import { useDeliveryVisualViewport } from '../../shared/hooks/useDeliveryVisualViewport'
 
 const IOS_LOCK_CLASS = 'delivery-publico-ios-lock'
@@ -36,6 +37,7 @@ export function DeliveryPublicoShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="delivery-publico-shell">
+      <DeliveryPwaServiceWorkerRegister />
       <main className="delivery-publico-scroll w-full">{children}</main>
       {toastHost
         ? createPortal(
