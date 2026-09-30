@@ -38,6 +38,30 @@
     background: #94a3b8;
   }
 
+  /* Hub Delivery — meios de pagamento: scroll horizontal bem claro */
+  .meios-pagamentos-hub-h-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: #f3f4f6 transparent;
+  }
+
+  .meios-pagamentos-hub-h-scroll::-webkit-scrollbar {
+    height: 6px;
+    width: 0;
+  }
+
+  .meios-pagamentos-hub-h-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .meios-pagamentos-hub-h-scroll::-webkit-scrollbar-thumb {
+    background: #f3f4f6;
+    border-radius: 999px;
+  }
+
+  .meios-pagamentos-hub-h-scroll::-webkit-scrollbar-thumb:hover {
+    background: #e5e7eb;
+  }
+
   /* Tooltip customizada para icones de mesa */
   .tooltip-hover {
     position: relative;

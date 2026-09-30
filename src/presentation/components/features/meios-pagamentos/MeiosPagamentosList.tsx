@@ -5,6 +5,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { MeioPagamento, type TipoParcelamento } from '@/src/domain/entities/MeioPagamento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { useHorizontalDragScroll } from '@/src/presentation/hooks/useHorizontalDragScroll'
 import { MdSearch, MdDelete } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -24,6 +25,11 @@ import {
 
 interface MeiosPagamentosListProps {
   onReload?: () => void
+  /**
+   * Layout do hub Delivery: rolagem horizontal na tabela com largura mínima/máxima.
+   * Não altera a tela em Configurações / rota full.
+   */
+  layoutDeliveryHub?: boolean
 }
 
 /**
@@ -74,7 +80,7 @@ function clonarMeioPagamento(
  * Lista de meios de pagamento com scroll infinito
  * Replica exatamente o design e lógica do Flutter
  */
-export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
+export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: MeiosPagamentosListProps) {
   const [meiosPagamento, setMeiosPagamento] = useState<MeioPagamento[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searchText, setSearchText] = useState('')
@@ -95,6 +101,16 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
     meioPagamentoId: undefined,
   })
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const {
+    scrollRef: hubHScrollRef,
+    isDragging: hubHDragging,
+    hasMovedRef: hubHHasMovedRef,
+    handleMouseDown: hubHHandleMouseDown,
+    handleWheel: hubHHandleWheel,
+    handleMouseMove: hubHHandleMouseMove,
+    handleMouseUp: hubHHandleMouseUp,
+    handleMouseLeave: hubHHandleMouseLeave,
+  } = useHorizontalDragScroll<HTMLDivElement>({ mapVerticalWheel: false })
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
   const { isAuthenticated } = useAuthStore()
@@ -717,31 +733,120 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
         </div>
       </div>
 
+      {/* Cabeçalho + linhas: no hub Delivery, scroll horizontal com largura limitada */}
+      <div
+        ref={layoutDeliveryHub ? hubHScrollRef : undefined}
+        onMouseDown={
+          layoutDeliveryHub
+            ? event => {
+                const alvo = event.target as HTMLElement | null
+                if (
+                  alvo?.closest(
+                    'button, input, select, a, label, [role="switch"], [role="checkbox"]'
+                  )
+                ) {
+                  return
+                }
+                hubHHandleMouseDown(event)
+              }
+            : undefined
+        }
+        onMouseMove={layoutDeliveryHub ? hubHHandleMouseMove : undefined}
+        onMouseUp={layoutDeliveryHub ? hubHHandleMouseUp : undefined}
+        onMouseLeave={layoutDeliveryHub ? hubHHandleMouseLeave : undefined}
+        onWheel={layoutDeliveryHub ? hubHHandleWheel : undefined}
+        className={
+          layoutDeliveryHub
+            ? `meios-pagamentos-hub-h-scroll flex min-h-0 flex-1 flex-col overflow-x-auto overflow-y-hidden md:px-[30px] px-1 ${
+                hubHDragging ? 'cursor-grabbing select-none' : 'cursor-grab'
+              }`
+            : 'contents'
+        }
+      >
+        <div
+          className={
+            layoutDeliveryHub
+              ? 'flex min-h-0 w-max max-w-none flex-1 flex-col'
+              : 'contents'
+          }
+        >
       {/* Cabeçalho da tabela */}
-      <div className="md:px-[30px] px-1 mt-0 flex-shrink-0">
-        <div className="h-10 bg-custom-2 rounded-lg md:px-4 px-1 flex items-center gap-[10px]">
-          <div className="flex-[3] font-semibold md:text-sm text-xs text-primary-text">
+      <div className={layoutDeliveryHub ? 'mt-0 flex-shrink-0' : 'md:px-[30px] px-1 mt-0 flex-shrink-0'}>
+        <div
+          className={`h-10 bg-custom-2 rounded-lg md:px-4 px-1 flex items-center ${
+            layoutDeliveryHub ? 'gap-0' : 'gap-[10px]'
+          }`}
+        >
+          <div
+            className={
+              layoutDeliveryHub
+                ? 'w-[200px] shrink-0 font-semibold text-sm text-primary-text'
+                : 'flex-[3] font-semibold md:text-sm text-xs text-primary-text'
+            }
+          >
             Nome
           </div>
-          <div className="flex-[2] font-semibold md:text-sm text-xs text-primary-text hidden md:flex">
+          <div
+            className={
+              layoutDeliveryHub
+                ? 'flex w-[180px] shrink-0 font-semibold text-sm text-primary-text'
+                : 'flex-[2] font-semibold md:text-sm text-xs text-primary-text hidden md:flex'
+            }
+          >
             Forma Fiscal
           </div>
-          <div className="md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text">
+          <div
+            className={
+              layoutDeliveryHub
+                ? 'flex w-[96px] shrink-0 items-center justify-center font-semibold text-sm text-primary-text'
+                : 'md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text'
+            }
+          >
             Terminal
           </div>
-          <div className="md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text">
+          <div
+            className={
+              layoutDeliveryHub
+                ? 'flex w-[96px] shrink-0 items-center justify-center font-semibold text-sm text-primary-text'
+                : 'md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text'
+            }
+          >
             Delivery
           </div>
-          <div className="md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text">
+          <div
+            className={
+              layoutDeliveryHub
+                ? 'flex w-[120px] shrink-0 items-center justify-center font-semibold text-sm text-primary-text'
+                : 'md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text'
+            }
+          >
             Permite Parcela
           </div>
-          <div className="md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text hidden md:flex">
+          <div
+            className={
+              layoutDeliveryHub
+                ? 'flex w-[168px] shrink-0 items-center justify-center font-semibold text-sm text-primary-text'
+                : 'md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text hidden md:flex'
+            }
+          >
             Tipo parcelamento
           </div>
-          <div className="md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text">
+          <div
+            className={
+              layoutDeliveryHub
+                ? 'flex w-[72px] shrink-0 items-center justify-center font-semibold text-sm text-primary-text'
+                : 'md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text'
+            }
+          >
             TEF
           </div>
-          <div className="md:flex-[2] flex-[1] text-right font-semibold md:text-sm text-xs text-primary-text">
+          <div
+            className={
+              layoutDeliveryHub
+                ? 'flex w-[72px] shrink-0 items-center justify-end font-semibold text-sm text-primary-text'
+                : 'md:flex-[2] flex-[1] text-right font-semibold md:text-sm text-xs text-primary-text'
+            }
+          >
             Ações
           </div>
         </div>
@@ -750,8 +855,12 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
       {/* Lista de meios de pagamento com scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto md:px-[30px] px-1 mt-2 scrollbar-hide"
-        style={{ maxHeight: 'calc(100vh - 300px)' }}
+        className={
+          layoutDeliveryHub
+            ? 'mt-2 min-h-0 flex-1 overflow-y-auto scrollbar-hide'
+            : 'flex-1 overflow-y-auto md:px-[30px] px-1 mt-2 scrollbar-hide'
+        }
+        style={layoutDeliveryHub ? undefined : { maxHeight: 'calc(100vh - 300px)' }}
       >
         {meiosPagamento.length === 0 && !isLoading && (
           <div className="flex items-center justify-center py-12">
@@ -762,6 +871,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
         {meiosPagamento.map((meioPagamento, index) => {
           // Handler para abrir edição ao clicar na linha
           const handleRowClick = () => {
+            if (layoutDeliveryHub && (hubHHasMovedRef.current || hubHDragging)) return
             openTabsModal({
               mode: 'edit',
               meioPagamentoId: meioPagamento.getId(),
@@ -774,15 +884,35 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
             onClick={handleRowClick}
             className={`${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} rounded-lg hover:bg-secondary-bg/15 transition-colors cursor-pointer`}
           >
-            <div className="md:px-4 px-1 py-1 flex items-center">
-              <div className="flex-[3] font-normal md:text-sm text-xs text-primary-text flex items-center gap-2">
-                # <span className="">{meioPagamento.getNome()}</span>
+            <div
+              className={`md:px-4 px-1 py-1 flex items-center ${
+                layoutDeliveryHub ? 'gap-0' : ''
+              }`}
+            >
+              <div
+                className={
+                  layoutDeliveryHub
+                    ? 'flex w-[200px] shrink-0 items-center gap-2 overflow-hidden text-sm font-normal text-primary-text'
+                    : 'flex-[3] font-normal md:text-sm text-xs text-primary-text flex items-center gap-2'
+                }
+              >
+                # <span className="truncate">{meioPagamento.getNome()}</span>
               </div>
-              <div className="flex-[2] font-normal text-sm text-secondary-text hidden md:flex">
+              <div
+                className={
+                  layoutDeliveryHub
+                    ? 'flex w-[180px] shrink-0 items-center whitespace-nowrap text-sm font-normal text-secondary-text'
+                    : 'flex-[2] font-normal text-sm text-secondary-text hidden md:flex'
+                }
+              >
                 {formatarFormaPagamentoFiscal(meioPagamento.getFormaPagamentoFiscal())}
               </div>
               <div
-                className="md:flex-[2] flex-[1] flex justify-center"
+                className={
+                  layoutDeliveryHub
+                    ? 'flex w-[96px] shrink-0 items-center justify-center'
+                    : 'md:flex-[2] flex-[1] flex justify-center'
+                }
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
@@ -803,7 +933,11 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
                 />
               </div>
               <div
-                className="md:flex-[2] flex-[1] flex justify-center"
+                className={
+                  layoutDeliveryHub
+                    ? 'flex w-[96px] shrink-0 items-center justify-center'
+                    : 'md:flex-[2] flex-[1] flex justify-center'
+                }
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
@@ -826,7 +960,11 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
                 />
               </div>
               <div
-                className="md:flex-[2] flex-[1] flex justify-center"
+                className={
+                  layoutDeliveryHub
+                    ? 'flex w-[120px] shrink-0 items-center justify-center'
+                    : 'md:flex-[2] flex-[1] flex justify-center'
+                }
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
@@ -853,7 +991,11 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
                 )}
               </div>
               <div
-                className="md:flex-[2] flex-[1] hidden md:flex justify-center"
+                className={
+                  layoutDeliveryHub
+                    ? 'flex w-[168px] shrink-0 items-center justify-center'
+                    : 'md:flex-[2] flex-[1] hidden md:flex justify-center'
+                }
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
@@ -870,7 +1012,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
                       )
                     }}
                     aria-label={`Tipo de parcelamento — ${meioPagamento.getNome()}`}
-                    className="h-8 max-w-full rounded-lg border border-gray-200 bg-info px-2 text-xs text-primary-text focus:border-primary focus:outline-none disabled:opacity-60"
+                    className="h-8 w-full max-w-[160px] rounded-lg border border-gray-200 bg-info px-2 text-xs text-primary-text focus:border-primary focus:outline-none disabled:opacity-60"
                   >
                     {TIPOS_PARCELAMENTO_OPCOES.map((opcao) => (
                       <option key={opcao.value} value={opcao.value}>
@@ -885,7 +1027,11 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
                 )}
               </div>
               <div
-                className="md:flex-[2] flex-[1] flex justify-center"
+                className={
+                  layoutDeliveryHub
+                    ? 'flex w-[72px] shrink-0 items-center justify-center'
+                    : 'md:flex-[2] flex-[1] flex justify-center'
+                }
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
@@ -905,8 +1051,14 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
                   }}
                 />
               </div>
-              <div className="md:flex-[2] flex-[1] flex justify-end" onClick={(e) => e.stopPropagation()}>
-                <button
+              <div
+                className={
+                  layoutDeliveryHub
+                    ? 'flex w-[72px] shrink-0 items-center justify-end'
+                    : 'md:flex-[2] flex-[1] flex justify-end'
+                }
+                onClick={(e) => e.stopPropagation()}
+              >                <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation()
@@ -933,6 +1085,8 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
             <JiffyLoading />
           </div>
         )}
+      </div>
+        </div>
       </div>
 
       <MeiosPagamentosTabsModal

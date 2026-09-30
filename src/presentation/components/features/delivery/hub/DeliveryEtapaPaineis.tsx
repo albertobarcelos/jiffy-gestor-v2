@@ -34,7 +34,7 @@ export function EntregadoresDeliveryEtapa() {
 export function MeiosDeliveryEtapa() {
   return (
     <DeliveryEtapaPainel>
-      <MeiosPagamentosList />
+      <MeiosPagamentosList layoutDeliveryHub />
     </DeliveryEtapaPainel>
   )
 }
