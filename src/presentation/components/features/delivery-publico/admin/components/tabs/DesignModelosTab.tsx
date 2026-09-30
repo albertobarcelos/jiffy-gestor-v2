@@ -3,6 +3,7 @@
 import type { DeliveryPublicoDesignConfig } from '../../../shared/types/deliveryPublicoDesignConfig'
 import { LAYOUT_MODELS } from '../../../shared/constants/layoutModels'
 import { DesignSelectableCard } from '../DesignSelectableCard'
+import { DesignSectionPageHeader } from '../DesignSectionPageHeader'
 import { LayoutModelWireframe } from '../LayoutModelWireframe'
 
 type DesignModelosTabProps = {
@@ -12,14 +13,8 @@ type DesignModelosTabProps = {
 
 export function DesignModelosTab({ config, onChange }: DesignModelosTabProps) {
   return (
-    <div className="space-y-3">
-      <div>
-        <h3 className="text-base font-semibold text-primary">Modelos</h3>
-        <p className="mt-1 text-sm text-secondary-text">
-          Escolha a estrutura do catálogo. Cores, fontes e demais opções do design aplicam em
-          qualquer modelo.
-        </p>
-      </div>
+    <div className="space-y-5">
+      <DesignSectionPageHeader sectionId="modelos" />
 
       <div className="grid gap-3 sm:grid-cols-2">
         {LAYOUT_MODELS.map(modelo => (

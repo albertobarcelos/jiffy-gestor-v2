@@ -180,20 +180,31 @@ html.delivery-publico-ios-lock select {
 
 /**
  * Preview mobile do designer — conteúdo ocupa 100% da largura útil do frame.
- * `transform` cria containing block para `position: fixed` (footer do carrinho etc.).
+ * `transform` no viewport cria containing block para `position: fixed` (footer)
+ * e o raio + overflow clipam os cantos inferiores do carrinho.
  */
 .delivery-preview-shell {
   width: 100%;
   max-width: 24rem;
   margin-inline: auto;
   min-height: 0;
-  transform: translateZ(0);
   container-type: inline-size;
 }
 
 .delivery-preview-viewport {
   width: 100%;
   min-height: 0;
+  transform: translateZ(0);
+  border-radius: 1.5rem; /* 2rem do frame − ~8px da borda */
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/** Footer fixo do carrinho — acompanha o raio interno do frame. */
+.delivery-preview-shell .fixed.bottom-0 {
+  overflow: hidden;
+  border-bottom-left-radius: 1.5rem;
+  border-bottom-right-radius: 1.5rem;
 }
 
 .delivery-preview-scale-host {

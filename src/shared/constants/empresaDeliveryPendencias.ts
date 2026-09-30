@@ -32,11 +32,11 @@ export type PendenciaAcao = {
 const ACAO_POR_TIPO: Partial<Record<EmpresaDeliveryPendenciaType, PendenciaAcao>> = {
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.EMPRESA_DELIVERY_NAO_CONFIGURADA]: {
     label: 'Configurar nome e cardápio',
-    href: deliveryHubEtapaPath('delivery-nome-cardapio'),
+    href: `${deliveryHubEtapaPath('delivery-design')}?secao=nome-cardapio`,
   },
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.CARDAPIO_DELIVERY_NAO_CONFIGURADO]: {
     label: 'Selecionar cardápio',
-    href: deliveryHubEtapaPath('delivery-nome-cardapio'),
+    href: `${deliveryHubEtapaPath('delivery-design')}?secao=nome-cardapio`,
   },
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.GEOLOCALIZACAO_NAO_CONFIGURADA]: {
     label: 'Definir pin na cobertura de entrega',
@@ -56,7 +56,7 @@ const ACAO_POR_TIPO: Partial<Record<EmpresaDeliveryPendenciaType, PendenciaAcao>
   },
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.CANAL_WHATSAPP_NAO_CONECTADO]: {
     label: 'Conectar WhatsApp',
-    href: deliveryHubEtapaPath('delivery-notificacoes'),
+    href: `${deliveryHubEtapaPath('delivery-design')}?secao=notificacoes`,
   },
 }
 

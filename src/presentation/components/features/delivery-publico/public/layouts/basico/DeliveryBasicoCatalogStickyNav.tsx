@@ -63,9 +63,9 @@ export function DeliveryBasicoCatalogStickyNav({
       '.delivery-basico-content-column'
     ) as HTMLElement | null
     const columnRect = column?.getBoundingClientRect()
-    const candidate = root.closest(
-      '.delivery-preview-shell'
-    ) as HTMLElement | null
+    const candidate =
+      (root.closest('.delivery-preview-viewport') as HTMLElement | null) ??
+      (root.closest('.delivery-preview-shell') as HTMLElement | null)
     const candidateTransform = candidate
       ? getComputedStyle(candidate).transform
       : 'none'
@@ -81,7 +81,7 @@ export function DeliveryBasicoCatalogStickyNav({
 
     const next: PinMetrics = {
       height,
-      // Com transform no preview, `fixed` é relativo ao shell — converter coords.
+      // Com transform no preview, `fixed` é relativo ao viewport — converter coords.
       top: Math.round(containingRect ? portTop - containingRect.top : portTop),
       left: Math.round(containingRect ? portLeft - containingRect.left : portLeft),
       width: Math.round(portWidth),

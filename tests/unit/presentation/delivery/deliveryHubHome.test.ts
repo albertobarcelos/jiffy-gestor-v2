@@ -13,14 +13,12 @@ import { isDeliveryEtapaId } from '@/src/shared/constants/configuracoesRoutes'
 
 const IDS_HUB = [
   'delivery-geolocalizacao',
-  'delivery-nome-cardapio',
   'delivery-design',
   'delivery-agenda',
   'delivery-cobertura',
   'delivery-entregadores',
   'delivery-meios',
   'delivery-impressoras',
-  'delivery-notificacoes',
 ] as const
 
 describe('resumirCoberturaHub', () => {
@@ -73,30 +71,26 @@ describe('contarItensListaHub', () => {
 })
 
 describe('montarPassosHubDelivery', () => {
-  it('mantém o hub da main e acrescenta nome, design e agenda', () => {
+  it('lista as etapas do hub sem nome/cardápio nem notificações', () => {
     const progresso = calcularDeliveryHubProgresso([], true)
     const passos = montarPassosHubDelivery(progresso)
     expect(passos.map(passo => passo.id)).toEqual([...IDS_HUB])
+    expect(passos.map(passo => passo.numero)).toEqual([1, 2, 3, 4, 5, 6, 7])
     expect(passos.filter(passo => passo.obrigatoria).map(passo => passo.id)).toEqual([
       'delivery-geolocalizacao',
-      'delivery-nome-cardapio',
       'delivery-agenda',
       'delivery-cobertura',
     ])
     expect(passos[0]?.href).toBe('/config/delivery/empresa')
-    expect(passos[1]?.href).toBe('/config/delivery/nome-cardapio')
-    expect(passos[2]?.href).toBe('/config/delivery/design')
-    expect(passos[3]?.href).toBe('/config/delivery/agenda')
-    expect(passos[4]?.href).toBe('/config/delivery/cobertura')
-    expect(passos[5]?.href).toBe('/config/delivery/entregadores')
-    expect(passos[8]?.href).toBe('/config/delivery/notificacoes')
+    expect(passos[1]?.href).toBe('/config/delivery/design')
+    expect(passos[2]?.href).toBe('/config/delivery/agenda')
+    expect(passos[3]?.href).toBe('/config/delivery/cobertura')
     expect(passos.every(passo => passo.etapaId === passo.id)).toBe(true)
   })
 
   it('não marca etapas recomendadas como concluídas pelo progresso obrigatório', () => {
     const passos = montarPassosHubDelivery(calcularDeliveryHubProgresso([], true), {
       empresaDeliveryConfigurada: true,
-      agendaConfigurada: true,
     })
     const recomendados = passos.filter(passo => !passo.obrigatoria)
     expect(recomendados.map(passo => passo.id)).toEqual([
@@ -104,44 +98,53 @@ describe('montarPassosHubDelivery', () => {
       'delivery-entregadores',
       'delivery-meios',
       'delivery-impressoras',
-      'delivery-notificacoes',
     ])
-    expect(recomendados.filter(passo => passo.id !== 'delivery-design').every(passo => passo.concluido === false)).toBe(
-      true
-    )
-    expect(passos.filter(passo => passo.obrigatoria).every(passo => passo.concluido)).toBe(true)
+    expect(
+      recomendados.filter(passo => passo.id !== 'delivery-design').every(passo => passo.concluido === false)
+    ).toBe(true)
   })
 
-  it('marca etapas recomendadas como concluídas só quando há cadastro ou WhatsApp conectado', () => {
+  it('marca etapas recomendadas como concluídas só quando há cadastro', () => {
     const progresso = calcularDeliveryHubProgresso([], true)
     const preenchidos = montarPassosHubDelivery(progresso, {
       qtdEntregadores: 2,
       qtdMeiosPagamento: 1,
       qtdImpressoras: 3,
-      whatsappConectado: true,
       empresaDeliveryConfigurada: true,
-      agendaConfigurada: true,
     })
     const entregadores = preenchidos.find(passo => passo.id === 'delivery-entregadores')
     const meios = preenchidos.find(passo => passo.id === 'delivery-meios')
     const impressoras = preenchidos.find(passo => passo.id === 'delivery-impressoras')
-    const notificacoes = preenchidos.find(passo => passo.id === 'delivery-notificacoes')
     expect(entregadores?.concluido).toBe(true)
     expect(meios?.concluido).toBe(true)
     expect(impressoras?.concluido).toBe(true)
-    expect(notificacoes?.concluido).toBe(true)
-    expect([entregadores, meios, impressoras, notificacoes].every(passo => passo?.cta === 'Editar')).toBe(true)
+    expect([entregadores, meios, impressoras].every(passo => passo?.cta === 'Editar')).toBe(true)
+  })
+
+  it('alinha badges das obrigatórias ao progresso expandido', () => {
+    const progresso = calcularDeliveryHubProgresso(
+      [
+        {
+          type: 'FUNCIONAMENTO_AGENDA_NAO_CONFIGURADA',
+          message: 'Agenda',
+        },
+      ],
+      true
+    )
+    const passos = montarPassosHubDelivery(progresso)
+    expect(passos.find(passo => passo.id === 'delivery-agenda')?.concluido).toBe(false)
+    expect(passos.find(passo => passo.id === 'delivery-cobertura')?.concluido).toBe(true)
   })
 })
 
 describe('DELIVERY_HUB_ETAPAS', () => {
-  it('expõe as seis etapas da main mais nome, design e agenda', () => {
-    expect(DELIVERY_HUB_ETAPAS.map(etapa => etapa.step)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9])
+  it('expõe sete etapas do hub (nome/cardápio e WhatsApp em Personalizar loja)', () => {
+    expect(DELIVERY_HUB_ETAPAS.map(etapa => etapa.step)).toEqual([1, 2, 3, 4, 5, 6, 7])
+    expect(getDeliveryEtapaById('delivery-design')?.step).toBe(2)
     expect(getDeliveryEtapaById('delivery-meios')?.label).toBe('Pagamento')
-    expect(getDeliveryEtapaById('delivery-nome-cardapio')?.label).toBe('Nome e cardápio')
     expect(getDeliveryEtapaById('delivery-impressoras')?.component).toBeTypeOf('function')
-    expect(getDeliveryEtapaById('delivery-notificacoes')?.label).toBe('WhatsApp')
-    expect(getDeliveryEtapaById('delivery-notificacoes')?.obrigatoria).toBe(false)
+    expect(getDeliveryEtapaById('delivery-nome-cardapio')).toBeUndefined()
+    expect(getDeliveryEtapaById('delivery-notificacoes')).toBeUndefined()
     expect(getDeliveryEtapaById('delivery-hub')).toBeUndefined()
   })
 
@@ -150,7 +153,7 @@ describe('DELIVERY_HUB_ETAPAS', () => {
     expect(isDeliveryTabId('delivery-entregadores')).toBe(true)
     expect(isDeliveryEtapaId('delivery-impressoras')).toBe(true)
     expect(isDeliveryEtapaId('delivery-nome-cardapio')).toBe(true)
-    expect(isDeliveryTabId('delivery-notificacoes')).toBe(true)
+    expect(isDeliveryEtapaId('delivery-notificacoes')).toBe(true)
     expect(isDeliveryTabId(null)).toBe(false)
     expect(isDeliveryTabId('empresa')).toBe(false)
     expect(isDeliveryEtapaId('delivery-hub')).toBe(false)

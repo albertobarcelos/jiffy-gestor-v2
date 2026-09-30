@@ -20,16 +20,12 @@ export type DeliveryHubPassoUi = {
 function concluidoEtapaRecomendada(
   etapaId: DeliveryEtapaId,
   extras?: DeliveryHubPassosExtras
-): boolean | null {
-  if (etapaId === 'delivery-notificacoes') return extras?.whatsappConectado === true
+): boolean {
   if (etapaId === 'delivery-entregadores') return (extras?.qtdEntregadores ?? 0) > 0
   if (etapaId === 'delivery-meios') return (extras?.qtdMeiosPagamento ?? 0) > 0
   if (etapaId === 'delivery-impressoras') return (extras?.qtdImpressoras ?? 0) > 0
-  if (etapaId === 'delivery-nome-cardapio' || etapaId === 'delivery-design') {
-    return extras?.empresaDeliveryConfigurada === true
-  }
-  if (etapaId === 'delivery-agenda') return extras?.agendaConfigurada === true
-  return null
+  if (etapaId === 'delivery-design') return extras?.empresaDeliveryConfigurada === true
+  return false
 }
 
 export function montarPassosHubDelivery(
@@ -38,8 +34,9 @@ export function montarPassosHubDelivery(
 ): DeliveryHubPassoUi[] {
   return DELIVERY_HUB_ETAPAS.map(etapa => {
     const doProgresso = progresso.passos.find(passo => passo.id === etapa.id)
-    const recomendada = concluidoEtapaRecomendada(etapa.id, extras)
-    const concluido = recomendada ?? doProgresso?.concluido ?? false
+    const concluido = etapa.obrigatoria
+      ? (doProgresso?.concluido ?? false)
+      : concluidoEtapaRecomendada(etapa.id, extras)
     return {
       id: etapa.id,
       numero: etapa.step,

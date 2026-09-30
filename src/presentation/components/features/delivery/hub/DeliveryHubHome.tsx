@@ -12,6 +12,8 @@ import type { DeliveryHubPassosExtras } from './deliveryHubCadastros'
 
 type DeliveryHubHomeProps = {
   progresso: DeliveryHubProgresso
+  /** `false` bloqueia “pronto” mesmo com checklist completo (ex.: `available` da API). */
+  lojaDisponivel?: boolean
   passosExtras?: DeliveryHubPassosExtras
   selecionadoId: DeliveryEtapaId | null
   onSelecionarPasso: (passo: DeliveryHubPassoUi) => void
@@ -43,6 +45,7 @@ function BadgeStatus({ passo }: { passo: DeliveryHubPassoUi }) {
 
 export function DeliveryHubHome({
   progresso,
+  lojaDisponivel = true,
   passosExtras,
   selecionadoId,
   onSelecionarPasso,
@@ -53,6 +56,7 @@ export function DeliveryHubHome({
     [progresso, passosExtras]
   )
   const pronto =
+    lojaDisponivel &&
     progresso.totalObrigatorios > 0 &&
     progresso.concluidosObrigatorios === progresso.totalObrigatorios
 
@@ -92,7 +96,7 @@ export function DeliveryHubHome({
       <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-4 sm:px-6 lg:flex-row">
         <nav
           aria-label="Passos do delivery"
-          className="flex max-h-[42vh] min-h-0 w-full shrink-0 flex-col overflow-y-auto rounded-2xl border border-gray-200 bg-white p-2 shadow-sm sm:p-3 lg:max-h-none lg:w-[22.5rem] lg:self-stretch"
+          className="flex max-h-[42vh] min-h-0 w-full shrink-0 flex-col overflow-y-auto rounded-2xl border border-gray-200 bg-white p-2 shadow-sm scrollbar-hide sm:p-3 lg:max-h-none lg:w-[22.5rem] lg:self-stretch"
         >
           {passos.map((passo, index) => {
             const ativo = passo.id === selecionadoId
