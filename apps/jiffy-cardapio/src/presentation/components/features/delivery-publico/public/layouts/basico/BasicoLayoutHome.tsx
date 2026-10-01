@@ -85,10 +85,9 @@ export function BasicoLayoutHome({
       {viewModel.carrinho.quantidadeItens > 0 ? (
         <div className="fixed inset-x-0 bottom-0 z-40">
           <div
-            className="delivery-basico-content-column pt-2 backdrop-blur-sm"
+            className="delivery-basico-content-column pt-2"
             style={{
-              backgroundColor:
-                'color-mix(in srgb, var(--delivery-bg, var(--delivery-surface)) 95%, transparent)',
+              backgroundColor: 'var(--delivery-bg, var(--delivery-surface, #f5f5f5))',
             }}
           >
             <DeliveryPedidoFooter

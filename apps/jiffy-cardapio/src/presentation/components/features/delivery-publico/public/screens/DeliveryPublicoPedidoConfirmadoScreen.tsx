@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { DeliveryCheckoutRevisaoModal } from '../components/checkout/DeliveryCheckoutRevisaoModal'
 import { DeliveryCheckoutShell } from '../components/checkout/DeliveryCheckoutShell'
 import { DeliveryCheckoutSucessoModal } from '../components/checkout/DeliveryCheckoutSucessoModal'
-import { DeliveryPublicoShell } from '../components/DeliveryPublicoShell'
 import { DeliveryThemeScope } from '../../shared/components/DeliveryThemeScope'
 import { DeliveryButton } from '../../shared/components/DeliveryButton'
 import { deliveryPublicoHomePath } from '../../shared/utils/deliveryPublicoRoutes'
@@ -74,15 +73,13 @@ export function DeliveryPublicoPedidoConfirmadoScreen({
   if (persistido === undefined) {
     return (
       <DeliveryThemeScope slug={slug}>
-        <DeliveryPublicoShell>
-          <div className="flex min-h-screen items-center justify-center">
-            <div
-              className="h-12 w-12 animate-spin rounded-full border-b-2"
-              style={{ borderColor: 'var(--delivery-primary, #333)' }}
-              aria-hidden
-            />
-          </div>
-        </DeliveryPublicoShell>
+        <div className="flex min-h-full items-center justify-center">
+          <div
+            className="h-12 w-12 animate-spin rounded-full border-b-2"
+            style={{ borderColor: 'var(--delivery-primary, #333)' }}
+            aria-hidden
+          />
+        </div>
       </DeliveryThemeScope>
     )
   }
@@ -90,20 +87,18 @@ export function DeliveryPublicoPedidoConfirmadoScreen({
   if (!persistido) {
     return (
       <DeliveryThemeScope slug={slug}>
-        <DeliveryPublicoShell>
-          <div className="mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center gap-4 px-4 text-center">
-            <h1 className="delivery-font-title text-xl font-semibold delivery-text-primary">
-              Pedido não encontrado
-            </h1>
-            <p className="text-sm delivery-text-secondary">
-              Não há dados deste pedido neste dispositivo. A confirmação fica disponível após
-              finalizar o pedido neste navegador.
-            </p>
-            <DeliveryButton type="button" onClick={irParaCardapio}>
-              Voltar ao cardápio
-            </DeliveryButton>
-          </div>
-        </DeliveryPublicoShell>
+        <div className="mx-auto flex min-h-full w-full max-w-md flex-col items-center justify-center gap-4 px-4 text-center">
+          <h1 className="delivery-font-title text-xl font-semibold delivery-text-primary">
+            Pedido não encontrado
+          </h1>
+          <p className="text-sm delivery-text-secondary">
+            Não há dados deste pedido neste dispositivo. A confirmação fica disponível após
+            finalizar o pedido neste navegador.
+          </p>
+          <DeliveryButton type="button" onClick={irParaCardapio}>
+            Voltar ao cardápio
+          </DeliveryButton>
+        </div>
       </DeliveryThemeScope>
     )
   }
@@ -112,52 +107,50 @@ export function DeliveryPublicoPedidoConfirmadoScreen({
 
   return (
     <DeliveryThemeScope slug={slug} nomeExibicaoFallback={meta.nomeEmpresa ?? ''}>
-      <DeliveryPublicoShell>
-        <div className="min-h-screen">
-          <DeliveryCheckoutShell
-            open
-            presentation="page"
-            stepKey={view}
-            direction={direction}
-            onClose={view === 'pedidoDetalhe' ? voltarSucesso : irParaCardapio}
-          >
-            {view === 'sucesso' ? (
-              <DeliveryCheckoutSucessoModal
-                slug={slug}
-                nomeCliente={snapshot.nome}
-                tipoEntrega={snapshot.tipoEntrega}
-                modoTempo={snapshot.modoTempo}
-                enderecoCliente={snapshot.enderecoCliente}
-                enderecoEmpresaTexto={snapshot.enderecoEmpresaTexto}
-                localizacaoEmpresa={meta.localizacaoEmpresa}
-                telefoneEmpresa={meta.telefoneEmpresa}
-                nomeEmpresa={meta.nomeEmpresa}
-                codigoVenda={snapshot.codigoVenda}
-                onVerPedido={irParaDetalhe}
-                onVoltarAoCardapio={irParaCardapio}
-              />
-            ) : (
-              <DeliveryCheckoutRevisaoModal
-                modo="somenteLeitura"
-                tipoEntrega={snapshot.tipoEntrega}
-                nome={snapshot.nome}
-                telefone={snapshot.telefone}
-                telefonePaisIso2={snapshot.telefonePaisIso2}
-                enderecoCliente={snapshot.enderecoCliente}
-                enderecoEmpresaTexto={snapshot.enderecoEmpresaTexto}
-                localizacaoEmpresa={meta.localizacaoEmpresa}
-                itens={snapshot.itens}
-                total={snapshot.total}
-                pagamentos={snapshot.pagamentos}
-                observacaoPedido={snapshot.observacaoPedido}
-                cpfNotaFiscal={snapshot.cpfNotaFiscal}
-                codigoVenda={snapshot.codigoVenda}
-                onVoltar={voltarSucesso}
-              />
-            )}
-          </DeliveryCheckoutShell>
-        </div>
-      </DeliveryPublicoShell>
+      <div className="min-h-full">
+        <DeliveryCheckoutShell
+          open
+          presentation="page"
+          stepKey={view}
+          direction={direction}
+          onClose={view === 'pedidoDetalhe' ? voltarSucesso : irParaCardapio}
+        >
+          {view === 'sucesso' ? (
+            <DeliveryCheckoutSucessoModal
+              slug={slug}
+              nomeCliente={snapshot.nome}
+              tipoEntrega={snapshot.tipoEntrega}
+              modoTempo={snapshot.modoTempo}
+              enderecoCliente={snapshot.enderecoCliente}
+              enderecoEmpresaTexto={snapshot.enderecoEmpresaTexto}
+              localizacaoEmpresa={meta.localizacaoEmpresa}
+              telefoneEmpresa={meta.telefoneEmpresa}
+              nomeEmpresa={meta.nomeEmpresa}
+              codigoVenda={snapshot.codigoVenda}
+              onVerPedido={irParaDetalhe}
+              onVoltarAoCardapio={irParaCardapio}
+            />
+          ) : (
+            <DeliveryCheckoutRevisaoModal
+              modo="somenteLeitura"
+              tipoEntrega={snapshot.tipoEntrega}
+              nome={snapshot.nome}
+              telefone={snapshot.telefone}
+              telefonePaisIso2={snapshot.telefonePaisIso2}
+              enderecoCliente={snapshot.enderecoCliente}
+              enderecoEmpresaTexto={snapshot.enderecoEmpresaTexto}
+              localizacaoEmpresa={meta.localizacaoEmpresa}
+              itens={snapshot.itens}
+              total={snapshot.total}
+              pagamentos={snapshot.pagamentos}
+              observacaoPedido={snapshot.observacaoPedido}
+              cpfNotaFiscal={snapshot.cpfNotaFiscal}
+              codigoVenda={snapshot.codigoVenda}
+              onVoltar={voltarSucesso}
+            />
+          )}
+        </DeliveryCheckoutShell>
+      </div>
     </DeliveryThemeScope>
   )
 }

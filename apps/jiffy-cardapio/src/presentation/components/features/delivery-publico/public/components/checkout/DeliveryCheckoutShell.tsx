@@ -255,15 +255,13 @@ export function DeliveryCheckoutShell({
             onMouseDown={e => e.preventDefault()}
             onClick={header.onBack ?? handleRequestClose}
             aria-label="Voltar"
-            className={`flex items-center justify-center rounded-full ${
-              isDarkHeader ? 'h-8 w-8' : 'h-9 w-9'
-            }`}
+            className="flex h-10 w-10 items-center justify-center rounded-full"
             style={{ color: headerFg }}
           >
             <span className="text-lg leading-none">‹</span>
           </button>
         ) : (
-          <span className="w-9 shrink-0" aria-hidden />
+          <span className="w-10 shrink-0" aria-hidden />
         )}
         <h2
           className={`delivery-font-title absolute left-1/2 -translate-x-1/2 truncate text-center text-base font-semibold ${
@@ -281,9 +279,7 @@ export function DeliveryCheckoutShell({
             onMouseDown={e => e.preventDefault()}
             onClick={handleRequestClose}
             aria-label="Fechar"
-            className={`flex shrink-0 items-center justify-center rounded-full ${
-              isDarkHeader ? 'h-8 w-8' : 'h-9 w-9'
-            }`}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
             style={{ color: headerFg }}
           >
             <MdClose className={isDarkHeader ? 'h-4 w-4' : 'h-5 w-5'} />

@@ -98,7 +98,7 @@ export function DeliverySugestoesProdutoCard({
                 ? `Escolher opções de ${produto.nome}`
                 : `Adicionar ${produto.nome} ao carrinho`
             }
-            className="absolute bottom-1.5 right-1.5 z-10 flex h-8 w-8 items-center justify-center rounded-full border shadow-sm transition-transform active:scale-95"
+            className="absolute bottom-1.5 right-1.5 z-10 flex h-10 w-10 items-center justify-center rounded-full border shadow-sm transition-transform active:scale-95"
             style={{
               backgroundColor: 'rgba(255, 255, 255, 0.92)',
               borderColor: '#4b5563',

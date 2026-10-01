@@ -1,10 +1,16 @@
 'use client'
 
+import { useLayoutEffect, useRef } from 'react'
 import { Download, Share, SquarePlus, X } from 'lucide-react'
+
+const PWA_BANNER_STACK_VAR = '--delivery-pwa-banner-stack'
+const PWA_BANNER_GAP_PX = 12
 
 type DeliveryPwaInstallBannerProps = {
   nomeLoja: string | null
   variante?: 'flutuante' | 'embutido'
+  /** Sobe o banner acima do footer “Ver carrinho” (home com itens). */
+  acimaDoFooter?: boolean
   onInstalar: () => void
   onAgoraNao: () => void
   onNaoMostrarDeNovo: () => void
@@ -13,6 +19,7 @@ type DeliveryPwaInstallBannerProps = {
 export function DeliveryPwaInstallBanner({
   nomeLoja,
   variante = 'flutuante',
+  acimaDoFooter = false,
   onInstalar,
   onAgoraNao,
   onNaoMostrarDeNovo,
@@ -22,6 +29,27 @@ export function DeliveryPwaInstallBanner({
     : 'Adicione o cardápio à tela inicial'
   const subtitulo =
     'Acesse mais rápido, como um app — sem ocupar espaço da loja de aplicativos.'
+  const stackHostRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    if (variante !== 'flutuante') return
+    const el = stackHostRef.current
+    if (!el || typeof document === 'undefined') return
+
+    const root = document.documentElement
+    const publish = () => {
+      const h = Math.ceil(el.getBoundingClientRect().height)
+      root.style.setProperty(PWA_BANNER_STACK_VAR, `${h + PWA_BANNER_GAP_PX}px`)
+    }
+
+    publish()
+    const ro = new ResizeObserver(publish)
+    ro.observe(el)
+    return () => {
+      ro.disconnect()
+      root.style.setProperty(PWA_BANNER_STACK_VAR, '0px')
+    }
+  }, [variante])
 
   const card = (
     <div
@@ -91,8 +119,16 @@ export function DeliveryPwaInstallBanner({
     return <div className="mt-4 w-full">{card}</div>
   }
 
+  const bottom = acimaDoFooter
+    ? 'var(--delivery-float-above-footer, calc(6.5rem + env(safe-area-inset-bottom, 0px)))'
+    : 'var(--delivery-float-above-home-edge, calc(0.75rem + env(safe-area-inset-bottom, 0px)))'
+
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[90] flex justify-center p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+    <div
+      ref={stackHostRef}
+      className="pointer-events-none fixed inset-x-0 z-[85] flex justify-center px-3"
+      style={{ bottom }}
+    >
       <div className="pointer-events-auto w-full max-w-md">{card}</div>
     </div>
   )
@@ -108,7 +144,10 @@ export function DeliveryPwaInstallIosGuide({ open, onClose }: DeliveryPwaInstall
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-end justify-center bg-black/45 p-3 sm:items-center"
+      className="delivery-vv-overlay z-[100] flex items-end justify-center bg-black/45 p-3 sm:items-center"
+      style={{
+        paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))',
+      }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="pwa-ios-guide-title"
@@ -156,7 +195,10 @@ export function DeliveryPwaInstallAndroidGuide({ open, onClose }: DeliveryPwaIns
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-end justify-center bg-black/45 p-3 sm:items-center"
+      className="delivery-vv-overlay z-[100] flex items-end justify-center bg-black/45 p-3 sm:items-center"
+      style={{
+        paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))',
+      }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="pwa-android-guide-title"

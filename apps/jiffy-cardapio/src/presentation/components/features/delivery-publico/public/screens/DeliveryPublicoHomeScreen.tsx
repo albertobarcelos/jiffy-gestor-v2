@@ -434,11 +434,13 @@ export function DeliveryPublicoHomeScreen({
         telefone={telefoneWhatsAppFab}
         nomeLoja={empresa?.nomeFantasia}
         visible={!carrinhoAberto}
+        acimaDoFooter={carrinhoQuantidade > 0}
       />
       <DeliveryPwaInstallHomeSlot
         slug={slug}
         nomeLoja={empresa?.nomeFantasia ?? null}
         permitido={!carrinhoAberto && !produtoIdAberto}
+        acimaDoFooter={carrinhoQuantidade > 0}
       />
     </DeliveryThemeScope>
   )
@@ -448,10 +450,12 @@ function DeliveryPwaInstallHomeSlot({
   slug,
   nomeLoja,
   permitido,
+  acimaDoFooter,
 }: {
   slug: string
   nomeLoja: string | null
   permitido: boolean
+  acimaDoFooter: boolean
 }) {
   const pwa = usePwaInstallPrompt({ slug, contexto: 'home', permitido })
   if (!pwa.visivel) return null
@@ -460,6 +464,7 @@ function DeliveryPwaInstallHomeSlot({
       <DeliveryPwaInstallBanner
         nomeLoja={nomeLoja}
         variante="flutuante"
+        acimaDoFooter={acimaDoFooter}
         onInstalar={() => void pwa.instalar()}
         onAgoraNao={pwa.agoraNao}
         onNaoMostrarDeNovo={pwa.naoMostrarDeNovo}

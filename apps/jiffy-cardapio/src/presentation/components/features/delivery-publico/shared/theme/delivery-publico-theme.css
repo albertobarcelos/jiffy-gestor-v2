@@ -120,12 +120,25 @@ html.delivery-publico-ios-lock select {
   top: var(--delivery-vv-offset-top, 0px);
   left: var(--delivery-vv-offset-left, 0px);
   z-index: 0;
+  box-sizing: border-box;
   width: var(--delivery-vv-width, 100%);
   max-width: 100%;
   height: var(--delivery-vv-height, 100dvh);
+  /* Notch / Dynamic Island / status bar (PWA standalone + viewport-fit=cover). */
+  padding-top: env(safe-area-inset-top, 0px);
   overflow: hidden;
   overscroll-behavior: none;
   background-color: var(--delivery-bg, var(--delivery-surface, #f5f5f5));
+}
+
+/**
+ * Offsets das camadas flutuantes da home (footer → PWA → FAB).
+ * Em `:root` para portais em `document.body` herdarem as vars.
+ */
+:root {
+  --delivery-float-above-footer: calc(6.5rem + env(safe-area-inset-bottom, 0px));
+  --delivery-float-above-home-edge: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  --delivery-pwa-banner-stack: 0px;
 }
 
 .delivery-publico-scroll {
@@ -149,24 +162,37 @@ html.delivery-publico-ios-lock select {
 }
 
 /**
- * Reserva o rodapé “Ver carrinho” + home indicator.
- * Sem inset (Android/desktop) equivale a `pb-24`.
+ * Padding superior sob notch/status bar.
+ * Em desktop/Android sem inset equivale a 0 — não altera layout.
+ */
+.delivery-safe-pt {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/**
+ * Reserva o rodapé “Ver carrinho” + home indicator + stack do banner PWA (se ativo).
+ * Sem inset (Android/desktop) e sem PWA equivale a ~`pb-24`.
  */
 .delivery-home-bottom-spacer {
-  padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(
+    6rem + env(safe-area-inset-bottom, 0px) + var(--delivery-pwa-banner-stack, 0px)
+  );
 }
 
 /**
  * Overlays full-screen (checkout, produto) — mesma altura/largura útil do teclado.
+ * padding-top: portals ficam fora do shell e precisam do inset sozinhas.
  */
 .delivery-vv-overlay {
   position: fixed;
   top: var(--delivery-vv-offset-top, 0px);
   left: var(--delivery-vv-offset-left, 0px);
   z-index: 50;
+  box-sizing: border-box;
   width: var(--delivery-vv-width, 100%);
   max-width: 100%;
   height: var(--delivery-vv-height, 100dvh);
+  padding-top: env(safe-area-inset-top, 0px);
   overflow: hidden;
   overscroll-behavior: none;
 }
@@ -179,9 +205,11 @@ html.delivery-publico-ios-lock select {
   top: var(--delivery-vv-offset-top, 0px);
   left: var(--delivery-vv-offset-left, 0px);
   z-index: 50;
+  box-sizing: border-box;
   width: var(--delivery-vv-width, 100%);
   max-width: 100%;
   height: var(--delivery-vv-height, 100dvh);
+  padding-top: env(safe-area-inset-top, 0px);
   overflow: hidden;
   overscroll-behavior: none;
 }
@@ -209,11 +237,13 @@ html.delivery-publico-ios-lock select {
   top: var(--delivery-vv-offset-top, 0px);
   left: var(--delivery-vv-offset-left, 0px);
   z-index: 50;
+  box-sizing: border-box;
   display: flex;
   justify-content: center;
   width: var(--delivery-vv-width, 100%);
   max-width: 100%;
   height: var(--delivery-vv-height, 100dvh);
+  padding-top: env(safe-area-inset-top, 0px);
   overflow: hidden;
   overscroll-behavior: none;
 }

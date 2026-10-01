@@ -90,7 +90,10 @@ export function VitrineLayoutHome({
       </div>
 
       {stickyFooterVisible ? (
-        <div className="fixed inset-x-0 bottom-0 z-40 bg-white/95 pt-2 backdrop-blur-sm">
+        <div
+          className="fixed inset-x-0 bottom-0 z-40 pt-2"
+          style={{ backgroundColor: 'var(--delivery-surface, #ffffff)' }}
+        >
           <DeliveryPedidoFooter
             total={viewModel.carrinho.total}
             quantidadeItens={viewModel.carrinho.quantidadeItens}
