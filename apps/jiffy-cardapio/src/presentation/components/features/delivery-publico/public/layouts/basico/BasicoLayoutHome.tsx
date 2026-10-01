@@ -30,9 +30,15 @@ export function BasicoLayoutHome({
 }: DeliveryLayoutHomeProps) {
   const filtered = filterViewModelByBusca(viewModel)
   const catalogRootRef = useRef<HTMLDivElement>(null)
+  const stickyFooterVisible = viewModel.carrinho.quantidadeItens > 0
 
   return (
-    <div ref={catalogRootRef} className="delivery-basico-catalog-root delivery-home-bottom-spacer flex min-h-full flex-col">
+    <div
+      ref={catalogRootRef}
+      className={`delivery-basico-catalog-root flex min-h-full flex-col${
+        stickyFooterVisible ? ' delivery-home-bottom-spacer' : ''
+      }`}
+    >
       <DeliveryBasicoTopNav
         config={config}
         carrinhoQuantidade={viewModel.carrinho.quantidadeItens}

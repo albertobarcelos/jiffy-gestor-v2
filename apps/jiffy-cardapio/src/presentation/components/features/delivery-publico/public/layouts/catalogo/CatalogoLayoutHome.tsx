@@ -53,7 +53,12 @@ export function CatalogoLayoutHome({
   }, [filtered.grupos, handleGrupoClick])
 
   return (
-    <div ref={catalogRootRef} className="delivery-home-bottom-spacer flex min-h-full flex-col">
+    <div
+      ref={catalogRootRef}
+      className={`flex min-h-full flex-col${
+        stickyFooterVisible ? ' delivery-home-bottom-spacer' : ''
+      }`}
+    >
       <DeliveryCatalogoHeader
         config={config}
         disponivel={viewModel.disponivel}

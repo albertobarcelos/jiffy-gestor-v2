@@ -47,7 +47,7 @@ export function VitrineLayoutHome({
   )
 
   return (
-    <div className="flex min-h-full flex-col pb-24">
+    <div className={`flex min-h-full flex-col${stickyFooterVisible ? ' pb-24' : ''}`}>
       <DeliveryVitrineHeader
         config={config}
         disponivel={viewModel.disponivel}

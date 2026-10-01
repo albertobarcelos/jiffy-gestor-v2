@@ -51,7 +51,7 @@ export function CatalogoLayoutHome({
   }, [filtered.grupos, handleGrupoClick])
 
   return (
-    <div className="flex min-h-full flex-col pb-24">
+    <div className={`flex min-h-full flex-col${stickyFooterVisible ? ' pb-24' : ''}`}>
       <DeliveryCatalogoHeader
         config={config}
         disponivel={viewModel.disponivel}

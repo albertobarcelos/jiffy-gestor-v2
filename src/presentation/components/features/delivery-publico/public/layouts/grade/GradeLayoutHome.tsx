@@ -33,7 +33,7 @@ export function GradeLayoutHome({
 
   return (
     <div
-      className="flex min-h-full flex-col pb-24"
+      className={`flex min-h-full flex-col${stickyFooterVisible ? ' pb-24' : ''}`}
       style={{ backgroundColor: 'var(--delivery-primary-dark)' }}
     >
       <DeliveryGradeHeader config={config} disponivel={viewModel.disponivel} />

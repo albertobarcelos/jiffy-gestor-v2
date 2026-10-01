@@ -34,7 +34,9 @@ export function GradeLayoutHome({
 
   return (
     <div
-      className="delivery-home-bottom-spacer flex min-h-full flex-col"
+      className={`flex min-h-full flex-col${
+        stickyFooterVisible ? ' delivery-home-bottom-spacer' : ''
+      }`}
       style={{ backgroundColor: 'var(--delivery-primary-dark)' }}
     >
       <DeliveryGradeHeader
