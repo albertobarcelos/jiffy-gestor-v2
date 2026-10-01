@@ -91,6 +91,7 @@ function ProdutoThumb({
   )
 }
 
+/** Bolinha absoluta à direita do preço vigente (não altera a altura do card). */
 function QuantidadeCarrinhoBadge({
   quantidade,
   produtoNome,
@@ -103,7 +104,7 @@ function QuantidadeCarrinhoBadge({
   if (quantidade <= 0) return null
 
   const className =
-    'absolute bottom-2.5 left-3.5 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold leading-none text-white shadow-sm transition-transform active:scale-95 @lg:bottom-3 @lg:left-4 @lg:h-6 @lg:min-w-6 @lg:text-xs'
+    'pointer-events-auto absolute bottom-0 left-0 z-10 flex h-5 min-w-5 -translate-x-[35%] translate-y-[40%] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold leading-none text-white shadow-sm transition-transform active:scale-95 @lg:h-6 @lg:min-w-6 @lg:text-xs'
   const label = `${quantidade} no carrinho — editar ${produtoNome}`
   const content = quantidade > 99 ? '99+' : quantidade
 
@@ -127,6 +128,89 @@ function QuantidadeCarrinhoBadge({
     <span className={`${className} pointer-events-none`} aria-label={`${quantidade} no carrinho`}>
       {content}
     </span>
+  )
+}
+
+function ProdutoTexto({
+  produto,
+  quantidadeNoCarrinho,
+  interactive,
+  onOpen,
+  onAbrirCarrinho,
+}: {
+  produto: DeliveryPublicoProdutoViewModel
+  quantidadeNoCarrinho: number
+  interactive: boolean
+  onOpen?: () => void
+  onAbrirCarrinho?: () => void
+}) {
+  const nomeClass = interactive
+    ? 'text-sm font-medium leading-snug @lg:text-lg'
+    : 'text-sm font-semibold leading-snug @lg:text-lg'
+
+  const precoBloco = (
+    <div className="relative mt-1 w-max max-w-full @lg:mt-1.5">
+      {interactive && onOpen ? (
+        <button type="button" onClick={onOpen} className="block text-left">
+          <DeliveryProdutoPreco
+            produto={produto}
+            accentColor="var(--delivery-text)"
+            className="mt-0"
+          />
+        </button>
+      ) : (
+        <DeliveryProdutoPreco produto={produto} className="mt-0" />
+      )}
+      <QuantidadeCarrinhoBadge
+        quantidade={quantidadeNoCarrinho}
+        produtoNome={produto.nome}
+        onClick={interactive ? onAbrirCarrinho : undefined}
+      />
+    </div>
+  )
+
+  if (interactive && onOpen) {
+    return (
+      <div className={textClassName}>
+        <button type="button" onClick={onOpen} className="w-full text-left">
+          <p
+            className={nomeClass}
+            style={{
+              color: 'var(--delivery-text)',
+              fontFamily: 'var(--delivery-font-title)',
+            }}
+          >
+            {produto.nome}
+          </p>
+          {produto.descricao ? (
+            <p className="delivery-text-secondary mt-0.5 line-clamp-2 text-xs leading-snug @lg:mt-1 @lg:text-sm">
+              {produto.descricao}
+            </p>
+          ) : null}
+        </button>
+        {precoBloco}
+      </div>
+    )
+  }
+
+  return (
+    <div className={textClassName}>
+      <p
+        className={nomeClass}
+        style={{
+          color: 'var(--delivery-text)',
+          fontFamily: 'var(--delivery-font-title)',
+        }}
+      >
+        {produto.nome}
+      </p>
+      {produto.descricao ? (
+        <p className="delivery-text-secondary mt-0.5 line-clamp-2 text-xs leading-snug @lg:mt-1 @lg:text-sm">
+          {produto.descricao}
+        </p>
+      ) : null}
+      {precoBloco}
+    </div>
   )
 }
 
@@ -163,35 +247,12 @@ export function DeliveryProdutoListItem({
         className={`relative ${cardClassName} hover:border-[color-mix(in_srgb,var(--delivery-primary)_24%,transparent)]`}
         style={cardStyle}
       >
-        <button
-          type="button"
-          onClick={handleOpenProduto}
-          className={`${textClassName} text-left${quantidadeNoCarrinho > 0 ? ' pb-9 @lg:pb-10' : ''}`}
-        >
-          <p
-            className="text-sm font-medium leading-snug @lg:text-lg"
-            style={{
-              color: 'var(--delivery-text)',
-              fontFamily: 'var(--delivery-font-title)',
-            }}
-          >
-            {produto.nome}
-          </p>
-          {produto.descricao ? (
-            <p className="delivery-text-secondary mt-0.5 line-clamp-2 text-xs leading-snug @lg:mt-1 @lg:text-sm">
-              {produto.descricao}
-            </p>
-          ) : null}
-          <DeliveryProdutoPreco
-            produto={produto}
-            accentColor="var(--delivery-text)"
-            className="mt-1 @lg:mt-1.5"
-          />
-        </button>
-        <QuantidadeCarrinhoBadge
-          quantidade={quantidadeNoCarrinho}
-          produtoNome={produto.nome}
-          onClick={onAbrirCarrinho}
+        <ProdutoTexto
+          produto={produto}
+          quantidadeNoCarrinho={quantidadeNoCarrinho}
+          interactive
+          onOpen={handleOpenProduto}
+          onAbrirCarrinho={onAbrirCarrinho}
         />
         <ProdutoThumb
           imagemUrl={produto.imagemUrl}
@@ -211,24 +272,11 @@ export function DeliveryProdutoListItem({
 
   return (
     <div className={`relative ${cardClassName}`} style={cardStyle}>
-      <div className={textClassName}>
-        <p
-          className="text-sm font-semibold leading-snug @lg:text-lg"
-          style={{
-            color: 'var(--delivery-text)',
-            fontFamily: 'var(--delivery-font-title)',
-          }}
-        >
-          {produto.nome}
-        </p>
-        {produto.descricao ? (
-          <p className="delivery-text-secondary mt-0.5 line-clamp-2 text-xs leading-snug @lg:mt-1 @lg:text-sm">
-            {produto.descricao}
-          </p>
-        ) : null}
-        <DeliveryProdutoPreco produto={produto} className="mt-1 @lg:mt-1.5" />
-      </div>
-      <QuantidadeCarrinhoBadge quantidade={quantidadeNoCarrinho} produtoNome={produto.nome} />
+      <ProdutoTexto
+        produto={produto}
+        quantidadeNoCarrinho={quantidadeNoCarrinho}
+        interactive={false}
+      />
       <ProdutoThumb
         imagemUrl={produto.imagemUrl}
         produtoNome={produto.nome}

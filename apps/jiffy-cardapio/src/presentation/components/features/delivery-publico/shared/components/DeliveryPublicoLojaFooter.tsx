@@ -59,7 +59,7 @@ export function DeliveryPublicoLojaFooter({
         <p className="mt-1 pl-6 text-sm leading-snug text-white/85">{horarioTexto}</p>
       </div>
 
-      <p className="mt-4 text-center text-xs text-white/70">
+      <p className="mt-4 mb-2 text-center text-xs text-white/70">
         Esta loja online foi criada com{' '}
         <a
           href={JIFFY_SITE_URL}
