@@ -19,6 +19,7 @@ import {
   formatarMensagemErroCotacaoPublica,
   PublicDeliveryApiError,
 } from '@/src/application/errors/publicDeliveryErrors'
+import { normalizarSlugPublico } from '@/src/application/delivery-publico/normalizarSlugPublico'
 
 export {
   CotacaoDesatualizadaPublicDeliveryError,
@@ -100,7 +101,8 @@ export async function fetchCatalogoPublico(
   if (params?.offset != null) search.set('offset', String(params.offset))
   if (params?.limit != null) search.set('limit', String(params.limit))
   const qs = search.toString()
-  const url = `/api/public/delivery/catalogo/${encodeURIComponent(slug)}${qs ? `?${qs}` : ''}`
+  const slugLimpo = normalizarSlugPublico(slug) || slug.trim()
+  const url = `/api/public/delivery/catalogo/${encodeURIComponent(slugLimpo)}${qs ? `?${qs}` : ''}`
 
   const res = await fetch(url, {
     // Permite aproveitar Cache-Control do BFF (s-maxage / SWR).
@@ -120,7 +122,8 @@ export async function fetchCatalogoPublico(
 export async function fetchMeiosPagamentoPublicos(
   slug: string
 ): Promise<GetMeiosPagamentoPublicosResponseDTO> {
-  const url = `/api/public/delivery/meios-pagamento/${encodeURIComponent(slug)}`
+  const slugLimpo = normalizarSlugPublico(slug) || slug.trim()
+  const url = `/api/public/delivery/meios-pagamento/${encodeURIComponent(slugLimpo)}`
   const res = await fetch(url, { cache: 'no-store' })
   if (!res.ok) {
     throw new PublicDeliveryApiError(await parseErrorMessage(res), res.status)

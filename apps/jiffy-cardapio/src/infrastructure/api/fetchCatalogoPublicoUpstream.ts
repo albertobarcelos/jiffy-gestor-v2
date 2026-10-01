@@ -6,6 +6,7 @@ import {
   catalogoPublicoCacheTag,
 } from '@/src/infrastructure/cache/catalogoPublicoCache'
 import { CATALOGO_GRUPOS_PAGE_LIMIT } from '@/src/presentation/hooks/publicDeliveryCatalogKeys'
+import { normalizarSlugPublico } from '@/src/application/delivery-publico/normalizarSlugPublico'
 
 /**
  * Busca catálogo direto no backend (server-side / RSC).
@@ -15,7 +16,7 @@ export async function fetchCatalogoPublicoUpstream(
   slug: string,
   params?: { offset?: number; limit?: number }
 ): Promise<GetCatalogoPublicoResponseDTO> {
-  const slugNormalizado = slug.trim()
+  const slugNormalizado = normalizarSlugPublico(slug)
   if (!slugNormalizado) {
     throw new Error('Slug é obrigatório')
   }

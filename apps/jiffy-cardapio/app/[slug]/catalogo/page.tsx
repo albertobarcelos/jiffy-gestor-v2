@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { normalizarSlugPublico } from '@/src/application/delivery-publico/normalizarSlugPublico'
 import {
   deliveryPublicoHomePath,
   deliveryPublicoInstrucoesPath,
@@ -10,7 +11,7 @@ import {
 export default function CardapioLegacyCatalogoRedirectPage() {
   const params = useParams()
   const router = useRouter()
-  const slug = (params.slug as string)?.trim() ?? ''
+  const slug = normalizarSlugPublico((params.slug as string) ?? '')
 
   useEffect(() => {
     if (slug) {

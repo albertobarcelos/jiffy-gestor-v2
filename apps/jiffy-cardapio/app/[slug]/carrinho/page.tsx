@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { HydrationBoundary } from '@tanstack/react-query'
 import { DeliveryPublicoHomeScreen } from '@/src/presentation/components/features/delivery-publico/public/screens/DeliveryPublicoHomeScreen'
 import { dehydrateCatalogoPrimeiraPagina } from '@/src/infrastructure/api/dehydrateCatalogoPrimeiraPagina'
+import { exigirSlugPublicoDaPagina } from '@/src/infrastructure/seo/exigirSlugPublicoDaPagina'
 import { metadataCardapioNaoIndexavel } from '@/src/infrastructure/seo/cardapioSlugMetadata'
 
 export { generateStaticParams } from '../catalogoSlugCache'
@@ -30,7 +31,7 @@ function HomeFallback() {
 
 export default async function CardapioCarrinhoPage({ params }: PageProps) {
   const { slug: rawSlug } = await params
-  const slug = rawSlug?.trim() ?? ''
+  const slug = exigirSlugPublicoDaPagina(rawSlug, '/carrinho')
   const state = await dehydrateCatalogoPrimeiraPagina(slug)
 
   return (

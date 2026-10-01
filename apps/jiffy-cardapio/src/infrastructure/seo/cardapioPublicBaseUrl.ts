@@ -1,3 +1,5 @@
+import { normalizarSlugPublico } from '@/src/application/delivery-publico/normalizarSlugPublico'
+
 export function cardapioPublicBaseUrl(): string {
   const raw =
     process.env.CARDAPIO_PUBLIC_URL?.trim() ||
@@ -7,5 +9,6 @@ export function cardapioPublicBaseUrl(): string {
 }
 
 export function cardapioSlugUrl(slug: string): string {
-  return `${cardapioPublicBaseUrl()}/${encodeURIComponent(slug.trim())}`
+  const limpo = normalizarSlugPublico(slug)
+  return `${cardapioPublicBaseUrl()}/${encodeURIComponent(limpo || slug.trim())}`
 }
