@@ -63,17 +63,21 @@ export function DeliveryBasicoCatalogStickyNav({
       '.delivery-basico-content-column'
     ) as HTMLElement | null
     const columnRect = column?.getBoundingClientRect()
-    const candidate =
-      (root.closest('.delivery-preview-viewport') as HTMLElement | null) ??
-      (root.closest('.delivery-preview-shell') as HTMLElement | null)
-    const candidateTransform = candidate
-      ? getComputedStyle(candidate).transform
-      : 'none'
+    // Preferir o shell: nele fica o `transform` do preview (containing block do fixed).
+    const shell = root.closest('.delivery-preview-shell') as HTMLElement | null
+    const viewportEl = root.closest('.delivery-preview-viewport') as HTMLElement | null
+    const withTransform = (el: HTMLElement | null) =>
+      el && getComputedStyle(el).transform !== 'none' ? el : null
     const fixedContainingBlock =
-      candidate && candidateTransform && candidateTransform !== 'none'
-        ? candidate
-        : null
+      withTransform(shell) ?? withTransform(viewportEl)
     const containingRect = fixedContainingBlock?.getBoundingClientRect()
+    // getBoundingClientRect = border-box; fixed com transform usa a padding-box.
+    const borderTop = fixedContainingBlock
+      ? Number.parseFloat(getComputedStyle(fixedContainingBlock).borderTopWidth) || 0
+      : 0
+    const borderLeft = fixedContainingBlock
+      ? Number.parseFloat(getComputedStyle(fixedContainingBlock).borderLeftWidth) || 0
+      : 0
 
     const portTop = scrollRect?.top ?? 0
     const portLeft = columnRect?.left ?? scrollRect?.left ?? navRect.left
@@ -81,9 +85,13 @@ export function DeliveryBasicoCatalogStickyNav({
 
     const next: PinMetrics = {
       height,
-      // Com transform no preview, `fixed` é relativo ao viewport — converter coords.
-      top: Math.round(containingRect ? portTop - containingRect.top : portTop),
-      left: Math.round(containingRect ? portLeft - containingRect.left : portLeft),
+      // Com transform no preview, `fixed` é relativo à padding-box do shell.
+      top: Math.round(
+        containingRect ? portTop - containingRect.top - borderTop : portTop
+      ),
+      left: Math.round(
+        containingRect ? portLeft - containingRect.left - borderLeft : portLeft
+      ),
       width: Math.round(portWidth),
     }
 

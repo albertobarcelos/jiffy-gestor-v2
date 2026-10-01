@@ -180,31 +180,54 @@ html.delivery-publico-ios-lock select {
 
 /**
  * Preview mobile do designer — conteúdo ocupa 100% da largura útil do frame.
- * `transform` no viewport cria containing block para `position: fixed` (footer)
- * e o raio + overflow clipam os cantos inferiores do carrinho.
+ * `transform` no **shell** (não no viewport) cria containing block para
+ * `position: fixed` do footer: o footer fica colado no fundo do frame enquanto
+ * só o viewport rola. Se o transform estiver no viewport, o fixed ancora no
+ * fim do conteúdo e o carrinho “rola junto” com a lista.
  */
 .delivery-preview-shell {
+  position: relative;
   width: 100%;
   max-width: 24rem;
   margin-inline: auto;
   min-height: 0;
+  transform: translateZ(0);
   container-type: inline-size;
 }
 
 .delivery-preview-viewport {
   width: 100%;
   min-height: 0;
-  transform: translateZ(0);
+  flex: 1 1 0;
   border-radius: 1.5rem; /* 2rem do frame − ~8px da borda */
   overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
-/** Footer fixo do carrinho — acompanha o raio interno do frame. */
+/** Footer fixo do carrinho — raio interno do frame + clip (sem quinas brancas). */
 .delivery-preview-shell .fixed.bottom-0 {
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  max-width: 100%;
   overflow: hidden;
   border-bottom-left-radius: 1.5rem;
   border-bottom-right-radius: 1.5rem;
+  /* Fundo opaco igual ao rodapé escuro — evita triângulos brancos nas quinas. */
+  background-color: var(--delivery-primary-dark, #171717);
+}
+
+.delivery-preview-shell .fixed.bottom-0 > * {
+  overflow: hidden;
+  border-bottom-left-radius: 1.5rem;
+  border-bottom-right-radius: 1.5rem;
+}
+
+/** Sticky busca/chips: fundo opaco colado no topo do frame (sem vazamento). */
+.delivery-preview-shell .delivery-basico-sticky-nav {
+  background-color: var(--delivery-bg, var(--delivery-surface, #f5f5f5));
 }
 
 .delivery-preview-scale-host {
@@ -226,6 +249,17 @@ html.delivery-publico-ios-lock select {
 
 .delivery-preview-shell .delivery-grupo-title[style*='background-image'] {
   min-height: 2.35rem !important;
+}
+
+/**
+ * Preview simula mobile: títulos de categoria rolam com a lista.
+ * Sem isso, o `@media (min-width: 768px)` do desktop ativa sticky
+ * dentro do frame (o viewport do browser é largo, não o do “celular”).
+ */
+.delivery-preview-shell .delivery-basico-grupo-title-sticky {
+  position: static !important;
+  top: auto !important;
+  z-index: auto !important;
 }
 
 /** Capa — mobile: proporção do crop (1200×300 · 4:1) + 28px extras. */
