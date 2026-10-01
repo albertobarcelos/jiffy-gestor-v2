@@ -10,6 +10,7 @@ export type ImpressoraTerminalConfig = {
   ativo?: boolean
   modoFicha?: boolean
   modoImpressao?: ModoImpressaoImpressora
+  imprimirSenha?: boolean
   modelo?: string
   ip?: string
   porta?: string
@@ -21,19 +22,28 @@ function asRecord(v: unknown): Record<string, unknown> | null {
   return v as Record<string, unknown>
 }
 
+/** `false` explícito permanece desligado; campo ausente fica ligado (padrão da API). */
+function flagComPadraoLigado(value: unknown): boolean {
+  return value !== false && value !== 'false'
+}
+
 function mapTerminalConfig(raw: unknown): ImpressoraTerminalConfig {
   const r = asRecord(raw) ?? {}
+  const nested = asRecord(r.config) ?? {}
   const modoImpressao = parseModoImpressaoImpressora(
     r.modoImpressao ?? r.modo_impressao,
     r.modoFicha === true || r.modoFicha === 'true' || r.modo_ficha === true || r.modo_ficha === 'true'
   )
   const ativo = r.ativo === true || r.ativo === 'true' || r.ativo === undefined
   const terminalIdRaw = r.terminalId ?? r.estacaoId ?? r.estacaoImpressaoId
+  const imprimirSenhaRaw =
+    r.imprimirSenha ?? nested.imprimirSenha ?? r.imprimir_senha ?? nested.imprimir_senha
   return {
     terminalId: terminalIdRaw != null ? String(terminalIdRaw) : undefined,
     ativo,
     modoImpressao,
     modoFicha: modoFichaDerivado(modoImpressao),
+    imprimirSenha: flagComPadraoLigado(imprimirSenhaRaw),
     modelo: r.modelo != null ? String(r.modelo) : undefined,
     ip: r.ip != null ? String(r.ip) : undefined,
     porta: r.porta != null ? String(r.porta) : undefined,
