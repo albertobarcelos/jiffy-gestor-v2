@@ -61,7 +61,7 @@ import { DeliveryWhatsAppFab } from '../../shared/components/DeliveryWhatsAppFab
 import { DeliveryPublicoCarrinhoScreen } from './DeliveryPublicoCarrinhoScreen'
 import { useFlyToCart } from '../../shared/hooks/useFlyToCart'
 import type { FlySourceRect } from '../../shared/components/FlyingProduct'
-import { getProdutoImageSourceRect } from '../../shared/utils/getProdutoImageSourceRect'
+import { getProdutoImageFlySource } from '../../shared/utils/getProdutoImageSourceRect'
 import { resolverPrecosDeliveryProduto } from '../../shared/utils/resolverPrecosDeliveryProduto'
 import { useDeliveryBodyScrollLock } from '../../shared/hooks/useDeliveryBodyScrollLock'
 import type { DeliveryCarrinhoThumb } from '../../shared/components/DeliveryPedidoFooter'
@@ -260,11 +260,12 @@ export function DeliveryPublicoHomeScreen({
         complementos: [],
       })
 
+      const flySource = getProdutoImageFlySource(produto.id)
       handleProdutoAdicionado({
         produtoId: produto.id,
         nome: produto.nome,
-        imagemUrl: produto.imagemUrl,
-        sourceRect: getProdutoImageSourceRect(produto.id),
+        imagemUrl: flySource?.loadedSrc?.trim() || produto.imagemUrl,
+        sourceRect: flySource?.rect ?? null,
         abrirDialogo: false,
       })
     },
@@ -290,7 +291,10 @@ export function DeliveryPublicoHomeScreen({
       const { nome, imagemUrl, produtoId, abrirDialogo = true, sourceRect } = pendingFly
       setPendingFly(null)
 
-      if (!imagemUrl?.trim() || !target) {
+      const flySource = getProdutoImageFlySource(produtoId)
+      const imageUrl = flySource?.loadedSrc?.trim() || imagemUrl?.trim() || ''
+
+      if (!imageUrl || !target) {
         if (abrirDialogo) setProdutoAdicionadoNome(nome)
         return
       }
@@ -308,9 +312,9 @@ export function DeliveryPublicoHomeScreen({
       }
 
       flyToCart({
-        imageUrl: imagemUrl,
+        imageUrl,
         targetElement: target,
-        sourceRect: sourceRect ?? getProdutoImageSourceRect(produtoId),
+        sourceRect: sourceRect ?? flySource?.rect ?? null,
         onArrive: () => {
           setFlyingProdutoId(null)
           setThumbsCongeladas(null)
