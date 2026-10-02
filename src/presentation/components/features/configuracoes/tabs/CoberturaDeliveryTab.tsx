@@ -105,6 +105,7 @@ import {
   parseTaxaDraftCobertura,
   type CoberturaPainelAba,
 } from '@/src/presentation/components/features/configuracoes/coberturaPainelAbas'
+import { CoberturaTaxasManuaisPainel } from '@/src/presentation/components/features/configuracoes/CoberturaTaxasManuaisPainel'
 import { useReportarCoberturaSuja } from '@/src/presentation/components/features/configuracoes/coberturaSairGuard'
 
 const NENHUM_RAIO: RaioEntregaDTO[] = []
@@ -1589,6 +1590,8 @@ export function CoberturaDeliveryTab() {
                   do raio é definido na aba Taxas por Raio.
                 </p>
               </div>
+            ) : painelAba === 'manuais' ? (
+              <CoberturaTaxasManuaisPainel />
             ) : painelAba === 'areas' ? (
               <div className="flex min-h-0 flex-1 flex-col">
                 <p className="px-4 pt-2 text-[11px] leading-snug text-secondary-text">

@@ -10,19 +10,26 @@ import {
 } from '@/src/presentation/components/features/configuracoes/coberturaPainelAbas'
 
 describe('coberturaPainelAbas', () => {
-  it('expõe taxas por raio primeiro, depois área e resumo', () => {
-    expect(COBERTURA_PAINEL_ABAS.map(aba => aba.id)).toEqual(['raios', 'areas', 'resumo'])
+  it('expõe taxas manuais primeiro, depois raio, área e resumo', () => {
+    expect(COBERTURA_PAINEL_ABAS.map(aba => aba.id)).toEqual([
+      'manuais',
+      'raios',
+      'areas',
+      'resumo',
+    ])
     expect(COBERTURA_PAINEL_ABAS.map(aba => aba.label)).toEqual([
+      'Taxas Manuais',
       'Taxas por Raio',
       'Taxas por Área',
       'Resumo',
     ])
   })
 
-  it('mostra no mapa só a camada da aba, e as duas no resumo', () => {
+  it('mostra no mapa só a camada da aba, e as duas no resumo/manuais', () => {
     expect(camadasMapaCobertura('raios')).toEqual({ raios: true, areas: false })
     expect(camadasMapaCobertura('areas')).toEqual({ raios: false, areas: true })
     expect(camadasMapaCobertura('resumo')).toEqual({ raios: true, areas: true })
+    expect(camadasMapaCobertura('manuais')).toEqual({ raios: true, areas: true })
   })
 
   it('aceita taxa com vírgula e prazo inteiro', () => {
