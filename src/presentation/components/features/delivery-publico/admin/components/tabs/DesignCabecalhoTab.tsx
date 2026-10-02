@@ -6,7 +6,6 @@ import {
   DELIVERY_CAPA_CROP_PRESET,
   DELIVERY_LOGO_CROP_PRESET,
 } from '@/src/presentation/constants/imageCropPresets'
-import { DesignSectionPageHeader } from '../DesignSectionPageHeader'
 import { useDesignCabecalhoMidia } from '../../hooks/useDesignCabecalhoMidia'
 
 type DesignCabecalhoTabProps = {
@@ -42,8 +41,6 @@ export function DesignCabecalhoTab({
 
   return (
     <div className="space-y-5">
-      <DesignSectionPageHeader sectionId="cabecalho" />
-
       <section>
         <h3 className="text-base font-semibold text-primary">Dados do negócio</h3>
         <div className="mt-2">

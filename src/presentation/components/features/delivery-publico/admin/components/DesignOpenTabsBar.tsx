@@ -61,9 +61,10 @@ export function DesignOpenTabsBar({
             <button
               type="button"
               onClick={() => onSelectTab(tabId)}
-              className="whitespace-nowrap px-1"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap px-1"
               aria-current={isActive ? 'page' : undefined}
             >
+              <tab.Icon className="h-4 w-4 shrink-0" aria-hidden />
               {tab.label}
             </button>
             <button

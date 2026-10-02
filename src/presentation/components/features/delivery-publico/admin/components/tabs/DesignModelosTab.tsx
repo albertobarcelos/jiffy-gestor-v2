@@ -3,7 +3,6 @@
 import type { DeliveryPublicoDesignConfig } from '../../../shared/types/deliveryPublicoDesignConfig'
 import { LAYOUT_MODELS } from '../../../shared/constants/layoutModels'
 import { DesignSelectableCard } from '../DesignSelectableCard'
-import { DesignSectionPageHeader } from '../DesignSectionPageHeader'
 import { LayoutModelWireframe } from '../LayoutModelWireframe'
 
 type DesignModelosTabProps = {
@@ -14,8 +13,6 @@ type DesignModelosTabProps = {
 export function DesignModelosTab({ config, onChange }: DesignModelosTabProps) {
   return (
     <div className="space-y-5">
-      <DesignSectionPageHeader sectionId="modelos" />
-
       <div className="grid gap-3 sm:grid-cols-2">
         {LAYOUT_MODELS.map(modelo => (
           <DesignSelectableCard

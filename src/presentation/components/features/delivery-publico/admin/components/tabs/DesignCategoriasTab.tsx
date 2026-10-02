@@ -27,7 +27,6 @@ import type { DeliveryPublicoDesignConfig } from '../../../shared/types/delivery
 import type { DesignCategoriaGrupo } from '../../../shared/types/designCategoriaGrupo'
 import { resolveDesignPaletteColors } from '../../../shared/constants/colorPalettes'
 import { DesignCategoriaGrupoSortableItem } from '../DesignCategoriaGrupoSortableItem'
-import { DesignSectionPageHeader } from '../DesignSectionPageHeader'
 import { useDesignCategoriaGrupoActions } from '../../hooks/useDesignCategoriaGrupoActions'
 
 type DesignCategoriasTabProps = {
@@ -186,7 +185,6 @@ export function DesignCategoriasTab({
   if (isLoading) {
     return (
       <div className="space-y-5">
-        <DesignSectionPageHeader sectionId="categorias" />
         <div className="flex min-h-[240px] items-center justify-center">
           <JiffyLoading />
         </div>
@@ -197,7 +195,6 @@ export function DesignCategoriasTab({
   if (!hasMenu) {
     return (
       <div className="space-y-5">
-        <DesignSectionPageHeader sectionId="categorias" />
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           <p className="font-semibold">Cardápio do delivery não configurado</p>
           <p className="mt-1 text-xs">
@@ -218,7 +215,6 @@ export function DesignCategoriasTab({
   if (isError) {
     return (
       <div className="space-y-5">
-        <DesignSectionPageHeader sectionId="categorias" />
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           Não foi possível carregar os grupos do cardápio publicado. Tente recarregar a página.
         </div>
@@ -228,8 +224,6 @@ export function DesignCategoriasTab({
 
   return (
     <div className="space-y-5">
-      <DesignSectionPageHeader sectionId="categorias" />
-
       <div className="space-y-2 rounded-xl border border-gray-200 bg-white p-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-1 items-start gap-2">

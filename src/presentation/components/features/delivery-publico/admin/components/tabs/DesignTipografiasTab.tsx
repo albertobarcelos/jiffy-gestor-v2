@@ -6,7 +6,6 @@ import {
   getPublishableTypographyLabel,
 } from '../../../shared/constants/typographyPresets'
 import { DesignSelectableCard } from '../DesignSelectableCard'
-import { DesignSectionPageHeader } from '../DesignSectionPageHeader'
 
 type DesignTipografiasTabProps = {
   config: DeliveryPublicoDesignConfig
@@ -30,7 +29,6 @@ function TypographyPreview({ presetId }: { presetId: TypographyPresetId }) {
 export function DesignTipografiasTab({ config, onChange }: DesignTipografiasTabProps) {
   return (
     <div className="space-y-5">
-      <DesignSectionPageHeader sectionId="tipografias" />
       <p className="text-sm text-secondary-text">
         Por enquanto, apenas a tipografia {getPublishableTypographyLabel()} pode ser publicada.
       </p>

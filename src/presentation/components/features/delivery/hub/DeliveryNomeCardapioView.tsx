@@ -17,7 +17,6 @@ import {
 } from '@/src/shared/utils/slugDelivery'
 import { MenuParametroEmpresaSelect } from '@/src/presentation/components/features/configuracoes/MenuParametroEmpresaSelect'
 import { DeliveryPendenciasAlert } from '@/src/presentation/components/features/delivery/configuracoes/DeliveryPendenciasAlert'
-import { DesignSectionPageHeader } from '@/src/presentation/components/features/delivery-publico/admin/components/DesignSectionPageHeader'
 import { EMPRESA_DELIVERY_PENDENCIA_TYPES } from '@/src/shared/constants/empresaDeliveryPendencias'
 import {
   filtrarPendenciasObrigatorias,
@@ -163,8 +162,6 @@ export function DeliveryNomeCardapioView() {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <div className="mx-auto w-full max-w-[720px] space-y-6 p-4 md:p-6">
-        <DesignSectionPageHeader sectionId="nome-cardapio" />
-
         {configurado &&
         !lojaDeliveryDisponivel(empresaDelivery ?? undefined) &&
         pendenciasDestePasso.length > 0 ? (

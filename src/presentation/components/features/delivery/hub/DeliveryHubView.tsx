@@ -7,7 +7,6 @@ import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliver
 import { useDeliveryHubCadastrosRecomendados } from '@/src/presentation/hooks/useDeliveryHubCadastrosRecomendados'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { usePedirSaidaCobertura } from '@/src/presentation/components/features/configuracoes/coberturaSairGuard'
-import { lojaDeliveryDisponivel } from '@/src/shared/constants/empresaDeliveryPendencias'
 import { deliveryHubEtapaPath } from '@/src/shared/constants/configuracoesRoutes'
 import { getDeliveryEtapaById, type DeliveryEtapaId } from './deliveryHubEtapas'
 import { calcularDeliveryHubProgresso } from './deliveryHubProgresso'
@@ -34,7 +33,6 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
     () => calcularDeliveryHubProgresso(pendencias, configurado),
     [pendencias, configurado]
   )
-  const lojaDisponivel = lojaDeliveryDisponivel(empresaDelivery ?? undefined)
 
   const cadastrosRecomendados = useDeliveryHubCadastrosRecomendados(true)
   const refetchCadastros = cadastrosRecomendados.refetch
@@ -133,7 +131,6 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <DeliveryHubHome
         progresso={progresso}
-        lojaDisponivel={lojaDisponivel}
         passosExtras={passosExtras}
         selecionadoId={etapaId}
         onSelecionarPasso={selecionarPasso}

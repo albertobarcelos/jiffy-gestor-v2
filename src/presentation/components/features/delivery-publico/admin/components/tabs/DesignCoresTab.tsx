@@ -13,7 +13,6 @@ import {
   resolveDesignPaletteColors,
 } from '../../../shared/constants/colorPalettes'
 import { DesignSelectableCard } from '../DesignSelectableCard'
-import { DesignSectionPageHeader } from '../DesignSectionPageHeader'
 
 type DesignCoresTabProps = {
   config: DeliveryPublicoDesignConfig
@@ -162,7 +161,6 @@ export function DesignCoresTab({ config, onChange }: DesignCoresTabProps) {
 
   return (
     <div className="space-y-5">
-      <DesignSectionPageHeader sectionId="cores" />
       <p className="text-sm text-secondary-text">
         Por enquanto, apenas as paletas {getPublishablePaletteLabel()} podem ser publicadas.
       </p>
