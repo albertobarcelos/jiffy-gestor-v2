@@ -4,6 +4,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import Tooltip from '@mui/material/Tooltip'
 import { MdCheck, MdChevronLeft, MdChevronRight } from 'react-icons/md'
 import { cn } from '@/src/shared/utils/cn'
+import { colors } from '@/src/shared/theme/colors'
 import type { DeliveryEtapaId } from '@/src/shared/constants/configuracoesRoutes'
 import type { DeliveryHubProgresso } from './deliveryHubProgresso'
 import {
@@ -11,6 +12,9 @@ import {
   type DeliveryHubPassoUi,
 } from './deliveryHubPassosUi'
 import type { DeliveryHubPassosExtras } from './deliveryHubCadastros'
+
+/** Mesmo verde do `JiffyIconSwitch` / token `accent5`. */
+const VERDE_PROGRESSO = colors.accent5
 
 type DeliveryHubHomeProps = {
   progresso: DeliveryHubProgresso
@@ -23,7 +27,10 @@ type DeliveryHubHomeProps = {
 function BadgeStatus({ passo }: { passo: DeliveryHubPassoUi }) {
   if (passo.concluido) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-[#00B074] px-2.5 py-0.5 text-[11px] font-semibold text-white">
+      <span
+        className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-white"
+        style={{ backgroundColor: VERDE_PROGRESSO }}
+      >
         <MdCheck className="h-3.5 w-3.5" />
         Concluído
       </span>
@@ -56,8 +63,9 @@ function LinhaPasso({
       className={cn(
         'absolute left-1/2 w-px -translate-x-1/2 transition-colors duration-300',
         posicao === 'acima' ? 'top-0 h-1/2' : 'top-1/2 h-[calc(50%+0.5rem)]',
-        concluidoOrigem ? 'bg-[#00B074]' : 'bg-gray-200'
+        !concluidoOrigem && 'bg-gray-200'
       )}
+      style={concluidoOrigem ? { backgroundColor: VERDE_PROGRESSO } : undefined}
       aria-hidden
     />
   )
@@ -106,8 +114,11 @@ export function DeliveryHubHome({
               const passoAnterior = index > 0 ? passos[index - 1] : null
               const numeroClassName = cn(
                 'relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white',
-                passo.concluido ? 'bg-[#00B074]' : 'bg-primary'
+                !passo.concluido && 'bg-primary'
               )
+              const numeroStyle = passo.concluido
+                ? { backgroundColor: VERDE_PROGRESSO }
+                : undefined
               const linhaAcima = passoAnterior ? (
                 <LinhaPasso concluidoOrigem={passoAnterior.concluido} posicao="acima" />
               ) : null
@@ -133,7 +144,9 @@ export function DeliveryHubHome({
                         <span className="relative flex min-h-[4.25rem] w-8 shrink-0 items-center justify-center">
                           {linhaAcima}
                           {linhaAbaixo}
-                          <span className={numeroClassName}>{passo.numero}</span>
+                          <span className={numeroClassName} style={numeroStyle}>
+                            {passo.numero}
+                          </span>
                         </span>
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary/10 text-secondary">
                           <passo.Icon className="h-5 w-5" aria-hidden />
@@ -150,7 +163,9 @@ export function DeliveryHubHome({
                       >
                         {linhaAcima}
                         {linhaAbaixo}
-                        <span className={numeroClassName}>{passo.numero}</span>
+                        <span className={numeroClassName} style={numeroStyle}>
+                          {passo.numero}
+                        </span>
                       </div>
                       <button
                         type="button"
@@ -192,7 +207,8 @@ export function DeliveryHubHome({
             aria-expanded={!menuRecolhido}
             aria-label={menuRecolhido ? 'Expandir menu' : 'Ocultar menu'}
             title={menuRecolhido ? 'Expandir menu' : 'Ocultar menu'}
-            className="absolute right-0 top-1/2 z-20 flex h-6 w-6 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full border-2 border-[#00B074] bg-white text-[#00B074] shadow-md transition-colors hover:bg-[#00B074]/10"
+            className="absolute right-0 top-1/2 z-20 flex h-6 w-6 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full border-2 bg-white shadow-md transition-colors hover:bg-black/[0.03]"
+            style={{ borderColor: VERDE_PROGRESSO, color: VERDE_PROGRESSO }}
           >
             {menuRecolhido ? (
               <MdChevronRight className="h-4 w-4" aria-hidden />

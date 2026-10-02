@@ -91,7 +91,7 @@ function ProdutoThumb({
   )
 }
 
-/** Bolinha absoluta à direita do preço vigente (não altera a altura do card). */
+/** Bolinha absoluta à esquerda do preço vigente (não altera a altura do card). */
 function QuantidadeCarrinhoBadge({
   quantidade,
   produtoNome,
