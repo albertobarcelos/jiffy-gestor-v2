@@ -18,7 +18,7 @@ function DeliveryEtapaPainel({ children }: { children: ReactNode }) {
 export function EmpresaDeliveryEtapa() {
   return (
     <DeliveryEtapaPainel>
-      <EmpresaTab />
+      <EmpresaTab mostrarStatusFuso />
     </DeliveryEtapaPainel>
   )
 }

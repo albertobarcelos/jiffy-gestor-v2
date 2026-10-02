@@ -4,9 +4,15 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
+import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { useDeliveryHubCadastrosRecomendados } from '@/src/presentation/hooks/useDeliveryHubCadastrosRecomendados'
+import { useFuncionamentoDelivery } from '@/src/presentation/hooks/useFuncionamentoDelivery'
+import { useAreasEntregaDelivery } from '@/src/presentation/hooks/useAreasEntregaDelivery'
+import { useRaiosEntregaDelivery } from '@/src/presentation/hooks/useRaiosEntregaDelivery'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { usePedirSaidaCobertura } from '@/src/presentation/components/features/configuracoes/coberturaSairGuard'
+import { temCoberturaEntregaAtiva } from '@/src/application/mappers/CoberturaEntregaMapper'
+import { agendaTemDiaAberto } from '@/src/shared/utils/funcionamentoDelivery'
 import { deliveryHubEtapaPath } from '@/src/shared/constants/configuracoesRoutes'
 import { getDeliveryEtapaById, type DeliveryEtapaId } from './deliveryHubEtapas'
 import { calcularDeliveryHubProgresso } from './deliveryHubProgresso'
@@ -24,19 +30,42 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
   const { toGestao } = useGestaoPath()
   const pedirSaida = usePedirSaidaCobertura()
   const empresaDeliveryQuery = useEmpresaDeliveryMe()
+  const { possuiGeolocalizacao } = useEmpresaMe()
   const etapaAnteriorRef = useRef<DeliveryEtapaId | null>(etapaId)
 
   const empresaDelivery = empresaDeliveryQuery.data
   const configurado = empresaDelivery != null
   const pendencias = empresaDelivery?.pendencias ?? []
+
+  const funcionamentoQuery = useFuncionamentoDelivery({ enabled: configurado })
+  const raiosQuery = useRaiosEntregaDelivery({ enabled: configurado })
+  const areasQuery = useAreasEntregaDelivery({ enabled: configurado })
+
+  const agendaConfigurada =
+    funcionamentoQuery.isSuccess &&
+    agendaTemDiaAberto(funcionamentoQuery.data.agendaSemanal)
+
+  const coberturaConfigurada =
+    raiosQuery.isSuccess &&
+    areasQuery.isSuccess &&
+    possuiGeolocalizacao &&
+    temCoberturaEntregaAtiva(raiosQuery.data ?? [], areasQuery.data ?? [])
+
   const progresso = useMemo(
-    () => calcularDeliveryHubProgresso(pendencias, configurado),
-    [pendencias, configurado]
+    () =>
+      calcularDeliveryHubProgresso(pendencias, configurado, {
+        agendaConfigurada,
+        coberturaConfigurada,
+      }),
+    [pendencias, configurado, agendaConfigurada, coberturaConfigurada]
   )
 
   const cadastrosRecomendados = useDeliveryHubCadastrosRecomendados(true)
   const refetchCadastros = cadastrosRecomendados.refetch
   const refetchEmpresa = empresaDeliveryQuery.refetch
+  const refetchFuncionamento = funcionamentoQuery.refetch
+  const refetchRaios = raiosQuery.refetch
+  const refetchAreas = areasQuery.refetch
   const passosExtras = useMemo(
     () => ({
       ...cadastrosRecomendados.extras,
@@ -72,9 +101,19 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
     const timeoutId = setTimeout(() => {
       void refetchEmpresa()
       void refetchCadastros()
+      void refetchFuncionamento()
+      void refetchRaios()
+      void refetchAreas()
     }, 400)
     return () => clearTimeout(timeoutId)
-  }, [etapaId, refetchCadastros, refetchEmpresa])
+  }, [
+    etapaId,
+    refetchAreas,
+    refetchCadastros,
+    refetchEmpresa,
+    refetchFuncionamento,
+    refetchRaios,
+  ])
 
   const selecionarPasso = useCallback(
     (passo: DeliveryHubPassoUi) => {

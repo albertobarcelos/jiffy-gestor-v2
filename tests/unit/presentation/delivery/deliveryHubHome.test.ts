@@ -72,11 +72,15 @@ describe('contarItensListaHub', () => {
 
 describe('montarPassosHubDelivery', () => {
   it('lista as etapas do hub sem nome/cardápio nem notificações', () => {
-    const progresso = calcularDeliveryHubProgresso([], true)
+    const progresso = calcularDeliveryHubProgresso([], true, {
+      agendaConfigurada: true,
+      coberturaConfigurada: true,
+    })
     const passos = montarPassosHubDelivery(progresso)
     expect(passos.map(passo => passo.id)).toEqual([...IDS_HUB])
     expect(passos.map(passo => passo.numero)).toEqual([1, 2, 3, 4, 5, 6, 7])
     expect(passos.filter(passo => passo.obrigatoria).map(passo => passo.id)).toEqual([
+      'delivery-design',
       'delivery-geolocalizacao',
       'delivery-agenda',
       'delivery-cobertura',
@@ -89,23 +93,49 @@ describe('montarPassosHubDelivery', () => {
   })
 
   it('não marca etapas recomendadas como concluídas pelo progresso obrigatório', () => {
-    const passos = montarPassosHubDelivery(calcularDeliveryHubProgresso([], true), {
-      empresaDeliveryConfigurada: true,
-    })
+    const passos = montarPassosHubDelivery(
+      calcularDeliveryHubProgresso([], true, {
+        agendaConfigurada: true,
+        coberturaConfigurada: true,
+      }),
+      {
+        empresaDeliveryConfigurada: true,
+      }
+    )
     const recomendados = passos.filter(passo => !passo.obrigatoria)
     expect(recomendados.map(passo => passo.id)).toEqual([
-      'delivery-design',
       'delivery-entregadores',
       'delivery-meios',
       'delivery-impressoras',
     ])
-    expect(
-      recomendados.filter(passo => passo.id !== 'delivery-design').every(passo => passo.concluido === false)
-    ).toBe(true)
+    expect(recomendados.every(passo => passo.concluido === false)).toBe(true)
+  })
+
+  it('marca Personalizar loja pelo mesmo critério de Nome da loja e cardápio', () => {
+    const comPendencia = montarPassosHubDelivery(
+      calcularDeliveryHubProgresso(
+        [{ type: 'CARDAPIO_DELIVERY_NAO_CONFIGURADO', message: 'Cardápio' }],
+        true,
+        { agendaConfigurada: true, coberturaConfigurada: true }
+      )
+    )
+    expect(comPendencia.find(passo => passo.id === 'delivery-design')?.obrigatoria).toBe(true)
+    expect(comPendencia.find(passo => passo.id === 'delivery-design')?.concluido).toBe(false)
+
+    const semPendencia = montarPassosHubDelivery(
+      calcularDeliveryHubProgresso([], true, {
+        agendaConfigurada: true,
+        coberturaConfigurada: true,
+      })
+    )
+    expect(semPendencia.find(passo => passo.id === 'delivery-design')?.concluido).toBe(true)
   })
 
   it('marca etapas recomendadas como concluídas só quando há cadastro', () => {
-    const progresso = calcularDeliveryHubProgresso([], true)
+    const progresso = calcularDeliveryHubProgresso([], true, {
+      agendaConfigurada: true,
+      coberturaConfigurada: true,
+    })
     const preenchidos = montarPassosHubDelivery(progresso, {
       qtdEntregadores: 2,
       qtdMeiosPagamento: 1,
@@ -127,13 +157,21 @@ describe('montarPassosHubDelivery', () => {
         {
           type: 'FUNCIONAMENTO_AGENDA_NAO_CONFIGURADA',
           message: 'Agenda',
+          obrigatoria: false,
         },
       ],
-      true
+      true,
+      { coberturaConfigurada: true }
     )
     const passos = montarPassosHubDelivery(progresso)
     expect(passos.find(passo => passo.id === 'delivery-agenda')?.concluido).toBe(false)
     expect(passos.find(passo => passo.id === 'delivery-cobertura')?.concluido).toBe(true)
+  })
+
+  it('mantém agenda e cobertura pendentes sem sinais locais', () => {
+    const passos = montarPassosHubDelivery(calcularDeliveryHubProgresso([], true))
+    expect(passos.find(passo => passo.id === 'delivery-agenda')?.concluido).toBe(false)
+    expect(passos.find(passo => passo.id === 'delivery-cobertura')?.concluido).toBe(false)
   })
 })
 

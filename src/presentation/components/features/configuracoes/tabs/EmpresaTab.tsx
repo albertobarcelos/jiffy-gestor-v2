@@ -153,10 +153,8 @@ function LogoImpressaoPreviewImage({ src, alt }: { src: string; alt: string }) {
 
 const LOGO_COLUNA_LARGURA_CLASS = 'w-full shrink-0 lg:w-[280px]'
 
-/**
- * Tab de Empresa - Edição de dados da empresa
- */
-export function EmpresaTab() {
+/** Tab de Empresa. `mostrarStatusFuso` só no passo Delivery (Empresa e endereço). */
+export function EmpresaTab({ mostrarStatusFuso = false }: { mostrarStatusFuso?: boolean }) {
   const [empresa, setEmpresa] = useState<Cliente | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
@@ -1399,29 +1397,42 @@ export function EmpresaTab() {
                     }
                   }}
                 />
-                <Input
-                  select
-                  label="Fuso horário (IANA)"
-                  value={timezone}
-                  onChange={e => setTimezone(e.target.value)}
-                  disabled={!isEditing}
-                  size="small"
-                  sx={sxEntradaEmpresa}
-                  InputLabelProps={{ shrink: true }}
-                  SelectProps={{ displayEmpty: true }}
-                >
-                  <MenuItem value="">
-                    <em>Selecione o fuso</em>
-                  </MenuItem>
-                  {timezone && !FUSOS_IANA_BRASIL.some(f => f.id === timezone) && (
-                    <MenuItem value={timezone}>{timezone} (registrado na API)</MenuItem>
-                  )}
-                  {FUSOS_IANA_BRASIL.map(f => (
-                    <MenuItem key={f.id} value={f.id}>
-                      {f.label}
+                <div>
+                  <Input
+                    select
+                    label="Fuso horário (IANA)"
+                    value={timezone}
+                    onChange={e => setTimezone(e.target.value)}
+                    disabled={!isEditing}
+                    size="small"
+                    sx={sxEntradaEmpresa}
+                    InputLabelProps={{ shrink: true }}
+                    SelectProps={{ displayEmpty: true }}
+                  >
+                    <MenuItem value="">
+                      <em>Selecione o fuso</em>
                     </MenuItem>
-                  ))}
-                </Input>
+                    {timezone && !FUSOS_IANA_BRASIL.some(f => f.id === timezone) && (
+                      <MenuItem value={timezone}>{timezone} (registrado na API)</MenuItem>
+                    )}
+                    {FUSOS_IANA_BRASIL.map(f => (
+                      <MenuItem key={f.id} value={f.id}>
+                        {f.label}
+                      </MenuItem>
+                    ))}
+                  </Input>
+                  {mostrarStatusFuso ? (
+                    <div className="mt-1 flex items-center justify-end gap-2">
+                      <p
+                        className={
+                          timezone.trim() ? 'text-sm text-green-500' : 'text-sm text-amber-600'
+                        }
+                      >
+                        {timezone.trim() ? 'Concluído' : 'Pendente'}
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </div>
           </div>

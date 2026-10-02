@@ -19,6 +19,8 @@ import {
 } from '@/src/presentation/components/ui/dialog'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { HUB_IMPRESSORAS_COUNT_QUERY_KEY } from '@/src/presentation/hooks/useDeliveryHubCadastrosRecomendados'
 
 interface ImpressorasListProps {
   onReload?: () => void
@@ -48,6 +50,11 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
+  const invalidateQueries = useInvalidateTenantQueries()
+
+  const atualizarContagemHub = useCallback(() => {
+    void invalidateQueries(HUB_IMPRESSORAS_COUNT_QUERY_KEY)
+  }, [invalidateQueries])
 
   const searchTextRef = useRef('')
 
@@ -216,6 +223,7 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
 
   const handleModalReload = () => {
     loadAllImpressoras()
+    atualizarContagemHub()
     onReload?.()
   }
 
@@ -252,6 +260,7 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
       setImpressoraToDelete(null)
       showToast.success('Impressora deletada com sucesso!')
       loadAllImpressoras()
+      atualizarContagemHub()
       onReload?.()
     } catch (error) {
       console.error('Erro ao deletar impressora:', error)
@@ -261,7 +270,7 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
     } finally {
       setIsDeleting(false)
     }
-  }, [impressoraToDelete, loadAllImpressoras, onReload])
+  }, [impressoraToDelete, loadAllImpressoras, atualizarContagemHub, onReload])
 
   /**
    * Gera código abreviado do ID (primeiros 6 caracteres em maiúsculas)

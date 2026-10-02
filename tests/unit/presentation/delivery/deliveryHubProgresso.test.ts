@@ -10,7 +10,7 @@ const IDS_OBRIGATORIOS = [
 ] as const
 
 describe('calcularDeliveryHubProgresso', () => {
-  it('trata as quatro obrigatórias iguais quando a API não envia pendências', () => {
+  it('não conclui agenda/cobertura só porque a empresa delivery existe', () => {
     const semEmpresa = calcularDeliveryHubProgresso([], false)
     expect(semEmpresa.passos.map(passo => passo.id)).toEqual([...IDS_OBRIGATORIOS])
     expect(semEmpresa.passos.every(passo => passo.concluido === false)).toBe(true)
@@ -18,21 +18,32 @@ describe('calcularDeliveryHubProgresso', () => {
     expect(semEmpresa.concluidosObrigatorios).toBe(0)
 
     const comEmpresa = calcularDeliveryHubProgresso([], true)
-    expect(comEmpresa.passos.every(passo => passo.concluido === true)).toBe(true)
-    expect(comEmpresa.concluidosObrigatorios).toBe(4)
-    expect(comEmpresa.porcentagemObrigatorias).toBe(100)
+    expect(
+      comEmpresa.passos.filter(passo => passo.concluido).map(passo => passo.id)
+    ).toEqual(['delivery-geolocalizacao', 'delivery-nome-cardapio'])
+    expect(comEmpresa.passos.find(passo => passo.id === 'delivery-agenda')?.concluido).toBe(false)
+    expect(comEmpresa.passos.find(passo => passo.id === 'delivery-cobertura')?.concluido).toBe(
+      false
+    )
+    expect(comEmpresa.concluidosObrigatorios).toBe(2)
+    expect(comEmpresa.porcentagemObrigatorias).toBe(50)
   })
 
-  it('marca só o passo com pendência obrigatória explícita', () => {
-    const progresso = calcularDeliveryHubProgresso(
-      [
-        {
-          type: EMPRESA_DELIVERY_PENDENCIA_TYPES.COBERTURA_NAO_CONFIGURADA,
-          message: 'Cobertura ausente',
-        },
-      ],
-      true
-    )
+  it('conclui agenda e cobertura só com sinais locais positivos', () => {
+    const progresso = calcularDeliveryHubProgresso([], true, {
+      agendaConfigurada: true,
+      coberturaConfigurada: true,
+    })
+    expect(progresso.passos.every(passo => passo.concluido === true)).toBe(true)
+    expect(progresso.concluidosObrigatorios).toBe(4)
+    expect(progresso.porcentagemObrigatorias).toBe(100)
+  })
+
+  it('respeita sinal local de cobertura mesmo sem pendência da API', () => {
+    const progresso = calcularDeliveryHubProgresso([], true, {
+      agendaConfigurada: true,
+      coberturaConfigurada: false,
+    })
 
     expect(
       progresso.passos.filter(passo => passo.concluido).map(passo => passo.id)
@@ -41,11 +52,10 @@ describe('calcularDeliveryHubProgresso', () => {
       false
     )
     expect(progresso.concluidosObrigatorios).toBe(3)
-    expect(progresso.totalObrigatorios).toBe(4)
     expect(progresso.porcentagemObrigatorias).toBe(75)
   })
 
-  it('marca empresa incompleta com pendência de pin ou timezone', () => {
+  it('marca empresa incompleta só com timezone; pin bloqueia áreas de entrega', () => {
     const comPin = calcularDeliveryHubProgresso(
       [
         {
@@ -53,14 +63,18 @@ describe('calcularDeliveryHubProgresso', () => {
           message: 'Pin ausente',
         },
       ],
-      true
+      true,
+      { agendaConfigurada: true, coberturaConfigurada: true }
     )
     expect(comPin.passos.find(passo => passo.id === 'delivery-geolocalizacao')?.concluido).toBe(
-      false
+      true
     )
-    expect(comPin.passos.find(passo => passo.id === 'delivery-cobertura')?.concluido).toBe(true)
-    expect(comPin.passos.find(passo => passo.id === 'delivery-geolocalizacao')?.href).toBe(
-      '/config/delivery/empresa'
+    expect(comPin.passos.find(passo => passo.id === 'delivery-cobertura')?.concluido).toBe(false)
+    expect(comPin.passos.find(passo => passo.id === 'delivery-cobertura')?.href).toBe(
+      '/config/delivery/cobertura'
+    )
+    expect(comPin.passos.find(passo => passo.id === 'delivery-cobertura')?.label).toBe(
+      'Áreas de entrega e Geo da Empresa'
     )
 
     const comTimezone = calcularDeliveryHubProgresso(
@@ -70,15 +84,19 @@ describe('calcularDeliveryHubProgresso', () => {
           message: 'Fuso ausente',
         },
       ],
-      true
+      true,
+      { agendaConfigurada: true, coberturaConfigurada: true }
     )
     expect(
       comTimezone.passos.find(passo => passo.id === 'delivery-geolocalizacao')?.concluido
     ).toBe(false)
+    expect(comTimezone.passos.find(passo => passo.id === 'delivery-cobertura')?.concluido).toBe(
+      true
+    )
     expect(comTimezone.concluidosObrigatorios).toBe(3)
   })
 
-  it('conta nome/cardápio e agenda como obrigatórias', () => {
+  it('conta nome/cardápio e agenda como pendentes', () => {
     const progresso = calcularDeliveryHubProgresso(
       [
         {
@@ -88,9 +106,11 @@ describe('calcularDeliveryHubProgresso', () => {
         {
           type: EMPRESA_DELIVERY_PENDENCIA_TYPES.FUNCIONAMENTO_AGENDA_NAO_CONFIGURADA,
           message: 'Agenda',
+          obrigatoria: false,
         },
       ],
-      true
+      true,
+      { coberturaConfigurada: true }
     )
     expect(progresso.passos.find(passo => passo.id === 'delivery-nome-cardapio')?.concluido).toBe(
       false
@@ -100,7 +120,7 @@ describe('calcularDeliveryHubProgresso', () => {
     expect(progresso.porcentagemObrigatorias).toBe(50)
   })
 
-  it('ignora orientação (obrigatoria false) no progresso', () => {
+  it('ignora orientação de WhatsApp/timezone no progresso de geo/nome', () => {
     const progresso = calcularDeliveryHubProgresso(
       [
         {
@@ -114,9 +134,19 @@ describe('calcularDeliveryHubProgresso', () => {
           obrigatoria: false,
         },
       ],
-      true
+      true,
+      { agendaConfigurada: true, coberturaConfigurada: true }
     )
     expect(progresso.concluidosObrigatorios).toBe(4)
     expect(progresso.passos.every(passo => passo.concluido)).toBe(true)
+  })
+
+  it('prioriza sinal local de agenda sobre ausência de pendência', () => {
+    const progresso = calcularDeliveryHubProgresso([], true, {
+      agendaConfigurada: false,
+      coberturaConfigurada: true,
+    })
+    expect(progresso.passos.find(passo => passo.id === 'delivery-agenda')?.concluido).toBe(false)
+    expect(progresso.passos.find(passo => passo.id === 'delivery-cobertura')?.concluido).toBe(true)
   })
 })

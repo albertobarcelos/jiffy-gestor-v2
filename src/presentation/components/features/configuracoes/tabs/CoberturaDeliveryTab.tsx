@@ -414,7 +414,11 @@ export function CoberturaDeliveryTab() {
     {
       onSuccess: async () => {
         await invalidateQueries(['empresa', 'endereco-geo'])
+        await invalidateQueries(['empresas', 'me'])
         await invalidateQueries(EMPRESA_DELIVERY_ME_QUERY_KEY)
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('jiffy:empresa-me-updated'))
+        }
         dispararEmpresaDeliveryAtualizada()
       },
     }

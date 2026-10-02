@@ -24,8 +24,13 @@ function concluidoEtapaRecomendada(
   if (etapaId === 'delivery-entregadores') return (extras?.qtdEntregadores ?? 0) > 0
   if (etapaId === 'delivery-meios') return (extras?.qtdMeiosPagamento ?? 0) > 0
   if (etapaId === 'delivery-impressoras') return (extras?.qtdImpressoras ?? 0) > 0
-  if (etapaId === 'delivery-design') return extras?.empresaDeliveryConfigurada === true
   return false
+}
+
+/** Personalizar loja no menu usa o mesmo critério de Nome da loja e cardápio (slug + menu). */
+function idProgressoDaEtapa(etapaId: DeliveryEtapaId): string {
+  if (etapaId === 'delivery-design') return 'delivery-nome-cardapio'
+  return etapaId
 }
 
 export function montarPassosHubDelivery(
@@ -33,7 +38,9 @@ export function montarPassosHubDelivery(
   extras?: DeliveryHubPassosExtras
 ): DeliveryHubPassoUi[] {
   return DELIVERY_HUB_ETAPAS.map(etapa => {
-    const doProgresso = progresso.passos.find(passo => passo.id === etapa.id)
+    const doProgresso = progresso.passos.find(
+      passo => passo.id === idProgressoDaEtapa(etapa.id)
+    )
     const concluido = etapa.obrigatoria
       ? (doProgresso?.concluido ?? false)
       : concluidoEtapaRecomendada(etapa.id, extras)
