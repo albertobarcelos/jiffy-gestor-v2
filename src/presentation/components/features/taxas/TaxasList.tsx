@@ -43,7 +43,6 @@ function formatTipoLabel(tipo: string): string {
   const t = tipo.toLowerCase()
   if (t === 'percentual') return 'Percentual'
   if (t === 'fixo' || t === 'valor_fixo') return 'Valor fixo'
-  if (t === 'entrega') return 'Entrega'
   if (!tipo) return '—'
   return tipo.charAt(0).toLocaleUpperCase('pt-BR') + tipo.slice(1)
 }
@@ -54,6 +53,10 @@ function tipoTaxaParaPatch(raw: unknown): 'percentual' | 'fixo' | 'entrega' {
   if (t === 'fixo' || t === 'valor_fixo') return 'fixo'
   if (t === 'entrega') return 'entrega'
   return 'percentual'
+}
+
+function taxaEhTipoEntrega(taxa: Taxa): boolean {
+  return taxa.getTipo().toLowerCase() === 'entrega'
 }
 
 type TerminalTaxaCfgPayload = {
@@ -403,10 +406,26 @@ export function TaxasList() {
   }, [isLoading, isFetching])
 
   const taxas = useMemo(() => {
-    return data?.pages.flatMap(page => page.taxas) || []
+    return (data?.pages.flatMap(page => page.taxas) || []).filter(
+      taxa => !taxaEhTipoEntrega(taxa)
+    )
   }, [data])
 
-  const totalTaxas = useMemo(() => data?.pages[0]?.count ?? 0, [data])
+  const totalTaxas = useMemo(() => {
+    const apiCount = data?.pages[0]?.count ?? 0
+    const entregaCarregadas = (data?.pages.flatMap(page => page.taxas) || []).filter(
+      taxaEhTipoEntrega
+    ).length
+    // API não filtra por tipo; ao carregar tudo, desconta as de entrega já vistas.
+    if (!hasNextPage) return Math.max(0, apiCount - entregaCarregadas)
+    return Math.max(taxas.length, apiCount - entregaCarregadas)
+  }, [data, hasNextPage, taxas.length])
+
+  // Se a página atual só tinha taxas de entrega, busca a próxima para não ficar lista vazia.
+  useEffect(() => {
+    if (taxas.length > 0 || !hasNextPage || isFetchingNextPage || isLoading) return
+    void fetchNextPage()
+  }, [taxas.length, hasNextPage, isFetchingNextPage, isLoading, fetchNextPage])
 
   useEffect(() => {
     if (debounceTimerRef.current) {
