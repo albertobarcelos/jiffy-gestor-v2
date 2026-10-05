@@ -20,6 +20,7 @@ import { useMenuMutations } from '@/src/presentation/hooks/menus/useMenuMutation
 import { usePropagarAlteracaoProduto } from '@/src/presentation/hooks/produtos/usePropagarAlteracaoProduto'
 import { showToast } from '@/src/shared/utils/toast'
 import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
+import type { SnapshotProdutoPropagavel } from '@/src/shared/types/propagarAlteracaoProduto'
 import { MENU_PRODUTO_FORM_ID } from './menuPanelConstants'
 import {
   MenuCategoriaNesteCardapioCampos,
@@ -340,7 +341,7 @@ export const MenuProdutoSnapshotForm = forwardRef<
       Boolean(grupoProdutoIdSelecionado) &&
       grupoProdutoIdSelecionado !== grupo?.grupoBase.id
 
-    const snapshot = {
+    const snapshot: SnapshotProdutoPropagavel = {
       nome: nomeTrim,
       descricao: descricao.trim() || null,
       valor: valorNum,
@@ -348,6 +349,9 @@ export const MenuProdutoSnapshotForm = forwardRef<
       promocaoAtiva: promoAtivaEfetiva,
       ativo,
       favorito,
+      ...(grupoMudou && grupoProdutoIdSelecionado
+        ? { grupoProdutoId: grupoProdutoIdSelecionado }
+        : {}),
     }
 
     onSavingChange?.(true)

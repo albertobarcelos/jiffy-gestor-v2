@@ -136,6 +136,7 @@ export function ProdutosFilters({
             loading={isLoadingGruposProdutos}
             value={grupoProdutoFilter}
             onChange={onGrupoProdutoChange}
+            destacarInativas
           />
         </div>
 

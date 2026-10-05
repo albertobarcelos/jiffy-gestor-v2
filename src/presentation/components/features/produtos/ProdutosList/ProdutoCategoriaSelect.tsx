@@ -5,6 +5,8 @@ import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { Autocomplete, TextField } from '@mui/material'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 
+const COR_CATEGORIA_INATIVA = '#9CA3AF'
+
 export type ProdutoCategoriaCommitResult = void | boolean | Promise<void | boolean>
 
 interface ProdutoCategoriaSelectProps {
@@ -103,6 +105,21 @@ export function ProdutoCategoriaSelect({
         isOptionEqualToValue={(a, b) => a.getId() === b.getId()}
         value={value ?? undefined}
         onChange={handleChange}
+        renderOption={(props, grupo) => {
+          const { key, ...optionProps } = props
+          return (
+            <li
+              key={key}
+              {...optionProps}
+              style={{
+                ...optionProps.style,
+                color: grupo.isAtivo() ? optionProps.style?.color : COR_CATEGORIA_INATIVA,
+              }}
+            >
+              {grupo.getNome()}
+            </li>
+          )
+        }}
         slotProps={{
           popper: {
             placement: 'bottom-start',
@@ -139,6 +156,7 @@ export function ProdutoCategoriaSelect({
                 padding: '8px 10px',
                 fontSize: '0.8125rem',
                 textOverflow: 'ellipsis',
+                color: value && !value.isAtivo() ? COR_CATEGORIA_INATIVA : undefined,
                 '@media (min-width: 768px)': {
                   padding: '6px 8px',
                   fontSize: '0.75rem',
