@@ -25,7 +25,10 @@ import { sxEntradaCompactaProduto } from '@/src/presentation/components/features
 import { brToEUA } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
 import { cn } from '@/src/shared/utils/cn'
-import { uniaoIdsVinculosDosAlvos } from '@/src/shared/helpers/filtroVinculoLote'
+import {
+  intersecaoIdsVinculosDosAlvos,
+  uniaoIdsVinculosDosAlvos,
+} from '@/src/shared/helpers/filtroVinculoLote'
 import type { ModoVinculoLote } from '@/src/shared/helpers/filtroVinculoLote'
 import { TEXTOS_VINCULO_GRUPOS_COMPLEMENTOS } from '@/src/shared/helpers/filtroVinculoLote'
 import type { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
@@ -177,16 +180,18 @@ export function MenuProdutosLote({ menuId }: MenuProdutosLoteProps) {
     [produtos, selecionados]
   )
 
-  const idsComplJaVinculados = useMemo(
-    () =>
-      uniaoIdsVinculosDosAlvos(
-        produtos,
-        selecionados,
-        p => p.produtoId,
-        p => (p.gruposComplementos ?? []).map(g => g.id)
-      ),
-    [produtos, selecionados]
-  )
+  const idsComplJaVinculados = useMemo(() => {
+    const calcular =
+      modoComplemento === 'adicionar'
+        ? intersecaoIdsVinculosDosAlvos
+        : uniaoIdsVinculosDosAlvos
+    return calcular(
+      produtos,
+      selecionados,
+      p => p.produtoId,
+      p => (p.gruposComplementos ?? []).map(g => g.id)
+    )
+  }, [produtos, selecionados, modoComplemento])
 
   const listaCompl = useListaVinculoLote({
     catalogo: gruposComplementos,
