@@ -39,6 +39,7 @@ export function DeliveryPedidoFooter({
   const itensLabel = quantidadeItens === 1 ? '1 item' : `${quantidadeItens} itens`
   const visibleThumbs = thumbs.slice(-MAX_THUMBS)
   const [bounce, setBounce] = useState(false)
+  const isClickable = Boolean(interactive && onClick)
 
   useEffect(() => {
     if (!thumbsBounceKey) return
@@ -88,29 +89,8 @@ export function DeliveryPedidoFooter({
     </div>
   )
 
-  const cartButtonClassName =
-    'flex h-full w-full items-center justify-center gap-2.5 rounded-none border-0 p-0 text-base font-semibold @sm:text-lg'
-  const cartButtonStyle = {
-    backgroundColor: 'var(--delivery-primary-dark, #171717)',
-    color: 'var(--delivery-btn-text, #ffffff)',
-  } as const
-
-  const cartButtonLabel = (
+  const content = (
     <>
-      <span className="relative inline-flex shrink-0">
-        <ShoppingCart className="h-5 w-5 @sm:h-6 @sm:w-6" aria-hidden />
-        {quantidadeItens > 0 ? (
-          <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold leading-none text-white shadow-sm">
-            {quantidadeItens > 99 ? '99+' : quantidadeItens}
-          </span>
-        ) : null}
-      </span>
-      Ver carrinho
-    </>
-  )
-
-  return (
-    <div className="w-full border-t border-neutral-200 bg-white text-neutral-900">
       <p className="px-5 pt-3 pb-2 text-base leading-tight @sm:text-lg">
         <span className="font-semibold">Subtotal:</span>{' '}
         {formatDeliveryCurrency(total)}
@@ -125,28 +105,44 @@ export function DeliveryPedidoFooter({
           minHeight: '3.5rem',
         }}
       >
-        <div className="flex min-h-[3.5rem] min-w-0 items-center px-5 py-2">
-          {thumbsArea}
-        </div>
+        <div className="flex min-h-[3.5rem] min-w-0 items-center px-5 py-2">{thumbsArea}</div>
 
-        <div className="min-h-[3.5rem]">
-          {interactive && onClick ? (
-            <button
-              type="button"
-              onClick={onClick}
-              aria-label="Ver carrinho"
-              className={cartButtonClassName}
-              style={cartButtonStyle}
-            >
-              {cartButtonLabel}
-            </button>
-          ) : (
-            <div className={cartButtonClassName} style={cartButtonStyle}>
-              {cartButtonLabel}
-            </div>
-          )}
+        <div
+          className="flex min-h-[3.5rem] w-full items-center justify-center gap-2.5 text-base font-semibold @sm:text-lg"
+          style={{
+            backgroundColor: 'var(--delivery-primary-dark, #171717)',
+            color: 'var(--delivery-btn-text, #ffffff)',
+          }}
+        >
+          <span className="relative inline-flex shrink-0">
+            <ShoppingCart className="h-5 w-5 @sm:h-6 @sm:w-6" aria-hidden />
+            {quantidadeItens > 0 ? (
+              <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold leading-none text-white shadow-sm">
+                {quantidadeItens > 99 ? '99+' : quantidadeItens}
+              </span>
+            ) : null}
+          </span>
+          Ver carrinho
         </div>
       </div>
-    </div>
+    </>
   )
+
+  const rootClassName =
+    'w-full border-t border-neutral-200 bg-white text-left text-neutral-900'
+
+  if (isClickable) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={`Ver carrinho — Subtotal ${formatDeliveryCurrency(total)} / ${itensLabel}`}
+        className={`${rootClassName} cursor-pointer`}
+      >
+        {content}
+      </button>
+    )
+  }
+
+  return <div className={rootClassName}>{content}</div>
 }

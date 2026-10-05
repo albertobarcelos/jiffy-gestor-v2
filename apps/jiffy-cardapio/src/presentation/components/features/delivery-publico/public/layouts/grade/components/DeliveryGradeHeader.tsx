@@ -43,14 +43,14 @@ export function DeliveryGradeHeader({
             aria-label="Informações da loja"
             disabled={!interactive}
             onClick={() => interactive && onInformacoesClick?.()}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/50 bg-black/20 text-white backdrop-blur-sm disabled:cursor-default"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/50 bg-black/20 text-white disabled:cursor-default"
           >
             <Info className="h-4 w-4" aria-hidden />
           </button>
           <button
             type="button"
             aria-label="Perfil"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/50 bg-black/20 text-white backdrop-blur-sm"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/50 bg-black/20 text-white"
           >
             <User className="h-4 w-4" aria-hidden />
           </button>

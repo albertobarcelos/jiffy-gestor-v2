@@ -28,11 +28,9 @@ function TypographyPreview({ presetId }: { presetId: TypographyPresetId }) {
 
 export function DesignTipografiasTab({ config, onChange }: DesignTipografiasTabProps) {
   return (
-    <div className="space-y-2">
-      <h3 className="text-base font-semibold text-primary">Tipografias sugeridas</h3>
+    <div className="space-y-5">
       <p className="text-sm text-secondary-text">
-        Teste qualquer tipografia no preview. Por enquanto, apenas a tipografia{' '}
-        {getPublishableTypographyLabel()} pode ser publicada.
+        Por enquanto, apenas a tipografia {getPublishableTypographyLabel()} pode ser publicada.
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
         {TYPOGRAPHY_PRESETS.map(preset => (

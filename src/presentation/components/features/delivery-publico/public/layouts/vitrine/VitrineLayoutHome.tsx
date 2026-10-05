@@ -15,6 +15,8 @@ export function VitrineLayoutHome({
   config,
   viewModel,
   enderecoTexto,
+  telefoneTexto,
+  cnpjTexto,
   interactive = false,
   onBuscaChange,
   onGrupoClick,
@@ -47,7 +49,7 @@ export function VitrineLayoutHome({
   )
 
   return (
-    <div className="flex min-h-full flex-col pb-24">
+    <div className={`flex min-h-full flex-col${stickyFooterVisible ? ' pb-24' : ''}`}>
       <DeliveryVitrineHeader
         config={config}
         disponivel={viewModel.disponivel}
@@ -102,7 +104,8 @@ export function VitrineLayoutHome({
       <DeliveryPublicoLojaFooter
         config={config}
         enderecoTexto={enderecoTexto}
-        horarioTexto={viewModel.horarioTexto}
+        telefoneTexto={telefoneTexto}
+        cnpjTexto={cnpjTexto}
       />
     </div>
   )

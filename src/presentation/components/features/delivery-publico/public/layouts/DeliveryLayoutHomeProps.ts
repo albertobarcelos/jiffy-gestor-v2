@@ -6,8 +6,12 @@ import type { DeliveryPublicoViewModel } from '../../shared/types/deliveryPublic
 export type DeliveryLayoutHomeProps = {
   config: DeliveryPublicoDesignConfig
   viewModel: DeliveryPublicoViewModel
-  /** Endereço formatado da loja (footer do layout Vitrine). */
+  /** Endereço formatado da loja (footer). */
   enderecoTexto?: string | null
+  /** Telefone da loja (footer). */
+  telefoneTexto?: string | null
+  /** CNPJ da loja quando disponível (footer). */
+  cnpjTexto?: string | null
   interactive?: boolean
   onBuscaChange?: (termo: string) => void
   onGrupoClick?: (grupoId: string) => void

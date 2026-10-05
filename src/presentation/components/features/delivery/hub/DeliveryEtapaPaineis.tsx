@@ -6,8 +6,6 @@ import { EmpresaTab } from '@/src/presentation/components/features/configuracoes
 import { EntregadoresList } from '@/src/presentation/components/features/entregadores/EntregadoresList'
 import { MeiosPagamentosList } from '@/src/presentation/components/features/meios-pagamentos/MeiosPagamentosList'
 import { ImpressorasList } from '@/src/presentation/components/features/impressoras/ImpressorasList'
-import { NotificacoesWhatsAppDeliveryTab } from '@/src/presentation/components/features/configuracoes/tabs/NotificacoesWhatsAppDeliveryTab'
-import { DeliveryNomeCardapioView } from './DeliveryNomeCardapioView'
 import { DeliveryAgendaView } from './DeliveryAgendaView'
 import { DeliveryDesignEtapaView } from './DeliveryDesignEtapaView'
 
@@ -20,7 +18,7 @@ function DeliveryEtapaPainel({ children }: { children: ReactNode }) {
 export function EmpresaDeliveryEtapa() {
   return (
     <DeliveryEtapaPainel>
-      <EmpresaTab />
+      <EmpresaTab mostrarStatusFuso />
     </DeliveryEtapaPainel>
   )
 }
@@ -36,7 +34,7 @@ export function EntregadoresDeliveryEtapa() {
 export function MeiosDeliveryEtapa() {
   return (
     <DeliveryEtapaPainel>
-      <MeiosPagamentosList />
+      <MeiosPagamentosList layoutDeliveryHub />
     </DeliveryEtapaPainel>
   )
 }
@@ -45,22 +43,6 @@ export function ImpressorasDeliveryEtapa() {
   return (
     <DeliveryEtapaPainel>
       <ImpressorasList />
-    </DeliveryEtapaPainel>
-  )
-}
-
-export function NotificacoesWhatsAppDeliveryEtapa() {
-  return (
-    <DeliveryEtapaPainel>
-      <NotificacoesWhatsAppDeliveryTab />
-    </DeliveryEtapaPainel>
-  )
-}
-
-export function NomeCardapioDeliveryEtapa() {
-  return (
-    <DeliveryEtapaPainel>
-      <DeliveryNomeCardapioView />
     </DeliveryEtapaPainel>
   )
 }

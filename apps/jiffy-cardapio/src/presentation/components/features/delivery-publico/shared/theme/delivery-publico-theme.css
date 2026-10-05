@@ -120,15 +120,30 @@ html.delivery-publico-ios-lock select {
   top: var(--delivery-vv-offset-top, 0px);
   left: var(--delivery-vv-offset-left, 0px);
   z-index: 0;
+  box-sizing: border-box;
   width: var(--delivery-vv-width, 100%);
   max-width: 100%;
   height: var(--delivery-vv-height, 100dvh);
+  /* Notch / Dynamic Island / status bar (PWA standalone + viewport-fit=cover). */
+  padding-top: env(safe-area-inset-top, 0px);
   overflow: hidden;
   overscroll-behavior: none;
   background-color: var(--delivery-bg, var(--delivery-surface, #f5f5f5));
 }
 
+/**
+ * Offsets das camadas flutuantes da home (footer → PWA → FAB).
+ * Em `:root` para portais em `document.body` herdarem as vars.
+ */
+:root {
+  --delivery-float-above-footer: calc(8.5rem + env(safe-area-inset-bottom, 0px));
+  --delivery-float-above-home-edge: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  --delivery-pwa-banner-stack: 0px;
+}
+
 .delivery-publico-scroll {
+  display: flex;
+  flex-direction: column;
   height: 100%;
   width: 100%;
   max-width: 100%;
@@ -137,6 +152,17 @@ html.delivery-publico-ios-lock select {
   overscroll-behavior-x: none;
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
+}
+
+/**
+ * Preenche a altura do scrollport para o rodapé da loja ir ao fundo
+ * quando o catálogo está vazio ou curto; com lista longa o bloco cresce e o rodapé rola.
+ */
+.delivery-publico-scroll > .delivery-theme {
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
+  min-height: 100%;
 }
 
 /**
@@ -149,24 +175,37 @@ html.delivery-publico-ios-lock select {
 }
 
 /**
- * Reserva o rodapé “Ver carrinho” + home indicator.
- * Sem inset (Android/desktop) equivale a `pb-24`.
+ * Padding superior sob notch/status bar.
+ * Em desktop/Android sem inset equivale a 0 — não altera layout.
+ */
+.delivery-safe-pt {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/**
+ * Reserva o rodapé “Ver carrinho” (subtotal + barra) + home indicator + stack do banner PWA.
+ * Sem inset (Android/desktop) e sem PWA equivale a ~`pb-34`.
  */
 .delivery-home-bottom-spacer {
-  padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(
+    8.5rem + env(safe-area-inset-bottom, 0px) + var(--delivery-pwa-banner-stack, 0px)
+  );
 }
 
 /**
  * Overlays full-screen (checkout, produto) — mesma altura/largura útil do teclado.
+ * padding-top: portals ficam fora do shell e precisam do inset sozinhas.
  */
 .delivery-vv-overlay {
   position: fixed;
   top: var(--delivery-vv-offset-top, 0px);
   left: var(--delivery-vv-offset-left, 0px);
   z-index: 50;
+  box-sizing: border-box;
   width: var(--delivery-vv-width, 100%);
   max-width: 100%;
   height: var(--delivery-vv-height, 100dvh);
+  padding-top: env(safe-area-inset-top, 0px);
   overflow: hidden;
   overscroll-behavior: none;
 }
@@ -179,9 +218,11 @@ html.delivery-publico-ios-lock select {
   top: var(--delivery-vv-offset-top, 0px);
   left: var(--delivery-vv-offset-left, 0px);
   z-index: 50;
+  box-sizing: border-box;
   width: var(--delivery-vv-width, 100%);
   max-width: 100%;
   height: var(--delivery-vv-height, 100dvh);
+  padding-top: env(safe-area-inset-top, 0px);
   overflow: hidden;
   overscroll-behavior: none;
 }
@@ -209,11 +250,13 @@ html.delivery-publico-ios-lock select {
   top: var(--delivery-vv-offset-top, 0px);
   left: var(--delivery-vv-offset-left, 0px);
   z-index: 50;
+  box-sizing: border-box;
   display: flex;
   justify-content: center;
   width: var(--delivery-vv-width, 100%);
   max-width: 100%;
   height: var(--delivery-vv-height, 100dvh);
+  padding-top: env(safe-area-inset-top, 0px);
   overflow: hidden;
   overscroll-behavior: none;
 }
@@ -238,9 +281,13 @@ html.delivery-publico-ios-lock select {
 
 /**
  * Preview mobile do designer — conteúdo ocupa 100% da largura útil do frame.
- * `transform` cria containing block para `position: fixed` (footer do carrinho etc.).
+ * `transform` no **shell** (não no viewport) cria containing block para
+ * `position: fixed` do footer: o footer fica colado no fundo do frame enquanto
+ * só o viewport rola. Se o transform estiver no viewport, o fixed ancora no
+ * fim do conteúdo e o carrinho “rola junto” com a lista.
  */
 .delivery-preview-shell {
+  position: relative;
   width: 100%;
   max-width: 24rem;
   margin-inline: auto;
@@ -252,6 +299,35 @@ html.delivery-publico-ios-lock select {
 .delivery-preview-viewport {
   width: 100%;
   min-height: 0;
+  flex: 1 1 0;
+  border-radius: 1.5rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/** Footer fixo do carrinho — raio interno do frame + clip (sem quinas brancas). */
+.delivery-preview-shell .fixed.bottom-0 {
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  max-width: 100%;
+  overflow: hidden;
+  border-bottom-left-radius: 1.5rem;
+  border-bottom-right-radius: 1.5rem;
+  background-color: var(--delivery-primary-dark, #171717);
+}
+
+.delivery-preview-shell .fixed.bottom-0 > * {
+  overflow: hidden;
+  border-bottom-left-radius: 1.5rem;
+  border-bottom-right-radius: 1.5rem;
+}
+
+/** Sticky busca/chips: fundo opaco colado no topo do frame (sem vazamento). */
+.delivery-preview-shell .delivery-basico-sticky-nav {
+  background-color: var(--delivery-bg, var(--delivery-surface, #f5f5f5));
 }
 
 .delivery-preview-scale-host {
@@ -273,6 +349,17 @@ html.delivery-publico-ios-lock select {
 
 .delivery-preview-shell .delivery-grupo-title[style*='background-image'] {
   min-height: 2.35rem !important;
+}
+
+/**
+ * Preview simula mobile: títulos de categoria rolam com a lista.
+ * Sem isso, o `@media (min-width: 768px)` do desktop ativa sticky
+ * dentro do frame (o viewport do browser é largo, não o do “celular”).
+ */
+.delivery-preview-shell .delivery-basico-grupo-title-sticky {
+  position: static !important;
+  top: auto !important;
+  z-index: auto !important;
 }
 
 /** Capa — mobile: proporção do crop (1200×300 · 4:1) + 28px extras. */

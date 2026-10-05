@@ -67,7 +67,7 @@ export function DeliveryLojaInfoModal({
       />
 
       <div
-        className="relative flex h-[95%] max-h-[95%] w-full max-w-md flex-col overflow-hidden rounded-t-2xl shadow-xl sm:h-auto sm:max-h-[85%] sm:rounded-2xl"
+        className="relative flex h-[calc(var(--delivery-vv-height,100dvh)*0.95)] max-h-[calc(var(--delivery-vv-height,100dvh)*0.95)] w-full max-w-md flex-col overflow-hidden rounded-t-2xl shadow-xl sm:h-auto sm:max-h-[calc(var(--delivery-vv-height,100dvh)*0.85)] sm:rounded-2xl"
         style={{ backgroundColor: 'var(--delivery-surface, #ffffff)' }}
         role="dialog"
         aria-modal="true"
@@ -77,7 +77,7 @@ export function DeliveryLojaInfoModal({
           type="button"
           aria-label="Fechar"
           onClick={onClose}
-          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full"
+          className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full"
           style={{
             color: 'var(--delivery-text-muted, #6b7280)',
             backgroundColor: 'var(--delivery-surface-muted, #f3f4f6)',

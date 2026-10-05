@@ -10,6 +10,11 @@ type DeliveryWhatsAppFabProps = {
   nomeLoja?: string | null
   /** Quando false (ex.: checkout aberto), não renderiza. */
   visible?: boolean
+  /**
+   * Quando true, sobe acima do footer “Ver carrinho”.
+   * Quando false, fica perto da borda inferior (carrinho vazio).
+   */
+  acimaDoFooter?: boolean
 }
 
 function WhatsAppGlyph({ className }: { className?: string }) {
@@ -28,11 +33,13 @@ function WhatsAppGlyph({ className }: { className?: string }) {
 /**
  * Botão flutuante para abrir conversa WhatsApp com a loja (wa.me / api.whatsapp.com).
  * Só renderiza com telefone válido.
+ * Empilha acima do footer e do banner PWA via CSS vars do shell.
  */
 export function DeliveryWhatsAppFab({
   telefone,
   nomeLoja,
   visible = true,
+  acimaDoFooter = true,
 }: DeliveryWhatsAppFabProps) {
   const [mounted, setMounted] = useState(false)
   useEffect(() => {
@@ -47,6 +54,10 @@ export function DeliveryWhatsAppFab({
   const href = montarLinkWhatsapp(telefone, mensagem)
   if (!href) return null
 
+  const baseClearance = acimaDoFooter
+    ? 'var(--delivery-float-above-footer, calc(6.5rem + env(safe-area-inset-bottom, 0px)))'
+    : 'var(--delivery-float-above-home-edge, calc(0.75rem + env(safe-area-inset-bottom, 0px)))'
+
   return createPortal(
     <a
       href={href}
@@ -57,7 +68,7 @@ export function DeliveryWhatsAppFab({
       style={{
         backgroundColor: '#25D366',
         right: 'max(1rem, env(safe-area-inset-right, 0px))',
-        bottom: 'calc(6.5rem + env(safe-area-inset-bottom, 0px))',
+        bottom: `calc(${baseClearance} + var(--delivery-pwa-banner-stack, 0px))`,
       }}
     >
       <WhatsAppGlyph className="h-7 w-7" />

@@ -16,6 +16,8 @@ export function BasicoLayoutHome({
   config,
   viewModel,
   enderecoTexto,
+  telefoneTexto,
+  cnpjTexto,
   interactive = false,
   onBuscaChange,
   onGrupoClick,
@@ -29,9 +31,15 @@ export function BasicoLayoutHome({
 }: DeliveryLayoutHomeProps) {
   const filtered = filterViewModelByBusca(viewModel)
   const catalogRootRef = useRef<HTMLDivElement>(null)
+  const stickyFooterVisible = viewModel.carrinho.quantidadeItens > 0
 
   return (
-    <div ref={catalogRootRef} className="delivery-basico-catalog-root flex min-h-full flex-col pb-24">
+    <div
+      ref={catalogRootRef}
+      className={`delivery-basico-catalog-root flex min-h-full flex-col${
+        stickyFooterVisible ? ' pb-24' : ''
+      }`}
+    >
       <DeliveryBasicoTopNav
         config={config}
         carrinhoQuantidade={viewModel.carrinho.quantidadeItens}
@@ -78,7 +86,8 @@ export function BasicoLayoutHome({
         <DeliveryPublicoLojaFooter
           config={config}
           enderecoTexto={enderecoTexto}
-          horarioTexto={viewModel.horarioTexto}
+          telefoneTexto={telefoneTexto}
+          cnpjTexto={cnpjTexto}
         />
       </div>
 

@@ -38,7 +38,7 @@ export function DeliveryCatalogoErroScreen({
   descricao,
 }: DeliveryCatalogoErroScreenProps) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-white px-6 text-center">
+    <div className="flex min-h-full flex-col items-center justify-center bg-white px-6 text-center">
       <div
         className="flex h-16 w-16 items-center justify-center rounded-full"
         style={{

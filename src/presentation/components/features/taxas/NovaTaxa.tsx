@@ -21,7 +21,7 @@ import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitc
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
 import { cn } from '@/src/shared/utils/cn'
-import { MdPhone, MdSearch } from 'react-icons/md'
+import { MdPointOfSale, MdSearch } from 'react-icons/md'
 
 /** Labels outlined em preto — igual NovoComplemento / NovaImpressora */
 const sxOutlinedLabelTextoEscuro = {
@@ -105,7 +105,7 @@ interface NovaTaxaProps {
   onCancel?: () => void
 }
 
-type TipoTaxaForm = 'percentual' | 'fixo' | 'entrega'
+type TipoTaxaForm = 'percentual' | 'fixo'
 
 type ConfigTerminal = {
   ativo: boolean
@@ -131,11 +131,10 @@ function parsePercentualDigitadoParaApi(texto: string): number {
   return n / 100
 }
 
-/** Normaliza tipo retornado pela API (ex.: valor_fixo). */
+/** Normaliza tipo retornado pela API (ex.: valor_fixo). Taxas de entrega ficam fora deste fluxo. */
 function normalizeTipoTaxaApi(raw: unknown): TipoTaxaForm {
   const t = String(raw ?? '').toLowerCase()
   if (t === 'fixo' || t === 'valor_fixo') return 'fixo'
-  if (t === 'entrega') return 'entrega'
   return 'percentual'
 }
 
@@ -708,7 +707,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
       />
     ) : (
       <Input
-        label={tipo === 'entrega' ? 'Valor da entrega (R$)' : 'Valor (R$)'}
+        label="Valor (R$)"
         value={valorMoeda}
         onChange={e => setValorMoeda(formatValorInput(e.target.value))}
         size="small"
@@ -817,7 +816,6 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
                   >
                     <MenuItem value="percentual">PERCENTUAL</MenuItem>
                     <MenuItem value="fixo">FIXO (R$)</MenuItem>
-                    <MenuItem value="entrega">ENTREGA</MenuItem>
                   </Select>
                 </FormControl>
 
@@ -1008,7 +1006,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
               hasLoadedTerminaisRef.current &&
               terminaisLista.length === 0 ? (
                 <div className="flex flex-col items-center justify-center gap-4 py-12">
-                  <MdPhone className="text-secondary-text" size={48} />
+                  <MdPointOfSale className="text-secondary-text" size={48} />
                   <p className="text-lg font-semibold text-primary-text">Nenhum terminal cadastrado</p>
                   <p className="max-w-xs text-center text-sm text-secondary-text">
                     Cadastre terminais em Configurações para vincular esta taxa aos PDVs.

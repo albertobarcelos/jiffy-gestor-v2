@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { cn } from '@/src/shared/utils/cn'
+import { colors } from '@/src/shared/theme/colors'
 
 export interface JiffyIconSwitchProps {
   checked: boolean
@@ -33,8 +34,8 @@ const TRANSITION = `all 0.3s ${EASING}`
 const EFFECT_TRANSITION = 'all 0.3s ease-in-out'
 
 const COLOR_TRACK_OFF = '#dc2626' /* red-600 */
-const COLOR_TRACK_ON = '#00B074' /* green-600 */
-const COLOR_ICON_CHECK = '#00B074'
+const COLOR_TRACK_ON = colors.accent5
+const COLOR_ICON_CHECK = colors.accent5
 const COLOR_ICON_CROSS = '#dc2626'
 
 const SIZES = {

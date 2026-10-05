@@ -145,7 +145,13 @@ function diaDaSemanaHoje(): DiaDaSemanaApi {
 }
 
 function formatarIntervalo(abreEm: string, fechaEm: string): string {
-  return `das ${abreEm} às ${fechaEm}`
+  const base = `das ${abreEm} às ${fechaEm}`
+  if (!intervaloCruzaMeiaNoite(abreEm, fechaEm)) return base
+  return `${base} (dia seguinte)`
+}
+
+function intervaloCruzaMeiaNoite(abreEm: string, fechaEm: string): boolean {
+  return horarioParaMinutos(fechaEm) < horarioParaMinutos(abreEm)
 }
 
 function buscarIntervaloHoje(
@@ -229,11 +235,21 @@ export function formatarStatusLojaPublica(input: {
 }): StatusLojaPublica {
   if (input.aberta) {
     const intervaloHoje = buscarIntervaloHoje(input.agendaSemanal, input.agora)
+    if (!intervaloHoje?.fechaEm) {
+      return {
+        mensagem: 'Aberto, faça seu pedido!',
+        detalheHorario: null,
+      }
+    }
+    const sufixoVirada = intervaloCruzaMeiaNoite(
+      intervaloHoje.abreEm,
+      intervaloHoje.fechaEm
+    )
+      ? ' (dia seguinte)'
+      : ''
     return {
       mensagem: 'Aberto, faça seu pedido!',
-      detalheHorario: intervaloHoje?.fechaEm
-        ? `até as ${intervaloHoje.fechaEm}`
-        : null,
+      detalheHorario: `até as ${intervaloHoje.fechaEm}${sufixoVirada}`,
     }
   }
 
@@ -307,7 +323,14 @@ export function listarAgendaSemanalPublica(
     const intervalos = porDia.get(diaDaSemana)?.intervalos ?? []
     const aberto = intervalos.length > 0
     const texto = aberto
-      ? intervalos.map(i => `${i.abreEm} – ${i.fechaEm}`).join(', ')
+      ? intervalos
+          .map(i => {
+            const base = `${i.abreEm} – ${i.fechaEm}`
+            return intervaloCruzaMeiaNoite(i.abreEm, i.fechaEm)
+              ? `${base} (dia seguinte)`
+              : base
+          })
+          .join(', ')
       : 'Fechado'
 
     return {

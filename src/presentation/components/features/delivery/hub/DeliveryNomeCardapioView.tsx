@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { MdStorefront } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
 import {
@@ -163,18 +162,6 @@ export function DeliveryNomeCardapioView() {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <div className="mx-auto w-full max-w-[720px] space-y-6 p-4 md:p-6">
-        <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-secondary/10 text-secondary">
-            <MdStorefront className="h-6 w-6" aria-hidden />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-primary-text">Nome da loja e cardápio</h1>
-            <p className="mt-1 text-sm text-secondary-text">
-              Defina o slug do link público e o cardápio (menu) publicado na loja online.
-            </p>
-          </div>
-        </div>
-
         {configurado &&
         !lojaDeliveryDisponivel(empresaDelivery ?? undefined) &&
         pendenciasDestePasso.length > 0 ? (

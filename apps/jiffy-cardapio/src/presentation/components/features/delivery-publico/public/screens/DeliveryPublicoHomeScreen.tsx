@@ -43,6 +43,7 @@ import { buildCatalogViewModel } from '../../shared/mappers/buildCatalogViewMode
 import { applySugestoesDaCasaVisibility } from '../../shared/utils/applySugestoesDaCasaVisibility'
 import { findCatalogoProdutoById } from '../../shared/utils/findCatalogoProdutoById'
 import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPublicaEndereco'
+import { formatarTelefoneBr } from '@/src/shared/utils/telefoneBr'
 import { produtoTemComplementosAtivos } from '../../shared/utils/produtoComplementosUtils'
 import { resolveDeliveryLayoutHome } from '../layouts/DeliveryPublicoLayoutRegistry'
 import type { DeliveryPublicoViewModel } from '../../shared/types/deliveryPublicoViewModel'
@@ -61,7 +62,7 @@ import { DeliveryWhatsAppFab } from '../../shared/components/DeliveryWhatsAppFab
 import { DeliveryPublicoCarrinhoScreen } from './DeliveryPublicoCarrinhoScreen'
 import { useFlyToCart } from '../../shared/hooks/useFlyToCart'
 import type { FlySourceRect } from '../../shared/components/FlyingProduct'
-import { getProdutoImageSourceRect } from '../../shared/utils/getProdutoImageSourceRect'
+import { getProdutoImageFlySource } from '../../shared/utils/getProdutoImageSourceRect'
 import { resolverPrecosDeliveryProduto } from '../../shared/utils/resolverPrecosDeliveryProduto'
 import { useDeliveryBodyScrollLock } from '../../shared/hooks/useDeliveryBodyScrollLock'
 import type { DeliveryCarrinhoThumb } from '../../shared/components/DeliveryPedidoFooter'
@@ -73,6 +74,12 @@ import {
 } from '../../shared/utils/deliveryPublicoRoutes'
 import { lerUltimoPedidoPublicoConfirmado } from '../../shared/utils/pedidoConfirmadoStorage'
 import { showToast } from '@/src/shared/utils/toast'
+import { usePwaInstallPrompt } from '../../shared/hooks/usePwaInstallPrompt'
+import {
+  DeliveryPwaInstallAndroidGuide,
+  DeliveryPwaInstallBanner,
+  DeliveryPwaInstallIosGuide,
+} from '../../shared/components/DeliveryPwaInstallBanner'
 
 type DeliveryPublicoHomeScreenProps = {
   slug: string
@@ -254,11 +261,12 @@ export function DeliveryPublicoHomeScreen({
         complementos: [],
       })
 
+      const flySource = getProdutoImageFlySource(produto.id)
       handleProdutoAdicionado({
         produtoId: produto.id,
         nome: produto.nome,
-        imagemUrl: produto.imagemUrl,
-        sourceRect: getProdutoImageSourceRect(produto.id),
+        imagemUrl: flySource?.loadedSrc?.trim() || produto.imagemUrl,
+        sourceRect: flySource?.rect ?? null,
         abrirDialogo: false,
       })
     },
@@ -284,7 +292,10 @@ export function DeliveryPublicoHomeScreen({
       const { nome, imagemUrl, produtoId, abrirDialogo = true, sourceRect } = pendingFly
       setPendingFly(null)
 
-      if (!imagemUrl?.trim() || !target) {
+      const flySource = getProdutoImageFlySource(produtoId)
+      const imageUrl = flySource?.loadedSrc?.trim() || imagemUrl?.trim() || ''
+
+      if (!imageUrl || !target) {
         if (abrirDialogo) setProdutoAdicionadoNome(nome)
         return
       }
@@ -302,9 +313,9 @@ export function DeliveryPublicoHomeScreen({
       }
 
       flyToCart({
-        imageUrl: imagemUrl,
+        imageUrl,
         targetElement: target,
-        sourceRect: sourceRect ?? getProdutoImageSourceRect(produtoId),
+        sourceRect: sourceRect ?? flySource?.rect ?? null,
         onArrive: () => {
           setFlyingProdutoId(null)
           setThumbsCongeladas(null)
@@ -428,8 +439,47 @@ export function DeliveryPublicoHomeScreen({
         telefone={telefoneWhatsAppFab}
         nomeLoja={empresa?.nomeFantasia}
         visible={!carrinhoAberto}
+        acimaDoFooter={carrinhoQuantidade > 0}
+      />
+      <DeliveryPwaInstallHomeSlot
+        slug={slug}
+        nomeLoja={empresa?.nomeFantasia ?? null}
+        permitido={!carrinhoAberto && !produtoIdAberto}
+        acimaDoFooter={carrinhoQuantidade > 0}
       />
     </DeliveryThemeScope>
+  )
+}
+
+function DeliveryPwaInstallHomeSlot({
+  slug,
+  nomeLoja,
+  permitido,
+  acimaDoFooter,
+}: {
+  slug: string
+  nomeLoja: string | null
+  permitido: boolean
+  acimaDoFooter: boolean
+}) {
+  const pwa = usePwaInstallPrompt({ slug, contexto: 'home', permitido })
+  if (!pwa.visivel) return null
+  return (
+    <>
+      <DeliveryPwaInstallBanner
+        nomeLoja={nomeLoja}
+        variante="flutuante"
+        acimaDoFooter={acimaDoFooter}
+        onInstalar={() => void pwa.instalar()}
+        onAgoraNao={pwa.agoraNao}
+        onNaoMostrarDeNovo={pwa.naoMostrarDeNovo}
+      />
+      <DeliveryPwaInstallIosGuide open={pwa.guiaIosAberto} onClose={pwa.fecharGuiaIos} />
+      <DeliveryPwaInstallAndroidGuide
+        open={pwa.guiaAndroidAberto}
+        onClose={pwa.fecharGuiaAndroid}
+      />
+    </>
   )
 }
 
@@ -509,6 +559,8 @@ function DeliveryPublicoHomeContent({
 
   const LayoutHome = resolveDeliveryLayoutHome(config.layoutId)
   const enderecoTexto = formatEmpresaPublicaEndereco(empresa?.endereco ?? null)
+  const telefoneRaw = empresa?.telefone?.trim() || null
+  const telefoneTexto = telefoneRaw ? formatarTelefoneBr(telefoneRaw) : null
 
   if (isCatalogLoading) {
     return <DeliveryPublicoHomeSkeleton />
@@ -522,6 +574,7 @@ function DeliveryPublicoHomeContent({
         config={config}
         viewModel={viewModel}
         enderecoTexto={enderecoTexto}
+        telefoneTexto={telefoneTexto}
         interactive
         onBuscaChange={onBuscaChange}
         onGrupoClick={onGrupoClick}

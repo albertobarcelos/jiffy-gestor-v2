@@ -987,6 +987,7 @@ export function DeliveryPublicoCarrinhoScreen({
             observacaoPedido={form.observacaoPedido}
             cpfNotaFiscal={form.cpfNotaFiscal}
             exigeCpfVenda={exigeCpfVenda}
+            cpfClienteCadastrado={clienteLookup.cliente?.cpf ?? null}
             enviando={enviando}
             etapaEnvio={etapaEnvio}
             onClose={fecharCheckout}
@@ -1008,6 +1009,7 @@ export function DeliveryPublicoCarrinhoScreen({
 
         {checkoutStep === 'sucesso' && pedidoConfirmado ? (
           <DeliveryCheckoutSucessoModal
+            slug={slug}
             nomeCliente={pedidoConfirmado.nome}
             tipoEntrega={pedidoConfirmado.tipoEntrega}
             modoTempo={pedidoConfirmado.modoTempo}

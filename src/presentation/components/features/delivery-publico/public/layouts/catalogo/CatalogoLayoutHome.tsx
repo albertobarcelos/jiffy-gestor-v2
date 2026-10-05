@@ -15,6 +15,8 @@ export function CatalogoLayoutHome({
   config,
   viewModel,
   enderecoTexto,
+  telefoneTexto,
+  cnpjTexto,
   interactive = false,
   onBuscaChange,
   onGrupoClick,
@@ -51,7 +53,7 @@ export function CatalogoLayoutHome({
   }, [filtered.grupos, handleGrupoClick])
 
   return (
-    <div className="flex min-h-full flex-col pb-24">
+    <div className={`flex min-h-full flex-col${stickyFooterVisible ? ' pb-24' : ''}`}>
       <DeliveryCatalogoHeader
         config={config}
         disponivel={viewModel.disponivel}
@@ -115,7 +117,8 @@ export function CatalogoLayoutHome({
       <DeliveryPublicoLojaFooter
         config={config}
         enderecoTexto={enderecoTexto}
-        horarioTexto={viewModel.horarioTexto}
+        telefoneTexto={telefoneTexto}
+        cnpjTexto={cnpjTexto}
       />
     </div>
   )

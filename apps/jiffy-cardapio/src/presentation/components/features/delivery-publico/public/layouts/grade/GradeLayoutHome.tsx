@@ -14,6 +14,8 @@ export function GradeLayoutHome({
   config,
   viewModel,
   enderecoTexto,
+  telefoneTexto,
+  cnpjTexto,
   interactive = false,
   onBuscaChange,
   onGrupoClick,
@@ -34,7 +36,9 @@ export function GradeLayoutHome({
 
   return (
     <div
-      className="delivery-home-bottom-spacer flex min-h-full flex-col"
+      className={`flex min-h-full flex-1 flex-col${
+        stickyFooterVisible ? ' delivery-home-bottom-spacer' : ''
+      }`}
       style={{ backgroundColor: 'var(--delivery-primary-dark)' }}
     >
       <DeliveryGradeHeader
@@ -75,10 +79,9 @@ export function GradeLayoutHome({
 
         {stickyFooterVisible ? (
           <div
-            className="fixed inset-x-0 bottom-0 z-40 pt-2 backdrop-blur-sm"
+            className="fixed inset-x-0 bottom-0 z-40 pt-2"
             style={{
-              backgroundColor:
-                'color-mix(in srgb, var(--delivery-bg, var(--delivery-surface)) 95%, transparent)',
+              backgroundColor: 'var(--delivery-bg, var(--delivery-surface, #f5f5f5))',
             }}
           >
             <DeliveryPedidoFooter
@@ -97,7 +100,8 @@ export function GradeLayoutHome({
       <DeliveryPublicoLojaFooter
         config={config}
         enderecoTexto={enderecoTexto}
-        horarioTexto={viewModel.horarioTexto}
+        telefoneTexto={telefoneTexto}
+        cnpjTexto={cnpjTexto}
       />
     </div>
   )
