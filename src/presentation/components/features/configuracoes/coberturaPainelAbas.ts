@@ -1,7 +1,7 @@
 export const COBERTURA_PAINEL_ABAS = [
-  { id: 'manuais', label: 'Taxas Manuais' },
   { id: 'raios', label: 'Taxas por Raio' },
   { id: 'areas', label: 'Taxas por Área' },
+  { id: 'manuais', label: 'Taxas Manuais' },
   { id: 'resumo', label: 'Resumo' },
 ] as const
 

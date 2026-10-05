@@ -1545,24 +1545,16 @@ export function CoberturaDeliveryTab() {
             {painelAba === 'resumo' ? (
               <div className="flex min-h-0 flex-1 flex-col">
                 <div className="grid grid-cols-2 gap-2 px-3 py-3">
-                  <div
-                    className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 text-center"
-                    onMouseEnter={() => destacarNaLista({ tipo: 'areas', id: null })}
-                    onMouseLeave={() => destacarNaLista(null)}
-                  >
-                    <MdMap className="mx-auto h-5 w-5 text-primary-text" aria-hidden />
-                    <p className="mt-1 text-2xl font-bold text-primary-text">{areas.length}</p>
-                    <p className="text-[11px] font-semibold text-primary-text">Cobertura Área</p>
-                    <p className="mt-0.5 text-[10px] text-secondary-text">Atalhos à direita</p>
-                  </div>
-                  <div
-                    className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 text-center"
+                  <button
+                    type="button"
+                    onClick={() => setPainelAba('raios')}
                     onMouseEnter={() =>
                       raioAlcance
                         ? destacarNaLista({ tipo: 'raio', id: raioAlcance.id })
                         : destacarNaLista(null)
                     }
                     onMouseLeave={() => destacarNaLista(null)}
+                    className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 text-center transition-colors hover:border-primary/30 hover:bg-primary/5"
                   >
                     <MdMyLocation className="mx-auto h-5 w-5 text-primary-text" aria-hidden />
                     <p className="mt-1 text-2xl font-bold leading-none text-primary-text">
@@ -1570,7 +1562,19 @@ export function CoberturaDeliveryTab() {
                     </p>
                     <p className="mt-1 text-[11px] font-semibold text-primary-text">Cobertura Raio</p>
                     <p className="mt-0.5 text-[10px] text-secondary-text">Faixas de 1 em 1 km</p>
-                  </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPainelAba('areas')}
+                    onMouseEnter={() => destacarNaLista({ tipo: 'areas', id: null })}
+                    onMouseLeave={() => destacarNaLista(null)}
+                    className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 text-center transition-colors hover:border-primary/30 hover:bg-primary/5"
+                  >
+                    <MdMap className="mx-auto h-5 w-5 text-primary-text" aria-hidden />
+                    <p className="mt-1 text-2xl font-bold text-primary-text">{areas.length}</p>
+                    <p className="text-[11px] font-semibold text-primary-text">Cobertura Área</p>
+                    <p className="mt-0.5 text-[10px] text-secondary-text">Atalhos à direita</p>
+                  </button>
                   <button
                     type="button"
                     onClick={() => setPainelAba('manuais')}

@@ -114,8 +114,6 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
   const [isCompact, setIsCompact] = useState(layoutDeliveryHub)
   const switchSize = isCompact ? 'xs' : 'sm'
   const deleteIconSize = isCompact ? 16 : 20
-  const textTitle = isCompact ? 'text-xs' : 'text-xl'
-  const textSubtitle = isCompact ? 'text-[11px]' : 'text-[22px]'
   const textCell = isCompact ? 'text-[10px]' : 'text-sm'
   const textMeta = isCompact ? 'text-[10px]' : 'text-xs'
 
@@ -699,21 +697,19 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
       <div className="flex-shrink-0 px-1 pb-1 pt-1 md:px-6">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <p className={`font-semibold text-primary ${textTitle}`}>
+            <p className="text-sm font-semibold text-primary md:text-xl">
               Meios de Pagamento Cadastrados
             </p>
-            <p className={`font-medium text-tertiary ${textSubtitle}`}>
+            <p className="text-sm font-medium text-tertiary md:text-[22px]">
               Total {meiosPagamento.length} de {totalMeiosPagamento}
             </p>
           </div>
           <button
             onClick={() => openTabsModal({ mode: 'create' })}
-            className={`flex shrink-0 items-center rounded-lg bg-primary font-semibold text-info transition-colors hover:bg-primary/90 md:px-[30px] ${
-              isCompact ? 'h-7 gap-1.5 px-2 text-xs' : 'h-8 gap-2 px-2 text-sm'
-            }`}
+            className="flex h-8 shrink-0 items-center gap-2 rounded-lg bg-primary px-2 text-sm font-semibold text-info transition-colors hover:bg-primary/90 md:px-[30px]"
           >
             Novo
-            <span className={isCompact ? 'text-base' : 'text-lg'}>+</span>
+            <span className="text-lg">+</span>
           </button>
         </div>
       </div>

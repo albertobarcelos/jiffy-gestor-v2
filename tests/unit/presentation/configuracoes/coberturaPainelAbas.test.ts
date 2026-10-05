@@ -10,17 +10,17 @@ import {
 } from '@/src/presentation/components/features/configuracoes/coberturaPainelAbas'
 
 describe('coberturaPainelAbas', () => {
-  it('expõe taxas manuais primeiro, depois raio, área e resumo', () => {
+  it('expõe raio, área, taxas manuais e resumo', () => {
     expect(COBERTURA_PAINEL_ABAS.map(aba => aba.id)).toEqual([
-      'manuais',
       'raios',
       'areas',
+      'manuais',
       'resumo',
     ])
     expect(COBERTURA_PAINEL_ABAS.map(aba => aba.label)).toEqual([
-      'Taxas Manuais',
       'Taxas por Raio',
       'Taxas por Área',
+      'Taxas Manuais',
       'Resumo',
     ])
   })
