@@ -136,12 +136,14 @@ html.delivery-publico-ios-lock select {
  * Em `:root` para portais em `document.body` herdarem as vars.
  */
 :root {
-  --delivery-float-above-footer: calc(6.5rem + env(safe-area-inset-bottom, 0px));
+  --delivery-float-above-footer: calc(8.5rem + env(safe-area-inset-bottom, 0px));
   --delivery-float-above-home-edge: calc(0.75rem + env(safe-area-inset-bottom, 0px));
   --delivery-pwa-banner-stack: 0px;
 }
 
 .delivery-publico-scroll {
+  display: flex;
+  flex-direction: column;
   height: 100%;
   width: 100%;
   max-width: 100%;
@@ -150,6 +152,17 @@ html.delivery-publico-ios-lock select {
   overscroll-behavior-x: none;
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
+}
+
+/**
+ * Preenche a altura do scrollport para o rodapé da loja ir ao fundo
+ * quando o catálogo está vazio ou curto; com lista longa o bloco cresce e o rodapé rola.
+ */
+.delivery-publico-scroll > .delivery-theme {
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
+  min-height: 100%;
 }
 
 /**
@@ -170,12 +183,12 @@ html.delivery-publico-ios-lock select {
 }
 
 /**
- * Reserva o rodapé “Ver carrinho” + home indicator + stack do banner PWA (se ativo).
- * Sem inset (Android/desktop) e sem PWA equivale a ~`pb-24`.
+ * Reserva o rodapé “Ver carrinho” (subtotal + barra) + home indicator + stack do banner PWA.
+ * Sem inset (Android/desktop) e sem PWA equivale a ~`pb-34`.
  */
 .delivery-home-bottom-spacer {
   padding-bottom: calc(
-    6rem + env(safe-area-inset-bottom, 0px) + var(--delivery-pwa-banner-stack, 0px)
+    8.5rem + env(safe-area-inset-bottom, 0px) + var(--delivery-pwa-banner-stack, 0px)
   );
 }
 

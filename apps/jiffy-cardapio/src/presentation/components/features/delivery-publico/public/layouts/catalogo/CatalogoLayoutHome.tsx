@@ -16,6 +16,8 @@ export function CatalogoLayoutHome({
   config,
   viewModel,
   enderecoTexto,
+  telefoneTexto,
+  cnpjTexto,
   interactive = false,
   onBuscaChange,
   onGrupoClick,
@@ -55,7 +57,7 @@ export function CatalogoLayoutHome({
   return (
     <div
       ref={catalogRootRef}
-      className={`flex min-h-full flex-col${
+      className={`flex min-h-full flex-1 flex-col${
         stickyFooterVisible ? ' delivery-home-bottom-spacer' : ''
       }`}
     >
@@ -125,7 +127,8 @@ export function CatalogoLayoutHome({
       <DeliveryPublicoLojaFooter
         config={config}
         enderecoTexto={enderecoTexto}
-        horarioTexto={viewModel.horarioTexto}
+        telefoneTexto={telefoneTexto}
+        cnpjTexto={cnpjTexto}
       />
     </div>
   )

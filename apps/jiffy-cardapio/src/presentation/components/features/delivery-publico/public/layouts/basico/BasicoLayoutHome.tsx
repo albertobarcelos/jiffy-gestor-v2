@@ -15,6 +15,8 @@ export function BasicoLayoutHome({
   config,
   viewModel,
   enderecoTexto,
+  telefoneTexto,
+  cnpjTexto,
   interactive = false,
   onBuscaChange,
   onGrupoClick,
@@ -35,7 +37,7 @@ export function BasicoLayoutHome({
   return (
     <div
       ref={catalogRootRef}
-      className={`delivery-basico-catalog-root flex min-h-full flex-col${
+      className={`delivery-basico-catalog-root flex min-h-full flex-1 flex-col${
         stickyFooterVisible ? ' delivery-home-bottom-spacer' : ''
       }`}
     >
@@ -84,7 +86,8 @@ export function BasicoLayoutHome({
         <DeliveryPublicoLojaFooter
           config={config}
           enderecoTexto={enderecoTexto}
-          horarioTexto={viewModel.horarioTexto}
+          telefoneTexto={telefoneTexto}
+          cnpjTexto={cnpjTexto}
         />
       </div>
 

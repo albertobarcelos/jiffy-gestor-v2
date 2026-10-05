@@ -14,6 +14,8 @@ export function GradeLayoutHome({
   config,
   viewModel,
   enderecoTexto,
+  telefoneTexto,
+  cnpjTexto,
   interactive = false,
   onBuscaChange,
   onGrupoClick,
@@ -91,7 +93,8 @@ export function GradeLayoutHome({
       <DeliveryPublicoLojaFooter
         config={config}
         enderecoTexto={enderecoTexto}
-        horarioTexto={viewModel.horarioTexto}
+        telefoneTexto={telefoneTexto}
+        cnpjTexto={cnpjTexto}
       />
     </div>
   )

@@ -16,6 +16,8 @@ export function VitrineLayoutHome({
   config,
   viewModel,
   enderecoTexto,
+  telefoneTexto,
+  cnpjTexto,
   interactive = false,
   onBuscaChange,
   onGrupoClick,
@@ -51,7 +53,7 @@ export function VitrineLayoutHome({
   return (
     <div
       ref={catalogRootRef}
-      className={`flex min-h-full flex-col${
+      className={`flex min-h-full flex-1 flex-col${
         stickyFooterVisible ? ' delivery-home-bottom-spacer' : ''
       }`}
     >
@@ -114,7 +116,8 @@ export function VitrineLayoutHome({
       <DeliveryPublicoLojaFooter
         config={config}
         enderecoTexto={enderecoTexto}
-        horarioTexto={viewModel.horarioTexto}
+        telefoneTexto={telefoneTexto}
+        cnpjTexto={cnpjTexto}
       />
     </div>
   )

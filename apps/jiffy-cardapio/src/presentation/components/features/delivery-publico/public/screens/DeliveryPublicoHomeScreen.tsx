@@ -43,6 +43,7 @@ import { buildCatalogViewModel } from '../../shared/mappers/buildCatalogViewMode
 import { applySugestoesDaCasaVisibility } from '../../shared/utils/applySugestoesDaCasaVisibility'
 import { findCatalogoProdutoById } from '../../shared/utils/findCatalogoProdutoById'
 import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPublicaEndereco'
+import { formatarTelefoneBr } from '@/src/shared/utils/telefoneBr'
 import { produtoTemComplementosAtivos } from '../../shared/utils/produtoComplementosUtils'
 import { resolveDeliveryLayoutHome } from '../layouts/DeliveryPublicoLayoutRegistry'
 import type { DeliveryPublicoViewModel } from '../../shared/types/deliveryPublicoViewModel'
@@ -558,6 +559,8 @@ function DeliveryPublicoHomeContent({
 
   const LayoutHome = resolveDeliveryLayoutHome(config.layoutId)
   const enderecoTexto = formatEmpresaPublicaEndereco(empresa?.endereco ?? null)
+  const telefoneRaw = empresa?.telefone?.trim() || null
+  const telefoneTexto = telefoneRaw ? formatarTelefoneBr(telefoneRaw) : null
 
   if (isCatalogLoading) {
     return <DeliveryPublicoHomeSkeleton />
@@ -571,6 +574,7 @@ function DeliveryPublicoHomeContent({
         config={config}
         viewModel={viewModel}
         enderecoTexto={enderecoTexto}
+        telefoneTexto={telefoneTexto}
         interactive
         onBuscaChange={onBuscaChange}
         onGrupoClick={onGrupoClick}

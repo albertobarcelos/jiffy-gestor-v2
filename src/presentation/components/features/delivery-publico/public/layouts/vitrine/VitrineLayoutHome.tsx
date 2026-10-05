@@ -15,6 +15,8 @@ export function VitrineLayoutHome({
   config,
   viewModel,
   enderecoTexto,
+  telefoneTexto,
+  cnpjTexto,
   interactive = false,
   onBuscaChange,
   onGrupoClick,
@@ -102,7 +104,8 @@ export function VitrineLayoutHome({
       <DeliveryPublicoLojaFooter
         config={config}
         enderecoTexto={enderecoTexto}
-        horarioTexto={viewModel.horarioTexto}
+        telefoneTexto={telefoneTexto}
+        cnpjTexto={cnpjTexto}
       />
     </div>
   )
