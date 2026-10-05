@@ -5,7 +5,6 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { MeioPagamento, type TipoParcelamento } from '@/src/domain/entities/MeioPagamento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import { useHorizontalDragScroll } from '@/src/presentation/hooks/useHorizontalDragScroll'
 import { MdSearch, MdDelete } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -25,12 +24,12 @@ import {
 
 interface MeiosPagamentosListProps {
   onReload?: () => void
-  /**
-   * Layout do hub Delivery: rolagem horizontal na tabela com largura mínima/máxima.
-   * Não altera a tela em Configurações / rota full.
-   */
+  /** No hub Delivery: lista preenche a altura do painel (sem maxHeight da rota full). */
   layoutDeliveryHub?: boolean
 }
+
+/** Largura do painel (não da janela) abaixo da qual tipografia/toggles ficam compactos. */
+const LISTA_COMPACTA_MAX_WIDTH = 1200
 
 /**
  * Mapeamento entre valores da API e labels para exibição
@@ -101,22 +100,43 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
     meioPagamentoId: undefined,
   })
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const {
-    scrollRef: hubHScrollRef,
-    isDragging: hubHDragging,
-    hasMovedRef: hubHHasMovedRef,
-    handleMouseDown: hubHHandleMouseDown,
-    handleWheel: hubHHandleWheel,
-    handleMouseMove: hubHHandleMouseMove,
-    handleMouseUp: hubHHandleMouseUp,
-    handleMouseLeave: hubHHandleMouseLeave,
-  } = useHorizontalDragScroll<HTMLDivElement>({ mapVerticalWheel: false })
+  const listRootRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
   const { isAuthenticated } = useAuthStore()
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
+  /**
+   * Compacto pela largura do painel (hub tem menu lateral): a janela pode ser larga
+   * e mesmo assim a lista ficar estreita — por isso não usamos breakpoint de viewport.
+   */
+  const [isCompact, setIsCompact] = useState(layoutDeliveryHub)
+  const switchSize = isCompact ? 'xs' : 'sm'
+  const deleteIconSize = isCompact ? 16 : 20
+  const textTitle = isCompact ? 'text-xs' : 'text-xl'
+  const textSubtitle = isCompact ? 'text-[11px]' : 'text-[22px]'
+  const textCell = isCompact ? 'text-[10px]' : 'text-sm'
+  const textMeta = isCompact ? 'text-[10px]' : 'text-xs'
+
+  useEffect(() => {
+    const el = listRootRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+
+    const update = (width: number) => {
+      setIsCompact(width < LISTA_COMPACTA_MAX_WIDTH)
+    }
+
+    update(el.getBoundingClientRect().width)
+
+    const observer = new ResizeObserver(entries => {
+      const entry = entries[0]
+      if (!entry) return
+      update(entry.contentRect.width)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   // Refs para evitar dependências desnecessárias no useCallback
   const isLoadingRef = useRef(false)
@@ -674,178 +694,123 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
   )
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header com título e botão */}
-      <div className="md:px-6 px-1 pt-1 flex-shrink-0">
-        <div className="flex items-start justify-between">
-          <div className="w-1/2">
-            <p className="text-primary text-xl font-semibold ">
+    <div ref={listRootRef} className="flex h-full w-full min-w-0 flex-col">
+      {/* Header com título e botão — espaçamento alinhado a ImpressorasList */}
+      <div className="flex-shrink-0 px-1 pb-1 pt-1 md:px-6">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className={`font-semibold text-primary ${textTitle}`}>
               Meios de Pagamento Cadastrados
             </p>
-            <p className="text-tertiary md:text-[22px] text-sm font-medium">
+            <p className={`font-medium text-tertiary ${textSubtitle}`}>
               Total {meiosPagamento.length} de {totalMeiosPagamento}
             </p>
           </div>
           <button
             onClick={() => openTabsModal({ mode: 'create' })}
-            className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+            className={`flex shrink-0 items-center rounded-lg bg-primary font-semibold text-info transition-colors hover:bg-primary/90 md:px-[30px] ${
+              isCompact ? 'h-7 gap-1.5 px-2 text-xs' : 'h-8 gap-2 px-2 text-sm'
+            }`}
           >
             Novo
-            <span className="text-lg">+</span>
+            <span className={isCompact ? 'text-base' : 'text-lg'}>+</span>
           </button>
         </div>
       </div>
 
-      <div className="bg-white md:px-6 px-1 py-2 flex-shrink-0 ">
-        <div className="flex flex-row items-start gap-2 border-t-2 border-primary/70">
-          {/* Barra de pesquisa */}
-          <div className="flex-1 mt-2 min-w-[180px] max-w-[360px]">
-            <div className="relative h-8">
-              <MdSearch className="absolute md:left-4 left-1 top-1/2 -translate-y-1/2 text-secondary-text" size={18} />
+      <div className="flex flex-shrink-0 gap-3 px-1 py-1 md:px-[20px]">
+        <div className="min-w-0 flex-1 border-t-2 border-primary/70">
+          <div className={`mt-2 flex flex-wrap items-start ${isCompact ? 'gap-2' : 'gap-3'}`}>
+            <div
+              className={`relative max-w-[360px] flex-1 ${
+                isCompact ? 'h-7 min-w-[140px]' : 'h-8 min-w-[180px]'
+              }`}
+            >
+              <MdSearch
+                className={`absolute top-1/2 -translate-y-1/2 text-secondary-text ${
+                  isCompact ? 'left-3' : 'left-4'
+                }`}
+                size={isCompact ? 16 : 18}
+              />
               <input
                 id="meios-pagamentos-search"
                 type="text"
                 placeholder="Pesquisar..."
                 value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full md:pl-11 pl-5 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm "
+                onChange={e => setSearchText(e.target.value)}
+                className={`h-full w-full rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none ${
+                  isCompact ? 'pl-9 pr-3 text-xs' : 'pl-11 pr-4 text-sm'
+                }`}
               />
             </div>
-          </div>
-
-          {/* Filtro de status */}
-          <div className="flex gap-2 items-center w-full sm:w-[160px] mt-2">
-            <label className="text-xs font-semibold text-secondary-text mb-1 block">Status</label>
-            <select
-              value={filterStatus}
-              onChange={(e) =>
-                setFilterStatus(
-                  e.target.value as 'Todos' | 'Ativo' | 'Desativado'
-                )
-              }
-              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm "
-            >
-              <option value="Todos">Todos</option>
-              <option value="Ativo">Ativo</option>
-              <option value="Desativado">Desativado</option>
-            </select>
+            <div className="flex w-full items-center gap-2 sm:w-[160px]">
+              <label className={`block font-semibold text-secondary-text ${textMeta}`}>
+                Status
+              </label>
+              <select
+                value={filterStatus}
+                onChange={e =>
+                  setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
+                }
+                className={`w-full rounded-lg border border-gray-200 bg-info text-primary-text focus:border-primary focus:outline-none ${
+                  isCompact ? 'h-7 px-3 text-xs' : 'h-8 px-5 text-sm'
+                }`}
+              >
+                <option value="Todos">Todos</option>
+                <option value="Ativo">Ativo</option>
+                <option value="Desativado">Desativado</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Cabeçalho + linhas: no hub Delivery, scroll horizontal com largura limitada */}
-      <div
-        ref={layoutDeliveryHub ? hubHScrollRef : undefined}
-        onMouseDown={
-          layoutDeliveryHub
-            ? event => {
-                const alvo = event.target as HTMLElement | null
-                if (
-                  alvo?.closest(
-                    'button, input, select, a, label, [role="switch"], [role="checkbox"]'
-                  )
-                ) {
-                  return
-                }
-                hubHHandleMouseDown(event)
-              }
-            : undefined
-        }
-        onMouseMove={layoutDeliveryHub ? hubHHandleMouseMove : undefined}
-        onMouseUp={layoutDeliveryHub ? hubHHandleMouseUp : undefined}
-        onMouseLeave={layoutDeliveryHub ? hubHHandleMouseLeave : undefined}
-        onWheel={layoutDeliveryHub ? hubHHandleWheel : undefined}
-        className={
-          layoutDeliveryHub
-            ? `meios-pagamentos-hub-h-scroll flex min-h-0 flex-1 flex-col overflow-x-auto overflow-y-hidden md:px-[30px] px-1 ${
-                hubHDragging ? 'cursor-grabbing select-none' : 'cursor-grab'
-              }`
-            : 'contents'
-        }
-      >
+      {/* Cabeçalho — tipografia compacta pela largura do painel */}
+      <div className="mt-0 flex-shrink-0 px-1 md:px-[20px]">
         <div
-          className={
-            layoutDeliveryHub
-              ? 'flex min-h-0 w-max max-w-none flex-1 flex-col'
-              : 'contents'
-          }
-        >
-      {/* Cabeçalho da tabela */}
-      <div className={layoutDeliveryHub ? 'mt-0 flex-shrink-0' : 'md:px-[30px] px-1 mt-0 flex-shrink-0'}>
-        <div
-          className={`h-10 bg-custom-2 rounded-lg md:px-4 px-1 flex items-center ${
-            layoutDeliveryHub ? 'gap-0' : 'gap-[10px]'
+          className={`flex items-center rounded-lg bg-custom-2 ${
+            isCompact
+              ? 'h-8 gap-1 px-0.5'
+              : 'h-10 gap-[10px] px-1 md:px-4'
           }`}
         >
-          <div
-            className={
-              layoutDeliveryHub
-                ? 'w-[200px] shrink-0 font-semibold text-sm text-primary-text'
-                : 'flex-[3] font-semibold md:text-sm text-xs text-primary-text'
-            }
-          >
+          <div className={`flex-[3] font-semibold leading-tight text-primary-text ${textCell}`}>
             Nome
           </div>
           <div
-            className={
-              layoutDeliveryHub
-                ? 'flex w-[180px] shrink-0 font-semibold text-sm text-primary-text'
-                : 'flex-[2] font-semibold md:text-sm text-xs text-primary-text hidden md:flex'
-            }
+            className={`hidden flex-[2] font-semibold leading-tight text-primary-text md:flex ${textCell}`}
           >
             Forma Fiscal
           </div>
           <div
-            className={
-              layoutDeliveryHub
-                ? 'flex w-[96px] shrink-0 items-center justify-center font-semibold text-sm text-primary-text'
-                : 'md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text'
-            }
+            className={`flex-[1] text-center font-semibold leading-tight text-primary-text md:flex-[2] ${textCell}`}
           >
             Terminal
           </div>
           <div
-            className={
-              layoutDeliveryHub
-                ? 'flex w-[96px] shrink-0 items-center justify-center font-semibold text-sm text-primary-text'
-                : 'md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text'
-            }
+            className={`flex-[1] text-center font-semibold leading-tight text-primary-text md:flex-[2] ${textCell}`}
           >
             Delivery
           </div>
           <div
-            className={
-              layoutDeliveryHub
-                ? 'flex w-[120px] shrink-0 items-center justify-center font-semibold text-sm text-primary-text'
-                : 'md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text'
-            }
+            className={`flex-[1] text-center font-semibold leading-tight text-primary-text md:flex-[2] ${textCell}`}
+            title="Permite Parcela"
           >
-            Permite Parcela
+            {isCompact ? 'Parcela' : 'Permite Parcela'}
           </div>
           <div
-            className={
-              layoutDeliveryHub
-                ? 'flex w-[168px] shrink-0 items-center justify-center font-semibold text-sm text-primary-text'
-                : 'md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text hidden md:flex'
-            }
+            className={`hidden flex-[2] text-center font-semibold leading-tight text-primary-text md:flex ${textCell}`}
+            title="Tipo parcelamento"
           >
-            Tipo parcelamento
+            {isCompact ? 'Tipo parc.' : 'Tipo parcelamento'}
           </div>
           <div
-            className={
-              layoutDeliveryHub
-                ? 'flex w-[72px] shrink-0 items-center justify-center font-semibold text-sm text-primary-text'
-                : 'md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text'
-            }
+            className={`flex-[1] text-center font-semibold leading-tight text-primary-text md:flex-[2] ${textCell}`}
           >
             TEF
           </div>
           <div
-            className={
-              layoutDeliveryHub
-                ? 'flex w-[72px] shrink-0 items-center justify-end font-semibold text-sm text-primary-text'
-                : 'md:flex-[2] flex-[1] text-right font-semibold md:text-sm text-xs text-primary-text'
-            }
+            className={`flex-[1] text-right font-semibold leading-tight text-primary-text md:flex-[2] ${textCell}`}
           >
             Ações
           </div>
@@ -857,8 +822,8 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
         ref={scrollContainerRef}
         className={
           layoutDeliveryHub
-            ? 'mt-2 min-h-0 flex-1 overflow-y-auto scrollbar-hide'
-            : 'flex-1 overflow-y-auto md:px-[30px] px-1 mt-2 scrollbar-hide'
+            ? 'mt-1 min-h-0 flex-1 overflow-y-auto px-1 scrollbar-hide md:px-[20px]'
+            : 'mt-1 flex-1 overflow-y-auto px-1 scrollbar-hide md:px-[20px]'
         }
         style={layoutDeliveryHub ? undefined : { maxHeight: 'calc(100vh - 300px)' }}
       >
@@ -869,9 +834,7 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
         )}
 
         {meiosPagamento.map((meioPagamento, index) => {
-          // Handler para abrir edição ao clicar na linha
           const handleRowClick = () => {
-            if (layoutDeliveryHub && (hubHHasMovedRef.current || hubHDragging)) return
             openTabsModal({
               mode: 'edit',
               meioPagamentoId: meioPagamento.getId(),
@@ -882,49 +845,39 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
           <div
             key={meioPagamento.getId()}
             onClick={handleRowClick}
-            className={`${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} rounded-lg hover:bg-secondary-bg/15 transition-colors cursor-pointer`}
+            className={`${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} cursor-pointer rounded-lg transition-colors hover:bg-secondary-bg/15`}
           >
             <div
-              className={`md:px-4 px-1 py-1 flex items-center ${
-                layoutDeliveryHub ? 'gap-0' : ''
+              className={`flex items-center ${
+                isCompact ? 'px-0.5 py-0.5' : 'px-1 py-1 md:px-4'
               }`}
             >
               <div
-                className={
-                  layoutDeliveryHub
-                    ? 'flex w-[200px] shrink-0 items-center gap-2 overflow-hidden text-sm font-normal text-primary-text'
-                    : 'flex-[3] font-normal md:text-sm text-xs text-primary-text flex items-center gap-2'
-                }
+                className={`flex min-w-0 flex-[3] items-center font-normal leading-tight text-primary-text ${
+                  isCompact ? 'gap-1' : 'gap-2'
+                } ${textCell}`}
               >
                 # <span className="truncate">{meioPagamento.getNome()}</span>
               </div>
               <div
-                className={
-                  layoutDeliveryHub
-                    ? 'flex w-[180px] shrink-0 items-center whitespace-nowrap text-sm font-normal text-secondary-text'
-                    : 'flex-[2] font-normal text-sm text-secondary-text hidden md:flex'
-                }
+                className={`hidden min-w-0 flex-[2] truncate font-normal leading-tight text-secondary-text md:flex ${textCell}`}
               >
                 {formatarFormaPagamentoFiscal(meioPagamento.getFormaPagamentoFiscal())}
               </div>
               <div
-                className={
-                  layoutDeliveryHub
-                    ? 'flex w-[96px] shrink-0 items-center justify-center'
-                    : 'md:flex-[2] flex-[1] flex justify-center'
-                }
-                onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-                onTouchStart={(e) => e.stopPropagation()}
+                className="flex flex-[1] justify-center md:flex-[2]"
+                onClick={e => e.stopPropagation()}
+                onMouseDown={e => e.stopPropagation()}
+                onTouchStart={e => e.stopPropagation()}
               >
                 <JiffyIconSwitch
                   checked={meioPagamento.isAtivo()}
-                  onChange={(e) => {
+                  onChange={e => {
                     e.stopPropagation()
                     handleToggleAtivo(meioPagamento, e.target.checked)
                   }}
                   disabled={!!updatingAtivo[meioPagamento.getId()]}
-                  size="sm"
+                  size={switchSize}
                   className="justify-center gap-0 px-0 py-0"
                   inputProps={{
                     'aria-label': `Ativo — ${meioPagamento.getNome()}`,
@@ -933,23 +886,19 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
                 />
               </div>
               <div
-                className={
-                  layoutDeliveryHub
-                    ? 'flex w-[96px] shrink-0 items-center justify-center'
-                    : 'md:flex-[2] flex-[1] flex justify-center'
-                }
-                onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-                onTouchStart={(e) => e.stopPropagation()}
+                className="flex flex-[1] justify-center md:flex-[2]"
+                onClick={e => e.stopPropagation()}
+                onMouseDown={e => e.stopPropagation()}
+                onTouchStart={e => e.stopPropagation()}
               >
                 <JiffyIconSwitch
                   checked={meioPagamento.isDelivery()}
-                  onChange={(e) => {
+                  onChange={e => {
                     e.stopPropagation()
                     handleToggleIsDelivery(meioPagamento, e.target.checked)
                   }}
                   disabled={!!updatingIsDelivery[meioPagamento.getId()]}
-                  size="sm"
+                  size={switchSize}
                   className="justify-center gap-0 px-0 py-0"
                   inputProps={{
                     'aria-label': `Delivery — ${meioPagamento.getNome()}`,
@@ -960,24 +909,20 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
                 />
               </div>
               <div
-                className={
-                  layoutDeliveryHub
-                    ? 'flex w-[120px] shrink-0 items-center justify-center'
-                    : 'md:flex-[2] flex-[1] flex justify-center'
-                }
-                onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-                onTouchStart={(e) => e.stopPropagation()}
+                className="flex flex-[1] justify-center md:flex-[2]"
+                onClick={e => e.stopPropagation()}
+                onMouseDown={e => e.stopPropagation()}
+                onTouchStart={e => e.stopPropagation()}
               >
                 {isFormaFiscalCartaoCredito(meioPagamento.getFormaPagamentoFiscal()) ? (
                   <JiffyIconSwitch
                     checked={meioPagamento.isParcelavel()}
-                    onChange={(e) => {
+                    onChange={e => {
                       e.stopPropagation()
                       handleToggleParcelavel(meioPagamento, e.target.checked)
                     }}
                     disabled={!!updatingParcelavel[meioPagamento.getId()]}
-                    size="sm"
+                    size={switchSize}
                     className="justify-center gap-0 px-0 py-0"
                     inputProps={{
                       'aria-label': `Permite parcela — ${meioPagamento.getNome()}`,
@@ -985,26 +930,22 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
                     }}
                   />
                 ) : (
-                  <span className="text-secondary-text md:text-sm text-xs" aria-hidden>
+                  <span className={`text-secondary-text ${textCell}`} aria-hidden>
                     -
                   </span>
                 )}
               </div>
               <div
-                className={
-                  layoutDeliveryHub
-                    ? 'flex w-[168px] shrink-0 items-center justify-center'
-                    : 'md:flex-[2] flex-[1] hidden md:flex justify-center'
-                }
-                onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-                onTouchStart={(e) => e.stopPropagation()}
+                className="hidden flex-[2] justify-center md:flex"
+                onClick={e => e.stopPropagation()}
+                onMouseDown={e => e.stopPropagation()}
+                onTouchStart={e => e.stopPropagation()}
               >
                 {meioPagamento.isParcelavel() ? (
                   <select
                     value={meioPagamento.getTipoParcelamento() ?? 'jurosCliente'}
                     disabled={!!updatingTipoParcelamento[meioPagamento.getId()]}
-                    onChange={(e) => {
+                    onChange={e => {
                       e.stopPropagation()
                       handleChangeTipoParcelamento(
                         meioPagamento,
@@ -1012,38 +953,36 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
                       )
                     }}
                     aria-label={`Tipo de parcelamento — ${meioPagamento.getNome()}`}
-                    className="h-8 w-full max-w-[160px] rounded-lg border border-gray-200 bg-info px-2 text-xs text-primary-text focus:border-primary focus:outline-none disabled:opacity-60"
+                    className={`w-full max-w-[160px] rounded-lg border border-gray-200 bg-info text-primary-text focus:border-primary focus:outline-none disabled:opacity-60 ${
+                      isCompact ? 'h-7 px-1.5 text-[10px]' : 'h-8 px-2 text-xs'
+                    }`}
                   >
-                    {TIPOS_PARCELAMENTO_OPCOES.map((opcao) => (
+                    {TIPOS_PARCELAMENTO_OPCOES.map(opcao => (
                       <option key={opcao.value} value={opcao.value}>
                         {opcao.label}
                       </option>
                     ))}
                   </select>
                 ) : (
-                  <span className="text-secondary-text md:text-sm text-xs" aria-hidden>
+                  <span className={`text-secondary-text ${textCell}`} aria-hidden>
                     -
                   </span>
                 )}
               </div>
               <div
-                className={
-                  layoutDeliveryHub
-                    ? 'flex w-[72px] shrink-0 items-center justify-center'
-                    : 'md:flex-[2] flex-[1] flex justify-center'
-                }
-                onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-                onTouchStart={(e) => e.stopPropagation()}
+                className="flex flex-[1] justify-center md:flex-[2]"
+                onClick={e => e.stopPropagation()}
+                onMouseDown={e => e.stopPropagation()}
+                onTouchStart={e => e.stopPropagation()}
               >
                 <JiffyIconSwitch
                   checked={meioPagamento.isTefAtivo()}
-                  onChange={(e) => {
+                  onChange={e => {
                     e.stopPropagation()
                     handleToggleTefAtivo(meioPagamento, e.target.checked)
                   }}
                   disabled={!!updatingTefAtivo[meioPagamento.getId()]}
-                  size="sm"
+                  size={switchSize}
                   className="justify-center gap-0 px-0 py-0"
                   inputProps={{
                     'aria-label': `TEF — ${meioPagamento.getNome()}`,
@@ -1052,26 +991,25 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
                 />
               </div>
               <div
-                className={
-                  layoutDeliveryHub
-                    ? 'flex w-[72px] shrink-0 items-center justify-end'
-                    : 'md:flex-[2] flex-[1] flex justify-end'
-                }
-                onClick={(e) => e.stopPropagation()}
-              >                <button
+                className="flex flex-[1] justify-end md:flex-[2]"
+                onClick={e => e.stopPropagation()}
+              >
+                <button
                   type="button"
-                  onClick={(e) => {
+                  onClick={e => {
                     e.stopPropagation()
                     handleDeleteClick(meioPagamento.getId())
                   }}
-                  className="w-10 h-10 rounded-lg flex items-center justify-center text-error hover:bg-error/10 transition-colors"
+                  className={`flex items-center justify-center rounded-lg text-error transition-colors hover:bg-error/10 ${
+                    isCompact ? 'h-7 w-7' : 'h-10 w-10'
+                  }`}
                   title="Deletar meio de pagamento"
                   disabled={isDeleting}
                 >
                   {isDeleting && meioPagamentoToDelete === meioPagamento.getId() ? (
-                    <div className="w-4 h-4 border-2 border-error border-t-transparent rounded-full animate-spin" />
+                    <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-error border-t-transparent" />
                   ) : (
-                    <MdDelete size={20} />
+                    <MdDelete size={deleteIconSize} />
                   )}
                 </button>
               </div>
@@ -1085,8 +1023,6 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
             <JiffyLoading />
           </div>
         )}
-      </div>
-        </div>
       </div>
 
       <MeiosPagamentosTabsModal

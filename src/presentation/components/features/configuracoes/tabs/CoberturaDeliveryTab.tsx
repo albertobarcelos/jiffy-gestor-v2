@@ -7,6 +7,7 @@ import {
   MdDeleteOutline,
   MdKeyboardArrowDown,
   MdKeyboardArrowUp,
+  MdLocalOffer,
   MdMap,
   MdMyLocation,
   MdWarning,
@@ -105,8 +106,10 @@ import {
   parseTaxaDraftCobertura,
   type CoberturaPainelAba,
 } from '@/src/presentation/components/features/configuracoes/coberturaPainelAbas'
+import { CoberturaBotaoSalvarTaxasLote } from '@/src/presentation/components/features/configuracoes/CoberturaBotaoSalvarTaxasLote'
 import { CoberturaTaxasManuaisPainel } from '@/src/presentation/components/features/configuracoes/CoberturaTaxasManuaisPainel'
 import { useReportarCoberturaSuja } from '@/src/presentation/components/features/configuracoes/coberturaSairGuard'
+import { useTaxasInfinite } from '@/src/presentation/hooks/useTaxas'
 
 const NENHUM_RAIO: RaioEntregaDTO[] = []
 const NENHUMA_AREA: AreaEntregaDTO[] = []
@@ -203,33 +206,6 @@ function CampoPrazoInline({
   )
 }
 
-function BotaoSalvarTaxasLote({
-  pendente,
-  disabled,
-  salvando,
-  onClick,
-}: {
-  pendente: boolean
-  disabled: boolean
-  salvando: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`w-full rounded-lg px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed ${
-        pendente
-          ? 'bg-primary text-white hover:bg-primary/90 disabled:opacity-50'
-          : 'bg-gray-200 text-gray-600'
-      }`}
-    >
-      {salvando ? 'Salvando…' : pendente ? 'Salvar' : 'Tudo certo'}
-    </button>
-  )
-}
-
 function NomeAreaInline({
   area,
   salvando,
@@ -300,6 +276,11 @@ export function CoberturaDeliveryTab() {
     enabled: empresaDeliveryQuery.isSuccess && empresaDeliveryQuery.data != null,
   })
   const areasQuery = useAreasEntregaDelivery({
+    enabled: empresaDeliveryQuery.isSuccess && empresaDeliveryQuery.data != null,
+  })
+  const taxasCatalogoQuery = useTaxasInfinite({
+    limit: 50,
+    staleTime: 15_000,
     enabled: empresaDeliveryQuery.isSuccess && empresaDeliveryQuery.data != null,
   })
   const criarRaiosLoteMutation = useCriarRaiosEntregaEmLote()
@@ -428,6 +409,12 @@ export function CoberturaDeliveryTab() {
   const empresaDelivery = empresaDeliveryQuery.data
   const raios = raiosQuery.data ?? []
   const areas = areasQuery.data ?? []
+  const qtdTaxasManuais = useMemo(() => {
+    const pages = taxasCatalogoQuery.data?.pages ?? []
+    return pages
+      .flatMap(page => page.taxas)
+      .filter(taxa => taxa.getTipo().toLowerCase() === 'entrega').length
+  }, [taxasCatalogoQuery.data])
   const raiosComDraft = useMemo(
     () => raios.map(raio => ({ ...raio, ativo: ativosDraft[raio.id] ?? raio.ativo })),
     [ativosDraft, raios]
@@ -1382,7 +1369,7 @@ export function CoberturaDeliveryTab() {
               className={`flex min-h-0 flex-col overflow-hidden transition-[max-height,opacity] duration-300 ease-out ${
                 painelRecolhido
                   ? 'max-h-0 opacity-0 pointer-events-none'
-                  : 'max-h-[min(85vh,900px)] flex-1 opacity-100'
+                  : 'h-[min(52vh,400px)] opacity-100'
               }`}
               aria-hidden={painelRecolhido}
             >
@@ -1584,10 +1571,24 @@ export function CoberturaDeliveryTab() {
                     <p className="mt-1 text-[11px] font-semibold text-primary-text">Cobertura Raio</p>
                     <p className="mt-0.5 text-[10px] text-secondary-text">Faixas de 1 em 1 km</p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setPainelAba('manuais')}
+                    className="col-span-2 rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 text-center transition-colors hover:border-primary/30 hover:bg-primary/5"
+                  >
+                    <MdLocalOffer className="mx-auto h-5 w-5 text-primary-text" aria-hidden />
+                    <p className="mt-1 text-2xl font-bold text-primary-text">
+                      {taxasCatalogoQuery.isPending ? '…' : qtdTaxasManuais}
+                    </p>
+                    <p className="text-[11px] font-semibold text-primary-text">Taxas Manuais</p>
+                    <p className="mt-0.5 text-[10px] text-secondary-text">
+                      Catálogo tipo entrega
+                    </p>
+                  </button>
                 </div>
                 <p className="px-3 pb-3 text-[11px] leading-snug text-secondary-text">
-                  Use Taxas por Área para polígonos e Taxas por Raio para as faixas de km. O alcance
-                  do raio é definido na aba Taxas por Raio.
+                  Use Taxas por Área para polígonos, Taxas por Raio para as faixas de km e Taxas
+                  Manuais para valores fixos do catálogo.
                 </p>
               </div>
             ) : painelAba === 'manuais' ? (
@@ -1681,7 +1682,7 @@ export function CoberturaDeliveryTab() {
                   )}
                 </div>
                 <div className="shrink-0 space-y-2 border-t border-gray-100 px-3 py-2">
-                  <BotaoSalvarTaxasLote
+                  <CoberturaBotaoSalvarTaxasLote
                     pendente={taxasPrazosAreaPendentes}
                     disabled={salvando || areas.length === 0 || !taxasPrazosAreaPendentes}
                     salvando={atualizarAreasLoteMutation.isPending}
@@ -1819,7 +1820,7 @@ export function CoberturaDeliveryTab() {
                   )}
                 </div>
                 <div className="shrink-0 space-y-2 border-t border-gray-100 px-3 py-2">
-                  <BotaoSalvarTaxasLote
+                  <CoberturaBotaoSalvarTaxasLote
                     pendente={taxasPrazosPendentes}
                     disabled={salvando || raiosOrdenados.length === 0 || !taxasPrazosPendentes}
                     salvando={atualizarRaiosLoteMutation.isPending}

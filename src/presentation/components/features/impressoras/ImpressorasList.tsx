@@ -283,7 +283,7 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
     <div className="flex flex-col h-full">
       {/* Header com título e botão */}
       <div className="md:px-6 px-1 pt-1 pb-1 flex-shrink-0">
-        <div className="flex items-start justify-between">
+        <div className="flex items-center justify-between">
           <div className="">
             <p className="text-primary md:text-xl text-sm font-semibold ">
               Impressoras Cadastradas
@@ -321,7 +321,7 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
           </div>
 
       {/* Cabeçalho da tabela */}
-      <div className="md:px-[30px] mt-0 flex-shrink-0">
+      <div className="mt-0 flex-shrink-0 px-1 md:px-[20px]">
         <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px]">
           <div className="flex-[1] w-16 font-semibold text-sm text-primary-text text-left hidden md:flex">
             Ícone
@@ -342,7 +342,7 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
       {/* Lista de impressoras com scroll */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto md:px-[30px] px-1 mt-1 scrollbar-hide"
+        className="mt-1 flex-1 overflow-y-auto px-1 scrollbar-hide md:px-[20px]"
         style={{ maxHeight: 'calc(100vh - 300px)' }}
       >
         {impressoras.length === 0 && !isLoading && (

@@ -241,67 +241,64 @@ export function EntregadoresList() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex-shrink-0 px-1 py-1 md:px-[30px]">
+      <div className="flex-shrink-0 px-1 pb-1 pt-1 md:px-6">
         <div className="flex items-center justify-between">
-          <div className="w-1/2 md:pl-5">
-            <p className="text-primary text-sm font-semibold md:text-lg">
+          <div>
+            <p className="text-sm font-semibold text-primary md:text-xl">
               Entregadores Cadastrados
             </p>
-            <p className="text-tertiary text-sm font-normal md:text-[22px]">
+            <p className="text-sm font-medium text-tertiary md:text-[22px]">
               Total {entregadores.length} de {total}
             </p>
           </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={abrirCriar}
-              className="flex h-8 items-center gap-2 rounded-lg bg-primary px-[30px] text-sm font-semibold text-info transition-colors hover:bg-primary/90"
-            >
-              Novo
-              <span className="text-lg">+</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="h-[4px] flex-shrink-0 border-t-2 border-primary/70" />
-
-      <div className="flex items-start justify-start gap-3 p-1">
-        <div className="flex flex-row items-start justify-start gap-2">
-          <div className="relative flex-col h-8 min-w-[300px] max-w-[360px]">
-            <MdSearch
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
-              size={18}
-            />
-            <input
-              id="entregadores-search"
-              type="text"
-              placeholder="Pesquisar entregador..."
-              value={searchText}
-              onChange={e => setSearchText(e.target.value)}
-              className="h-full w-full rounded-lg border border-gray-200 bg-info pl-11 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
-            />
-          </div>
-        </div>
-
-        <div className="flex w-full flex-row items-center justify-start gap-2 sm:w-[160px]">
-          <label className="mb-1 block text-xs font-semibold text-secondary-text">Status</label>
-          <select
-            value={filterStatus}
-            onChange={e =>
-              setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
-            }
-            className="h-8 w-full rounded-lg border border-gray-200 bg-info px-5 text-sm text-primary-text focus:border-primary focus:outline-none"
+          <button
+            type="button"
+            onClick={abrirCriar}
+            className="flex h-8 items-center gap-2 rounded-lg bg-primary px-2 text-sm font-semibold text-info transition-colors hover:bg-primary/90 md:px-[30px]"
           >
-            <option value="Todos">Todos</option>
-            <option value="Ativo">Ativo</option>
-            <option value="Desativado">Desativado</option>
-          </select>
+            Novo
+            <span className="text-lg">+</span>
+          </button>
         </div>
       </div>
 
-      <div className="mt-0 flex-shrink-0 md:px-[0px]">
-        <div className="flex h-10 items-center gap-2 rounded-lg bg-custom-2 px-4">
+      <div className="flex flex-shrink-0 gap-3 px-1 py-1 md:px-[20px]">
+        <div className="flex-1 border-t-2 border-primary/70">
+          <div className="mt-2 flex flex-wrap items-start gap-3">
+            <div className="relative h-8 min-w-[180px] max-w-[360px] flex-1">
+              <MdSearch
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
+                size={18}
+              />
+              <input
+                id="entregadores-search"
+                type="text"
+                placeholder="Pesquisar entregador..."
+                value={searchText}
+                onChange={e => setSearchText(e.target.value)}
+                className="h-full w-full rounded-lg border border-gray-200 bg-info pl-11 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+              />
+            </div>
+            <div className="mt-0 flex w-full items-center gap-2 sm:w-[160px]">
+              <label className="block text-xs font-semibold text-secondary-text">Status</label>
+              <select
+                value={filterStatus}
+                onChange={e =>
+                  setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
+                }
+                className="h-8 w-full rounded-lg border border-gray-200 bg-info px-5 text-sm text-primary-text focus:border-primary focus:outline-none"
+              >
+                <option value="Todos">Todos</option>
+                <option value="Ativo">Ativo</option>
+                <option value="Desativado">Desativado</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-0 flex-shrink-0 px-1 md:px-[20px]">
+        <div className="flex h-10 items-center gap-[10px] rounded-lg bg-custom-2 px-4">
           <div className="flex-[2] text-xs font-semibold text-primary-text md:text-sm">
             Nome
           </div>
@@ -316,7 +313,7 @@ export function EntregadoresList() {
 
       <div
         ref={scrollContainerRef}
-        className="mt-1 flex-1 overflow-y-auto px-1 scrollbar-hide md:px-[0px]"
+        className="mt-1 flex-1 overflow-y-auto px-1 scrollbar-hide md:px-[20px]"
         style={{ maxHeight: 'calc(100vh - 300px)' }}
       >
         {(isLoading || !hasLoadedInitialRef.current) && entregadores.length === 0 && (
