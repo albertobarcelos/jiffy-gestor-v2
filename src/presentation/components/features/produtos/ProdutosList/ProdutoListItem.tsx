@@ -9,12 +9,13 @@ import { ProdutoActionIcons } from './ProdutoActionIcons'
 import { ProdutoCategoriaSelect } from './ProdutoCategoriaSelect'
 import { toggleStatesFromProduto } from './toggleStatesFromProduto'
 
-function CategoriaNomeTexto({ nome }: { nome?: string }) {
+function CategoriaNomeTexto({ nome, inativa = false }: { nome?: string; inativa?: boolean }) {
   const categoria = nome?.trim() || '—'
   const exibicao = categoria.length > 30 ? `${categoria.slice(0, 30)}…` : categoria
   return (
     <span
       className="min-w-0 truncate text-sm font-normal tracking-wide text-primary-text md:text-base"
+      style={inativa ? { color: '#9CA3AF' } : undefined}
       title={categoria.length > 30 ? categoria : undefined}
     >
       {exibicao}
@@ -59,6 +60,12 @@ function ProdutoListItemBase({
 }: ProdutoListItemProps) {
   const produtoId = produto.getId()
   const toggleStates = useMemo(() => toggleStatesFromProduto(produto), [produto])
+  const categoriaInativa = useMemo(() => {
+    const grupoId = produto.getGrupoId()
+    if (!grupoId) return false
+    const grupo = gruposProdutos.find(item => item.getId() === grupoId)
+    return grupo ? !grupo.isAtivo() : false
+  }, [produto, gruposProdutos])
 
   return (
     <CatalogProductRow
@@ -87,7 +94,7 @@ function ProdutoListItemBase({
             }
           />
         ) : (
-          <CategoriaNomeTexto nome={produto.getNomeGrupo()} />
+          <CategoriaNomeTexto nome={produto.getNomeGrupo()} inativa={categoriaInativa} />
         )
       }
       actionsSlot={

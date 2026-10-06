@@ -35,6 +35,7 @@ import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitc
 import { cn } from '@/src/shared/utils/cn'
 import type { JiffySidePanelFooterActions } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { espelharSnapshotNoCadastroSeMenuPrincipal } from '@/src/presentation/utils/espelharCadastroMenuPrincipal'
 
 /** Grupo vinculado ao produto (estado local da aba). */
 interface GrupoComplementoItem {
@@ -221,8 +222,8 @@ interface ComplementosMultiSelectDialogProps {
     }>
   }>
   /**
-   * Se informado, o vínculo de grupos grava só no snapshot do menu
-   * (`PATCH /menus/:menuId/produtos/:produtoId`), não no cadastro base.
+   * Se informado, o vínculo grava no snapshot do menu.
+   * No menu principal, o mesmo vínculo também vai para o cadastro base.
    */
   menuId?: string
   /**
@@ -757,6 +758,16 @@ export const ComplementosMultiSelectDialog = forwardRef<
           }
           await invalidate(['menu-produtos', menuId])
           await invalidate(['menu', menuId])
+          const espelhouCadastro = await espelharSnapshotNoCadastroSeMenuPrincipal({
+            token,
+            menuId,
+            produtoId,
+            snapshot: { gruposComplementosIds: ids },
+          })
+          if (espelhouCadastro) {
+            await invalidate(['produtos'])
+            await invalidate(['produto', produtoId])
+          }
         } else if (ids.length === 0) {
           // A API ignora PATCH com `gruposComplementosIds: []`, então removemos cada
           // vínculo via DELETE para desvincular todos os grupos do produto.

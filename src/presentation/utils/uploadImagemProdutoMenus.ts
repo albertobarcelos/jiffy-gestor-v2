@@ -1,3 +1,4 @@
+import { idMenuPrincipalDeLista } from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 async function parseUploadError(response: Response, fallback: string): Promise<never> {
@@ -145,8 +146,7 @@ export async function buscarMenusDaEmpresa(params: {
 
 export async function buscarIdMenuPrincipal(token: string): Promise<string | null> {
   const menus = await buscarMenusDaEmpresa({ token })
-  const principal = menus.find(m => m.tipo === 'principal') ?? menus[0]
-  return principal?.id ?? null
+  return idMenuPrincipalDeLista(menus)
 }
 
 export async function vincularProdutoAosMenus(params: {
