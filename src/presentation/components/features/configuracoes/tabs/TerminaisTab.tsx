@@ -45,21 +45,24 @@ const TERMINAIS_COL_HEADER =
 function TerminaisListColumnHeader() {
   return (
     <div className="mb-1 flex min-h-8 items-center gap-[10px] px-4 py-1 bg-primary/10">
-      <div className={`flex-[2] hidden md:block ${TERMINAIS_COL_HEADER}`}>
+      <div className={`min-w-0 flex-[2] hidden md:block ${TERMINAIS_COL_HEADER}`}>
         Código do Terminal
       </div>
-      <div className={`flex-[2] ${TERMINAIS_COL_HEADER}`}>Nome do Terminal</div>
-      <div className={`flex-[2] ${TERMINAIS_COL_HEADER}`}>Modelo Dispositivo</div>
-      <div className={`flex-[2] text-center leading-tight ${TERMINAIS_COL_HEADER}`}>
+      <div className={`min-w-0 flex-[2] ${TERMINAIS_COL_HEADER}`}>Nome do Terminal</div>
+      <div className={`min-w-0 flex-[2] ${TERMINAIS_COL_HEADER}`}>Modelo Dispositivo</div>
+      <div className={`min-w-0 flex-[2] text-center leading-tight ${TERMINAIS_COL_HEADER}`}>
         <span className="block">Versão APK</span>
       </div>
-      <div className={`flex-[2] hidden md:block leading-tight ${TERMINAIS_COL_HEADER}`}>
+      <div className={`min-w-0 flex-[2] hidden md:block leading-tight ${TERMINAIS_COL_HEADER}`}>
+        <span className="block">Data Criação</span>
+      </div>
+      <div className={`min-w-0 flex-[2] hidden md:block leading-tight ${TERMINAIS_COL_HEADER}`}>
         <span className="block">Data Última Venda</span>
       </div>
-      <div className={`flex-[2] hidden md:flex ${TERMINAIS_COL_HEADER}`}>Imp. Finalização</div>
-      <div className={`flex-[1.5] text-center ${TERMINAIS_COL_HEADER}`}>Comp. Mesas</div>
-      <div className={`flex-[1.5] text-center ${TERMINAIS_COL_HEADER}`}>Fiscal ativo</div>
-      <div className={`flex-[1.5] text-center leading-tight ${TERMINAIS_COL_HEADER}`}>
+      <div className={`min-w-0 flex-[2] hidden md:flex ${TERMINAIS_COL_HEADER}`}>Imp. Finalização</div>
+      <div className={`min-w-0 flex-[1.5] text-center ${TERMINAIS_COL_HEADER}`}>Comp. Mesas</div>
+      <div className={`min-w-0 flex-[1.5] text-center ${TERMINAIS_COL_HEADER}`}>Fiscal ativo</div>
+      <div className={`min-w-0 flex-[1.5] text-center leading-tight ${TERMINAIS_COL_HEADER}`}>
         <span className="block">Leitor C. Barras</span>
       </div>
       <div className="w-10 shrink-0" aria-hidden />
@@ -1076,6 +1079,7 @@ export function TerminaisTab() {
       const modelo = rawData?.modeloDispositivo || rawData?.modelo || rawData?.deviceModel || 'Unknown'
       const versao =
         rawData?.versaoApk || rawData?.versao || rawData?.apkVersion || rawData?.version || '1.0.0'
+      const dataCriacao = formatarDataDetalhePedido(rawData?.dataCriacao ?? null)
       const dataUltimaVenda = formatarDataDetalhePedido(
         rawData?.dataUltimaVenda ?? null
       )
@@ -1098,23 +1102,34 @@ export function TerminaisTab() {
             index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
           }`}
         >
-          <div className="flex-[2] hidden md:flex items-center gap-3">
+          <div className="min-w-0 flex-[2] hidden md:flex items-center gap-3">
             <span className="text-sm font-normal text-primary-text"># {codigo}</span>
           </div>
-          <div className="flex-[2] flex items-center gap-1 md:text-sm text-[10px] text-primary-text">
+          <div className="min-w-0 flex-[2] flex items-center gap-1 md:text-sm text-[10px] text-primary-text">
             {nome}
           </div>
-          <div className="flex-[2] md:text-sm text-[10px] text-secondary-text">{modelo}</div>
-          <div className="flex-[2] text-center md:text-sm text-[10px] text-secondary-text">
+          <div
+            className="min-w-0 flex-[2] overflow-hidden break-all line-clamp-2 md:text-sm text-[10px] leading-tight text-secondary-text"
+            title={modelo}
+          >
+            {modelo}
+          </div>
+          <div className="min-w-0 flex-[2] text-center md:text-sm text-[10px] text-secondary-text">
             {versao}
           </div>
           <div
-            className="flex-[2] hidden md:block md:text-sm text-[10px] text-secondary-text"
+            className="min-w-0 flex-[2] hidden md:block md:text-sm text-[10px] text-secondary-text"
+            title={dataCriacao}
+          >
+            {dataCriacao}
+          </div>
+          <div
+            className="min-w-0 flex-[2] hidden md:block md:text-sm text-[10px] text-secondary-text"
             title={dataUltimaVenda}
           >
             {dataUltimaVenda}
           </div>
-          <div className="flex-[2] md:text-sm text-[10px] text-secondary-text hidden md:flex">
+          <div className="min-w-0 flex-[2] md:text-sm text-[10px] text-secondary-text hidden md:flex">
             {preferencesLoaded ? (
               <select
                 value={prefs.impressoraFinalizacaoId ?? ''}
@@ -1138,7 +1153,7 @@ export function TerminaisTab() {
             )}
           </div>
           <div
-            className="flex-[1.5] flex justify-center"
+            className="min-w-0 flex-[1.5] flex justify-center"
             onClick={e => e.stopPropagation()}
             onMouseDown={e => e.stopPropagation()}
           >
@@ -1160,7 +1175,7 @@ export function TerminaisTab() {
             />
           </div>
           <div
-            className="flex-[1.5] flex justify-center"
+            className="min-w-0 flex-[1.5] flex justify-center"
             onClick={e => e.stopPropagation()}
             onMouseDown={e => e.stopPropagation()}
           >
@@ -1180,7 +1195,7 @@ export function TerminaisTab() {
             />
           </div>
           <div
-            className="flex-[1.5] flex justify-center"
+            className="min-w-0 flex-[1.5] flex justify-center"
             onClick={e => e.stopPropagation()}
             onMouseDown={e => e.stopPropagation()}
           >
