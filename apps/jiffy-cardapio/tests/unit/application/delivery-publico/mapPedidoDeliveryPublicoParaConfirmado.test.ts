@@ -100,6 +100,9 @@ describe('pedido delivery público', () => {
 
     expect(view.id).toBe('pedido-1')
     expect(view.statusDelivery).toBe('PENDENTE')
+    expect(view.transicoesStatus).toEqual([
+      { status: 'PENDENTE', realizadaEm: '2026-10-06T19:00:00.000Z' },
+    ])
     expect(view.codigoVenda).toBe('A12')
     expect(view.slug).toBe('pizzaria')
     expect(view.nome).toBe('Ana Silva')

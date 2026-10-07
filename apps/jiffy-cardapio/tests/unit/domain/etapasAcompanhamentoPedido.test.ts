@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { montarEtapasAcompanhamentoPedido } from '@/src/domain/services/pedido/etapasAcompanhamentoPedido'
+import {
+  horarioInicioEtapa,
+  montarEtapasAcompanhamentoPedido,
+} from '@/src/domain/services/pedido/etapasAcompanhamentoPedido'
 
 describe('montarEtapasAcompanhamentoPedido', () => {
   it('entrega tem cinco passos e marca o atual em Pronto', () => {
@@ -39,6 +42,20 @@ describe('montarEtapasAcompanhamentoPedido', () => {
     ])
     expect(etapas.find(etapa => etapa.status === 'PRONTO')?.lado).toBe('esquerda')
     expect(etapas.find(etapa => etapa.status === 'FINALIZADO')?.lado).toBe('direita')
+  })
+
+  it('usa o último horário quando o status se repete', () => {
+    const horario = horarioInicioEtapa(
+      [
+        { status: 'PENDENTE', realizadaEm: '2026-10-07T14:00:00.000Z' },
+        { status: 'EM_PREPARO', realizadaEm: '2026-10-07T14:10:00.000Z' },
+        { status: 'EM_PREPARO', realizadaEm: '2026-10-07T15:05:00.000Z' },
+      ],
+      'EM_PREPARO'
+    )
+
+    expect(horario).toBe('2026-10-07T15:05:00.000Z')
+    expect(horarioInicioEtapa([], 'PRONTO')).toBeNull()
   })
 
   it('cancelado encerra a lista nesse rótulo', () => {

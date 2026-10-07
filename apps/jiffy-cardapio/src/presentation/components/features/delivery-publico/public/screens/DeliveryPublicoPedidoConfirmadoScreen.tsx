@@ -137,6 +137,7 @@ export function DeliveryPublicoPedidoConfirmadoScreen({
             localizacaoEmpresa={pedido.localizacaoEmpresa}
             codigoVenda={pedido.codigoVenda}
             statusDelivery={pedido.statusDelivery}
+            transicoesStatus={pedido.transicoesStatus}
             canalWhatsAppAtivo={catalogQuery.data?.pages[0]?.canalWhatsApp?.conectado === true}
             onVerPedido={irParaDetalhe}
             onVoltarAoCardapio={irParaCardapio}

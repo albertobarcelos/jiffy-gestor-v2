@@ -16,7 +16,10 @@ import {
 } from './DeliveryCheckoutShell'
 import { DeliveryDistanciaLojaHint } from './DeliveryDistanciaLojaHint'
 import { DeliveryPedidoProgressoVertical } from './DeliveryPedidoProgressoVertical'
-import type { StatusAcompanhamentoPedido } from '@/src/domain/services/pedido/etapasAcompanhamentoPedido'
+import type {
+  StatusAcompanhamentoPedido,
+  TransicaoAcompanhamentoPedido,
+} from '@/src/domain/services/pedido/etapasAcompanhamentoPedido'
 
 type DeliveryCheckoutSucessoModalProps = {
   nomeCliente: string
@@ -27,6 +30,7 @@ type DeliveryCheckoutSucessoModalProps = {
   localizacaoEmpresa?: GeoJsonPoint | null
   codigoVenda: string | null
   statusDelivery: StatusAcompanhamentoPedido
+  transicoesStatus?: readonly TransicaoAcompanhamentoPedido[]
   /** Aviso de atualizações no WhatsApp. Só com o canal conectado no gestor. */
   canalWhatsAppAtivo?: boolean
   onVerPedido: () => void
@@ -47,6 +51,7 @@ export function DeliveryCheckoutSucessoModal({
   localizacaoEmpresa = null,
   codigoVenda,
   statusDelivery,
+  transicoesStatus = [],
   canalWhatsAppAtivo = false,
   onVerPedido,
   onVoltarAoCardapio,
@@ -117,6 +122,7 @@ export function DeliveryCheckoutSucessoModal({
             <DeliveryPedidoProgressoVertical
               tipoEntrega={tipoEntrega}
               statusDelivery={statusDelivery}
+              transicoesStatus={transicoesStatus}
             />
           </div>
 

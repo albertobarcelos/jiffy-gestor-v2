@@ -4,7 +4,10 @@ import type {
   MeioPagamentoPublicoDTO,
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { ItemCarrinhoDelivery } from '@/src/domain/types/carrinho'
-import type { StatusAcompanhamentoPedido } from '@/src/domain/services/pedido/etapasAcompanhamentoPedido'
+import type {
+  StatusAcompanhamentoPedido,
+  TransicaoAcompanhamentoPedido,
+} from '@/src/domain/services/pedido/etapasAcompanhamentoPedido'
 import type { DeliveryTipoEntrega } from '@/src/domain/types/entrega'
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import { formatarEnderecoEmpresa } from '@/src/shared/utils/formatarResumoEndereco'
@@ -15,6 +18,7 @@ export type PedidoPublicoConfirmadoView = {
   slug: string
   tipoEntrega: DeliveryTipoEntrega
   statusDelivery: StatusAcompanhamentoPedido
+  transicoesStatus: TransicaoAcompanhamentoPedido[]
   nome: string
   telefone: string
   enderecoCliente: EnderecoClienteDeliveryPublicoDTO | null
@@ -127,6 +131,10 @@ export function mapPedidoDeliveryPublicoParaConfirmado(
     slug: pedido.empresa.slug.trim(),
     tipoEntrega,
     statusDelivery: pedido.statusDelivery,
+    transicoesStatus: pedido.sequenciaTransicoes.map(transicao => ({
+      status: transicao.status,
+      realizadaEm: transicao.realizadaEm,
+    })),
     nome,
     telefone,
     enderecoCliente,

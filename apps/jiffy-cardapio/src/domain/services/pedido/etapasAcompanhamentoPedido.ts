@@ -19,6 +19,27 @@ export type EtapaAcompanhamentoPedido = {
   estado: EstadoEtapaAcompanhamento
 }
 
+export type TransicaoAcompanhamentoPedido = {
+  status: StatusAcompanhamentoPedido
+  realizadaEm: string
+}
+
+/**
+ * Horário em que o passo começou. Se o status entrou mais de uma vez, vale a última.
+ */
+export function horarioInicioEtapa(
+  transicoes: readonly TransicaoAcompanhamentoPedido[],
+  status: StatusAcompanhamentoPedido
+): string | null {
+  for (let index = transicoes.length - 1; index >= 0; index -= 1) {
+    const transicao = transicoes[index]
+    if (transicao?.status === status && transicao.realizadaEm.trim()) {
+      return transicao.realizadaEm
+    }
+  }
+  return null
+}
+
 const ROTULO: Record<StatusAcompanhamentoPedido, string> = {
   PENDENTE: 'Pendente',
   EM_PREPARO: 'Em preparo',

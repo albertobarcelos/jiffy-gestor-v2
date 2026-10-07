@@ -996,6 +996,7 @@ export function DeliveryPublicoCarrinhoScreen({
             localizacaoEmpresa={pedidoConfirmado.localizacaoEmpresa}
             codigoVenda={pedidoConfirmado.codigoVenda}
             statusDelivery={pedidoConfirmado.statusDelivery}
+            transicoesStatus={pedidoConfirmado.transicoesStatus}
             canalWhatsAppAtivo={catalogQuery.data?.pages[0]?.canalWhatsApp?.conectado === true}
             onVerPedido={() => goToCheckoutStep('pedidoDetalhe')}
             onVoltarAoCardapio={concluirAposSucesso}
