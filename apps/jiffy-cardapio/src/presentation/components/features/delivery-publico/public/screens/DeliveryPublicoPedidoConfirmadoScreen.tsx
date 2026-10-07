@@ -5,37 +5,40 @@ import { useRouter } from 'next/navigation'
 import { DeliveryCheckoutRevisaoModal } from '../components/checkout/DeliveryCheckoutRevisaoModal'
 import { DeliveryCheckoutShell } from '../components/checkout/DeliveryCheckoutShell'
 import { DeliveryCheckoutSucessoModal } from '../components/checkout/DeliveryCheckoutSucessoModal'
-import { DeliveryPublicoShell } from '../components/DeliveryPublicoShell'
 import { DeliveryThemeScope } from '../../shared/components/DeliveryThemeScope'
 import { DeliveryButton } from '../../shared/components/DeliveryButton'
-import { deliveryPublicoHomePath } from '../../shared/utils/deliveryPublicoRoutes'
+import { usePedidoDeliveryPublico } from '@/src/presentation/hooks/usePedidoDeliveryPublico'
+import { usePublicDeliveryCatalogInfinite } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import {
-  lerPedidoPublicoConfirmado,
-  type PedidoPublicoConfirmadoPersistido,
-} from '../../shared/utils/pedidoConfirmadoStorage'
+  DeliveryWhatsAppFab,
+  telefoneWhatsAppCanalConectado,
+} from '../../shared/components/DeliveryWhatsAppFab'
+import { DELIVERY_PAIS_TELEFONE_PADRAO } from '@/src/shared/constants/deliveryPaisesTelefone'
+import {
+  deliveryPublicoHomePath,
+  deliveryPublicoPedidoPath,
+} from '../../shared/utils/deliveryPublicoRoutes'
 
 type View = 'sucesso' | 'pedidoDetalhe'
 
 type DeliveryPublicoPedidoConfirmadoScreenProps = {
   slug: string
-  codigo: string
+  pedidoId: string
 }
 
 export function DeliveryPublicoPedidoConfirmadoScreen({
   slug,
-  codigo,
+  pedidoId,
 }: DeliveryPublicoPedidoConfirmadoScreenProps) {
   const router = useRouter()
-  const [persistido, setPersistido] = useState<PedidoPublicoConfirmadoPersistido | null | undefined>(
-    undefined
+  const { pedido, status, mensagemErro } = usePedidoDeliveryPublico(pedidoId)
+  const catalogQuery = usePublicDeliveryCatalogInfinite(slug)
+  const telefoneWhatsApp = telefoneWhatsAppCanalConectado(
+    catalogQuery.data?.pages[0]?.canalWhatsApp
   )
   const [view, setView] = useState<View>('sucesso')
   const [direction, setDirection] = useState<1 | -1>(1)
   const interacaoLiberadaRef = useRef(false)
-
-  useEffect(() => {
-    setPersistido(lerPedidoPublicoConfirmado(slug, codigo))
-  }, [slug, codigo])
 
   useEffect(() => {
     interacaoLiberadaRef.current = false
@@ -54,7 +57,15 @@ export function DeliveryPublicoPedidoConfirmadoScreen({
       window.clearTimeout(unlockTimer)
       document.removeEventListener('click', bloquearCliqueFantasma, true)
     }
-  }, [slug, codigo])
+  }, [slug, pedidoId])
+
+  useEffect(() => {
+    if (status !== 'ready' || !pedido) return
+    const slugPedido = pedido.slug.trim().toLowerCase()
+    const slugRota = slug.trim().toLowerCase()
+    if (!slugPedido || slugPedido === slugRota) return
+    router.replace(deliveryPublicoPedidoPath(pedido.slug, pedido.id))
+  }, [pedido, router, slug, status])
 
   const irParaCardapio = useCallback(() => {
     if (!interacaoLiberadaRef.current) return
@@ -71,92 +82,95 @@ export function DeliveryPublicoPedidoConfirmadoScreen({
     setView('sucesso')
   }
 
-  if (persistido === undefined) {
+  if (status === 'loading') {
     return (
       <DeliveryThemeScope slug={slug}>
-        <DeliveryPublicoShell>
-          <div className="flex min-h-screen items-center justify-center">
-            <div
-              className="h-12 w-12 animate-spin rounded-full border-b-2"
-              style={{ borderColor: 'var(--delivery-primary, #333)' }}
-              aria-hidden
-            />
-          </div>
-        </DeliveryPublicoShell>
+        <div className="flex h-full items-center justify-center">
+          <div
+            className="h-12 w-12 animate-spin rounded-full border-b-2"
+            style={{ borderColor: 'var(--delivery-primary, #333)' }}
+            aria-hidden
+          />
+        </div>
       </DeliveryThemeScope>
     )
   }
 
-  if (!persistido) {
+  if (status !== 'ready' || !pedido) {
+    const titulo = status === 'not_found' ? 'Pedido não encontrado' : 'Não foi possível abrir o pedido'
+    const descricao =
+      status === 'not_found'
+        ? 'Este pedido não está disponível.'
+        : mensagemErro || 'Tente novamente em instantes.'
+
     return (
       <DeliveryThemeScope slug={slug}>
-        <DeliveryPublicoShell>
-          <div className="mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center gap-4 px-4 text-center">
-            <h1 className="delivery-font-title text-xl font-semibold delivery-text-primary">
-              Pedido não encontrado
-            </h1>
-            <p className="text-sm delivery-text-secondary">
-              Não há dados deste pedido neste dispositivo. A confirmação fica disponível após
-              finalizar o pedido neste navegador.
-            </p>
-            <DeliveryButton type="button" onClick={irParaCardapio}>
-              Voltar ao cardápio
-            </DeliveryButton>
-          </div>
-        </DeliveryPublicoShell>
+        <div className="mx-auto flex h-full w-full max-w-md flex-col items-center justify-center gap-4 px-4 text-center">
+          <h1 className="delivery-font-title text-xl font-semibold delivery-text-primary">
+            {titulo}
+          </h1>
+          <p className="text-sm delivery-text-secondary">{descricao}</p>
+          <DeliveryButton type="button" onClick={irParaCardapio}>
+            Voltar ao cardápio
+          </DeliveryButton>
+        </div>
       </DeliveryThemeScope>
     )
   }
-
-  const { snapshot, meta } = persistido
 
   return (
-    <DeliveryThemeScope slug={slug} nomeExibicaoFallback={meta.nomeEmpresa ?? ''}>
-      <DeliveryPublicoShell>
-        <div className="min-h-screen">
-          <DeliveryCheckoutShell
-            open
-            presentation="page"
-            stepKey={view}
-            direction={direction}
-            onClose={view === 'pedidoDetalhe' ? voltarSucesso : irParaCardapio}
-          >
-            {view === 'sucesso' ? (
-              <DeliveryCheckoutSucessoModal
-                nomeCliente={snapshot.nome}
-                tipoEntrega={snapshot.tipoEntrega}
-                modoTempo={snapshot.modoTempo}
-                enderecoCliente={snapshot.enderecoCliente}
-                enderecoEmpresaTexto={snapshot.enderecoEmpresaTexto}
-                localizacaoEmpresa={meta.localizacaoEmpresa}
-                telefoneEmpresa={meta.telefoneEmpresa}
-                nomeEmpresa={meta.nomeEmpresa}
-                codigoVenda={snapshot.codigoVenda}
-                onVerPedido={irParaDetalhe}
-                onVoltarAoCardapio={irParaCardapio}
-              />
-            ) : (
-              <DeliveryCheckoutRevisaoModal
-                modo="somenteLeitura"
-                tipoEntrega={snapshot.tipoEntrega}
-                nome={snapshot.nome}
-                telefone={snapshot.telefone}
-                telefonePaisIso2={snapshot.telefonePaisIso2}
-                enderecoCliente={snapshot.enderecoCliente}
-                enderecoEmpresaTexto={snapshot.enderecoEmpresaTexto}
-                localizacaoEmpresa={meta.localizacaoEmpresa}
-                itens={snapshot.itens}
-                total={snapshot.total}
-                pagamentos={snapshot.pagamentos}
-                observacaoPedido={snapshot.observacaoPedido}
-                cpfNotaFiscal={snapshot.cpfNotaFiscal}
-                codigoVenda={snapshot.codigoVenda}
-                onVoltar={voltarSucesso}
-              />
-            )}
-          </DeliveryCheckoutShell>
-        </div>
-      </DeliveryPublicoShell>
+    <DeliveryThemeScope slug={slug} nomeExibicaoFallback={pedido.nomeEmpresa ?? ''}>
+      <DeliveryCheckoutShell
+        open
+        presentation="page"
+        stepKey={view}
+        direction={direction}
+        onClose={view === 'pedidoDetalhe' ? voltarSucesso : irParaCardapio}
+      >
+        {view === 'sucesso' ? (
+          <DeliveryCheckoutSucessoModal
+            nomeCliente={pedido.nome}
+            tipoEntrega={pedido.tipoEntrega}
+            modoTempo="imediato"
+            enderecoCliente={pedido.enderecoCliente}
+            enderecoEmpresaTexto={pedido.enderecoEmpresaTexto}
+            localizacaoEmpresa={pedido.localizacaoEmpresa}
+            codigoVenda={pedido.codigoVenda}
+            statusDelivery={pedido.statusDelivery}
+            canalWhatsAppAtivo={catalogQuery.data?.pages[0]?.canalWhatsApp?.conectado === true}
+            onVerPedido={irParaDetalhe}
+            onVoltarAoCardapio={irParaCardapio}
+          />
+        ) : (
+          <DeliveryCheckoutRevisaoModal
+            modo="somenteLeitura"
+            tipoEntrega={pedido.tipoEntrega}
+            nome={pedido.nome}
+            telefone={pedido.telefone}
+            telefonePaisIso2={DELIVERY_PAIS_TELEFONE_PADRAO}
+            enderecoCliente={pedido.enderecoCliente}
+            enderecoEmpresaTexto={pedido.enderecoEmpresaTexto}
+            localizacaoEmpresa={pedido.localizacaoEmpresa}
+            itens={pedido.itens}
+            total={pedido.total}
+            subtotalOficial={pedido.subtotal}
+            taxaEntregaOficial={pedido.taxaEntrega}
+            totalOficial={pedido.total}
+            trocoOficial={pedido.troco}
+            pagamentos={pedido.pagamentos}
+            observacaoPedido={pedido.observacaoPedido}
+            cpfNotaFiscal={pedido.cpfNotaFiscal}
+            codigoVenda={pedido.codigoVenda}
+            onVoltar={voltarSucesso}
+          />
+        )}
+      </DeliveryCheckoutShell>
+      <DeliveryWhatsAppFab
+        telefone={telefoneWhatsApp}
+        nomeLoja={pedido.nomeEmpresa}
+        visible={view === 'sucesso'}
+        bottomOffset="8rem"
+      />
     </DeliveryThemeScope>
   )
 }
