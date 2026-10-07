@@ -1,6 +1,7 @@
 import { AtualizarNomeClienteDeliveryPublicoUseCase } from '@/src/application/use-cases/delivery-publico/AtualizarNomeClienteDeliveryPublicoUseCase'
 import { BuscarClienteDeliveryPublicoUseCase } from '@/src/application/use-cases/delivery-publico/BuscarClienteDeliveryPublicoUseCase'
 import { CotarPedidoPublicoUseCase } from '@/src/application/use-cases/delivery-publico/CotarPedidoPublicoUseCase'
+import { ConsultarPedidoDeliveryPublicoUseCase } from '@/src/application/use-cases/delivery-publico/ConsultarPedidoDeliveryPublicoUseCase'
 import { EnviarPedidoPublicoUseCase } from '@/src/application/use-cases/delivery-publico/EnviarPedidoPublicoUseCase'
 import { GarantirClienteDeliveryPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirClienteDeliveryPublicoUseCase'
 import { GarantirEnderecoEntregaPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirEnderecoEntregaPublicoUseCase'
@@ -28,6 +29,9 @@ export const cotarPedidoPublicoUseCase = new CotarPedidoPublicoUseCase(
   garantirEnderecoEntregaPublicoUseCase,
   garantirClienteDeliveryPublicoUseCase
 )
+
+export const consultarPedidoDeliveryPublicoUseCase =
+  new ConsultarPedidoDeliveryPublicoUseCase(publicDeliveryPedidoAdapter)
 
 export const enviarPedidoPublicoUseCase = new EnviarPedidoPublicoUseCase(
   publicDeliveryPedidoAdapter,

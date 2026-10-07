@@ -1,13 +1,13 @@
 import { DeliveryPublicoPedidoConfirmadoScreen } from '@/src/presentation/components/features/delivery-publico/public/screens/DeliveryPublicoPedidoConfirmadoScreen'
 
 type PageProps = {
-  params: Promise<{ slug: string; codigo: string }>
+  params: Promise<{ slug: string; id: string }>
 }
 
 export default async function CardapioPedidoConfirmadoPage({ params }: PageProps) {
-  const { slug: rawSlug, codigo: rawCodigo } = await params
+  const { slug: rawSlug, id: rawId } = await params
   const slug = rawSlug?.trim() ?? ''
-  const codigo = rawCodigo?.trim() ?? ''
+  const pedidoId = rawId?.trim() ?? ''
 
-  return <DeliveryPublicoPedidoConfirmadoScreen slug={slug} codigo={codigo} />
+  return <DeliveryPublicoPedidoConfirmadoScreen slug={slug} pedidoId={pedidoId} />
 }

@@ -3,12 +3,14 @@ import type {
   ClienteDeliveryPublicoDTO,
   CotacaoPedidoPublicoInput,
   CreatePedidoPublicoInput,
-  CreatePedidoPublicoResponseDTO,
   CriarClienteDeliveryPublicoInput,
   GetCatalogoPublicoResponseDTO,
   GetMeiosPagamentoPublicosResponseDTO,
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
-import { parseCreatePedidoPublicoResponse } from '@/src/application/dto/delivery-publico/CreatePedidoPublicoResponseDTO'
+import {
+  parsePedidoDeliveryPublicoResponse,
+  type PedidoDeliveryPublicoDTO,
+} from '@/src/application/dto/delivery-publico/PedidoDeliveryPublicoDTO'
 import {
   parseCotacaoPedidoPublicoFromErrorBody,
   parseCotacaoPedidoPublicoResponse,
@@ -149,7 +151,7 @@ export async function cotarPedidoPublico(
 
 export async function criarPedidoPublico(
   input: CreatePedidoPublicoInput
-): Promise<CreatePedidoPublicoResponseDTO> {
+): Promise<PedidoDeliveryPublicoDTO> {
   const res = await fetch('/api/public/delivery/pedidos', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -166,7 +168,24 @@ export async function criarPedidoPublico(
     }
     throw new PublicDeliveryApiError(message, res.status, body)
   }
-  return parseCreatePedidoPublicoResponse(await res.json())
+  return parsePedidoDeliveryPublicoResponse(await res.json())
+}
+
+export async function consultarPedidoPublico(id: string): Promise<PedidoDeliveryPublicoDTO> {
+  const idNormalizado = id.trim()
+  const res = await fetch(
+    `/api/public/delivery/pedidos/${encodeURIComponent(idNormalizado)}`,
+    { cache: 'no-store', headers: { Accept: 'application/json' } }
+  )
+  const body = await parseErrorBody(res)
+  if (!res.ok) {
+    throw new PublicDeliveryApiError(
+      parseErrorMessageFromBody(body, res.status),
+      res.status,
+      body
+    )
+  }
+  return parsePedidoDeliveryPublicoResponse(body)
 }
 
 /**

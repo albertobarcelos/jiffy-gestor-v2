@@ -1,23 +1,36 @@
-import type { CreatePedidoPublicoResponseDTO } from '@/src/application/dto/delivery-publico/CreatePedidoPublicoResponseDTO'
+import type { PedidoDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/PedidoDeliveryPublicoDTO'
 import type {
   EnderecoClienteDeliveryPublicoDTO,
   MeioPagamentoPublicoDTO,
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { ItemCarrinhoDelivery } from '@/src/domain/types/carrinho'
+import type {
+  StatusAcompanhamentoPedido,
+  TransicaoAcompanhamentoPedido,
+} from '@/src/domain/services/pedido/etapasAcompanhamentoPedido'
 import type { DeliveryTipoEntrega } from '@/src/domain/types/entrega'
+import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
+import { formatarEnderecoEmpresa } from '@/src/shared/utils/formatarResumoEndereco'
 
-export type PedidoPublicoConfirmadoSnapshot = {
-  pedidoId: string | null
+export type PedidoPublicoConfirmadoView = {
+  id: string
   codigoVenda: string | null
+  slug: string
   tipoEntrega: DeliveryTipoEntrega
-  modoTempo: 'imediato' | 'agendado'
+  statusDelivery: StatusAcompanhamentoPedido
+  transicoesStatus: TransicaoAcompanhamentoPedido[]
   nome: string
   telefone: string
-  telefonePaisIso2: string
   enderecoCliente: EnderecoClienteDeliveryPublicoDTO | null
   enderecoEmpresaTexto: string | null
+  localizacaoEmpresa: GeoJsonPoint | null
+  telefoneLoja: string | null
+  nomeEmpresa: string | null
   itens: ItemCarrinhoDelivery[]
   total: number
+  subtotal: number
+  taxaEntrega: number
+  troco: number
   pagamentos: Array<{
     meioPagamentoId: string
     valor: number
@@ -27,119 +40,118 @@ export type PedidoPublicoConfirmadoSnapshot = {
   cpfNotaFiscal: string
 }
 
-export type MapPedidoPublicoConfirmadoFallback = {
-  /** Contexto local do checkout — preenchido quando a API omite algo. */
-  tipoEntrega: DeliveryTipoEntrega
-  modoTempo: 'imediato' | 'agendado'
-  nome: string
-  telefone: string
-  telefonePaisIso2: string
-  enderecoCliente: EnderecoClienteDeliveryPublicoDTO | null
-  enderecoEmpresaTexto: string | null
-  itensCarrinho: ItemCarrinhoDelivery[]
-  total: number
-  pagamentos: Array<{
-    meioPagamentoId: string
-    valor: number
-    meio: MeioPagamentoPublicoDTO | null
-  }>
-  observacaoPedido: string
-  cpfNotaFiscal: string
-  meiosPagamento: MeioPagamentoPublicoDTO[]
+function subtotalPedido(valorFinal: number, taxaEntrega: number): number {
+  return Math.round((valorFinal - taxaEntrega) * 100) / 100
+}
+
+function meioPagamentoExibicao(nome: string, index: number): MeioPagamentoPublicoDTO {
+  const id = `cobranca-${index}`
+  return {
+    id,
+    nome,
+    formaPagamentoFiscal: '',
+    formaPagamentoFiscalLabel: '',
+    isParcelavel: false,
+    tipoParcelamento: '',
+  }
 }
 
 /**
- * Monta o snapshot da tela de sucesso/detalhes a partir do response do POST,
- * com fallback do checkout local para campos que a API não traz (ex.: imagem).
+ * Traduz o DTO público do pedido para a visão da tela de confirmação.
+ * Não completa campos com carrinho nem catálogo local.
  */
-export function mapPedidoPublicoCriadoParaConfirmado(
-  pedido: CreatePedidoPublicoResponseDTO,
-  fallback: MapPedidoPublicoConfirmadoFallback
-): PedidoPublicoConfirmadoSnapshot {
-  const tipoEntrega = pedido.tipoEntrega ?? fallback.tipoEntrega
-  const modoTempo = pedido.pedidoAgendado ? 'agendado' : fallback.modoTempo
+export function mapPedidoDeliveryPublicoParaConfirmado(
+  pedido: PedidoDeliveryPublicoDTO
+): PedidoPublicoConfirmadoView {
+  const tipoEntrega = pedido.tipoEntrega
+  const contexto = pedido.contextoEntrega
+  const enderecoApi = contexto?.enderecoEntrega
 
-  const nome =
-    pedido.cliente?.nome?.trim() ||
-    pedido.contextoEntrega?.destinatarioNome?.trim() ||
-    fallback.nome
-
-  const telefone =
-    pedido.contextoEntrega?.destinatarioTelefone?.trim() || fallback.telefone
-
-  const enderecoApi = pedido.contextoEntrega?.enderecoEntrega
   const enderecoCliente: EnderecoClienteDeliveryPublicoDTO | null =
     tipoEntrega === 'entrega' && enderecoApi
       ? {
-          id: 'pedido-confirmado',
-          etiqueta: enderecoApi.etiqueta || 'outro',
+          id: 'pedido',
+          etiqueta: enderecoApi.etiqueta,
           rua: enderecoApi.rua,
           numero: enderecoApi.numero ?? '',
           bairro: enderecoApi.bairro ?? '',
-          cidade: enderecoApi.cidade,
-          estado: enderecoApi.estado,
+          cidade: enderecoApi.cidade ?? null,
+          estado: enderecoApi.estado ?? null,
           cep: enderecoApi.cep,
-          complemento: enderecoApi.complemento,
+          complemento: enderecoApi.complemento ?? null,
+          enderecoLocalizacao: contexto?.enderecoLocalizacao ?? null,
+          preferenciaEntrega: contexto?.localExatoEntrega ?? null,
         }
-      : tipoEntrega === 'entrega'
-        ? fallback.enderecoCliente
-        : null
+      : null
 
-  const imagemPorProdutoId = new Map(
-    fallback.itensCarrinho.map(item => [item.produtoId, item.produtoImagemUrl] as const)
-  )
+  const nome =
+    pedido.clienteDelivery?.nome.trim() ||
+    contexto?.destinatarioNome?.trim() ||
+    ''
 
-  const itensFromApi: ItemCarrinhoDelivery[] = pedido.produtosLancados.map(p => ({
-    id: p.id,
-    produtoId: p.produtoId,
-    produtoNome: p.nomeProduto,
-    produtoImagemUrl: imagemPorProdutoId.get(p.produtoId) ?? null,
-    quantidade: p.quantidade,
-    valorUnitario: p.valorUnitario,
-    valorTotal: p.valorFinal,
-    observacoes: p.observacoes,
-    complementos: p.complementos.map(c => ({
-      complementoId: c.complementoId,
-      grupoComplementoId: c.grupoComplementoId,
-      quantidade: c.quantidade,
-      nome: c.nomeComplemento,
-      valor: c.valorUnitario,
-      tipoImpactoPreco: c.tipoImpactoPreco,
+  const telefone =
+    pedido.clienteDelivery?.telefone.trim() ||
+    contexto?.destinatarioTelefone.trim() ||
+    ''
+
+  const itens: ItemCarrinhoDelivery[] = pedido.produtosLancados.map((produto, index) => ({
+    id: `item-${index}`,
+    produtoId: `item-${index}`,
+    produtoNome: produto.nomeProduto,
+    produtoImagemUrl: produto.imagemUrl,
+    quantidade: produto.quantidade,
+    valorUnitario: produto.valorUnitario,
+    valorTotal: produto.valorFinal,
+    observacoes: produto.observacoes.map(obs => obs.observacao).filter(obs => obs.trim()),
+    complementos: produto.complementos.map((complemento, complementoIndex) => ({
+      complementoId: `comp-${index}-${complementoIndex}`,
+      grupoComplementoId: '',
+      quantidade: complemento.quantidade,
+      nome: complemento.nomeComplemento,
+      valor: complemento.valorUnitario,
+      tipoImpactoPreco: complemento.tipoImpactoPreco,
     })),
-    adicionadoEm: new Date().toISOString(),
+    adicionadoEm: '',
   }))
 
-  const meiosById = new Map(fallback.meiosPagamento.map(m => [m.id, m] as const))
-  const pagamentosFromApi = pedido.cobrancas.map(c => ({
-    meioPagamentoId: c.meioPagamentoId,
-    valor: c.valor,
-    meio: meiosById.get(c.meioPagamentoId) ?? null,
-  }))
+  const pagamentos = pedido.cobrancas.map((cobranca, index) => {
+    const nomeMeio = cobranca.meioPagamentoNome.trim() || 'Pagamento'
+    return {
+      meioPagamentoId: `cobranca-${index}`,
+      valor: cobranca.valor,
+      meio: meioPagamentoExibicao(nomeMeio, index),
+    }
+  })
 
-  const observacaoPedido =
-    pedido.observacoes.length > 0
-      ? pedido.observacoes.join(' · ')
-      : fallback.observacaoPedido
-
-  const cpfNotaFiscal =
-    pedido.documentoCpfCnpj?.replace(/\D/g, '') ||
-    pedido.contextoEntrega?.destinatarioCpf?.replace(/\D/g, '') ||
-    fallback.cpfNotaFiscal.replace(/\D/g, '')
+  const telefoneWhatsapp = pedido.telefoneWhatsapp?.trim() || null
 
   return {
-    pedidoId: pedido.id,
-    codigoVenda: pedido.codigoVenda,
+    id: pedido.id,
+    codigoVenda: pedido.codigoVenda.trim() || null,
+    slug: pedido.empresa.slug.trim(),
     tipoEntrega,
-    modoTempo,
+    statusDelivery: pedido.statusDelivery,
+    transicoesStatus: pedido.sequenciaTransicoes.map(transicao => ({
+      status: transicao.status,
+      realizadaEm: transicao.realizadaEm,
+    })),
     nome,
     telefone,
-    telefonePaisIso2: fallback.telefonePaisIso2,
     enderecoCliente,
-    enderecoEmpresaTexto: fallback.enderecoEmpresaTexto,
-    itens: itensFromApi.length > 0 ? itensFromApi : fallback.itensCarrinho,
-    total: pedido.valorFinal ?? fallback.total,
-    pagamentos: pagamentosFromApi.length > 0 ? pagamentosFromApi : fallback.pagamentos,
-    observacaoPedido,
-    cpfNotaFiscal,
+    enderecoEmpresaTexto: formatarEnderecoEmpresa(pedido.empresa.endereco),
+    localizacaoEmpresa: pedido.empresa.localizacao,
+    telefoneLoja: telefoneWhatsapp || pedido.empresa.telefone,
+    nomeEmpresa: pedido.empresa.nomeFantasia.trim() || null,
+    itens,
+    total: pedido.valorFinal,
+    subtotal: subtotalPedido(pedido.valorFinal, pedido.taxaEntrega),
+    taxaEntrega: pedido.taxaEntrega,
+    troco: pedido.troco,
+    pagamentos,
+    observacaoPedido: pedido.observacoes
+      .map(obs => obs.observacao.trim())
+      .filter(Boolean)
+      .join(' · '),
+    cpfNotaFiscal: pedido.documentoCpfCnpj?.replace(/\D/g, '') ?? '',
   }
 }

@@ -4,7 +4,6 @@ import Image from 'next/image'
 import { ClipboardList, MapPin, MessageCircle } from 'lucide-react'
 import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
-import { abrirWhatsapp, telefoneValidoParaWhatsapp } from '@/src/shared/utils/whatsappLink'
 import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPreferenciaEntregaStore'
 import { formatarResumoEnderecoPublico } from '@/src/application/mappers/ClienteDeliveryPublicoMapper'
 import {
@@ -16,6 +15,11 @@ import {
   DeliveryCheckoutShellHeader,
 } from './DeliveryCheckoutShell'
 import { DeliveryDistanciaLojaHint } from './DeliveryDistanciaLojaHint'
+import { DeliveryPedidoProgressoVertical } from './DeliveryPedidoProgressoVertical'
+import type {
+  StatusAcompanhamentoPedido,
+  TransicaoAcompanhamentoPedido,
+} from '@/src/domain/services/pedido/etapasAcompanhamentoPedido'
 
 type DeliveryCheckoutSucessoModalProps = {
   nomeCliente: string
@@ -24,9 +28,11 @@ type DeliveryCheckoutSucessoModalProps = {
   enderecoCliente: EnderecoClienteDeliveryPublicoDTO | null
   enderecoEmpresaTexto: string | null
   localizacaoEmpresa?: GeoJsonPoint | null
-  telefoneEmpresa: string | null
-  nomeEmpresa: string | null
   codigoVenda: string | null
+  statusDelivery: StatusAcompanhamentoPedido
+  transicoesStatus?: readonly TransicaoAcompanhamentoPedido[]
+  /** Aviso de atualizações no WhatsApp. Só com o canal conectado no gestor. */
+  canalWhatsAppAtivo?: boolean
   onVerPedido: () => void
   onVoltarAoCardapio: () => void
 }
@@ -43,9 +49,10 @@ export function DeliveryCheckoutSucessoModal({
   enderecoCliente,
   enderecoEmpresaTexto,
   localizacaoEmpresa = null,
-  telefoneEmpresa,
-  nomeEmpresa,
   codigoVenda,
+  statusDelivery,
+  transicoesStatus = [],
+  canalWhatsAppAtivo = false,
   onVerPedido,
   onVoltarAoCardapio,
 }: DeliveryCheckoutSucessoModalProps) {
@@ -54,7 +61,7 @@ export function DeliveryCheckoutSucessoModal({
   const titulo = nomeCurto ? `Obrigado, ${nomeCurto}!` : 'Pedido enviado!'
 
   const orientacao = isEntrega
-    ? 'Seu pedido será preparado e, em breve, chegará no endereço cadastrado.'
+    ? 'Seu pedido será confirmado e iniciaremos o preparo, siga abaixo.'
     : 'Seu pedido será preparado. Quando estiver pronto, retire no endereço da loja.'
 
   const enderecoResumo = isEntrega
@@ -71,11 +78,6 @@ export function DeliveryCheckoutSucessoModal({
         )
       : null
 
-  const podeWhatsapp = telefoneValidoParaWhatsapp(telefoneEmpresa)
-  const mensagemWhatsapp = nomeEmpresa
-    ? `Olá! Acabei de fazer um pedido pelo delivery de ${nomeEmpresa}.`
-    : 'Olá! Acabei de fazer um pedido pelo delivery.'
-
   return (
     <>
       <DeliveryCheckoutShellHeader
@@ -85,8 +87,8 @@ export function DeliveryCheckoutSucessoModal({
       />
 
       <div className="flex min-h-full flex-col">
-        <div className="flex flex-1 flex-col items-center px-1 pb-6 pt-4 text-center">
-          <div className="relative mb-4 h-28 w-28" aria-hidden>
+        <div className="flex flex-1 flex-col items-center px-1 pb-3 pt-0 text-center">
+          <div className="relative -mt-2 mb-1 h-28 w-28" aria-hidden>
             <Image
               src="/images/jiffy-acenando.png"
               alt=""
@@ -100,13 +102,13 @@ export function DeliveryCheckoutSucessoModal({
           <h3 className="delivery-font-title text-xl font-semibold delivery-text-primary">
             {titulo}
           </h3>
-          <p className="mt-2 max-w-sm text-sm leading-relaxed delivery-text-secondary">
+          <p className="mt-1 max-w-sm text-sm leading-snug delivery-text-secondary">
             {orientacao}
           </p>
 
           {codigoVenda ? (
             <div
-              className="mt-4 w-full rounded-xl border px-3 py-3"
+              className="mt-2 w-full rounded-xl border px-3 py-2"
               style={{ borderColor: 'var(--delivery-border)' }}
             >
               <p className="text-xs delivery-text-secondary">Código do pedido</p>
@@ -115,6 +117,14 @@ export function DeliveryCheckoutSucessoModal({
               </p>
             </div>
           ) : null}
+
+          <div className="-mt-2 w-full">
+            <DeliveryPedidoProgressoVertical
+              tipoEntrega={tipoEntrega}
+              statusDelivery={statusDelivery}
+              transicoesStatus={transicoesStatus}
+            />
+          </div>
 
           {modoTempo === 'agendado' ? (
             <p className="mt-2 text-sm font-medium delivery-text-primary">
@@ -126,7 +136,7 @@ export function DeliveryCheckoutSucessoModal({
 
           {enderecoResumo ? (
             <div
-              className="mt-5 w-full rounded-xl border p-3 text-left"
+              className="mt-2 w-full rounded-xl border px-3 py-2 text-left"
               style={{ borderColor: 'var(--delivery-border)' }}
             >
               <div className="flex items-start gap-3">
@@ -153,25 +163,27 @@ export function DeliveryCheckoutSucessoModal({
             </div>
           ) : null}
 
-          <div
-            className="mt-4 w-full rounded-xl border p-3 text-left"
-            style={{
-              borderColor: 'var(--delivery-border)',
-              backgroundColor: 'var(--delivery-surface-muted)',
-            }}
-          >
-            <div className="flex items-start gap-3">
-              <MessageCircle
-                className="mt-0.5 h-5 w-5 shrink-0"
-                style={{ color: 'var(--delivery-primary)' }}
-                aria-hidden
-              />
-              <p className="text-sm leading-relaxed delivery-text-secondary">
-                Você poderá receber atualizações do andamento do pedido pelo WhatsApp no celular
-                informado no checkout.
-              </p>
+          {canalWhatsAppAtivo ? (
+            <div
+              className="mt-2 w-full rounded-xl border px-3 py-2 text-left"
+              style={{
+                borderColor: 'var(--delivery-border)',
+                backgroundColor: 'var(--delivery-surface-muted)',
+              }}
+            >
+              <div className="flex items-start gap-3">
+                <MessageCircle
+                  className="mt-0.5 h-5 w-5 shrink-0"
+                  style={{ color: 'var(--delivery-primary)' }}
+                  aria-hidden
+                />
+                <p className="text-sm leading-snug delivery-text-secondary">
+                  Você poderá receber atualizações do andamento do pedido pelo WhatsApp no celular
+                  informado no checkout.
+                </p>
+              </div>
             </div>
-          </div>
+          ) : null}
         </div>
       </div>
 
@@ -190,21 +202,6 @@ export function DeliveryCheckoutSucessoModal({
             <ClipboardList className="h-5 w-5" aria-hidden />
             Ver pedido
           </button>
-          {podeWhatsapp ? (
-            <button
-              type="button"
-              onClick={() => abrirWhatsapp(telefoneEmpresa, mensagemWhatsapp)}
-              className="flex min-h-[3.5rem] w-full items-center justify-center gap-2 text-base font-semibold"
-              style={{
-                borderBottom: '1px solid var(--delivery-border)',
-                color: '#25D366',
-                backgroundColor: 'var(--delivery-surface)',
-              }}
-            >
-              <MessageCircle className="h-5 w-5" aria-hidden />
-              Falar com a loja
-            </button>
-          ) : null}
           <button
             type="button"
             onClick={onVoltarAoCardapio}

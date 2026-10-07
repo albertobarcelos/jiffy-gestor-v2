@@ -8,6 +8,7 @@ import type {
 import {
   atualizarClienteDeliveryPublico,
   buscarClienteDeliveryPublico,
+  consultarPedidoPublico,
   cotarPedidoPublico,
   criarClienteDeliveryPublico,
   criarPedidoPublico,
@@ -29,6 +30,7 @@ export const publicDeliveryCotacaoAdapter: ICotacaoPedidoPublicoPort = {
 
 export const publicDeliveryPedidoAdapter: IPedidoPublicoPort = {
   criar: input => criarPedidoPublico(input),
+  consultar: id => consultarPedidoPublico(id),
 }
 
 export const publicDeliveryCatalogoAdapter: ICatalogoPublicoPort = {

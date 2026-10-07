@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
 import type { ClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import type { PedidoDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/PedidoDeliveryPublicoDTO'
 import { EnviarPedidoPublicoUseCase } from '@/src/application/use-cases/delivery-publico/EnviarPedidoPublicoUseCase'
 import { MSG_PAGAMENTO_OBRIGATORIO_PEDIDO_PUBLICO } from '@/src/domain/policies/PagamentoObrigatorioPedidoPublico'
 import { GarantirClienteDeliveryPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirClienteDeliveryPublicoUseCase'
@@ -15,6 +16,7 @@ vi.mock('@/src/infrastructure/api/publicDeliveryApi', () => ({
   buscarClienteDeliveryPublico: vi.fn(),
   atualizarClienteDeliveryPublico: vi.fn(),
   criarPedidoPublico: vi.fn(),
+  consultarPedidoPublico: vi.fn(),
   criarClienteDeliveryPublico: vi.fn(),
 }))
 
@@ -78,7 +80,9 @@ describe('EnviarPedidoPublicoUseCase', () => {
     vi.mocked(publicDeliveryApi.buscarClienteDeliveryPublico).mockReset()
     vi.mocked(publicDeliveryApi.atualizarClienteDeliveryPublico).mockReset()
     vi.mocked(publicDeliveryApi.criarClienteDeliveryPublico).mockReset()
-    vi.mocked(publicDeliveryApi.criarPedidoPublico).mockResolvedValue({ id: 'pedido-1' })
+    vi.mocked(publicDeliveryApi.criarPedidoPublico).mockResolvedValue({
+      id: 'pedido-1',
+    } as PedidoDeliveryPublicoDTO)
   })
 
   afterEach(() => {

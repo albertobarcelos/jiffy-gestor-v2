@@ -2,7 +2,7 @@ import type {
   CheckoutFormData,
   PedidoPublicoCarrinhoItemInput,
 } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
-import type { CreatePedidoPublicoResponseDTO } from '@/src/application/dto/delivery-publico/CreatePedidoPublicoResponseDTO'
+import type { PedidoDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/PedidoDeliveryPublicoDTO'
 import type { CotacaoPedidoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import {
   CreatePedidoPublicoInputSchema,
@@ -45,7 +45,7 @@ export type EnviarPedidoPublicoResult =
   | {
       ok: true
       clienteAtualizado: ClienteDeliveryPublicoDTO | null
-      pedido: CreatePedidoPublicoResponseDTO
+      pedido: PedidoDeliveryPublicoDTO
     }
   | {
       ok: false

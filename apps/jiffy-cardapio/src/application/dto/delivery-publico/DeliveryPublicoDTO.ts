@@ -147,8 +147,11 @@ export type ClienteDeliveryPublicoDTO = {
   enderecos: EnderecoClienteDeliveryPublicoDTO[]
 }
 
-export type { CreatePedidoPublicoResponseDTO } from './CreatePedidoPublicoResponseDTO'
-export { parseCreatePedidoPublicoResponse } from './CreatePedidoPublicoResponseDTO'
+export type {
+  CreatePedidoPublicoResponseDTO,
+  PedidoDeliveryPublicoDTO,
+} from './PedidoDeliveryPublicoDTO'
+export { parsePedidoDeliveryPublicoResponse } from './PedidoDeliveryPublicoDTO'
 
 export type { CotacaoPedidoPublicoDTO } from './CotacaoPedidoPublicoDTO'
 export {
