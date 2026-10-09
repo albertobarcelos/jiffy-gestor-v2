@@ -858,6 +858,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     if (!hasMoreVendasRef.current || isLoadingRef.current || isLoadingMoreRef.current) return
 
     const seq = vendasFetchSeqRef.current
+    isLoadingMoreRef.current = true
     setIsLoadingMore(true)
 
     try {
@@ -875,6 +876,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
       showToast.error('Erro ao carregar mais vendas')
     } finally {
       // Sempre encerra: um reset de filtros pode invalidar `seq` e outra busca já zerou o estado
+      isLoadingMoreRef.current = false
       setIsLoadingMore(false)
     }
   }, [ buscarPaginaVendas, inferirHasMoreApi])
@@ -967,6 +969,19 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
       }
     }
   }, [handleScrollListaVendas])
+
+  // Página curta (ex.: Mesa) não gera rolagem, então o scroll não pede a próxima.
+  useEffect(() => {
+    if (isLoading || isLoadingMore || !hasMoreVendas) return
+    const frame = requestAnimationFrame(() => {
+      const container = scrollContainerRef.current
+      if (!container) return
+      if (container.scrollHeight > container.clientHeight + 8) return
+      if (!hasMoreVendasRef.current || isLoadingRef.current || isLoadingMoreRef.current) return
+      void loadMoreVendas()
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [vendas, hasMoreVendas, isLoading, isLoadingMore, loadMoreVendas])
 
   /**
    * Limpa todos os filtros
