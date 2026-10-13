@@ -22,7 +22,15 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
-import { MdClose, MdSearch, MdAdd, MdKeyboardArrowDown, MdKeyboardArrowUp } from 'react-icons/md'
+import { arrayMove } from '@dnd-kit/sortable'
+import type { DragEndEvent } from '@dnd-kit/core'
+import { MdClose, MdSearch, MdAdd, MdKeyboardArrowDown } from 'react-icons/md'
+import {
+  AlcaArraste,
+  ListaArrastavel,
+  LinhaArrastavel,
+  type ArrasteControle,
+} from './ComplementosListaArrastavel'
 import {
   GruposComplementosTabsModal,
   GruposComplementosTabsModalState,
@@ -139,6 +147,22 @@ function ordenarComplementosParaExibicao(lista: Complemento[]): Complemento[] {
     if (oa == null && ob != null) return 1
     return (a.getNome() || '').localeCompare(b.getNome() || '', 'pt-BR', { sensitivity: 'base' })
   })
+}
+
+/** Regrava a ordem 1-based para a lista não voltar à ordem anterior no próximo render. */
+function aplicarOrdemNaLista(lista: Complemento[]): Complemento[] {
+  return lista.map((c, index) =>
+    Complemento.create(
+      c.getId(),
+      c.getNome(),
+      c.getDescricao(),
+      c.getValor(),
+      c.isAtivo(),
+      c.getTipoImpactoPreco(),
+      index + 1,
+      c.getImagemUrl()
+    )
+  )
 }
 
 /** Atualiza só o valor daquele complemento, sem tocar nos outros grupos. */
@@ -343,6 +367,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
   const valoresDigitadosRef = useRef<Record<string, string>>({})
   const [salvandoValorChave, setSalvandoValorChave] = useState<Record<string, boolean>>({})
   const salvandoValorRef = useRef<Set<string>>(new Set())
+  const listaLimiteRef = useRef<HTMLDivElement>(null)
   const [abrindoGrupoComplementosId, setAbrindoGrupoComplementosId] = useState<string | null>(
     null
   )
@@ -449,16 +474,16 @@ export const ComplementosMultiSelectDialog = forwardRef<
       caminho: 'reordena-grupo-complemento' | 'reordena-complemento',
       body: Record<string, unknown>,
       chave: string
-    ) => {
-      if (!menuId || !produtoId) return
+    ): Promise<boolean> => {
+      if (!menuId || !produtoId) return false
       if (isDirtyRef.current) {
         showToast.error('Salve os vínculos antes de alterar a ordem.')
-        return
+        return false
       }
       const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
-        return
+        return false
       }
       setReordenandoChave(chave)
       try {
@@ -478,8 +503,10 @@ export const ComplementosMultiSelectDialog = forwardRef<
           throw new Error(errorData.message || errorData.error || 'Erro ao reordenar')
         }
         await loadGroups({ silent: true })
+        return true
       } catch (err) {
         showToast.error(err instanceof Error ? err.message : 'Erro ao reordenar')
+        return false
       } finally {
         setReordenandoChave(null)
       }
@@ -884,6 +911,69 @@ export const ComplementosMultiSelectDialog = forwardRef<
     open,
     sessionOrderTick,
   ])
+
+  const podeReordenarNoMenu =
+    Boolean(menuId && produtoId) &&
+    filterTab === 'vinculados' &&
+    !catalogSearch.trim() &&
+    sameIdSet(gruposVinculadosIds, gruposPersistidosIds)
+
+  const handleDragEndGrupos = useCallback(
+    async (event: DragEndEvent) => {
+      const { active, over } = event
+      if (!over || active.id === over.id || reordenandoChave) return
+      const ids = gruposCatalogoParaLista.map(grupo => grupo.id)
+      const oldIndex = ids.indexOf(String(active.id))
+      const newIndex = ids.indexOf(String(over.id))
+      if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return
+      const anterior = groups
+      const nextIds = arrayMove(ids, oldIndex, newIndex)
+      setGroups(prev => {
+        const byId = new Map(prev.map(grupo => [grupo.id, grupo]))
+        const ordered = nextIds
+          .map(id => byId.get(id))
+          .filter((grupo): grupo is GrupoComplementoItem => Boolean(grupo))
+        const restantes = prev.filter(grupo => !nextIds.includes(grupo.id))
+        return [...ordered, ...restantes]
+      })
+      const ok = await reordenarNoMenu(
+        'reordena-grupo-complemento',
+        { novaPosicao: newIndex + 1, grupoComplementoId: String(active.id) },
+        `grupo:${String(active.id)}`
+      )
+      if (!ok) setGroups(anterior)
+    },
+    [groups, gruposCatalogoParaLista, reordenandoChave, reordenarNoMenu]
+  )
+
+  const handleDragEndComplementos = useCallback(
+    async (grupoId: string, complementos: Complemento[], event: DragEndEvent) => {
+      const { active, over } = event
+      if (!over || active.id === over.id || reordenandoChave) return
+      const ids = complementos.map(comp => comp.getId())
+      const oldIndex = ids.indexOf(String(active.id))
+      const newIndex = ids.indexOf(String(over.id))
+      if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return
+      const anterior = groups
+      const reordenados = aplicarOrdemNaLista(arrayMove(complementos, oldIndex, newIndex))
+      setGroups(prev =>
+        prev.map(grupo =>
+          grupo.id === grupoId ? { ...grupo, complementos: reordenados } : grupo
+        )
+      )
+      const ok = await reordenarNoMenu(
+        'reordena-complemento',
+        {
+          novaPosicao: newIndex + 1,
+          grupoComplementoId: grupoId,
+          complementoId: String(active.id),
+        },
+        `comp:${grupoId}:${String(active.id)}`
+      )
+      if (!ok) setGroups(anterior)
+    },
+    [groups, reordenandoChave, reordenarNoMenu]
+  )
 
   const persistGruposSelection = useCallback(
     async (
@@ -1555,7 +1645,10 @@ export const ComplementosMultiSelectDialog = forwardRef<
               })}
             </div>
           </div>
-          <div className="scrollbar-hide max-h-[280px] min-h-0 overflow-y-auto rounded-lg border border-gray-100 bg-gray-50/50 md:max-h-[360px]">
+          <div
+            ref={listaLimiteRef}
+            className="scrollbar-hide max-h-[280px] min-h-0 overflow-x-hidden overflow-y-auto overscroll-y-contain rounded-lg border border-gray-100 bg-gray-50/50 md:max-h-[360px]"
+          >
             {isLoadingSelectableGroups &&
             gruposCatalogoParaLista.length === 0 &&
             filterTab !== 'vinculados' ? (
@@ -1563,8 +1656,9 @@ export const ComplementosMultiSelectDialog = forwardRef<
                 Carregando grupos...
               </p>
             ) : gruposCatalogoParaLista.length ? (
-              <ul className="divide-y divide-gray-100">
-                {gruposCatalogoParaLista.map(grupo => {
+              (() => {
+                const linhasGrupos = gruposCatalogoParaLista.map(grupo => {
+                  const renderGrupo = (arrasteGrupo: ArrasteControle | null) => {
                   const vinculado = gruposVinculadosIds.includes(grupo.id)
                   const expandido = expandedGrupoIds.has(grupo.id)
                   const grupoVinculado = groups.find(g => g.id === grupo.id)
@@ -1590,7 +1684,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
                     !(grupoVinculado?.complementos?.length)
 
                   return (
-                    <li key={grupo.id}>
+                    <>
                       <div
                         className={cn(
                           'flex items-center justify-between gap-2 px-2 py-1.5 hover:bg-white/80',
@@ -1641,61 +1735,13 @@ export const ComplementosMultiSelectDialog = forwardRef<
                           </button>
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
-                          {Boolean(menuId && produtoId) &&
-                          vinculado &&
-                          filterTab === 'vinculados' &&
-                          !catalogSearch.trim() ? (
-                            <div className="flex flex-col">
-                              <button
-                                type="button"
-                                aria-label={`Subir grupo ${grupo.nome ?? ''}`}
-                                disabled={
-                                  isSaving ||
-                                  reordenandoChave !== null ||
-                                  groups.findIndex(item => item.id === grupo.id) <= 0
-                                }
-                                onClick={() => {
-                                  const indice = groups.findIndex(item => item.id === grupo.id)
-                                  if (indice <= 0) return
-                                  void reordenarNoMenu(
-                                    'reordena-grupo-complemento',
-                                    {
-                                      novaPosicao: indice,
-                                      grupoComplementoId: grupo.id,
-                                    },
-                                    `grupo:${grupo.id}`
-                                  )
-                                }}
-                                className="rounded p-0.5 text-secondary-text hover:bg-white disabled:opacity-30"
-                              >
-                                <MdKeyboardArrowUp size={16} />
-                              </button>
-                              <button
-                                type="button"
-                                aria-label={`Descer grupo ${grupo.nome ?? ''}`}
-                                disabled={
-                                  isSaving ||
-                                  reordenandoChave !== null ||
-                                  groups.findIndex(item => item.id === grupo.id) < 0 ||
-                                  groups.findIndex(item => item.id === grupo.id) >= groups.length - 1
-                                }
-                                onClick={() => {
-                                  const indice = groups.findIndex(item => item.id === grupo.id)
-                                  if (indice < 0 || indice >= groups.length - 1) return
-                                  void reordenarNoMenu(
-                                    'reordena-grupo-complemento',
-                                    {
-                                      novaPosicao: indice + 2,
-                                      grupoComplementoId: grupo.id,
-                                    },
-                                    `grupo:${grupo.id}`
-                                  )
-                                }}
-                                className="rounded p-0.5 text-secondary-text hover:bg-white disabled:opacity-30"
-                              >
-                                <MdKeyboardArrowDown size={16} />
-                              </button>
-                            </div>
+                          {arrasteGrupo ? (
+                            <AlcaArraste
+                              label={grupo.nome || 'Grupo'}
+                              attributes={arrasteGrupo.attributes}
+                              listeners={arrasteGrupo.listeners}
+                              disabled={reordenandoChave !== null}
+                            />
                           ) : null}
                           <div
                             className="shrink-0 self-center"
@@ -1775,82 +1821,38 @@ export const ComplementosMultiSelectDialog = forwardRef<
                                   Nenhum complemento neste grupo.
                                 </p>
                               ) : null}
-                              {complementosOrdenados.map((comp, indiceComplemento) => {
-                                const mostrarSetasComplemento =
-                                  Boolean(menuId && produtoId) &&
-                                  vinculado &&
-                                  filterTab === 'vinculados' &&
-                                  !catalogSearch.trim()
-                                return (
-                                <div
-                                  key={comp.getId()}
-                                  className={cn(
+                              {(() => {
+                                const mostrarAlcaComplemento =
+                                  podeReordenarNoMenu && vinculado
+                                const linhasComplemento = complementosOrdenados.map(comp => {
+                                  const gridClass = cn(
                                     'grid items-center gap-2 border-b border-gray-200 p-2 transition-colors hover:bg-primary-bg/60',
-                                    mostrarSetasComplemento && showAtivoComplemento
+                                    mostrarAlcaComplemento && showAtivoComplemento
                                       ? 'grid-cols-[auto_minmax(0,1fr)_auto_auto]'
-                                      : mostrarSetasComplemento
+                                      : mostrarAlcaComplemento
                                         ? 'grid-cols-[auto_minmax(0,1fr)_auto]'
                                         : showAtivoComplemento
                                           ? 'grid-cols-[minmax(0,1fr)_auto_auto]'
                                           : 'grid-cols-[minmax(0,1fr)_auto]'
-                                  )}
-                                >
-                                  {mostrarSetasComplemento ? (
-                                    <div className="flex flex-col">
-                                      <button
-                                        type="button"
-                                        aria-label={`Subir complemento ${comp.getNome()}`}
-                                        disabled={
-                                          isSaving || reordenandoChave !== null || indiceComplemento <= 0
-                                        }
-                                        onClick={() =>
-                                          void reordenarNoMenu(
-                                            'reordena-complemento',
-                                            {
-                                              novaPosicao: indiceComplemento,
-                                              grupoComplementoId: grupo.id,
-                                              complementoId: comp.getId(),
-                                            },
-                                            `comp:${grupo.id}:${comp.getId()}`
-                                          )
-                                        }
-                                        className="rounded p-0.5 text-secondary-text hover:bg-white disabled:opacity-30"
+                                  )
+                                  const conteudo = (arraste: ArrasteControle | null) => (
+                                    <>
+                                      {arraste ? (
+                                        <AlcaArraste
+                                          label={comp.getNome()}
+                                          attributes={arraste.attributes}
+                                          listeners={arraste.listeners}
+                                          disabled={reordenandoChave !== null}
+                                        />
+                                      ) : null}
+                                      <p
+                                        className={cn(
+                                          'min-w-0 truncate text-sm font-normal text-primary-text',
+                                          !comp.isAtivo() && 'text-secondary-text line-through'
+                                        )}
                                       >
-                                        <MdKeyboardArrowUp size={16} />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        aria-label={`Descer complemento ${comp.getNome()}`}
-                                        disabled={
-                                          isSaving ||
-                                          reordenandoChave !== null ||
-                                          indiceComplemento >= complementosOrdenados.length - 1
-                                        }
-                                        onClick={() =>
-                                          void reordenarNoMenu(
-                                            'reordena-complemento',
-                                            {
-                                              novaPosicao: indiceComplemento + 2,
-                                              grupoComplementoId: grupo.id,
-                                              complementoId: comp.getId(),
-                                            },
-                                            `comp:${grupo.id}:${comp.getId()}`
-                                          )
-                                        }
-                                        className="rounded p-0.5 text-secondary-text hover:bg-white disabled:opacity-30"
-                                      >
-                                        <MdKeyboardArrowDown size={16} />
-                                      </button>
-                                    </div>
-                                  ) : null}
-                                  <p
-                                    className={cn(
-                                      'min-w-0 truncate text-sm font-normal text-primary-text',
-                                      !comp.isAtivo() && 'text-secondary-text line-through'
-                                    )}
-                                  >
-                                    {comp.getNome()}
-                                  </p>
+                                        {comp.getNome()}
+                                      </p>
                                   {vinculoNoMenu && produtoId && vinculado ? (
                                     <input
                                       type="text"
@@ -1921,17 +1923,81 @@ export const ComplementosMultiSelectDialog = forwardRef<
                                       />
                                     </div>
                                   ) : null}
-                                </div>
+                                    </>
+                                  )
+                                  if (!mostrarAlcaComplemento) {
+                                    return (
+                                      <div key={comp.getId()} className={gridClass}>
+                                        {conteudo(null)}
+                                      </div>
+                                    )
+                                  }
+                                  return (
+                                    <LinhaArrastavel
+                                      key={comp.getId()}
+                                      id={comp.getId()}
+                                      as="div"
+                                      className={gridClass}
+                                      disabled={reordenandoChave !== null}
+                                    >
+                                      {conteudo}
+                                    </LinhaArrastavel>
+                                  )
+                                })
+                                if (!mostrarAlcaComplemento || complementosOrdenados.length === 0) {
+                                  return linhasComplemento
+                                }
+                                return (
+                                  <ListaArrastavel
+                                    ids={complementosOrdenados.map(item => item.getId())}
+                                    onDragEnd={event =>
+                                      void handleDragEndComplementos(
+                                        grupo.id,
+                                        complementosOrdenados,
+                                        event
+                                      )
+                                    }
+                                    limiteRef={listaLimiteRef}
+                                    as="div"
+                                  >
+                                    {linhasComplemento}
+                                  </ListaArrastavel>
                                 )
-                              })}
+                              })()}
                             </>
                           )}
                         </div>
                       ) : null}
-                    </li>
+                    </>
                   )
-                })}
-              </ul>
+                  }
+                  if (!podeReordenarNoMenu) {
+                    return <li key={grupo.id}>{renderGrupo(null)}</li>
+                  }
+                  return (
+                    <LinhaArrastavel
+                      key={grupo.id}
+                      id={grupo.id}
+                      as="li"
+                      disabled={reordenandoChave !== null}
+                    >
+                      {renderGrupo}
+                    </LinhaArrastavel>
+                  )
+                })
+                return podeReordenarNoMenu ? (
+                  <ListaArrastavel
+                    ids={gruposCatalogoParaLista.map(item => item.id)}
+                    onDragEnd={event => void handleDragEndGrupos(event)}
+                    limiteRef={listaLimiteRef}
+                    className="divide-y divide-gray-100"
+                  >
+                    {linhasGrupos}
+                  </ListaArrastavel>
+                ) : (
+                  <ul className="divide-y divide-gray-100">{linhasGrupos}</ul>
+                )
+              })()
             ) : (
               <p className="py-8 text-center text-xs text-secondary-text">
                 {allSelectableGroups.length === 0
