@@ -22,7 +22,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
-import { MdClose, MdSearch, MdAdd, MdKeyboardArrowDown } from 'react-icons/md'
+import { MdClose, MdSearch, MdAdd, MdKeyboardArrowDown, MdKeyboardArrowUp } from 'react-icons/md'
 import {
   GruposComplementosTabsModal,
   GruposComplementosTabsModalState,
@@ -103,6 +103,12 @@ function mapApiGrupoToGrupoComplemento(grupo: any): GrupoComplementoItem {
 
 function formatarValorComplemento(valor: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
+}
+
+/** No cardápio, sem ordem gravada a lista já vem na ordem efetiva da API. */
+function ordenarComplementosDoCardapio(lista: Complemento[]): Complemento[] {
+  if (!lista.some(item => item.getOrdem() != null)) return lista
+  return ordenarComplementosParaExibicao(lista)
 }
 
 /** Ordenação alinhada ao modal de grupo (ordem explícita, depois nome) */
@@ -316,6 +322,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
   const sessionCatalogOrderRef = useRef<string[] | null>(null)
   /** Incrementa quando a ordem estável da sessão é definida (ref sozinha não dispara render). */
   const [sessionOrderTick, setSessionOrderTick] = useState(0)
+  const [reordenandoChave, setReordenandoChave] = useState<string | null>(null)
 
   const loadGroups = useCallback(
     async (options?: { silent?: boolean; signal?: AbortSignal }) => {
@@ -388,6 +395,49 @@ export const ComplementosMultiSelectDialog = forwardRef<
       }
     },
     [open, produtoId, menuId]
+  )
+
+  const reordenarNoMenu = useCallback(
+    async (
+      caminho: 'reordena-grupo-complemento' | 'reordena-complemento',
+      body: Record<string, unknown>,
+      chave: string
+    ) => {
+      if (!menuId || !produtoId) return
+      if (isDirtyRef.current) {
+        showToast.error('Salve os vínculos antes de alterar a ordem.')
+        return
+      }
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+      setReordenandoChave(chave)
+      try {
+        const response = await fetchGestorApi(
+          `/api/menus/${encodeURIComponent(menuId)}/produtos/${encodeURIComponent(produtoId)}/${caminho}`,
+          {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(body),
+          }
+        )
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || errorData.error || 'Erro ao reordenar')
+        }
+        await loadGroups({ silent: true })
+      } catch (err) {
+        showToast.error(err instanceof Error ? err.message : 'Erro ao reordenar')
+      } finally {
+        setReordenandoChave(null)
+      }
+    },
+    [loadGroups, menuId, produtoId]
   )
 
   const loadSelectableGroups = useCallback(async (signal?: AbortSignal) => {
@@ -681,6 +731,14 @@ export const ComplementosMultiSelectDialog = forwardRef<
           ? bySearch.filter(g => !gruposVinculadosIds.includes(g.id))
           : bySearch
 
+    if (filterTab === 'vinculados' && vinculoNoMenu) {
+      const ordem = new Map(groups.map((grupo, index) => [grupo.id, index]))
+      return [...filtrados].sort(
+        (a, b) =>
+          (ordem.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (ordem.get(b.id) ?? Number.MAX_SAFE_INTEGER)
+      )
+    }
+
     if (filterTab !== 'todos') {
       return [...filtrados].sort((a, b) =>
         (a.nome || '').localeCompare(b.nome || '', 'pt-BR', { sensitivity: 'base' })
@@ -706,6 +764,8 @@ export const ComplementosMultiSelectDialog = forwardRef<
     catalogSearch,
     filterTab,
     gruposVinculadosIds,
+    groups,
+    vinculoNoMenu,
     open,
     sessionOrderTick,
   ])
@@ -1394,7 +1454,10 @@ export const ComplementosMultiSelectDialog = forwardRef<
                     (grupoVinculado?.complementos?.length
                       ? grupoVinculado.complementos
                       : detalhesComplementosCache[grupo.id] ?? grupo.complementos) ?? []
-                  const complementosOrdenados = ordenarComplementosParaExibicao(complementosLista)
+                  const complementosOrdenados =
+                    vinculoNoMenu && grupoVinculado?.complementos?.length
+                      ? ordenarComplementosDoCardapio(grupoVinculado.complementos)
+                      : ordenarComplementosParaExibicao(complementosLista)
                   const qtdComplementosConhecida =
                     (grupoVinculado?.complementos?.length ?? 0) > 0
                       ? grupoVinculado!.complementos.length
@@ -1459,11 +1522,68 @@ export const ComplementosMultiSelectDialog = forwardRef<
                             </div>
                           </button>
                         </div>
-                        <div
-                          className="shrink-0 self-center"
-                          onClick={e => e.stopPropagation()}
-                          onMouseDown={e => e.stopPropagation()}
-                        >
+                        <div className="flex shrink-0 items-center gap-1">
+                          {Boolean(menuId && produtoId) &&
+                          vinculado &&
+                          filterTab === 'vinculados' &&
+                          !catalogSearch.trim() ? (
+                            <div className="flex flex-col">
+                              <button
+                                type="button"
+                                aria-label={`Subir grupo ${grupo.nome ?? ''}`}
+                                disabled={
+                                  isSaving ||
+                                  reordenandoChave !== null ||
+                                  groups.findIndex(item => item.id === grupo.id) <= 0
+                                }
+                                onClick={() => {
+                                  const indice = groups.findIndex(item => item.id === grupo.id)
+                                  if (indice <= 0) return
+                                  void reordenarNoMenu(
+                                    'reordena-grupo-complemento',
+                                    {
+                                      novaPosicao: indice,
+                                      grupoComplementoId: grupo.id,
+                                    },
+                                    `grupo:${grupo.id}`
+                                  )
+                                }}
+                                className="rounded p-0.5 text-secondary-text hover:bg-white disabled:opacity-30"
+                              >
+                                <MdKeyboardArrowUp size={16} />
+                              </button>
+                              <button
+                                type="button"
+                                aria-label={`Descer grupo ${grupo.nome ?? ''}`}
+                                disabled={
+                                  isSaving ||
+                                  reordenandoChave !== null ||
+                                  groups.findIndex(item => item.id === grupo.id) < 0 ||
+                                  groups.findIndex(item => item.id === grupo.id) >= groups.length - 1
+                                }
+                                onClick={() => {
+                                  const indice = groups.findIndex(item => item.id === grupo.id)
+                                  if (indice < 0 || indice >= groups.length - 1) return
+                                  void reordenarNoMenu(
+                                    'reordena-grupo-complemento',
+                                    {
+                                      novaPosicao: indice + 2,
+                                      grupoComplementoId: grupo.id,
+                                    },
+                                    `grupo:${grupo.id}`
+                                  )
+                                }}
+                                className="rounded p-0.5 text-secondary-text hover:bg-white disabled:opacity-30"
+                              >
+                                <MdKeyboardArrowDown size={16} />
+                              </button>
+                            </div>
+                          ) : null}
+                          <div
+                            className="shrink-0 self-center"
+                            onClick={e => e.stopPropagation()}
+                            onMouseDown={e => e.stopPropagation()}
+                          >
                           <JiffyIconSwitch
                             checked={vinculado}
                             onChange={e => {
@@ -1483,6 +1603,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
                               onClick: e => e.stopPropagation(),
                             }}
                           />
+                        </div>
                         </div>
                       </div>
                       {expandido ? (
@@ -1536,16 +1657,74 @@ export const ComplementosMultiSelectDialog = forwardRef<
                                   Nenhum complemento neste grupo.
                                 </p>
                               ) : null}
-                              {complementosOrdenados.map(comp => (
+                              {complementosOrdenados.map((comp, indiceComplemento) => {
+                                const mostrarSetasComplemento =
+                                  Boolean(menuId && produtoId) &&
+                                  vinculado &&
+                                  filterTab === 'vinculados' &&
+                                  !catalogSearch.trim()
+                                return (
                                 <div
                                   key={comp.getId()}
                                   className={cn(
                                     'grid items-center gap-2 border-b border-gray-200 p-2 transition-colors hover:bg-primary-bg/60',
-                                    showAtivoComplemento
-                                      ? 'grid-cols-[minmax(0,1fr)_auto_auto]'
-                                      : 'grid-cols-[minmax(0,1fr)_auto]'
+                                    mostrarSetasComplemento && showAtivoComplemento
+                                      ? 'grid-cols-[auto_minmax(0,1fr)_auto_auto]'
+                                      : mostrarSetasComplemento
+                                        ? 'grid-cols-[auto_minmax(0,1fr)_auto]'
+                                        : showAtivoComplemento
+                                          ? 'grid-cols-[minmax(0,1fr)_auto_auto]'
+                                          : 'grid-cols-[minmax(0,1fr)_auto]'
                                   )}
                                 >
+                                  {mostrarSetasComplemento ? (
+                                    <div className="flex flex-col">
+                                      <button
+                                        type="button"
+                                        aria-label={`Subir complemento ${comp.getNome()}`}
+                                        disabled={
+                                          isSaving || reordenandoChave !== null || indiceComplemento <= 0
+                                        }
+                                        onClick={() =>
+                                          void reordenarNoMenu(
+                                            'reordena-complemento',
+                                            {
+                                              novaPosicao: indiceComplemento,
+                                              grupoComplementoId: grupo.id,
+                                              complementoId: comp.getId(),
+                                            },
+                                            `comp:${grupo.id}:${comp.getId()}`
+                                          )
+                                        }
+                                        className="rounded p-0.5 text-secondary-text hover:bg-white disabled:opacity-30"
+                                      >
+                                        <MdKeyboardArrowUp size={16} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        aria-label={`Descer complemento ${comp.getNome()}`}
+                                        disabled={
+                                          isSaving ||
+                                          reordenandoChave !== null ||
+                                          indiceComplemento >= complementosOrdenados.length - 1
+                                        }
+                                        onClick={() =>
+                                          void reordenarNoMenu(
+                                            'reordena-complemento',
+                                            {
+                                              novaPosicao: indiceComplemento + 2,
+                                              grupoComplementoId: grupo.id,
+                                              complementoId: comp.getId(),
+                                            },
+                                            `comp:${grupo.id}:${comp.getId()}`
+                                          )
+                                        }
+                                        className="rounded p-0.5 text-secondary-text hover:bg-white disabled:opacity-30"
+                                      >
+                                        <MdKeyboardArrowDown size={16} />
+                                      </button>
+                                    </div>
+                                  ) : null}
                                   <p
                                     className={cn(
                                       'min-w-0 truncate text-sm font-normal text-primary-text',
@@ -1587,7 +1766,8 @@ export const ComplementosMultiSelectDialog = forwardRef<
                                     </div>
                                   ) : null}
                                 </div>
-                              ))}
+                                )
+                              })}
                             </>
                           )}
                         </div>

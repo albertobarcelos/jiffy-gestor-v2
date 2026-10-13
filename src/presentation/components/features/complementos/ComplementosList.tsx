@@ -690,7 +690,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
     await refreshOne(savedId)
   }, [applyAfterSave, handleActionsReload, refreshOne])
 
-  const handleTabsModalTabChange = useCallback((tab: 'complemento') => {
+  const handleTabsModalTabChange = useCallback((tab: ComplementosTabsModalState['tab']) => {
     setTabsModalState(prev => ({
       ...prev,
       tab,
