@@ -32,6 +32,7 @@ import {
   type ComplementosTabsModalState,
 } from '../complementos/ComplementosTabsModal'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
+import { gravarOverridesComplemento } from '@/src/presentation/components/features/complementos/complementoOverrideApi'
 import { cn } from '@/src/shared/utils/cn'
 import type { JiffySidePanelFooterActions } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
@@ -105,6 +106,23 @@ function formatarValorComplemento(valor: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
 }
 
+function formatarDigitacaoMoeda(value: string): string {
+  const digits = value.replace(/\D/g, '')
+  if (!digits) return formatarValorComplemento(0)
+  return formatarValorComplemento(parseInt(digits, 10) / 100)
+}
+
+function lerMoeda(value: string): number {
+  const normalized = value.replace(/R\$/g, '').trim().replace(/\./g, '').replace(',', '.')
+  const parsed = parseFloat(normalized)
+  if (Number.isNaN(parsed)) return 0
+  return Math.round(parsed * 100) / 100
+}
+
+function chaveValorNoMenu(grupoId: string, complementoId: string): string {
+  return `${grupoId}:${complementoId}`
+}
+
 /** No cardápio, sem ordem gravada a lista já vem na ordem efetiva da API. */
 function ordenarComplementosDoCardapio(lista: Complemento[]): Complemento[] {
   if (!lista.some(item => item.getOrdem() != null)) return lista
@@ -121,6 +139,28 @@ function ordenarComplementosParaExibicao(lista: Complemento[]): Complemento[] {
     if (oa == null && ob != null) return 1
     return (a.getNome() || '').localeCompare(b.getNome() || '', 'pt-BR', { sensitivity: 'base' })
   })
+}
+
+/** Atualiza só o valor daquele complemento, sem tocar nos outros grupos. */
+function atualizarValorNaLista(
+  complementos: Complemento[],
+  complementoId: string,
+  valor: number
+): Complemento[] {
+  return complementos.map(c =>
+    c.getId() !== complementoId
+      ? c
+      : Complemento.create(
+          c.getId(),
+          c.getNome(),
+          c.getDescricao(),
+          valor,
+          c.isAtivo(),
+          c.getTipoImpactoPreco(),
+          c.getOrdem(),
+          c.getImagemUrl()
+        )
+  )
 }
 
 /** Atualiza apenas o flag ativo para refletir o PATCH sem recarregar o grupo inteiro */
@@ -279,9 +319,9 @@ export const ComplementosMultiSelectDialog = forwardRef<
   /** Salvando todos os vínculos pendentes (botão Salvar). */
   const [isSaving, setIsSaving] = useState(false)
   /** IDs persistidos no backend — comparação define dirty. */
-  const baselineGruposIdsRef = useRef<string[]>(
-    mapResumoToGrupos(initialGruposResumo).map(g => g.id)
-  )
+  const baselineInicial = mapResumoToGrupos(initialGruposResumo).map(g => g.id)
+  const baselineGruposIdsRef = useRef<string[]>(baselineInicial)
+  const [gruposPersistidosIds, setGruposPersistidosIds] = useState<string[]>(baselineInicial)
   const isDirtyRef = useRef(false)
   const [allSelectableGroups, setAllSelectableGroups] = useState<GrupoCatalogoItem[]>([])
   const [isLoadingSelectableGroups, setIsLoadingSelectableGroups] = useState(false)
@@ -298,6 +338,11 @@ export const ComplementosMultiSelectDialog = forwardRef<
   >({})
   const [loadingDetalheGrupoId, setLoadingDetalheGrupoId] = useState<string | null>(null)
   const [togglingComplementoId, setTogglingComplementoId] = useState<string | null>(null)
+  /** Rascunho do valor enquanto o campo está em edição. A chave inclui o grupo. */
+  const [valoresDigitados, setValoresDigitados] = useState<Record<string, string>>({})
+  const valoresDigitadosRef = useRef<Record<string, string>>({})
+  const [salvandoValorChave, setSalvandoValorChave] = useState<Record<string, boolean>>({})
+  const salvandoValorRef = useRef<Set<string>>(new Set())
   const [abrindoGrupoComplementosId, setAbrindoGrupoComplementosId] = useState<string | null>(
     null
   )
@@ -379,7 +424,9 @@ export const ComplementosMultiSelectDialog = forwardRef<
           )
         } else {
           setGroups(grupos)
-          baselineGruposIdsRef.current = grupos.map(g => g.id)
+          const idsPersistidos = grupos.map(g => g.id)
+          baselineGruposIdsRef.current = idsPersistidos
+          setGruposPersistidosIds(idsPersistidos)
           isDirtyRef.current = false
         }
       } catch (err) {
@@ -438,6 +485,74 @@ export const ComplementosMultiSelectDialog = forwardRef<
       }
     },
     [loadGroups, menuId, produtoId]
+  )
+
+  useEffect(() => {
+    valoresDigitadosRef.current = {}
+    setValoresDigitados({})
+  }, [menuId, produtoId])
+
+  const definirValorDigitado = useCallback((chave: string, texto: string) => {
+    valoresDigitadosRef.current = { ...valoresDigitadosRef.current, [chave]: texto }
+    setValoresDigitados(valoresDigitadosRef.current)
+  }, [])
+
+  const limparValorDigitado = useCallback((chave: string) => {
+    if (!(chave in valoresDigitadosRef.current)) return
+    const next = { ...valoresDigitadosRef.current }
+    delete next[chave]
+    valoresDigitadosRef.current = next
+    setValoresDigitados(next)
+  }, [])
+
+  const gravarValorNoMenu = useCallback(
+    async (grupoId: string, comp: Complemento) => {
+      if (!menuId || !produtoId) return
+      if (!baselineGruposIdsRef.current.includes(grupoId)) return
+      const chave = chaveValorNoMenu(grupoId, comp.getId())
+      const texto = valoresDigitadosRef.current[chave]
+      if (texto == null || salvandoValorRef.current.has(chave)) return
+      const novoValor = lerMoeda(texto)
+      const valorAtual = Math.round(comp.getValor() * 100) / 100
+      if (novoValor === valorAtual) {
+        limparValorDigitado(chave)
+        return
+      }
+      salvandoValorRef.current.add(chave)
+      setSalvandoValorChave(prev => ({ ...prev, [chave]: true }))
+      try {
+        await gravarOverridesComplemento({
+          vinculos: [
+            {
+              menuId,
+              produtoId,
+              complementoId: comp.getId(),
+              grupoComplementoId: grupoId,
+              valor: novoValor,
+            },
+          ],
+        })
+        setGroups(prev =>
+          prev.map(grupo =>
+            grupo.id === grupoId
+              ? {
+                  ...grupo,
+                  complementos: atualizarValorNaLista(grupo.complementos, comp.getId(), novoValor),
+                }
+              : grupo
+          )
+        )
+        limparValorDigitado(chave)
+        showToast.success('Valor atualizado neste produto e neste grupo.')
+      } catch (err) {
+        showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar o valor.')
+        definirValorDigitado(chave, formatarValorComplemento(comp.getValor()))
+      } finally {
+        salvandoValorRef.current.delete(chave)
+        setSalvandoValorChave(prev => ({ ...prev, [chave]: false }))
+      }
+    },
+    [definirValorDigitado, limparValorDigitado, menuId, produtoId]
   )
 
   const loadSelectableGroups = useCallback(async (signal?: AbortSignal) => {
@@ -1000,7 +1115,9 @@ export const ComplementosMultiSelectDialog = forwardRef<
         }
       )
       if (ok) {
-        baselineGruposIdsRef.current = [...currentIds]
+        const idsPersistidos = [...currentIds]
+        baselineGruposIdsRef.current = idsPersistidos
+        setGruposPersistidosIds(idsPersistidos)
         isDirtyRef.current = false
         onEmbedStateChange?.({ isDirty: false, isSaving: false })
       } else {
@@ -1327,6 +1444,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
         return
       }
       baselineGruposIdsRef.current = nextIds
+      setGruposPersistidosIds(nextIds)
       isDirtyRef.current = false
       onEmbedStateChange?.({ isDirty: false, isSaving: false })
       setFilterTab('vinculados')
@@ -1733,9 +1851,47 @@ export const ComplementosMultiSelectDialog = forwardRef<
                                   >
                                     {comp.getNome()}
                                   </p>
-                                  <div className="min-w-[100px] rounded border border-gray-200 bg-white px-2 py-1 text-right text-xs font-normal tabular-nums text-primary-text">
-                                    {formatarValorComplemento(comp.getValor())}
-                                  </div>
+                                  {vinculoNoMenu && produtoId && vinculado ? (
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      value={
+                                        valoresDigitados[chaveValorNoMenu(grupo.id, comp.getId())] ??
+                                        formatarValorComplemento(comp.getValor())
+                                      }
+                                      onChange={event =>
+                                        definirValorDigitado(
+                                          chaveValorNoMenu(grupo.id, comp.getId()),
+                                          formatarDigitacaoMoeda(event.target.value)
+                                        )
+                                      }
+                                      onFocus={event => event.target.select()}
+                                      onBlur={() => void gravarValorNoMenu(grupo.id, comp)}
+                                      onKeyDown={event => {
+                                        if (event.key === 'Enter') event.currentTarget.blur()
+                                      }}
+                                      disabled={
+                                        !gruposPersistidosIds.includes(grupo.id) ||
+                                        isSaving ||
+                                        salvandoValorChave[chaveValorNoMenu(grupo.id, comp.getId())]
+                                      }
+                                      title={
+                                        gruposPersistidosIds.includes(grupo.id)
+                                          ? undefined
+                                          : 'Salve o grupo para alterar este valor.'
+                                      }
+                                      aria-label={
+                                        gruposPersistidosIds.includes(grupo.id)
+                                          ? `Valor de ${comp.getNome()} em ${grupo.nome || 'grupo'}`
+                                          : `Valor de ${comp.getNome()} em ${grupo.nome || 'grupo'}. Salve o grupo para editar.`
+                                      }
+                                      className="w-[7.5rem] rounded border border-gray-200 bg-white px-2 py-1 text-right text-xs font-normal tabular-nums text-primary-text focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                                    />
+                                  ) : (
+                                    <div className="min-w-[100px] rounded border border-gray-200 bg-white px-2 py-1 text-right text-xs font-normal tabular-nums text-primary-text">
+                                      {formatarValorComplemento(comp.getValor())}
+                                    </div>
+                                  )}
                                   {showAtivoComplemento ? (
                                     <div
                                       className="flex justify-end self-center"
@@ -1821,8 +1977,9 @@ export const ComplementosMultiSelectDialog = forwardRef<
             </div>
             {vinculoNoMenu ? (
               <p className="mt-2 text-xs text-secondary-text">
-                Os grupos marcados valem só neste cardápio. Nome e valor dos complementos se
-                alteram no cadastro do grupo, não aqui.
+                Os grupos marcados valem só neste cardápio. Salve o grupo para alterar o valor de
+                cada complemento; esse valor vale só neste produto e neste grupo. O nome continua
+                no cadastro do complemento.
               </p>
             ) : (
               <p className="mt-2 text-xs text-secondary-text">
