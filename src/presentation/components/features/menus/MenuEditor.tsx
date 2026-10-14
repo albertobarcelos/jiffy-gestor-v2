@@ -457,6 +457,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
               onAdicionar={handleAdicionarProdutosCabecalho}
               onReordenar={() => setReorderOpen(true)}
               loteHref={toGestao(`/menus/${menuId}/atualizar-lote`)}
+              valorComplementosHref={toGestao(`/menus/${menuId}/alterar-valor-complementos`)}
               className="w-full justify-start sm:w-auto sm:flex-none"
             />
           ) : null}

@@ -7,6 +7,7 @@ interface MenuCardapioAcoesProps {
   onAdicionar: () => void
   onReordenar?: () => void
   loteHref?: string
+  valorComplementosHref?: string
   adicionarLabel?: string
   className?: string
 }
@@ -15,6 +16,7 @@ export function MenuCardapioAcoes({
   onAdicionar,
   onReordenar,
   loteHref,
+  valorComplementosHref,
   adicionarLabel = 'Adicionar produtos',
   className,
 }: MenuCardapioAcoesProps) {
@@ -29,6 +31,15 @@ export function MenuCardapioAcoes({
           <span className="xl:hidden">Reordenar</span>
           <span className="hidden xl:inline">Reordenar cardápio</span>
         </button>
+      ) : null}
+      {valorComplementosHref ? (
+        <Link
+          href={valorComplementosHref}
+          className="flex h-8 shrink-0 items-center whitespace-nowrap rounded-lg border border-primary/50 bg-white px-2.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 md:px-3 md:text-sm"
+        >
+          <span className="xl:hidden">Valor</span>
+          <span className="hidden xl:inline">Alterar valor em lote</span>
+        </Link>
       ) : null}
       {loteHref ? (
         <Link
