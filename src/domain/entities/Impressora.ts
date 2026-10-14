@@ -10,10 +10,15 @@ export type ImpressoraTerminalConfig = {
   ativo?: boolean
   modoFicha?: boolean
   modoImpressao?: ModoImpressaoImpressora
+  imprimirSenha?: boolean
   modelo?: string
   ip?: string
   porta?: string
   tipoConexao?: string
+}
+
+function flagLigada(valor: unknown): boolean {
+  return valor === true || valor === 'true' || valor === 1 || valor === '1'
 }
 
 function asRecord(v: unknown): Record<string, unknown> | null {
@@ -34,6 +39,7 @@ function mapTerminalConfig(raw: unknown): ImpressoraTerminalConfig {
     ativo,
     modoImpressao,
     modoFicha: modoFichaDerivado(modoImpressao),
+    imprimirSenha: flagLigada(r.imprimirSenha ?? r.imprimir_senha),
     modelo: r.modelo != null ? String(r.modelo) : undefined,
     ip: r.ip != null ? String(r.ip) : undefined,
     porta: r.porta != null ? String(r.porta) : undefined,
