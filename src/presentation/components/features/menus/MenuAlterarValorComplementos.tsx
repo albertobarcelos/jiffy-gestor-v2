@@ -9,7 +9,6 @@ import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { Checkbox } from '@/src/presentation/components/ui/checkbox'
-import { Button } from '@/src/presentation/components/ui/button'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
@@ -471,14 +470,14 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
                       aria-label={`Valor de ${complemento.nome}`}
                       className="h-8 w-[7.5rem] shrink-0 rounded-lg border border-primary/70 bg-white px-2 text-center text-sm text-primary-text focus:border-primary focus:outline-none disabled:opacity-50"
                     />
-                    <Button
+                    <button
                       type="button"
                       disabled={!podeAplicar}
                       onClick={() => void aplicar()}
-                      className="h-8 shrink-0 bg-primary text-info"
+                      className="h-8 shrink-0 rounded-lg border border-solid border-white bg-transparent px-3 text-sm font-semibold text-white [-webkit-text-fill-color:#fff] hover:bg-transparent disabled:cursor-not-allowed"
                     >
                       {salvando ? 'Aplicando…' : `Aplicar (${selecionados.size})`}
-                    </Button>
+                    </button>
                   </div>
                 ) : null
               }
