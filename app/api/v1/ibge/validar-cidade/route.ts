@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getTokenInfo } from '@/src/shared/utils/getTokenInfo'
-import { validarCidadeNoEstado } from '@/src/infrastructure/ibge/ibgeLocalidadesClient'
+import { localizarMunicipioNoEstado } from '@/src/infrastructure/ibge/ibgeLocalidadesClient'
 
 /**
  * GET /api/v1/ibge/validar-cidade?cidade=São Paulo&uf=SP
- * Valida se uma cidade existe no estado informado (API pública do IBGE).
+ * Valida se uma cidade existe no estado informado (BrasilAPI, códigos do IBGE).
  */
 export async function GET(request: NextRequest) {
   try {
@@ -28,12 +28,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'UF deve ter 2 caracteres' }, { status: 400 })
     }
 
-    const valido = await validarCidadeNoEstado(cidade, uf)
+    const municipio = await localizarMunicipioNoEstado(cidade, uf)
 
     return NextResponse.json({
-      valido,
+      valido: Boolean(municipio),
       cidade,
       uf: uf.toUpperCase(),
+      codigoCidadeIbge: municipio?.codigoCidadeIbge ?? null,
+      nomeCidade: municipio?.nomeCidade ?? null,
     })
   } catch (error) {
     console.error('Erro ao validar cidade:', error)

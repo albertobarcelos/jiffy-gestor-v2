@@ -1,9 +1,9 @@
-const IBGE_BASE_URL = 'https://servicodados.ibge.gov.br/api/v1/localidades'
+const BRASIL_API_BASE_URL = 'https://brasilapi.com.br/api/ibge/municipios/v1'
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
-type MunicipioIbgeRaw = {
-  id: number
+type MunicipioBrasilApiRaw = {
   nome: string
+  codigo_ibge: string | number
 }
 
 export type MunicipioIbgeItem = {
@@ -30,7 +30,11 @@ function normalizarUf(uf: string): string {
   return uf.toUpperCase().trim()
 }
 
-async function fetchIbgeJson<T>(url: string, timeoutMs = 10000): Promise<T> {
+function paraCodigoIbge(valor: string | number): string {
+  return valor.toString().padStart(7, '0')
+}
+
+async function fetchJson<T>(url: string, timeoutMs: number): Promise<T> {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
@@ -41,13 +45,13 @@ async function fetchIbgeJson<T>(url: string, timeoutMs = 10000): Promise<T> {
     })
 
     if (!response.ok) {
-      throw new Error(`Erro ao consultar IBGE: ${response.status} ${response.statusText}`)
+      throw new Error(`Erro ao consultar municípios: ${response.status} ${response.statusText}`)
     }
 
     return (await response.json()) as T
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Tempo esgotado ao consultar API do IBGE')
+      throw new Error('Tempo esgotado ao consultar municípios')
     }
     throw error
   } finally {
@@ -55,9 +59,52 @@ async function fetchIbgeJson<T>(url: string, timeoutMs = 10000): Promise<T> {
   }
 }
 
+function mapearMunicipiosBrasilApi(municipios: MunicipioBrasilApiRaw[]): MunicipioIbgeItem[] {
+  return municipios.map(municipio => ({
+    codigoCidadeIbge: paraCodigoIbge(municipio.codigo_ibge),
+    nomeCidade: municipio.nome,
+  }))
+}
+
+function listaValida(municipios: MunicipioIbgeItem[]): MunicipioIbgeItem[] {
+  if (municipios.length === 0) {
+    throw new Error('Nenhum município retornado')
+  }
+  return municipios
+}
+
 /**
- * Lista municípios de um estado via API pública do IBGE (sem autenticação).
+ * A cadeia TLS do IBGE quebra no Node. A BrasilAPI entrega os mesmos
+ * códigos oficiais com certificado válido, e o BFF do Next usa só ela.
  */
+async function buscarMunicipiosRemotos(uf: string): Promise<MunicipioIbgeItem[]> {
+  const municipios = await fetchJson<MunicipioBrasilApiRaw[]>(
+    `${BRASIL_API_BASE_URL}/${uf}`,
+    15000
+  )
+  return listaValida(mapearMunicipiosBrasilApi(municipios))
+}
+
+function encontrarMunicipioPorNome(
+  municipios: MunicipioIbgeItem[],
+  nomeCidade: string
+): MunicipioIbgeItem | undefined {
+  const cidadeNormalizada = normalizarTexto(nomeCidade)
+  return municipios.find(municipio => normalizarTexto(municipio.nomeCidade) === cidadeNormalizada)
+}
+
+export async function localizarMunicipioNoEstado(
+  cidade: string,
+  uf: string
+): Promise<MunicipioIbgeItem | null> {
+  if (!cidade?.trim() || !uf?.trim()) {
+    return null
+  }
+
+  const municipios = await listarMunicipiosPorEstado(uf)
+  return encontrarMunicipioPorNome(municipios, cidade) ?? null
+}
+
 export async function listarMunicipiosPorEstado(uf: string): Promise<MunicipioIbgeItem[]> {
   const ufNormalizada = normalizarUf(uf)
   const cacheKey = `municipios:${ufNormalizada}`
@@ -67,18 +114,8 @@ export async function listarMunicipiosPorEstado(uf: string): Promise<MunicipioIb
     return cached.data
   }
 
-  const municipios = await fetchIbgeJson<MunicipioIbgeRaw[]>(
-    `${IBGE_BASE_URL}/estados/${ufNormalizada}/municipios`,
-    15000
-  )
-
-  const resultado = municipios.map(municipio => ({
-    codigoCidadeIbge: municipio.id.toString().padStart(7, '0'),
-    nomeCidade: municipio.nome,
-  }))
-
+  const resultado = await buscarMunicipiosRemotos(ufNormalizada)
   municipiosCache.set(cacheKey, { data: resultado, timestamp: Date.now() })
-
   return resultado
 }
 
@@ -105,14 +142,5 @@ export async function buscarMunicipiosPorNome(
 }
 
 export async function validarCidadeNoEstado(cidade: string, uf: string): Promise<boolean> {
-  if (!cidade?.trim() || !uf?.trim()) {
-    return false
-  }
-
-  const municipios = await listarMunicipiosPorEstado(uf)
-  const cidadeNormalizada = normalizarTexto(cidade)
-
-  return municipios.some(
-    municipio => normalizarTexto(municipio.nomeCidade) === cidadeNormalizada
-  )
+  return Boolean(await localizarMunicipioNoEstado(cidade, uf))
 }

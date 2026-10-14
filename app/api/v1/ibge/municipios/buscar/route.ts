@@ -4,7 +4,7 @@ import { buscarMunicipiosPorNome } from '@/src/infrastructure/ibge/ibgeLocalidad
 
 /**
  * GET /api/v1/ibge/municipios/buscar?uf=SP&nome=São
- * Busca municípios por nome (autocomplete) via API pública do IBGE.
+ * Busca municípios por nome (autocomplete) via BrasilAPI.
  */
 export async function GET(request: NextRequest) {
   try {
