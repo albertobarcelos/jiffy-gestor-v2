@@ -15,7 +15,7 @@ const MenuAlterarValorComplementos = dynamic(
   }
 )
 
-export default function MenuAlterarValorComplementosPage({
+export default function MenuComplementosPage({
   params,
 }: {
   params: Promise<{ id: string }>
@@ -23,8 +23,10 @@ export default function MenuAlterarValorComplementosPage({
   const { id } = use(params)
 
   return (
-    <Suspense fallback={<PageLoading />}>
-      <MenuAlterarValorComplementos menuId={id} />
-    </Suspense>
+    <div className="flex h-full min-h-0 flex-col">
+      <Suspense fallback={<PageLoading />}>
+        <MenuAlterarValorComplementos menuId={id} />
+      </Suspense>
+    </div>
   )
 }

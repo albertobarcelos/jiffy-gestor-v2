@@ -1,11 +1,11 @@
 'use client'
 
 import { useMemo, useState, type ReactNode } from 'react'
-import Link from 'next/link'
+import { MdSearch } from 'react-icons/md'
 import type { ComplementoUsoNoMenu } from '@/src/domain/complemento/tipos'
 import { listarMenuProdutosViaBffUseCase } from '@/src/application/use-cases/menus/menuBffUseCases'
 import { useMenu } from '@/src/presentation/hooks/menus/useMenus'
-import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
+import { MenuCardapioChrome } from './MenuCardapioChrome'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { Checkbox } from '@/src/presentation/components/ui/checkbox'
@@ -21,6 +21,14 @@ import {
 
 const PAGINA_PRODUTOS = 100
 const LIMITE_VINCULOS = 100
+
+const MODOS_VALOR_LOTE = [
+  { id: 'acrescentar', label: 'Acrescentar' },
+  { id: 'alterar', label: 'Alterar' },
+  { id: 'diminuir', label: 'Diminuir' },
+] as const
+
+type ModoValorLote = (typeof MODOS_VALOR_LOTE)[number]['id']
 
 type ComplementoDoGrupo = {
   id: string
@@ -67,8 +75,24 @@ function lerMoeda(value: string): number {
   return Math.round(parsed * 100) / 100
 }
 
+function arredondarCentavos(valor: number): number {
+  return Math.round(valor * 100) / 100
+}
+
+function valorNoModo(atual: number, digitado: number, modo: ModoValorLote): number {
+  if (modo === 'acrescentar') return arredondarCentavos(atual + digitado)
+  if (modo === 'diminuir') return Math.max(0, arredondarCentavos(atual - digitado))
+  return digitado
+}
+
 function compararNome(a: string, b: string): number {
   return a.localeCompare(b, 'pt-BR', { sensitivity: 'base' })
+}
+
+function contemBusca(texto: string, busca: string): boolean {
+  const termo = busca.trim().toLocaleLowerCase('pt-BR')
+  if (!termo) return true
+  return texto.toLocaleLowerCase('pt-BR').includes(termo)
 }
 
 function lerComplementos(raw: unknown): ComplementoDoGrupo[] {
@@ -229,14 +253,17 @@ interface MenuAlterarValorComplementosProps {
 }
 
 export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplementosProps) {
-  const { toGestao } = useGestaoPath()
   const invalidate = useInvalidateTenantQueries()
   const { data: menu } = useMenu(menuId)
   const [complementoId, setComplementoId] = useState<string | null>(null)
   const [gruposSelecionados, setGruposSelecionados] = useState<Set<string>>(() => new Set())
+  const [modoValor, setModoValor] = useState<ModoValorLote>('alterar')
   const [novoValor, setNovoValor] = useState('')
   const [selecionados, setSelecionados] = useState<Set<string>>(() => new Set())
   const [salvando, setSalvando] = useState(false)
+  const [buscaComplemento, setBuscaComplemento] = useState('')
+  const [buscaGrupo, setBuscaGrupo] = useState('')
+  const [buscaProduto, setBuscaProduto] = useState('')
 
   const gruposQuery = useSecureTenantQuery(
     ['menu-grupos-valor-complemento', menuId],
@@ -254,6 +281,14 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
     () => grupos.filter(grupo => grupo.complementos.some(item => item.id === complementoId)),
     [grupos, complementoId]
   )
+  const complementosFiltrados = useMemo(
+    () => complementos.filter(item => contemBusca(item.nome, buscaComplemento)),
+    [complementos, buscaComplemento]
+  )
+  const gruposFiltrados = useMemo(
+    () => gruposDoComplemento.filter(item => contemBusca(item.nome, buscaGrupo)),
+    [gruposDoComplemento, buscaGrupo]
+  )
 
   const usosQuery = useSecureTenantQuery(
     ['menu-complemento-usos', menuId, complementoId ?? ''],
@@ -269,18 +304,26 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
     () => montarLinhas(usosQuery.data ?? [], menuId, gruposSelecionados),
     [usosQuery.data, menuId, gruposSelecionados]
   )
+  const linhasFiltradas = useMemo(
+    () => linhas.filter(item => contemBusca(`${item.produtoNome} ${item.grupoNome}`, buscaProduto)),
+    [linhas, buscaProduto]
+  )
   const todosGruposMarcados =
-    gruposDoComplemento.length > 0 && gruposDoComplemento.every(item => gruposSelecionados.has(item.id))
-  const algumGrupoMarcado = gruposDoComplemento.some(item => gruposSelecionados.has(item.id))
-  const todosMarcados = linhas.length > 0 && linhas.every(item => selecionados.has(item.chave))
-  const algumMarcado = linhas.some(item => selecionados.has(item.chave))
+    gruposFiltrados.length > 0 && gruposFiltrados.every(item => gruposSelecionados.has(item.id))
+  const algumGrupoMarcado = gruposFiltrados.some(item => gruposSelecionados.has(item.id))
+  const todosMarcados =
+    linhasFiltradas.length > 0 && linhasFiltradas.every(item => selecionados.has(item.chave))
+  const algumMarcado = linhasFiltradas.some(item => selecionados.has(item.chave))
   const podeAplicar = selecionados.size > 0 && novoValor.trim() !== '' && !salvando
 
   const escolherComplemento = (id: string) => {
     setComplementoId(id)
     setGruposSelecionados(new Set())
+    setModoValor('alterar')
     setNovoValor('')
     setSelecionados(new Set())
+    setBuscaGrupo('')
+    setBuscaProduto('')
   }
 
   const alternarGrupos = (ids: string[]) => {
@@ -329,7 +372,7 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
         produtoId: item.produtoId,
         complementoId,
         grupoComplementoId: item.grupoId,
-        valor,
+        valor: valorNoModo(item.valorAtual, valor, modoValor),
       }))
       for (const lote of partirEmLotes(vinculos, LIMITE_VINCULOS)) {
         await gravarOverridesComplemento({ vinculos: lote })
@@ -350,25 +393,37 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
   }
 
   return (
+    <MenuCardapioChrome menuId={menuId} nomeMenu={menu?.nome ?? ''} aba="complementos">
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-primary/30 bg-white px-2 py-3 md:px-4">
-        <div className="min-w-0">
-          <h1 className="text-lg font-semibold text-primary md:text-xl">Alterar valor em lote</h1>
-          <p className="text-sm text-secondary-text">
-            {menu?.nome ? `Cardápio: ${menu.nome}` : 'Carregando cardápio…'}
-            {' · '}
-            O valor vale só para as linhas marcadas, neste cardápio.
-          </p>
-        </div>
-        <Link
-          href={toGestao(`/menus/${menuId}`)}
-          className="flex h-8 items-center rounded-lg border border-primary bg-info px-6 text-sm font-semibold text-primary shadow-sm transition-colors hover:bg-primary/20"
-        >
-          Fechar
-        </Link>
+      <div className="flex items-center justify-between gap-3 px-2 pt-2 md:px-4">
+        <h1 className="text-lg font-semibold text-primary md:text-xl">Alterar valor do complemento em lote</h1>
+        {gruposSelecionados.size > 0 && complemento ? (
+          <div
+            className="inline-flex h-8 shrink-0 items-center rounded-lg border border-secondary bg-white p-[3px]"
+            role="group"
+            aria-label="Como aplicar o valor"
+          >
+            {MODOS_VALOR_LOTE.map(modo => (
+              <button
+                key={modo.id}
+                type="button"
+                disabled={salvando}
+                onClick={() => setModoValor(modo.id)}
+                className={cn(
+                  'flex h-full items-center rounded-md px-3 text-xs font-semibold leading-none transition-colors',
+                  modoValor === modo.id
+                    ? 'bg-secondary text-white'
+                    : 'text-secondary hover:bg-secondary/10 hover:text-secondary'
+                )}
+              >
+                {modo.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
 
-      <div className="flex min-h-0 flex-1 overflow-hidden p-2 md:p-4">
+      <div className="flex min-h-0 flex-1 overflow-hidden p-2">
         <div className="flex min-h-[320px] min-w-0 flex-1 overflow-x-auto overflow-y-hidden rounded-lg border border-gray-200 bg-white">
           <div className="flex min-h-0 min-w-[980px] flex-1">
             <Coluna
@@ -377,8 +432,18 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
               erro={gruposQuery.error ? handleApiError(gruposQuery.error) : null}
               vazio={complementos.length === 0}
               vazioTexto="Nenhum complemento neste cardápio."
+              semResultado={complementos.length > 0 && complementosFiltrados.length === 0}
+              semResultadoTexto={`Nenhum complemento encontrado para “${buscaComplemento.trim()}”.`}
+              busca={
+                <BuscaColuna
+                  id="busca-complementos-lote"
+                  value={buscaComplemento}
+                  onChange={setBuscaComplemento}
+                  placeholder="Buscar complemento..."
+                />
+              }
             >
-              {complementos.map(item => (
+              {complementosFiltrados.map(item => (
                 <li key={item.id}>
                   <button
                     type="button"
@@ -391,7 +456,7 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
                     )}
                   >
                     <span className="truncate text-sm">{item.nome}</span>
-                    <span className="shrink-0 text-xs text-secondary-text">
+                    <span className="shrink-0 text-xs text-alternate">
                       {item.grupos === 1 ? '1 grupo' : `${item.grupos} grupos`}
                     </span>
                   </button>
@@ -403,8 +468,18 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
               titulo="Grupos"
               vazio={!complemento || gruposDoComplemento.length === 0}
               vazioTexto={complemento ? 'Nenhum grupo deste cardápio usa este complemento.' : 'Selecione um complemento.'}
+              semResultado={gruposDoComplemento.length > 0 && gruposFiltrados.length === 0}
+              semResultadoTexto={`Nenhum grupo encontrado para “${buscaGrupo.trim()}”.`}
+              busca={
+                <BuscaColuna
+                  id="busca-grupos-lote"
+                  value={buscaGrupo}
+                  onChange={setBuscaGrupo}
+                  placeholder="Buscar grupo..."
+                />
+              }
               cabecalho={
-                complemento && gruposDoComplemento.length > 0 ? (
+                complemento && gruposFiltrados.length > 0 ? (
                   <label className="flex cursor-pointer items-center gap-2 border-b border-gray-200 px-2 py-2">
                     <Checkbox
                       {...iconesCheckboxLote}
@@ -412,7 +487,7 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
                       checked={todosGruposMarcados}
                       indeterminate={!todosGruposMarcados && algumGrupoMarcado}
                       disabled={salvando}
-                      onChange={() => alternarGrupos(gruposDoComplemento.map(item => item.id))}
+                      onChange={() => alternarGrupos(gruposFiltrados.map(item => item.id))}
                       inputProps={{ 'aria-label': 'Marcar todos os grupos' }}
                     />
                     <span className="text-xs font-semibold text-secondary-text">Marcar todos</span>
@@ -420,7 +495,7 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
                 ) : null
               }
             >
-              {gruposDoComplemento.map(item => (
+              {gruposFiltrados.map(item => (
                 <li key={item.id}>
                   <label
                     className={cn(
@@ -455,6 +530,16 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
                   ? 'Nenhum produto deste cardápio usa os grupos marcados.'
                   : 'Selecione um grupo.'
               }
+              semResultado={linhas.length > 0 && linhasFiltradas.length === 0}
+              semResultadoTexto={`Nenhum produto encontrado para “${buscaProduto.trim()}”.`}
+              busca={
+                <BuscaColuna
+                  id="busca-produtos-lote"
+                  value={buscaProduto}
+                  onChange={setBuscaProduto}
+                  placeholder="Buscar produto ou grupo..."
+                />
+              }
               tituloAcoes={
                 gruposSelecionados.size > 0 && complemento ? (
                   <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
@@ -482,15 +567,15 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
                 ) : null
               }
               cabecalho={
-                linhas.length > 0 ? (
+                linhasFiltradas.length > 0 ? (
                   <label className="flex cursor-pointer items-center gap-2 border-b border-gray-200 px-2 py-1">
-                        <Checkbox
-                          {...iconesCheckboxLote}
-                          size="small"
-                          checked={todosMarcados}
+                    <Checkbox
+                      {...iconesCheckboxLote}
+                      size="small"
+                      checked={todosMarcados}
                       indeterminate={!todosMarcados && algumMarcado}
                       disabled={salvando}
-                      onChange={() => alternarProdutos(linhas.map(item => item.chave))}
+                      onChange={() => alternarProdutos(linhasFiltradas.map(item => item.chave))}
                       inputProps={{ 'aria-label': 'Marcar todos os produtos' }}
                     />
                     <span className="text-xs font-semibold text-secondary-text">Marcar todos</span>
@@ -498,7 +583,7 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
                 ) : null
               }
             >
-              {linhas.map(item => (
+              {linhasFiltradas.map(item => (
                 <li key={item.chave}>
                   <label
                     className={cn(
@@ -523,7 +608,7 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
                           <span className="ml-2 text-xs text-secondary-text">inativo</span>
                         )}
                       </span>
-                      <span className="block truncate text-xs text-secondary-text">{item.grupoNome}</span>
+                      <span className="block truncate text-xs text-alternate">{item.grupoNome}</span>
                     </span>
                     <span className="shrink-0 text-sm text-primary-text">{formatarMoeda(item.valorAtual)}</span>
                   </label>
@@ -534,6 +619,36 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
         </div>
       </div>
     </div>
+    </MenuCardapioChrome>
+  )
+}
+
+function BuscaColuna({
+  id,
+  value,
+  onChange,
+  placeholder,
+}: {
+  id: string
+  value: string
+  onChange: (value: string) => void
+  placeholder: string
+}) {
+  return (
+    <div className="relative border-b border-gray-200 px-2 py-2">
+      <MdSearch
+        size={16}
+        className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
+      />
+      <input
+        id={id}
+        type="text"
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="h-8 w-full rounded-lg border border-gray-200 bg-white pl-8 pr-2 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+      />
+    </div>
   )
 }
 
@@ -543,7 +658,10 @@ function Coluna({
   erro = null,
   vazio = false,
   vazioTexto,
+  semResultado = false,
+  semResultadoTexto,
   tituloAcoes,
+  busca,
   cabecalho,
   className,
   children,
@@ -553,7 +671,10 @@ function Coluna({
   erro?: string | null
   vazio?: boolean
   vazioTexto: string
+  semResultado?: boolean
+  semResultadoTexto?: string
   tituloAcoes?: ReactNode
+  busca?: ReactNode
   cabecalho?: ReactNode
   className?: string
   children: ReactNode
@@ -564,6 +685,7 @@ function Coluna({
         <h2 className="shrink-0 text-sm font-semibold text-white">{titulo}</h2>
         {tituloAcoes}
       </div>
+      {busca}
       {cabecalho}
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {carregando ? (
@@ -574,6 +696,8 @@ function Coluna({
           <p className="px-2 py-6 text-center text-sm text-red-600">{erro}</p>
         ) : vazio ? (
           <p className="px-2 py-6 text-center text-sm text-secondary-text">{vazioTexto}</p>
+        ) : semResultado ? (
+          <p className="px-2 py-6 text-center text-sm text-secondary-text">{semResultadoTexto}</p>
         ) : (
           <ul className="space-y-1">{children}</ul>
         )}

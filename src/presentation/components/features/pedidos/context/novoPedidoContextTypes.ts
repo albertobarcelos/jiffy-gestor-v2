@@ -22,7 +22,10 @@ import type {
   ProdutosTabsTabKey,
 } from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
 import type { ClientesTabsModalState } from '@/src/presentation/components/features/clientes/ClientesTabsModal'
-import type { ComplementosTabsModalState } from '@/src/presentation/components/features/complementos/ComplementosTabsModal'
+import type {
+  ComplementoTabKey,
+  ComplementosTabsModalState,
+} from '@/src/presentation/components/features/complementos/ComplementosTabsModal'
 import type { ModalLancamentoProdutoPainelConfirmPayload, ModalLancamentoProdutoPainelModo } from '../components/ModalLancamentoProdutoPainel'
 import type {
   AbaDetalhesPedido,
@@ -131,7 +134,7 @@ export interface NovoPedidoEdicaoLinhaSlice {
     options?: { produtoIdCarrinho?: string }
   ) => void
   fecharComplementoTabsModalNoPainel: () => void
-  handleTabChangeComplementoTabsModalPainel: (tab: 'complemento') => void
+  handleTabChangeComplementoTabsModalPainel: (tab: ComplementoTabKey) => void
   recarregarProdutoPainelAposEdicaoComplemento: () => Promise<void>
   recarregarProdutoCarrinhoAposEdicao: (produtoId?: string) => Promise<void>
   produtoParaLancamentoPainel: Produto | null
