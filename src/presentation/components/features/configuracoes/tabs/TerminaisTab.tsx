@@ -39,26 +39,106 @@ function menusParaGrupoSelect(
 }
 
 const TERMINAIS_COL_HEADER =
-  'font-semibold text-[10px] text-primary-text uppercase'
+  'font-semibold text-[10px] leading-tight text-primary-text uppercase'
+
+const TERMINAIS_GRID =
+  'grid items-center gap-x-2 min-w-[78rem] [grid-template-columns:minmax(6.5rem,1.1fr)_minmax(7rem,1.3fr)_minmax(6rem,1fr)_3.5rem_minmax(8.5rem,1.1fr)_repeat(7,5.5rem)_2.5rem]'
+
+const OPCOES_TERMINAL_COLUNAS = [
+  {
+    key: 'compartilharMesas',
+    label: 'Compartilhar mesas',
+    header: 'Compartilhar\nmesas',
+    hint: 'Mesas compartilhadas entre terminais, ou cada um vê só as próprias',
+  },
+  {
+    key: 'fiscalAtivo',
+    label: 'Fiscal ativo',
+    header: 'Fiscal\nativo',
+    hint: 'Define se este terminal emite documento fiscal',
+  },
+  {
+    key: 'leitorHabilitado',
+    label: 'Leitor de barras',
+    header: 'Leitor de\nbarras',
+    hint: 'Liga ou desliga o leitor de código de barras',
+  },
+  {
+    key: 'finalizaDireto',
+    label: 'Finalização direta',
+    header: 'Finalização\ndireta',
+    hint: 'Finaliza sem abrir o modal de opções depois do pagamento',
+  },
+  {
+    key: 'imprimeFinalizacao',
+    label: 'Imprimir cupom',
+    header: 'Imprimir\ncupom',
+    hint: 'Com a finalização direta ligada, define se o cupom sai na hora',
+  },
+  {
+    key: 'finalizaAutomatico',
+    label: 'Finalização automática',
+    header: 'Finalização\nautomática',
+    hint: 'Finaliza sozinho depois do último pagamento no TEF',
+  },
+  {
+    key: 'stoneTexto',
+    label: 'Stone em texto',
+    header: 'Stone em\ntexto',
+    hint: 'Stone imprime em texto; desligado segue no modo padrão, por arquivo',
+  },
+] as const
+
+function OpcaoTerminalColuna({
+  label,
+  hint,
+  checked,
+  disabled,
+  onChange,
+}: {
+  label: string
+  hint: string
+  checked: boolean
+  disabled: boolean
+  onChange: (ligado: boolean) => void
+}) {
+  return (
+    <div
+      title={hint}
+      className="flex justify-center"
+      onClick={e => e.stopPropagation()}
+      onMouseDown={e => e.stopPropagation()}
+    >
+      <JiffyIconSwitch
+        checked={checked}
+        disabled={disabled}
+        onChange={e => onChange(e.target.checked)}
+        size="xs"
+        className="shrink-0 justify-center gap-0 px-0 py-0"
+        inputProps={{ 'aria-label': `${label}. ${hint}` }}
+      />
+    </div>
+  )
+}
 
 function TerminaisListColumnHeader() {
   return (
-    <div className="mb-1 flex min-h-8 items-center gap-[10px] px-4 py-1 bg-primary/10">
-      <div className={`flex-[2] hidden md:block ${TERMINAIS_COL_HEADER}`}>
-        Código do Terminal
-      </div>
-      <div className={`flex-[2] ${TERMINAIS_COL_HEADER}`}>Nome do Terminal</div>
-      <div className={`flex-[2] ${TERMINAIS_COL_HEADER}`}>Modelo Dispositivo</div>
-      <div className={`w-16 shrink-0 text-center leading-tight ${TERMINAIS_COL_HEADER}`}>
-        <span className="block">Versão APK</span>
-      </div>
-      <div className={`flex-[2] hidden md:flex ${TERMINAIS_COL_HEADER}`}>Imp. Finalização</div>
-      <div className={`flex-[1.5] text-center ${TERMINAIS_COL_HEADER}`}>Comp. Mesas</div>
-      <div className={`flex-[1.5] text-center ${TERMINAIS_COL_HEADER}`}>Fiscal ativo</div>
-      <div className={`flex-[1.5] text-center leading-tight ${TERMINAIS_COL_HEADER}`}>
-        <span className="block">Leitor C. Barras</span>
-      </div>
-      <div className="w-10 shrink-0" aria-hidden />
+    <div className={`mb-1 min-h-12 items-end px-4 py-1.5 bg-primary/10 ${TERMINAIS_GRID}`}>
+      <div className={TERMINAIS_COL_HEADER}>Código do Terminal</div>
+      <div className={TERMINAIS_COL_HEADER}>Nome do Terminal</div>
+      <div className={TERMINAIS_COL_HEADER}>Modelo Dispositivo</div>
+      <div className={`text-center ${TERMINAIS_COL_HEADER}`}>Versão APK</div>
+      <div className={TERMINAIS_COL_HEADER}>Imp. Finalização</div>
+      {OPCOES_TERMINAL_COLUNAS.map(coluna => (
+        <div
+          key={coluna.key}
+          title={coluna.hint}
+          className={`whitespace-pre-line text-center ${TERMINAIS_COL_HEADER}`}
+        >
+          {coluna.header}
+        </div>
+      ))}
+      <div aria-hidden />
     </div>
   )
 }
@@ -76,12 +156,25 @@ interface TerminalData {
   rawData: any // Dados brutos da API para campos extras
 }
 
+/** Valor que o PDV trata como impressão Stone em texto na finalização. */
+const MODO_STONE_TEXTO = 'texto'
+
 interface TerminalPreferenceData {
   compartilharMesas: boolean
   impressoraFinalizacaoNome: string
   impressoraFinalizacaoId?: string
   fiscalAtivo: boolean
   leitorHabilitado: boolean
+  finalizaDireto: boolean
+  finalizaAutomatico: boolean
+  imprimeFinalizacao: boolean
+  modoImpressaoFechamentoStone: string | null
+}
+
+function modoStoneFromApi(valor: unknown): string | null {
+  if (typeof valor !== 'string') return null
+  const trimmed = valor.trim()
+  return trimmed.length > 0 ? trimmed : null
 }
 
 /** Normaliza resposta de GET único ou item da lista de preferências */
@@ -104,6 +197,10 @@ function rawToPreferenceData(data: any): TerminalPreferenceData {
     impressoraFinalizacaoId: impressoraId,
     fiscalAtivo: !!data.fiscalAtivo,
     leitorHabilitado: !!data.leitorHabilitado,
+    finalizaDireto: !!data.finalizaDireto,
+    finalizaAutomatico: !!data.finalizaAutomatico,
+    imprimeFinalizacao: !!data.imprimeFinalizacao,
+    modoImpressaoFechamentoStone: modoStoneFromApi(data.modoImpressaoFechamentoStone),
   }
 }
 
@@ -114,6 +211,17 @@ const DEFAULT_TERMINAL_PREFERENCES: TerminalPreferenceData = {
   impressoraFinalizacaoId: undefined,
   fiscalAtivo: false,
   leitorHabilitado: false,
+  finalizaDireto: false,
+  finalizaAutomatico: false,
+  imprimeFinalizacao: false,
+  modoImpressaoFechamentoStone: null,
+}
+
+function patchPreference(
+  current: TerminalPreferenceData | undefined,
+  patch: Partial<TerminalPreferenceData>
+): TerminalPreferenceData {
+  return { ...DEFAULT_TERMINAL_PREFERENCES, ...current, ...patch }
 }
 
 /** Após carregar preferências, terminais sem registro usam o padrão (evita “Carregando...” infinito) */
@@ -136,6 +244,7 @@ export function TerminaisTab() {
   const [updatingShare, setUpdatingShare] = useState<Record<string, boolean>>({})
   const [updatingFiscal, setUpdatingFiscal] = useState<Record<string, boolean>>({})
   const [updatingLeitor, setUpdatingLeitor] = useState<Record<string, boolean>>({})
+  const [updatingFinalizacao, setUpdatingFinalizacao] = useState<Record<string, boolean>>({})
   const [updatingPrinter, setUpdatingPrinter] = useState<Record<string, boolean>>({})
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
   const [updatingGroupMenuKey, setUpdatingGroupMenuKey] = useState<string | null>(null)
@@ -507,6 +616,10 @@ export function TerminaisTab() {
           impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId, // Preserva o ID da impressora
           fiscalAtivo: prev[terminalId]?.fiscalAtivo ?? false,
           leitorHabilitado: prev[terminalId]?.leitorHabilitado ?? false,
+          finalizaDireto: prev[terminalId]?.finalizaDireto ?? false,
+          finalizaAutomatico: prev[terminalId]?.finalizaAutomatico ?? false,
+          imprimeFinalizacao: prev[terminalId]?.imprimeFinalizacao ?? false,
+          modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
         },
       }))
 
@@ -564,6 +677,10 @@ export function TerminaisTab() {
             impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId, // Preserva o ID da impressora
             fiscalAtivo: prev[terminalId]?.fiscalAtivo ?? false,
             leitorHabilitado: prev[terminalId]?.leitorHabilitado ?? false,
+          finalizaDireto: prev[terminalId]?.finalizaDireto ?? false,
+          finalizaAutomatico: prev[terminalId]?.finalizaAutomatico ?? false,
+          imprimeFinalizacao: prev[terminalId]?.imprimeFinalizacao ?? false,
+          modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
           },
         }))
       } finally {
@@ -593,6 +710,10 @@ export function TerminaisTab() {
           impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId,
           fiscalAtivo: novoValor,
           leitorHabilitado: prev[terminalId]?.leitorHabilitado ?? false,
+          finalizaDireto: prev[terminalId]?.finalizaDireto ?? false,
+          finalizaAutomatico: prev[terminalId]?.finalizaAutomatico ?? false,
+          imprimeFinalizacao: prev[terminalId]?.imprimeFinalizacao ?? false,
+          modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
         },
       }))
 
@@ -647,6 +768,10 @@ export function TerminaisTab() {
             impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId,
             fiscalAtivo: !novoValor,
             leitorHabilitado: prev[terminalId]?.leitorHabilitado ?? false,
+          finalizaDireto: prev[terminalId]?.finalizaDireto ?? false,
+          finalizaAutomatico: prev[terminalId]?.finalizaAutomatico ?? false,
+          imprimeFinalizacao: prev[terminalId]?.imprimeFinalizacao ?? false,
+          modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
           },
         }))
       } finally {
@@ -676,6 +801,10 @@ export function TerminaisTab() {
           impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId,
           fiscalAtivo: prev[terminalId]?.fiscalAtivo ?? false,
           leitorHabilitado: novoValor,
+          finalizaDireto: prev[terminalId]?.finalizaDireto ?? false,
+          finalizaAutomatico: prev[terminalId]?.finalizaAutomatico ?? false,
+          imprimeFinalizacao: prev[terminalId]?.imprimeFinalizacao ?? false,
+          modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
         },
       }))
 
@@ -730,11 +859,94 @@ export function TerminaisTab() {
             impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId,
             fiscalAtivo: prev[terminalId]?.fiscalAtivo ?? false,
             leitorHabilitado: !novoValor,
+          finalizaDireto: prev[terminalId]?.finalizaDireto ?? false,
+          finalizaAutomatico: prev[terminalId]?.finalizaAutomatico ?? false,
+          imprimeFinalizacao: prev[terminalId]?.imprimeFinalizacao ?? false,
+          modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
           },
         }))
       } finally {
         setUpdatingLeitor((prev) => {
           const { [terminalId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    []
+  )
+
+  const salvarCampoFinalizacao = useCallback(
+    async (
+      terminalId: string,
+      campo: string,
+      patch: Partial<TerminalPreferenceData>,
+      fields: Record<string, unknown>,
+      mensagemOk: string
+    ) => {
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      const chave = `${terminalId}:${campo}`
+      let anterior: TerminalPreferenceData | undefined
+      setUpdatingFinalizacao(prev => ({ ...prev, [chave]: true }))
+      setPreferencesMap(prev => {
+        anterior = prev[terminalId]
+        return {
+          ...prev,
+          [terminalId]: patchPreference(prev[terminalId], patch),
+        }
+      })
+
+      try {
+        const response = await fetchGestorApi(`/api/preferencias-terminal`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            terminaisId: terminalId,
+            fields,
+          }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Erro ao atualizar preferências')
+        }
+
+        try {
+          const prefsResponse = await fetchGestorApi(`/api/preferencias-terminal/${terminalId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          })
+          if (prefsResponse.ok) {
+            const prefsData = await prefsResponse.json()
+            setPreferencesMap(prev => ({
+              ...prev,
+              [terminalId]: rawToPreferenceData(prefsData),
+            }))
+          }
+        } catch (prefsError) {
+          console.warn('Erro ao buscar preferências atualizadas:', prefsError)
+        }
+
+        showToast.success(mensagemOk)
+      } catch (error: any) {
+        console.error('Erro ao atualizar finalização do terminal:', error)
+        showToast.error(error.message || 'Erro ao atualizar finalização do terminal')
+        if (anterior) {
+          const restaurar = anterior
+          setPreferencesMap(prev => ({ ...prev, [terminalId]: restaurar }))
+        }
+      } finally {
+        setUpdatingFinalizacao(prev => {
+          const { [chave]: _, ...rest } = prev
           return rest
         })
       }
@@ -763,6 +975,10 @@ export function TerminaisTab() {
           impressoraFinalizacaoId: impressoraId || undefined,
           fiscalAtivo: prev[terminalId]?.fiscalAtivo ?? false,
           leitorHabilitado: prev[terminalId]?.leitorHabilitado ?? false,
+          finalizaDireto: prev[terminalId]?.finalizaDireto ?? false,
+          finalizaAutomatico: prev[terminalId]?.finalizaAutomatico ?? false,
+          imprimeFinalizacao: prev[terminalId]?.imprimeFinalizacao ?? false,
+          modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
         },
       }))
 
@@ -802,6 +1018,10 @@ export function TerminaisTab() {
             impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId,
             fiscalAtivo: prev[terminalId]?.fiscalAtivo ?? false,
             leitorHabilitado: prev[terminalId]?.leitorHabilitado ?? false,
+          finalizaDireto: prev[terminalId]?.finalizaDireto ?? false,
+          finalizaAutomatico: prev[terminalId]?.finalizaAutomatico ?? false,
+          imprimeFinalizacao: prev[terminalId]?.imprimeFinalizacao ?? false,
+          modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
           },
         }))
       } finally {
@@ -1076,6 +1296,9 @@ export function TerminaisTab() {
       const compartilhamentoAtivo = prefs.compartilharMesas
       const fiscalAtivo = prefs.fiscalAtivo
       const leitorHabilitado = prefs.leitorHabilitado
+      const stoneLigado = Boolean(prefs.modoImpressaoFechamentoStone)
+      const finalizacaoOcupada = (campo: string) =>
+        !!updatingFinalizacao[`${terminal.getId()}:${campo}`]
 
       return (
         <div
@@ -1087,21 +1310,27 @@ export function TerminaisTab() {
               terminalId: terminal.getId(),
             })
           }
-          className={`px-4 py-2 flex items-center gap-[10px] rounded-lg hover:bg-primary/10 transition-colors cursor-pointer ${
+          className={`rounded-lg px-4 py-2.5 transition-colors hover:bg-primary/10 cursor-pointer ${TERMINAIS_GRID} ${
             index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
           }`}
         >
-          <div className="flex-[2] hidden md:flex items-center gap-3">
+          <div className="flex items-center">
             <span className="text-sm font-normal text-primary-text"># {codigo}</span>
           </div>
-          <div className="flex-[2] flex items-center gap-1 md:text-sm text-[10px] text-primary-text">
+          <div className="md:text-sm text-[10px] text-primary-text truncate" title={nome}>
             {nome}
           </div>
-          <div className="flex-[2] md:text-sm text-[10px] text-secondary-text">{modelo}</div>
-          <div className="w-14 shrink-0 text-center md:text-sm text-[10px] text-secondary-text">
+          <div className="md:text-sm text-[10px] text-secondary-text truncate" title={modelo}>
+            {modelo}
+          </div>
+          <div className="text-center md:text-sm text-[10px] text-secondary-text">
             {versao}
           </div>
-          <div className="flex-[2] md:text-sm text-[10px] text-secondary-text hidden md:flex">
+          <div
+            className="md:text-sm text-[10px] text-secondary-text"
+            onClick={event => event.stopPropagation()}
+            onMouseDown={event => event.stopPropagation()}
+          >
             {preferencesLoaded ? (
               <select
                 value={prefs.impressoraFinalizacaoId ?? ''}
@@ -1124,70 +1353,123 @@ export function TerminaisTab() {
               <div className="md:text-xs text-[10px] text-secondary-text">Carregando...</div>
             )}
           </div>
+          {preferencesLoaded ? (
+            <>
+              <OpcaoTerminalColuna
+                label="Compartilhar mesas"
+                hint={
+                  compartilhamentoAtivo
+                    ? 'Mesas compartilhadas entre terminais'
+                    : 'Cada terminal vê só as próprias mesas'
+                }
+                checked={compartilhamentoAtivo}
+                disabled={!!updatingShare[terminal.getId()]}
+                onChange={ligado => handleToggleCompartilhar(terminal.getId(), ligado)}
+              />
+              <OpcaoTerminalColuna
+                label="Fiscal ativo"
+                hint={
+                  fiscalAtivo
+                    ? 'Este terminal emite documento fiscal'
+                    : 'Este terminal não emite documento fiscal'
+                }
+                checked={fiscalAtivo}
+                disabled={!!updatingFiscal[terminal.getId()]}
+                onChange={ligado => handleToggleFiscalAtivo(terminal.getId(), ligado)}
+              />
+              <OpcaoTerminalColuna
+                label="Leitor de barras"
+                hint={
+                  leitorHabilitado
+                    ? 'Leitor de código de barras ligado'
+                    : 'Leitor de código de barras desligado'
+                }
+                checked={leitorHabilitado}
+                disabled={!!updatingLeitor[terminal.getId()]}
+                onChange={ligado => handleToggleLeitorCodigoBarras(terminal.getId(), ligado)}
+              />
+              <OpcaoTerminalColuna
+                label="Finalização direta"
+                hint="Finaliza sem abrir o modal de opções depois do pagamento"
+                checked={prefs.finalizaDireto}
+                disabled={finalizacaoOcupada('finalizaDireto')}
+                onChange={ligado =>
+                  void salvarCampoFinalizacao(
+                    terminal.getId(),
+                    'finalizaDireto',
+                    { finalizaDireto: ligado },
+                    { finalizaDireto: ligado },
+                    'Finalização direta atualizada!'
+                  )
+                }
+              />
+              <OpcaoTerminalColuna
+                label="Imprimir cupom"
+                hint="Com a finalização direta ligada, define se o cupom sai na hora"
+                checked={prefs.imprimeFinalizacao}
+                disabled={finalizacaoOcupada('imprimeFinalizacao')}
+                onChange={ligado =>
+                  void salvarCampoFinalizacao(
+                    terminal.getId(),
+                    'imprimeFinalizacao',
+                    { imprimeFinalizacao: ligado },
+                    { imprimeFinalizacao: ligado },
+                    'Impressão da finalização atualizada!'
+                  )
+                }
+              />
+              <OpcaoTerminalColuna
+                label="Finalização automática"
+                hint="Finaliza sozinho depois do último pagamento no TEF"
+                checked={prefs.finalizaAutomatico}
+                disabled={finalizacaoOcupada('finalizaAutomatico')}
+                onChange={ligado =>
+                  void salvarCampoFinalizacao(
+                    terminal.getId(),
+                    'finalizaAutomatico',
+                    { finalizaAutomatico: ligado },
+                    { finalizaAutomatico: ligado },
+                    'Finalização automática atualizada!'
+                  )
+                }
+              />
+              <OpcaoTerminalColuna
+                label="Stone em texto"
+                hint={
+                  stoneLigado
+                    ? `Stone imprime em texto (${prefs.modoImpressaoFechamentoStone})`
+                    : 'Stone segue no modo padrão, por arquivo'
+                }
+                checked={stoneLigado}
+                disabled={finalizacaoOcupada('modoImpressaoFechamentoStone')}
+                onChange={ligado => {
+                  const proximo = ligado
+                    ? prefs.modoImpressaoFechamentoStone?.trim() || MODO_STONE_TEXTO
+                    : null
+                  void salvarCampoFinalizacao(
+                    terminal.getId(),
+                    'modoImpressaoFechamentoStone',
+                    { modoImpressaoFechamentoStone: proximo },
+                    { modoImpressaoFechamentoStone: proximo },
+                    ligado ? 'Stone em texto ligada!' : 'Stone em texto desligada!'
+                  )
+                }}
+              />
+            </>
+          ) : (
+            <>
+              {OPCOES_TERMINAL_COLUNAS.map(coluna => (
+                <div
+                  key={coluna.key}
+                  className="text-center text-[10px] text-secondary-text"
+                >
+                  ...
+                </div>
+              ))}
+            </>
+          )}
           <div
-            className="flex-[1.5] flex justify-center"
-            onClick={e => e.stopPropagation()}
-            onMouseDown={e => e.stopPropagation()}
-          >
-            <JiffyIconSwitch
-              checked={compartilhamentoAtivo}
-              onChange={e => {
-                e.stopPropagation()
-                handleToggleCompartilhar(terminal.getId(), e.target.checked)
-              }}
-              disabled={!!updatingShare[terminal.getId()]}
-              size="sm"
-              className="justify-center gap-0 px-0 py-0"
-              inputProps={{
-                'aria-label': `Compartilhar mesas — ${nome}`,
-                title: compartilhamentoAtivo
-                  ? 'Compartilhamento habilitado'
-                  : 'Compartilhamento desabilitado',
-              }}
-            />
-          </div>
-          <div
-            className="flex-[1.5] flex justify-center"
-            onClick={e => e.stopPropagation()}
-            onMouseDown={e => e.stopPropagation()}
-          >
-            <JiffyIconSwitch
-              checked={fiscalAtivo}
-              onChange={e => {
-                e.stopPropagation()
-                handleToggleFiscalAtivo(terminal.getId(), e.target.checked)
-              }}
-              disabled={!!updatingFiscal[terminal.getId()]}
-              size="sm"
-              className="justify-center gap-0 px-0 py-0"
-              inputProps={{
-                'aria-label': `Fiscal ativo — ${nome}`,
-                title: fiscalAtivo ? 'Fiscal ativo' : 'Fiscal inativo',
-              }}
-            />
-          </div>
-          <div
-            className="flex-[1.5] flex justify-center"
-            onClick={e => e.stopPropagation()}
-            onMouseDown={e => e.stopPropagation()}
-          >
-            <JiffyIconSwitch
-              checked={leitorHabilitado}
-              onChange={e => {
-                e.stopPropagation()
-                handleToggleLeitorCodigoBarras(terminal.getId(), e.target.checked)
-              }}
-              disabled={!!updatingLeitor[terminal.getId()]}
-              size="sm"
-              className="justify-center gap-0 px-0 py-0"
-              inputProps={{
-                'aria-label': `Leitor código de barras — ${nome}`,
-                title: leitorHabilitado ? 'Leitor habilitado' : 'Leitor desabilitado',
-              }}
-            />
-          </div>
-          <div
-            className="w-10 shrink-0 flex justify-center"
+            className="flex justify-center"
             onClick={e => e.stopPropagation()}
             onMouseDown={e => e.stopPropagation()}
           >
@@ -1217,6 +1499,8 @@ export function TerminaisTab() {
       updatingShare,
       updatingFiscal,
       updatingLeitor,
+      updatingFinalizacao,
+      salvarCampoFinalizacao,
       togglingStatus,
       handleChangeImpressora,
       handleToggleCompartilhar,
@@ -1279,7 +1563,7 @@ export function TerminaisTab() {
       </div>
 
       {/* Lista de terminais com scroll */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden md:px-[20px] px-1 scrollbar-hide">
+      <div className="flex-1 overflow-y-auto overflow-x-auto md:px-[20px] px-1 scrollbar-thin">
         {terminais.length === 0 && !isLoading && (
           <div className="flex flex-col items-center justify-center py-12">
             <MdPhone className="text-secondary-text mb-4" size={48} />
