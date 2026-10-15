@@ -15,6 +15,14 @@ interface ComplementoOndeUsadoTabProps {
   complementoId: string
 }
 
+type UsoAgrupadoPorProduto = {
+  menuProdutoId: string
+  menu: ComplementoUsoNoMenu['menu']
+  produto: ComplementoUsoNoMenu['produto']
+  grupoProduto: ComplementoUsoNoMenu['grupoProduto']
+  usos: ComplementoUsoNoMenu[]
+}
+
 function formatarMoeda(valor: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor || 0)
 }
@@ -33,6 +41,38 @@ function lerMoeda(value: string): number {
 
 function chaveUso(uso: ComplementoUsoNoMenu): string {
   return `${uso.menuProdutoId}:${uso.grupoComplementos.id}`
+}
+
+function agruparUsosPorProduto(usos: ComplementoUsoNoMenu[]): UsoAgrupadoPorProduto[] {
+  const mapa = new Map<string, UsoAgrupadoPorProduto>()
+
+  for (const uso of usos) {
+    const existente = mapa.get(uso.menuProdutoId)
+    if (existente) {
+      existente.usos.push(uso)
+      continue
+    }
+    mapa.set(uso.menuProdutoId, {
+      menuProdutoId: uso.menuProdutoId,
+      menu: uso.menu,
+      produto: uso.produto,
+      grupoProduto: uso.grupoProduto,
+      usos: [uso],
+    })
+  }
+
+  return Array.from(mapa.values())
+    .map(grupo => ({
+      ...grupo,
+      usos: [...grupo.usos].sort((a, b) =>
+        a.grupoComplementos.nome.localeCompare(b.grupoComplementos.nome, 'pt-BR')
+      ),
+    }))
+    .sort((a, b) => {
+      const porProduto = a.produto.nome.localeCompare(b.produto.nome, 'pt-BR')
+      if (porProduto !== 0) return porProduto
+      return a.menu.nome.localeCompare(b.menu.nome, 'pt-BR')
+    })
 }
 
 export function ComplementoOndeUsadoTab({ complementoId }: ComplementoOndeUsadoTabProps) {
@@ -75,6 +115,8 @@ export function ComplementoOndeUsadoTab({ complementoId }: ComplementoOndeUsadoT
       return texto.includes(termo)
     })
   }, [busca, usos])
+
+  const agrupados = useMemo(() => agruparUsosPorProduto(filtrados), [filtrados])
 
   const gravarValor = useCallback(
     async (uso: ComplementoUsoNoMenu) => {
@@ -162,10 +204,10 @@ export function ComplementoOndeUsadoTab({ complementoId }: ComplementoOndeUsadoT
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-info p-3 md:p-5">
-      <p className="mb-3 text-sm text-secondary-text">
-        Valor e ativo valem só neste produto deste cardápio.
+      <p className="mb-2 text-sm text-secondary-text">
+        Valor e ativo valem por grupo neste produto deste cardápio.
       </p>
-      <div className="relative mb-3">
+      <div className="relative mb-2">
         <input
           type="text"
           value={busca}
@@ -177,61 +219,70 @@ export function ComplementoOndeUsadoTab({ complementoId }: ComplementoOndeUsadoT
           <MdSearch size={16} />
         </span>
       </div>
-      {erro ? <p className="mb-3 text-sm text-red-600">{erro}</p> : null}
+      {erro ? <p className="mb-2 text-sm text-red-600">{erro}</p> : null}
       {usos.length === 0 ? (
         <p className="py-10 text-center text-sm text-secondary-text">
           Este complemento ainda não aparece em nenhum cardápio.
         </p>
-      ) : filtrados.length === 0 ? (
+      ) : agrupados.length === 0 ? (
         <p className="py-10 text-center text-sm text-secondary-text">Nenhum uso encontrado para a busca.</p>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-gray-100 bg-white">
-          {filtrados.map(uso => {
-            const chave = chaveUso(uso)
-            return (
-              <div
-                key={chave}
-                className="grid items-center gap-3 border-b border-gray-100 px-3 py-2 sm:grid-cols-[minmax(0,1fr)_7.5rem_auto]"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-primary-text">
-                    {uso.menu.nome}
-                    <span className="font-normal text-secondary-text"> · {uso.produto.nome}</span>
-                  </p>
-                  <p className="truncate text-xs text-secondary-text">
-                    {uso.grupoComplementos.nome}
-                    {uso.grupoProduto.nome ? ` · ${uso.grupoProduto.nome}` : ''}
-                  </p>
-                </div>
-                <input
-                  type="text"
-                  value={valores[chave] ?? formatarMoeda(uso.complementoConfig.valor)}
-                  onChange={event =>
-                    setValores(prev => ({ ...prev, [chave]: formatarDigitacao(event.target.value) }))
-                  }
-                  onFocus={event => event.target.select()}
-                  onBlur={() => void gravarValor(uso)}
-                  onKeyDown={event => {
-                    if (event.key === 'Enter') event.currentTarget.blur()
-                  }}
-                  disabled={salvando[chave]}
-                  aria-label={`Valor em ${uso.menu.nome}`}
-                  className="w-full rounded border border-gray-200 px-2 py-1 text-center text-xs text-primary-text focus:border-primary focus:outline-none disabled:opacity-50"
-                />
-                <JiffyIconSwitch
-                  size="xs"
-                  checked={uso.complementoConfig.ativo}
-                  disabled={salvando[chave]}
-                  onChange={event => void gravarAtivo(uso, event.target.checked)}
-                  inputProps={{
-                    'aria-label': uso.complementoConfig.ativo
-                      ? `Desativar em ${uso.produto.nome}`
-                      : `Ativar em ${uso.produto.nome}`,
-                  }}
-                />
+        <div className="min-h-0 flex-1 divide-y divide-gray-100 overflow-y-auto rounded-lg border border-gray-100 bg-white">
+          {agrupados.map(grupo => (
+            <div key={grupo.menuProdutoId} className="px-3 py-1.5">
+              <div className="min-w-0 leading-tight">
+                <p className="truncate text-sm font-semibold text-primary-text">{grupo.produto.nome}</p>
+                <p className="truncate text-xs text-secondary-text">
+                  {grupo.menu.nome}
+                  {grupo.grupoProduto.nome ? ` · ${grupo.grupoProduto.nome}` : ''}
+                </p>
               </div>
-            )
-          })}
+              <div className="mt-1 space-y-0.5">
+                {grupo.usos.map(uso => {
+                  const chave = chaveUso(uso)
+                  return (
+                    <div
+                      key={chave}
+                      className="grid items-center gap-2 sm:grid-cols-[minmax(0,1fr)_7.5rem_auto]"
+                    >
+                      <p className="min-w-0 truncate text-sm leading-tight text-primary-text">
+                        {uso.grupoComplementos.nome}
+                      </p>
+                      <input
+                        type="text"
+                        value={valores[chave] ?? formatarMoeda(uso.complementoConfig.valor)}
+                        onChange={event =>
+                          setValores(prev => ({
+                            ...prev,
+                            [chave]: formatarDigitacao(event.target.value),
+                          }))
+                        }
+                        onFocus={event => event.target.select()}
+                        onBlur={() => void gravarValor(uso)}
+                        onKeyDown={event => {
+                          if (event.key === 'Enter') event.currentTarget.blur()
+                        }}
+                        disabled={salvando[chave]}
+                        aria-label={`Valor em ${uso.produto.nome} · ${uso.grupoComplementos.nome}`}
+                        className="w-full rounded border border-gray-200 px-2 py-0.5 text-center text-xs text-primary-text focus:border-primary focus:outline-none disabled:opacity-50"
+                      />
+                      <JiffyIconSwitch
+                        size="xs"
+                        checked={uso.complementoConfig.ativo}
+                        disabled={salvando[chave]}
+                        onChange={event => void gravarAtivo(uso, event.target.checked)}
+                        inputProps={{
+                          'aria-label': uso.complementoConfig.ativo
+                            ? `Desativar em ${uso.produto.nome} · ${uso.grupoComplementos.nome}`
+                            : `Ativar em ${uso.produto.nome} · ${uso.grupoComplementos.nome}`,
+                        }}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
