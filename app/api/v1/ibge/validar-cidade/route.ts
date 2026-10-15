@@ -4,7 +4,7 @@ import { localizarMunicipioNoEstado } from '@/src/infrastructure/ibge/ibgeLocali
 
 /**
  * GET /api/v1/ibge/validar-cidade?cidade=São Paulo&uf=SP
- * Valida se uma cidade existe no estado informado (BrasilAPI, códigos do IBGE).
+ * Valida cidade no catálogo local do Gestor.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'UF deve ter 2 caracteres' }, { status: 400 })
     }
 
-    const municipio = await localizarMunicipioNoEstado(cidade, uf)
+    const municipio = localizarMunicipioNoEstado(cidade, uf)
 
     return NextResponse.json({
       valido: Boolean(municipio),

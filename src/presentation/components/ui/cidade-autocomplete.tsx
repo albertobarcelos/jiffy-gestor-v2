@@ -43,16 +43,7 @@ const SCROLL_SPEED = 8
 const SCROLL_INTERVAL_MS = 16 // ~60fps
 
 /**
- * Componente de autocomplete de cidade via API do IBGE.
- *
- * Funcionalidades:
- * - Carrega todas as cidades do estado ao selecionar a UF
- * - Abre o dropdown ao focar no campo (sem precisar digitar)
- * - Filtra a lista localmente enquanto o usuário digita
- * - Botões ▲/▼ com scroll contínuo ao passar o mouse (igual ao Select de estado)
- * - Ao selecionar uma cidade da lista, marca como válido automaticamente
- * - Valida via API ao perder foco caso o usuário tenha digitado sem selecionar da lista
- * - Feedback visual de validação (verde=válido, vermelho=inválido)
+ * Autocomplete de cidade via BFF do Gestor (`/api/v1/ibge/*`).
  */
 export function CidadeAutocomplete({
   value,
@@ -301,8 +292,7 @@ export function CidadeAutocomplete({
   }
 
   /**
-   * Carrega todos os municípios do estado selecionado via API.
-   * Executado uma única vez por estado — a filtragem é feita localmente.
+   * Carrega os municípios do estado pelo BFF. Filtragem é local.
    */
   const carregarMunicipios = async (uf: string) => {
     try {

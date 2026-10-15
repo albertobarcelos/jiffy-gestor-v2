@@ -6,8 +6,7 @@ type ValidarCidadeBffResponse = {
 }
 
 /**
- * Busca o código IBGE da cidade pelo BFF do Gestor.
- * A tela não consulta provedor externo nem a camada de infraestrutura.
+ * Código IBGE da cidade via BFF (catálogo local do Gestor).
  */
 export async function consultarCodigoCidadeIbge(
   nomeCidade: string,
