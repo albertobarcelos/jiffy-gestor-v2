@@ -23,13 +23,15 @@ function leanGruposDoProduto(
   return Array.isArray(produto.gruposComplementos) ? produto.gruposComplementos : []
 }
 
-/** Produto com ao menos um complemento ativo (abre tela de detalhes). */
+/**
+ * Produto com ao menos um complemento ativo para exibir no delivery público.
+ * Ignora `abreComplementos` (flag só de gestor/PDV); usa vínculo no menu + lean ativo.
+ */
 export function produtoTemComplementosAtivos(
-  produto: Pick<CatalogoPublicoProdutoDTO, 'abreComplementos' | 'grupoComplementosIds'> & {
+  produto: Pick<CatalogoPublicoProdutoDTO, 'grupoComplementosIds'> & {
     gruposComplementos?: CatalogoPublicoProdutoDTO['gruposComplementos']
   }
 ): boolean {
-  if (!produto.abreComplementos) return false
   const lean = leanGruposDoProduto(produto)
   if (lean.length > 0) {
     return lean.some(grupo => grupo.complementos.some(comp => comp.ativo !== false))
@@ -59,12 +61,13 @@ function resolveGruposViaTemplate(
 /**
  * Join dicionário (metadados) + lean do produto (valor/ativo/ordem/impacto).
  * Sem lean (payload antigo), cai no join só por `grupoComplementosIds`.
+ * Não usa `abreComplementos` — no público vale o vínculo ativo no cardápio.
  */
 export function resolveGruposComplementos(
   cache: ComplementosCatalogoCache | null,
   produto: CatalogoPublicoProdutoDTO
 ): GrupoComplementoResolvido[] {
-  if (!cache || !produto.abreComplementos) return []
+  if (!cache) return []
 
   const lean = leanGruposDoProduto(produto)
   if (lean.length === 0) {

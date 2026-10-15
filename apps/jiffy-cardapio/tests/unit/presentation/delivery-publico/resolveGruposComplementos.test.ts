@@ -219,4 +219,29 @@ describe('produtoTemComplementosAtivos / cacheComplementosCobreProduto', () => {
     expect(cacheComplementosCobreProduto(cache, produto)).toBe(true)
     expect(cacheComplementosCobreProduto(null, produto)).toBe(false)
   })
+
+  it('ignora abreComplementos e ainda resolve grupos com lean ativo', () => {
+    const produto = produtoBase({
+      abreComplementos: false,
+      gruposComplementos: [
+        {
+          id: 'g-add',
+          ordem: 1,
+          complementos: [
+            {
+              id: 'c-bacon',
+              valor: 3,
+              ativo: true,
+              ordem: 1,
+              tipoImpactoPreco: 'aumenta',
+            },
+          ],
+        },
+      ],
+    })
+    expect(produtoTemComplementosAtivos(produto)).toBe(true)
+    const grupos = resolveGruposComplementos(cache, produto)
+    expect(grupos).toHaveLength(1)
+    expect(grupos[0]?.complementos[0]?.id).toBe('c-bacon')
+  })
 })

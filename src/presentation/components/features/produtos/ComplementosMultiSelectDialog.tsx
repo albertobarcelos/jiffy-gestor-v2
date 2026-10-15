@@ -46,6 +46,7 @@ import {
   reordenarGrupoComplementoNoMenu,
 } from '@/src/presentation/components/features/complementos/complementoOverrideApi'
 import { BotaoAtivoComplemento } from '@/src/presentation/components/features/complementos/BotaoAtivoComplemento'
+import { normalizarTipoImpactoPreco } from '@/src/domain/complemento/tipos'
 import { cn } from '@/src/shared/utils/cn'
 import type { JiffySidePanelFooterActions } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
@@ -115,21 +116,45 @@ function mapApiGrupoToGrupoComplemento(grupo: any): GrupoComplementoItem {
   }
 }
 
-function formatarValorComplemento(valor: number): string {
+function formatarMoedaBrl(valor: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
 }
 
 function formatarDigitacaoMoeda(value: string): string {
   const digits = value.replace(/\D/g, '')
-  if (!digits) return formatarValorComplemento(0)
-  return formatarValorComplemento(parseInt(digits, 10) / 100)
+  if (!digits) return formatarMoedaBrl(0)
+  return formatarMoedaBrl(parseInt(digits, 10) / 100)
 }
 
 function lerMoeda(value: string): number {
-  const normalized = value.replace(/R\$/g, '').trim().replace(/\./g, '').replace(',', '.')
+  const normalized = value
+    .replace(/[+\-]/g, '')
+    .replace(/R\$/g, '')
+    .trim()
+    .replace(/\./g, '')
+    .replace(',', '.')
   const parsed = parseFloat(normalized)
   if (Number.isNaN(parsed)) return 0
   return Math.round(parsed * 100) / 100
+}
+
+/** Prefixo visual do valor conforme o impacto do complemento no grupo. */
+function prefixoImpactoValor(tipoImpactoPreco: unknown): '+' | '-' | null {
+  const tipo = normalizarTipoImpactoPreco(tipoImpactoPreco)
+  if (tipo === 'aumenta') return '+'
+  if (tipo === 'diminui') return '-'
+  return null
+}
+
+/** Ex.: `+ R$ 4,00`, `- R$ 8,50` ou `R$ 0,00` (nenhum). */
+function formatarMoedaComImpacto(valor: number, tipoImpactoPreco: unknown): string {
+  const moeda = formatarMoedaBrl(valor)
+  const prefixo = prefixoImpactoValor(tipoImpactoPreco)
+  return prefixo ? `${prefixo} ${moeda}` : moeda
+}
+
+function formatarDigitacaoMoedaComImpacto(value: string, tipoImpactoPreco: unknown): string {
+  return formatarMoedaComImpacto(lerMoeda(formatarDigitacaoMoeda(value)), tipoImpactoPreco)
 }
 
 function chaveValorNoMenu(grupoId: string, complementoId: string): string {
@@ -586,7 +611,10 @@ export const ComplementosMultiSelectDialog = forwardRef<
         showToast.success('Valor atualizado neste produto e neste grupo.')
       } catch (err) {
         showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar o valor.')
-        definirValorDigitado(chave, formatarValorComplemento(comp.getValor()))
+        definirValorDigitado(
+          chave,
+          formatarMoedaComImpacto(comp.getValor(), comp.getTipoImpactoPreco())
+        )
       } finally {
         salvandoValorRef.current.delete(chave)
         setSalvandoValorChave(prev => ({ ...prev, [chave]: false }))
@@ -1915,47 +1943,78 @@ export const ComplementosMultiSelectDialog = forwardRef<
                                       >
                                         {comp.getNome()}
                                       </p>
-                                  {vinculoNoMenu && produtoId && vinculado ? (
-                                    <input
-                                      type="text"
-                                      inputMode="numeric"
-                                      value={
-                                        valoresDigitados[chaveValorNoMenu(grupo.id, comp.getId())] ??
-                                        formatarValorComplemento(comp.getValor())
-                                      }
-                                      onChange={event =>
-                                        definirValorDigitado(
-                                          chaveValorNoMenu(grupo.id, comp.getId()),
-                                          formatarDigitacaoMoeda(event.target.value)
-                                        )
-                                      }
-                                      onFocus={event => event.target.select()}
-                                      onBlur={() => void gravarValorNoMenu(grupo.id, comp)}
-                                      onKeyDown={event => {
-                                        if (event.key === 'Enter') event.currentTarget.blur()
-                                      }}
-                                      disabled={
-                                        !gruposPersistidosIds.includes(grupo.id) ||
-                                        isSaving ||
-                                        salvandoValorChave[chaveValorNoMenu(grupo.id, comp.getId())]
-                                      }
-                                      title={
-                                        gruposPersistidosIds.includes(grupo.id)
-                                          ? undefined
-                                          : 'Salve o grupo para alterar este valor.'
-                                      }
-                                      aria-label={
-                                        gruposPersistidosIds.includes(grupo.id)
-                                          ? `Valor de ${comp.getNome()} em ${grupo.nome || 'grupo'}`
-                                          : `Valor de ${comp.getNome()} em ${grupo.nome || 'grupo'}. Salve o grupo para editar.`
-                                      }
-                                      className="w-[7.5rem] rounded border border-gray-200 bg-white px-2 py-1 text-right text-xs font-normal tabular-nums text-primary-text focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                                    />
-                                  ) : (
-                                    <div className="min-w-[100px] rounded border border-gray-200 bg-white px-2 py-1 text-right text-xs font-normal tabular-nums text-primary-text">
-                                      {formatarValorComplemento(comp.getValor())}
-                                    </div>
-                                  )}
+                                  {(() => {
+                                    const tipoImpacto = normalizarTipoImpactoPreco(
+                                      comp.getTipoImpactoPreco()
+                                    )
+                                    const valorRiscado = tipoImpacto === 'nenhum'
+                                    const valorMoeda =
+                                      valoresDigitados[chaveValorNoMenu(grupo.id, comp.getId())] ??
+                                      formatarMoedaComImpacto(comp.getValor(), tipoImpacto)
+
+                                    if (vinculoNoMenu && produtoId && vinculado) {
+                                      return (
+                                        <input
+                                          type="text"
+                                          inputMode="numeric"
+                                          value={valorMoeda}
+                                          onChange={event =>
+                                            definirValorDigitado(
+                                              chaveValorNoMenu(grupo.id, comp.getId()),
+                                              formatarDigitacaoMoedaComImpacto(
+                                                event.target.value,
+                                                tipoImpacto
+                                              )
+                                            )
+                                          }
+                                          onFocus={event => event.target.select()}
+                                          onBlur={() => void gravarValorNoMenu(grupo.id, comp)}
+                                          onKeyDown={event => {
+                                            if (event.key === 'Enter') event.currentTarget.blur()
+                                          }}
+                                          disabled={
+                                            !gruposPersistidosIds.includes(grupo.id) ||
+                                            isSaving ||
+                                            salvandoValorChave[
+                                              chaveValorNoMenu(grupo.id, comp.getId())
+                                            ]
+                                          }
+                                          title={
+                                            gruposPersistidosIds.includes(grupo.id)
+                                              ? valorRiscado
+                                                ? 'Impacto nenhum: este valor não altera o preço'
+                                                : undefined
+                                              : 'Salve o grupo para alterar este valor.'
+                                          }
+                                          aria-label={
+                                            gruposPersistidosIds.includes(grupo.id)
+                                              ? `Valor de ${comp.getNome()} em ${grupo.nome || 'grupo'}`
+                                              : `Valor de ${comp.getNome()} em ${grupo.nome || 'grupo'}. Salve o grupo para editar.`
+                                          }
+                                          className={cn(
+                                            'w-[8.5rem] rounded border border-gray-200 bg-white px-2 py-1 text-right text-xs font-normal tabular-nums text-primary-text focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-50',
+                                            valorRiscado && 'line-through opacity-70'
+                                          )}
+                                        />
+                                      )
+                                    }
+
+                                    return (
+                                      <div
+                                        className={cn(
+                                          'min-w-[100px] rounded border border-gray-200 bg-white px-2 py-1 text-right text-xs font-normal tabular-nums text-primary-text',
+                                          valorRiscado && 'line-through opacity-70'
+                                        )}
+                                        title={
+                                          valorRiscado
+                                            ? 'Impacto nenhum: este valor não altera o preço'
+                                            : undefined
+                                        }
+                                      >
+                                        {formatarMoedaComImpacto(comp.getValor(), tipoImpacto)}
+                                      </div>
+                                    )
+                                  })()}
                                   {mostrarPauseNoMenu ? (
                                     <div
                                       className="flex justify-end self-center"
