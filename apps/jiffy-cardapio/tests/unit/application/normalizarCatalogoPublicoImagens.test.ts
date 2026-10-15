@@ -68,4 +68,36 @@ describe('normalizarCatalogoPublicoImagens', () => {
     )
     expect(result.catalogo.complementos?.[0]?.imagemUrl).toBe('https://cdn/bacon.jpg')
   })
+
+  it('garante gruposComplementos lean no produto quando o payload omite o campo', () => {
+    const result = normalizarCatalogoPublicoImagens(
+      catalogoBase({
+        gruposProdutos: [
+          {
+            id: 'gp1',
+            nome: 'Lanches',
+            imagemUrl: null,
+            cor: '#000',
+            icone: 'food',
+            ordem: 1,
+            produtos: [
+              {
+                id: 'p1',
+                nome: 'Burger',
+                valor: 10,
+                descricao: null,
+                imagemUrl: null,
+                ordem: 1,
+                unidadeMedida: 'un',
+                favorito: false,
+                abreComplementos: true,
+                grupoComplementosIds: ['g1'],
+              } as never,
+            ],
+          },
+        ],
+      })
+    )
+    expect(result.catalogo.gruposProdutos[0]?.produtos[0]?.gruposComplementos).toEqual([])
+  })
 })

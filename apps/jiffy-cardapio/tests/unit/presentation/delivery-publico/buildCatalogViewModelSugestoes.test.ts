@@ -21,6 +21,7 @@ function produtoBase(
     favorito: false,
     abreComplementos: false,
     grupoComplementosIds: [],
+    gruposComplementos: [],
     ...overrides,
   }
 }
