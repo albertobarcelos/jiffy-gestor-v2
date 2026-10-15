@@ -21,9 +21,11 @@ export function MenuCardapioChrome({ menuId, nomeMenu, aba, toolbar, children }:
           <MenuCardapioHeaderSelect menuId={menuId} nomeMenu={nomeMenu} aba={aba} />
           <div className="hidden h-5 w-px shrink-0 bg-primary/25 xl:block" aria-hidden />
           <MenuCardapioAbas menuId={menuId} aba={aba} />
-          <div className="w-full min-w-0 basis-full xl:ml-auto xl:h-auto xl:w-auto xl:basis-auto xl:shrink-0">
-            {toolbar}
-          </div>
+          {toolbar ? (
+            <div className="w-full min-w-0 basis-full xl:ml-auto xl:h-auto xl:w-auto xl:basis-auto xl:shrink-0">
+              {toolbar}
+            </div>
+          ) : null}
         </div>
       </div>
       <div className="h-[4px] flex-shrink-0 border-t-2 border-primary/50" />

@@ -5,6 +5,7 @@ import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalida
 import { MdSearch, MdAdd } from 'react-icons/md'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { Complemento } from '@/src/domain/entities/Complemento'
+import { gravarOverridesComplemento } from '@/src/presentation/components/features/complementos/complementoOverrideApi'
 import { useComplementos } from '@/src/presentation/hooks/useComplementos'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
@@ -33,6 +34,22 @@ interface GrupoComplementoComplementosModalProps {
 const EMPTY_COMPLEMENTOS: Complemento[] = []
 
 /** IDs dos complementos vinculados ao grupo (a partir da entidade ou do GET do grupo) */
+function impactoEfetivoDoGrupo(
+  g: GrupoComplemento
+): Record<string, 'nenhum' | 'aumenta' | 'diminui'> {
+  const comps = g.getComplementos()
+  if (!Array.isArray(comps)) return {}
+  const out: Record<string, 'nenhum' | 'aumenta' | 'diminui'> = {}
+  for (const item of comps) {
+    if (!item || typeof item !== 'object') continue
+    const rec = item as { id?: unknown; tipoImpactoPreco?: unknown }
+    if (rec.id == null) continue
+    const tipo = String(rec.tipoImpactoPreco ?? '').toLowerCase()
+    out[String(rec.id)] = tipo === 'aumenta' || tipo === 'diminui' ? tipo : 'nenhum'
+  }
+  return out
+}
+
 function getLinkedIdsFromGrupo(g: GrupoComplemento): string[] {
   const rawIds = g.getComplementosIds()
   if (rawIds && rawIds.length > 0) {
@@ -67,6 +84,10 @@ export function GrupoComplementoComplementosModal({
   const [searchTerm, setSearchTerm] = useState('')
   const [isLoadingGrupoComplementos, setIsLoadingGrupoComplementos] = useState(false)
   const [linkedIds, setLinkedIds] = useState<string[]>([])
+  /** Impacto efetivo vindo do GET do grupo. O cadastro (modelo) fica no catálogo. */
+  const [impactoPorComplemento, setImpactoPorComplemento] = useState<
+    Record<string, 'nenhum' | 'aumenta' | 'diminui'>
+  >({})
   const [vinculoLoadingId, setVinculoLoadingId] = useState<string | null>(null)
   const [filterTab, setFilterTab] = useState<'todos' | 'vinculados' | 'catalogo'>('vinculados')
 
@@ -114,6 +135,7 @@ export function GrupoComplementoComplementosModal({
         const data = await response.json()
         const parsedGrupo = GrupoComplemento.fromJSON(data)
         setLinkedIds(getLinkedIdsFromGrupo(parsedGrupo))
+        setImpactoPorComplemento(impactoEfetivoDoGrupo(parsedGrupo))
       } catch (error) {
         console.error('Erro ao carregar complementos do grupo:', error)
         const message = handleApiError(error)
@@ -141,9 +163,8 @@ export function GrupoComplementoComplementosModal({
     const idsDoProps = getLinkedIdsFromGrupo(grupo)
     if (idsDoProps.length > 0) {
       setLinkedIds(idsDoProps)
-    } else {
-      carregarComplementos(grupoId)
     }
+    void carregarComplementos(grupoId)
     // `grupo` é lido mas excluído das deps propositalmente — só nos importa o grupoId mudar.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isVisible, isDraftMode, grupoId, carregarComplementos])
@@ -312,7 +333,7 @@ export function GrupoComplementoComplementosModal({
     }))
   }, [])
 
-  const handleComplementosTabChange = useCallback((tab: 'complemento') => {
+  const handleComplementosTabChange = useCallback((tab: ComplementosTabsModalState['tab']) => {
     setComplementosTabsState((prev) => ({
       ...prev,
       tab,
@@ -503,7 +524,10 @@ export function GrupoComplementoComplementosModal({
         return
       }
 
-      const tipoAtual = normalizeTipoImpacto(complementoAtual.getTipoImpactoPreco())
+      const tipoAtual = isDraftMode
+        ? normalizeTipoImpacto(complementoAtual.getTipoImpactoPreco())
+        : (impactoPorComplemento[complementoId] ??
+          normalizeTipoImpacto(complementoAtual.getTipoImpactoPreco()))
       if (tipoAtual === novoTipo) {
         return
       }
@@ -511,25 +535,38 @@ export function GrupoComplementoComplementosModal({
       setSavingMap((prev) => ({ ...prev, [complementoId]: { ...prev[complementoId], tipo: true } }))
 
       try {
-        const payloadTipo = novoTipo.toLowerCase()
-        const response = await fetchGestorApi(`/api/complementos/${complementoId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ tipoImpactoPreco: payloadTipo }),
-        })
+        if (!isDraftMode && grupoId) {
+          await gravarOverridesComplemento({
+            grupos: [
+              {
+                grupoComplementoId: grupoId,
+                complementoId,
+                tipoImpactoPreco: novoTipo,
+              },
+            ],
+          })
+          setImpactoPorComplemento((prev) => ({ ...prev, [complementoId]: novoTipo }))
+          showToast.success('Impacto deste grupo atualizado.')
+        } else {
+          const payloadTipo = novoTipo.toLowerCase()
+          const response = await fetchGestorApi(`/api/complementos/${complementoId}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ tipoImpactoPreco: payloadTipo }),
+          })
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.message || errorData.error || 'Erro ao atualizar tipo de impacto')
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            throw new Error(errorData.message || errorData.error || 'Erro ao atualizar tipo de impacto')
+          }
+
+          showToast.success('Tipo de impacto atualizado com sucesso!')
+          void invalidate(['complementos'])
+          void invalidate(['complemento', complementoId])
         }
-
-        showToast.success('Tipo de impacto atualizado com sucesso!')
-        // Invalida cache do React Query para refletir mudanças em outras telas
-        void invalidate(['complementos'])
-        void invalidate(['complemento', complementoId])
       } catch (error: any) {
         console.error('Erro ao atualizar tipo de impacto:', error)
         const message = handleApiError(error)
@@ -542,7 +579,7 @@ export function GrupoComplementoComplementosModal({
         })
       }
     },
-    [ todosComplementos, normalizeTipoImpacto, invalidate]
+    [todosComplementos, normalizeTipoImpacto, invalidate, isDraftMode, grupoId, impactoPorComplemento]
   )
 
   // Sincroniza inputs de valor com o catálogo (React Query)
@@ -734,7 +771,12 @@ export function GrupoComplementoComplementosModal({
                             {/* Impacto inline */}
                             {isLinked ? (
                               <select
-                                value={normalizeTipoImpacto(comp.getTipoImpactoPreco())}
+                                value={
+                                  isDraftMode
+                                    ? normalizeTipoImpacto(comp.getTipoImpactoPreco())
+                                    : (impactoPorComplemento[id] ??
+                                      normalizeTipoImpacto(comp.getTipoImpactoPreco()))
+                                }
                                 onChange={(e) =>
                                   handleUpdateTipoImpacto(
                                     id,
@@ -821,7 +863,12 @@ export function GrupoComplementoComplementosModal({
                                 className="w-[90px] rounded border border-gray-200 px-2 py-1 text-xs text-primary-text focus:border-primary focus:outline-none disabled:opacity-50"
                               />
                               <select
-                                value={normalizeTipoImpacto(comp.getTipoImpactoPreco())}
+                                value={
+                                  isDraftMode
+                                    ? normalizeTipoImpacto(comp.getTipoImpactoPreco())
+                                    : (impactoPorComplemento[id] ??
+                                      normalizeTipoImpacto(comp.getTipoImpactoPreco()))
+                                }
                                 onChange={(e) =>
                                   handleUpdateTipoImpacto(
                                     id,

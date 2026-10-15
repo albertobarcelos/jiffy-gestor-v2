@@ -379,7 +379,6 @@ export const NovoGrupoComplemento = forwardRef<
           return
         }
         await Promise.resolve(onSaved?.(idCriado, imagemPersistida))
-        onClose?.()
       } else {
         setTimeout(() => {
           router.push('/grupos-complementos')

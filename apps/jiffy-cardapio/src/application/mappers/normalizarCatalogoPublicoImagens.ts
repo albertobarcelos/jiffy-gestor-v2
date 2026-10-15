@@ -38,7 +38,12 @@ export function normalizarCatalogoPublicoImagens(
       ...catalogo,
       gruposProdutos: catalogo.gruposProdutos.map(grupo => ({
         ...comImagemUrl(grupo),
-        produtos: grupo.produtos.map(produto => comImagemUrl(produto)),
+        produtos: grupo.produtos.map(produto => ({
+          ...comImagemUrl(produto),
+          gruposComplementos: Array.isArray(produto.gruposComplementos)
+            ? produto.gruposComplementos
+            : [],
+        })),
       })),
       gruposComplementos: catalogo.gruposComplementos?.map(comImagemUrl) ?? catalogo.gruposComplementos,
       complementos: catalogo.complementos?.map(comImagemUrl) ?? catalogo.complementos,

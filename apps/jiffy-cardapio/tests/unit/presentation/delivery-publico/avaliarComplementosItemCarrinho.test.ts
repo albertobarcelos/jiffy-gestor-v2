@@ -49,6 +49,8 @@ function produto(
     favorito: false,
     abreComplementos,
     grupoComplementosIds,
+    /** Sem lean → fallback template (compatível com fixtures antigas). */
+    gruposComplementos: [],
   }
 }
 
@@ -166,5 +168,67 @@ describe('avaliarComplementosItemCarrinho', () => {
     })
 
     expect(resultado).toEqual({ status: 'ok' })
+  })
+
+  it('com lean só pausados, não exige cache de dicionário', () => {
+    const resultado = avaliarComplementosItemCarrinho({
+      produto: {
+        ...produto(['g1']),
+        gruposComplementos: [
+          {
+            id: 'g1',
+            ordem: 1,
+            complementos: [
+              {
+                id: 'comp-1',
+                valor: 1,
+                ativo: false,
+                ordem: 1,
+                tipoImpactoPreco: 'aumenta',
+              },
+            ],
+          },
+        ],
+      },
+      cache: null,
+      produtoNome: 'Pastel',
+      complementos: [],
+    })
+
+    expect(resultado).toEqual({ status: 'ok' })
+  })
+
+  it('com lean ativo, valida mínimo usando merge com o dicionário', () => {
+    const grupoComplemento = grupo({
+      id: 'g1',
+      qtdMinima: 1,
+      qtdMaxima: 0,
+      obrigatorio: true,
+    })
+    const resultado = avaliarComplementosItemCarrinho({
+      produto: {
+        ...produto(['g1']),
+        gruposComplementos: [
+          {
+            id: 'g1',
+            ordem: 1,
+            complementos: [
+              {
+                id: 'comp-1',
+                valor: 5,
+                ativo: true,
+                ordem: 1,
+                tipoImpactoPreco: 'aumenta',
+              },
+            ],
+          },
+        ],
+      },
+      cache: cacheDe(grupoComplemento),
+      produtoNome: 'Pastel',
+      complementos: [],
+    })
+
+    expect(resultado.status).toBe('invalido')
   })
 })
