@@ -40,7 +40,11 @@ import {
   type ComplementosTabsModalState,
 } from '../complementos/ComplementosTabsModal'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
-import { gravarOverridesComplemento } from '@/src/presentation/components/features/complementos/complementoOverrideApi'
+import {
+  gravarOverridesComplemento,
+  reordenarComplementoNoMenu,
+  reordenarGrupoComplementoNoMenu,
+} from '@/src/presentation/components/features/complementos/complementoOverrideApi'
 import { BotaoAtivoComplemento } from '@/src/presentation/components/features/complementos/BotaoAtivoComplemento'
 import { cn } from '@/src/shared/utils/cn'
 import type { JiffySidePanelFooterActions } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
@@ -474,8 +478,18 @@ export const ComplementosMultiSelectDialog = forwardRef<
 
   const reordenarNoMenu = useCallback(
     async (
-      caminho: 'reordena-grupo-complemento' | 'reordena-complemento',
-      body: Record<string, unknown>,
+      acao:
+        | {
+            tipo: 'grupo'
+            grupoComplementoId: string
+            novaPosicao: number
+          }
+        | {
+            tipo: 'complemento'
+            grupoComplementoId: string
+            complementoId: string
+            novaPosicao: number
+          },
       chave: string
     ): Promise<boolean> => {
       if (!menuId || !produtoId) return false
@@ -483,27 +497,23 @@ export const ComplementosMultiSelectDialog = forwardRef<
         showToast.error('Salve os vínculos antes de alterar a ordem.')
         return false
       }
-      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-      if (!token) {
-        showToast.error('Token não encontrado. Faça login novamente.')
-        return false
-      }
       setReordenandoChave(chave)
       try {
-        const response = await fetchGestorApi(
-          `/api/menus/${encodeURIComponent(menuId)}/produtos/${encodeURIComponent(produtoId)}/${caminho}`,
-          {
-            method: 'PATCH',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(body),
-          }
-        )
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.message || errorData.error || 'Erro ao reordenar')
+        if (acao.tipo === 'grupo') {
+          await reordenarGrupoComplementoNoMenu({
+            menuId,
+            produtoId,
+            grupoComplementoId: acao.grupoComplementoId,
+            novaPosicao: acao.novaPosicao,
+          })
+        } else {
+          await reordenarComplementoNoMenu({
+            menuId,
+            produtoId,
+            grupoComplementoId: acao.grupoComplementoId,
+            complementoId: acao.complementoId,
+            novaPosicao: acao.novaPosicao,
+          })
         }
         await loadGroups({ silent: true })
         return true
@@ -984,8 +994,11 @@ export const ComplementosMultiSelectDialog = forwardRef<
         return [...ordered, ...restantes]
       })
       const ok = await reordenarNoMenu(
-        'reordena-grupo-complemento',
-        { novaPosicao: newIndex + 1, grupoComplementoId: String(active.id) },
+        {
+          tipo: 'grupo',
+          grupoComplementoId: String(active.id),
+          novaPosicao: newIndex + 1,
+        },
         `grupo:${String(active.id)}`
       )
       if (!ok) setGroups(anterior)
@@ -1009,11 +1022,11 @@ export const ComplementosMultiSelectDialog = forwardRef<
         )
       )
       const ok = await reordenarNoMenu(
-        'reordena-complemento',
         {
-          novaPosicao: newIndex + 1,
+          tipo: 'complemento',
           grupoComplementoId: grupoId,
           complementoId: String(active.id),
+          novaPosicao: newIndex + 1,
         },
         `comp:${grupoId}:${String(active.id)}`
       )

@@ -3,51 +3,32 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { MdPause, MdPlayArrow, MdSearch } from 'react-icons/md'
 import type { ComplementoUsoNoMenu } from '@/src/domain/complemento/tipos'
-import { listarMenuProdutosViaBffUseCase } from '@/src/application/use-cases/menus/menuBffUseCases'
+import {
+  compararNomePt,
+  listarComplementosDoCardapioLote,
+} from '@/src/application/complementos/menuComplementoLote'
+import {
+  filtrarLinhasParaAtivoAlvo,
+  LIMITE_VINCULOS_OVERRIDE,
+  MODOS_VALOR_COMPLEMENTO_LOTE,
+  partirEmLotes,
+  valorComplementoNoModo,
+  type ModoValorComplementoLote,
+} from '@/src/application/complementos/valorComplementoLote'
 import { useMenu } from '@/src/presentation/hooks/menus/useMenus'
 import { MenuCardapioChrome } from './MenuCardapioChrome'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { Checkbox } from '@/src/presentation/components/ui/checkbox'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { cn } from '@/src/shared/utils/cn'
-import type { MenuProduto } from '@/src/shared/types/menus'
 import { BotaoAtivoComplemento } from '@/src/presentation/components/features/complementos/BotaoAtivoComplemento'
 import {
   buscarComplementoCompleto,
   gravarOverridesComplemento,
+  listarGruposComplementoMenuLote,
 } from '@/src/presentation/components/features/complementos/complementoOverrideApi'
-
-const PAGINA_PRODUTOS = 100
-const LIMITE_VINCULOS = 100
-
-const MODOS_VALOR_LOTE = [
-  { id: 'acrescentar', label: 'Acrescentar' },
-  { id: 'alterar', label: 'Alterar' },
-  { id: 'diminuir', label: 'Diminuir' },
-] as const
-
-type ModoValorLote = (typeof MODOS_VALOR_LOTE)[number]['id']
-
-type ComplementoDoGrupo = {
-  id: string
-  nome: string
-}
-
-type GrupoDoCardapio = {
-  id: string
-  nome: string
-  produtos: number
-  complementos: ComplementoDoGrupo[]
-}
-
-type ComplementoDoCardapio = {
-  id: string
-  nome: string
-  grupos: number
-}
 
 type LinhaProduto = {
   chave: string
@@ -77,113 +58,10 @@ function lerMoeda(value: string): number {
   return Math.round(parsed * 100) / 100
 }
 
-function arredondarCentavos(valor: number): number {
-  return Math.round(valor * 100) / 100
-}
-
-function valorNoModo(atual: number, digitado: number, modo: ModoValorLote): number {
-  if (modo === 'acrescentar') return arredondarCentavos(atual + digitado)
-  if (modo === 'diminuir') return Math.max(0, arredondarCentavos(atual - digitado))
-  return digitado
-}
-
-function compararNome(a: string, b: string): number {
-  return a.localeCompare(b, 'pt-BR', { sensitivity: 'base' })
-}
-
 function contemBusca(texto: string, busca: string): boolean {
   const termo = busca.trim().toLocaleLowerCase('pt-BR')
   if (!termo) return true
   return texto.toLocaleLowerCase('pt-BR').includes(termo)
-}
-
-function lerComplementos(raw: unknown): ComplementoDoGrupo[] {
-  if (!Array.isArray(raw)) return []
-  const itens: ComplementoDoGrupo[] = []
-  for (const item of raw) {
-    if (!item || typeof item !== 'object') continue
-    const registro = item as Record<string, unknown>
-    const id = registro.id != null ? String(registro.id) : ''
-    const nome = registro.nome != null ? String(registro.nome) : ''
-    if (id && nome) itens.push({ id, nome })
-  }
-  return itens.sort((a, b) => compararNome(a.nome, b.nome))
-}
-
-async function listarProdutosDoCardapio(token: string, menuId: string): Promise<MenuProduto[]> {
-  const itens: MenuProduto[] = []
-  let offset = 0
-  for (let pagina = 0; pagina < 50; pagina += 1) {
-    const data = await listarMenuProdutosViaBffUseCase.execute({
-      token,
-      menuId,
-      limit: PAGINA_PRODUTOS,
-      offset,
-      tipo: 'all',
-    })
-    itens.push(...data.items)
-    if (data.items.length < PAGINA_PRODUTOS) break
-    offset += data.items.length
-    if (typeof data.count === 'number' && offset >= data.count) break
-  }
-  return itens
-}
-
-async function buscarComplementosDoGrupo(token: string, grupoId: string): Promise<ComplementoDoGrupo[]> {
-  const response = await fetchGestorApi(
-    `/api/grupos-complementos/${encodeURIComponent(grupoId)}`,
-    {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    }
-  )
-  if (response.status === 404) return []
-  if (!response.ok) {
-    const errorData = (await response.json().catch(() => ({}))) as { error?: string; message?: string }
-    throw new Error(errorData.error || errorData.message || 'Erro ao carregar grupo de complementos')
-  }
-  const data = (await response.json()) as { complementos?: unknown }
-  return lerComplementos(data.complementos)
-}
-
-async function listarGruposDoCardapio(token: string, menuId: string): Promise<GrupoDoCardapio[]> {
-  const produtos = await listarProdutosDoCardapio(token, menuId)
-  const porId = new Map<string, { nome: string; produtos: Set<string> }>()
-
-  for (const produto of produtos) {
-    for (const grupo of produto.gruposComplementos ?? []) {
-      if (!grupo.id) continue
-      const atual = porId.get(grupo.id) ?? { nome: grupo.nome || 'Grupo', produtos: new Set<string>() }
-      if (grupo.nome) atual.nome = grupo.nome
-      atual.produtos.add(produto.produtoId)
-      porId.set(grupo.id, atual)
-    }
-  }
-
-  const grupos = await Promise.all(
-    [...porId.entries()].map(async ([id, info]) => ({
-      id,
-      nome: info.nome,
-      produtos: info.produtos.size,
-      complementos: await buscarComplementosDoGrupo(token, id),
-    }))
-  )
-
-  return grupos.sort((a, b) => compararNome(a.nome, b.nome))
-}
-
-function listarComplementos(grupos: GrupoDoCardapio[]): ComplementoDoCardapio[] {
-  const porId = new Map<string, { nome: string; grupos: Set<string> }>()
-  for (const grupo of grupos) {
-    for (const complemento of grupo.complementos) {
-      const atual = porId.get(complemento.id) ?? { nome: complemento.nome, grupos: new Set<string>() }
-      atual.grupos.add(grupo.id)
-      porId.set(complemento.id, atual)
-    }
-  }
-  return [...porId.entries()]
-    .map(([id, item]) => ({ id, nome: item.nome, grupos: item.grupos.size }))
-    .sort((a, b) => compararNome(a.nome, b.nome))
 }
 
 function montarLinhas(
@@ -207,9 +85,9 @@ function montarLinhas(
     })
   }
   return [...porChave.values()].sort((a, b) => {
-    const porProduto = compararNome(a.produtoNome, b.produtoNome)
+    const porProduto = compararNomePt(a.produtoNome, b.produtoNome)
     if (porProduto !== 0) return porProduto
-    return compararNome(a.grupoNome, b.grupoNome)
+    return compararNomePt(a.grupoNome, b.grupoNome)
   })
 }
 
@@ -243,14 +121,6 @@ const iconesCheckboxLote = {
   indeterminateIcon: <IconeCheckboxParcial />,
 }
 
-function partirEmLotes<T>(itens: T[], tamanho: number): T[][] {
-  const lotes: T[][] = []
-  for (let indice = 0; indice < itens.length; indice += tamanho) {
-    lotes.push(itens.slice(indice, indice + tamanho))
-  }
-  return lotes
-}
-
 interface MenuAlterarValorComplementosProps {
   menuId: string
 }
@@ -260,7 +130,7 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
   const { data: menu } = useMenu(menuId)
   const [complementoId, setComplementoId] = useState<string | null>(null)
   const [gruposSelecionados, setGruposSelecionados] = useState<Set<string>>(() => new Set())
-  const [modoValor, setModoValor] = useState<ModoValorLote>('alterar')
+  const [modoValor, setModoValor] = useState<ModoValorComplementoLote>('alterar')
   const [novoValor, setNovoValor] = useState('')
   const [selecionados, setSelecionados] = useState<Set<string>>(() => new Set())
   const [salvando, setSalvando] = useState(false)
@@ -272,12 +142,12 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
 
   const gruposQuery = useSecureTenantQuery(
     ['menu-grupos-valor-complemento', menuId],
-    ({ token }) => listarGruposDoCardapio(token, menuId),
+    () => listarGruposComplementoMenuLote(menuId),
     { staleTime: 0, refetchOnMount: 'always' }
   )
 
   const grupos = gruposQuery.data ?? []
-  const complementos = useMemo(() => listarComplementos(grupos), [grupos])
+  const complementos = useMemo(() => listarComplementosDoCardapioLote(grupos), [grupos])
   const complemento = useMemo(
     () => complementos.find(item => item.id === complementoId) ?? null,
     [complementos, complementoId]
@@ -407,7 +277,13 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
     if (!complementoId || !podeAtivoLote) return
     const marcados = linhas.filter(item => selecionados.has(item.chave))
     if (marcados.length === 0) return
-    const paraAtualizar = marcados.filter(item => complementoAtivoDaLinha(item) !== ativo)
+    const paraAtualizar = filtrarLinhasParaAtivoAlvo(
+      marcados.map(item => ({
+        ...item,
+        ativoAtual: complementoAtivoDaLinha(item),
+      })),
+      ativo
+    )
     if (paraAtualizar.length === 0) {
       showToast.success(
         ativo
@@ -431,7 +307,7 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
         grupoComplementoId: item.grupoId,
         ativo,
       }))
-      for (const lote of partirEmLotes(vinculos, LIMITE_VINCULOS)) {
+      for (const lote of partirEmLotes(vinculos, LIMITE_VINCULOS_OVERRIDE)) {
         await gravarOverridesComplemento({ vinculos: lote })
       }
       setSelecionados(new Set())
@@ -465,9 +341,9 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
         produtoId: item.produtoId,
         complementoId,
         grupoComplementoId: item.grupoId,
-        valor: valorNoModo(item.valorAtual, valor, modoValor),
+        valor: valorComplementoNoModo(item.valorAtual, valor, modoValor),
       }))
-      for (const lote of partirEmLotes(vinculos, LIMITE_VINCULOS)) {
+      for (const lote of partirEmLotes(vinculos, LIMITE_VINCULOS_OVERRIDE)) {
         await gravarOverridesComplemento({ vinculos: lote })
       }
       setSelecionados(new Set())
@@ -497,7 +373,7 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
               role="group"
               aria-label="Como aplicar o valor"
             >
-              {MODOS_VALOR_LOTE.map(modo => (
+              {MODOS_VALOR_COMPLEMENTO_LOTE.map(modo => (
                 <button
                   key={modo.id}
                   type="button"

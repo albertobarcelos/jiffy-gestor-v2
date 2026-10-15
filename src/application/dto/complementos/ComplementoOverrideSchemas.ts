@@ -21,20 +21,6 @@ export const ImpactoComplementoNoGrupoSchema = z.object({
   tipoImpactoPreco: TipoImpactoPrecoSchema,
 })
 
-export const AtualizarVinculosComplementoSchema = z.object({
-  vinculos: z
-    .array(VinculoComplementoOverrideSchema)
-    .min(1, 'Informe ao menos um vínculo')
-    .max(100, 'Máximo de 100 vínculos'),
-})
-
-export const AtualizarImpactoComplementoNosGruposSchema = z.object({
-  grupos: z
-    .array(ImpactoComplementoNoGrupoSchema)
-    .min(1, 'Informe ao menos um grupo')
-    .max(100, 'Máximo de 100 grupos'),
-})
-
 export const AtualizarOverridesComplementoSchema = z
   .object({
     vinculos: z
@@ -62,10 +48,6 @@ export const ReordenarComplementoNoMenuSchema = ReordenarGrupoComplementoNoMenuS
   complementoId: z.string().trim().min(1, 'ID do complemento é obrigatório'),
 })
 
-export type AtualizarVinculosComplementoDTO = z.infer<typeof AtualizarVinculosComplementoSchema>
-export type AtualizarImpactoComplementoNosGruposDTO = z.infer<
-  typeof AtualizarImpactoComplementoNosGruposSchema
->
 export type AtualizarOverridesComplementoDTO = z.infer<typeof AtualizarOverridesComplementoSchema>
 export type ReordenarGrupoComplementoNoMenuDTO = z.infer<typeof ReordenarGrupoComplementoNoMenuSchema>
 export type ReordenarComplementoNoMenuDTO = z.infer<typeof ReordenarComplementoNoMenuSchema>

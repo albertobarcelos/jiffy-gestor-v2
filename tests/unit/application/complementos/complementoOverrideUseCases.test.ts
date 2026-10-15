@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ZodError } from 'zod'
 import { AtualizarOverridesComplementoUseCase } from '@/src/application/use-cases/complementos/AtualizarOverridesComplementoUseCase'
-import { AtualizarVinculosComplementoUseCase } from '@/src/application/use-cases/complementos/AtualizarVinculosComplementoUseCase'
 import { ReordenarComplementoNoMenuUseCase } from '@/src/application/use-cases/complementos/ReordenarComplementoNoMenuUseCase'
 import type { IComplementoOverrideRepository } from '@/src/domain/repositories/IComplementoOverrideRepository'
 import { mapComplementoCompletoFromApi } from '@/src/infrastructure/database/repositories/mapComplementoCompletoFromApi'
@@ -21,7 +20,7 @@ function repositorioFake(): IComplementoOverrideRepository {
 describe('overrides de complemento', () => {
   it('rejeita vínculo sem valor e sem ativo', async () => {
     const repository = repositorioFake()
-    const useCase = new AtualizarVinculosComplementoUseCase(repository)
+    const useCase = new AtualizarOverridesComplementoUseCase(repository)
 
     await expect(
       useCase.execute({
