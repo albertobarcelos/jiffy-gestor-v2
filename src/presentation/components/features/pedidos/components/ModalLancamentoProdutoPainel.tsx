@@ -35,6 +35,7 @@ import {
   calcularTotalComplementos,
 } from '@/src/domain/services/pedido/CalculadoraPedido'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
+import { listarComplementosVisiveisNoPedido } from '@/src/domain/policies/pedido/ComplementoCatalogoVendaPolicy'
 import {
   grupoComplementoAtingiuMaximo,
   limiteMaximoEfetivoGrupo,
@@ -150,7 +151,7 @@ interface ModalLancamentoProdutoPainelProps {
 function produtoTemComplementosVinculados(produto: Produto): boolean {
   const grupos = produto.getGruposComplementos()
   if (!grupos || grupos.length === 0) return false
-  return grupos.some(grupo => grupo.complementos && grupo.complementos.length > 0)
+  return grupos.some(grupo => listarComplementosVisiveisNoPedido(grupo.complementos).length > 0)
 }
 
 function buildMapQuantidadesComplementos(
@@ -159,7 +160,7 @@ function buildMapQuantidadesComplementos(
 ): Record<string, number> {
   const map: Record<string, number> = {}
   for (const grupo of produto.getGruposComplementos()) {
-    for (const comp of grupo.complementos ?? []) {
+    for (const comp of listarComplementosVisiveisNoPedido(grupo.complementos)) {
       const chave = `${grupo.id}-${comp.id}`
       const qtd = iniciais?.[chave]
       map[chave] =
@@ -175,7 +176,7 @@ function montarComplementosSelecionados(
 ): ComplementoLancamentoPainelPayload[] {
   const out: ComplementoLancamentoPainelPayload[] = []
   produto.getGruposComplementos().forEach(grupo => {
-    grupo.complementos.forEach(comp => {
+    listarComplementosVisiveisNoPedido(grupo.complementos).forEach(comp => {
       const chave = `${grupo.id}-${comp.id}`
       const quantidade = Math.max(0, Math.floor(quantidades[chave] ?? 0))
       if (quantidade < 1) return
@@ -339,7 +340,11 @@ export function ModalLancamentoProdutoPainel({
     if (mostrarComplementos) {
       const gruposComItens = produto
         .getGruposComplementos()
-        .filter(grupo => (grupo.complementos?.length ?? 0) > 0)
+        .map(grupo => ({
+          ...grupo,
+          complementos: listarComplementosVisiveisNoPedido(grupo.complementos),
+        }))
+        .filter(grupo => grupo.complementos.length > 0)
       const limites = validarLimitesGruposComplementosLancamento(
         gruposComItens,
         quantidadesComplementos
@@ -474,6 +479,10 @@ export function ModalLancamentoProdutoPainel({
                 ) : produtoTemComplementosVinculados(produto) ? (
                   <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
                     {produto.getGruposComplementos().map(grupo => {
+                      const complementosVisiveis = listarComplementosVisiveisNoPedido(
+                        grupo.complementos
+                      )
+                      if (complementosVisiveis.length === 0) return null
                       const totalNoGrupo = somarQuantidadeComplementosNoGrupo(
                         quantidadesComplementos,
                         grupo.id
@@ -489,9 +498,9 @@ export function ModalLancamentoProdutoPainel({
                             {rotuloLimitesGrupoComplemento(grupo)}
                           </span>
                         </div>
-                        {grupo.complementos && grupo.complementos.length > 0 ? (
+                        {complementosVisiveis.length > 0 ? (
                           <div className="space-y-0.5">
-                            {grupo.complementos.map(comp => {
+                            {complementosVisiveis.map(comp => {
                               const chaveUnica = `${grupo.id}-${comp.id}`
                               const quantidade = Math.max(
                                 0,

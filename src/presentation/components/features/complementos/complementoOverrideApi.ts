@@ -1,4 +1,8 @@
 import type { GrupoComplementoLote } from '@/src/application/complementos/menuComplementoLote'
+import {
+  montarGrupoImpactoLoteDeJson,
+  type GrupoImpactoLote,
+} from '@/src/application/complementos/impactoComplementoLote'
 import type { ComplementoCompleto } from '@/src/domain/complemento/tipos'
 import type {
   ImpactoComplementoNoGrupo,
@@ -36,6 +40,27 @@ export async function listarGruposComplementoMenuLote(menuId: string): Promise<G
   }
   const data = (await response.json()) as { grupos?: GrupoComplementoLote[] }
   return Array.isArray(data.grupos) ? data.grupos : []
+}
+
+/** Detalhe do grupo com impacto efetivo por complemento (lote de impacto). */
+export async function buscarGrupoImpactoLote(grupoId: string): Promise<GrupoImpactoLote> {
+  const token = await tokenOuErro()
+  const response = await fetchGestorApi(
+    `/api/grupos-complementos/${encodeURIComponent(grupoId)}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    }
+  )
+  if (!response.ok) {
+    await lerErro(response, 'Erro ao carregar grupo de complementos')
+  }
+  const data = await response.json()
+  const grupo = montarGrupoImpactoLoteDeJson(data)
+  if (!grupo) {
+    throw new Error('Grupo de complementos inválido')
+  }
+  return grupo
 }
 
 export async function buscarComplementoCompleto(complementoId: string): Promise<ComplementoCompleto> {
