@@ -41,6 +41,7 @@ import {
 } from '../complementos/ComplementosTabsModal'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { gravarOverridesComplemento } from '@/src/presentation/components/features/complementos/complementoOverrideApi'
+import { BotaoAtivoComplemento } from '@/src/presentation/components/features/complementos/BotaoAtivoComplemento'
 import { cn } from '@/src/shared/utils/cn'
 import type { JiffySidePanelFooterActions } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
@@ -367,6 +368,8 @@ export const ComplementosMultiSelectDialog = forwardRef<
   const valoresDigitadosRef = useRef<Record<string, string>>({})
   const [salvandoValorChave, setSalvandoValorChave] = useState<Record<string, boolean>>({})
   const salvandoValorRef = useRef<Set<string>>(new Set())
+  const [salvandoAtivoChave, setSalvandoAtivoChave] = useState<Record<string, boolean>>({})
+  const salvandoAtivoRef = useRef<Set<string>>(new Set())
   const listaLimiteRef = useRef<HTMLDivElement>(null)
   const [abrindoGrupoComplementosId, setAbrindoGrupoComplementosId] = useState<string | null>(
     null
@@ -580,6 +583,50 @@ export const ComplementosMultiSelectDialog = forwardRef<
       }
     },
     [definirValorDigitado, limparValorDigitado, menuId, produtoId]
+  )
+
+  const gravarAtivoNoMenu = useCallback(
+    async (grupoId: string, comp: Complemento) => {
+      if (!menuId || !produtoId) return
+      if (!baselineGruposIdsRef.current.includes(grupoId)) return
+      const chave = chaveValorNoMenu(grupoId, comp.getId())
+      if (salvandoAtivoRef.current.has(chave)) return
+      const proximo = !comp.isAtivo()
+      salvandoAtivoRef.current.add(chave)
+      setSalvandoAtivoChave(prev => ({ ...prev, [chave]: true }))
+      try {
+        await gravarOverridesComplemento({
+          vinculos: [
+            {
+              menuId,
+              produtoId,
+              complementoId: comp.getId(),
+              grupoComplementoId: grupoId,
+              ativo: proximo,
+            },
+          ],
+        })
+        setGroups(prev =>
+          prev.map(grupo =>
+            grupo.id === grupoId
+              ? {
+                  ...grupo,
+                  complementos: atualizarAtivoNaLista(grupo.complementos, comp.getId(), proximo),
+                }
+              : grupo
+          )
+        )
+        showToast.success(
+          proximo ? 'Complemento ativado neste produto.' : 'Complemento pausado neste produto.'
+        )
+      } catch (err) {
+        showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar o complemento.')
+      } finally {
+        salvandoAtivoRef.current.delete(chave)
+        setSalvandoAtivoChave(prev => ({ ...prev, [chave]: false }))
+      }
+    },
+    [menuId, produtoId]
   )
 
   const loadSelectableGroups = useCallback(async (signal?: AbortSignal) => {
@@ -1824,14 +1871,16 @@ export const ComplementosMultiSelectDialog = forwardRef<
                               {(() => {
                                 const mostrarAlcaComplemento =
                                   podeReordenarNoMenu && vinculado
+                                const mostrarPauseNoMenu = Boolean(vinculoNoMenu && produtoId && vinculado)
+                                const temControleAtivo = showAtivoComplemento || mostrarPauseNoMenu
                                 const linhasComplemento = complementosOrdenados.map(comp => {
                                   const gridClass = cn(
                                     'grid items-center gap-2 border-b border-gray-200 p-2 transition-colors hover:bg-primary-bg/60',
-                                    mostrarAlcaComplemento && showAtivoComplemento
+                                    mostrarAlcaComplemento && temControleAtivo
                                       ? 'grid-cols-[auto_minmax(0,1fr)_auto_auto]'
                                       : mostrarAlcaComplemento
                                         ? 'grid-cols-[auto_minmax(0,1fr)_auto]'
-                                        : showAtivoComplemento
+                                        : temControleAtivo
                                           ? 'grid-cols-[minmax(0,1fr)_auto_auto]'
                                           : 'grid-cols-[minmax(0,1fr)_auto]'
                                   )
@@ -1894,6 +1943,28 @@ export const ComplementosMultiSelectDialog = forwardRef<
                                       {formatarValorComplemento(comp.getValor())}
                                     </div>
                                   )}
+                                  {mostrarPauseNoMenu ? (
+                                    <div
+                                      className="flex justify-end self-center"
+                                      onClick={e => e.stopPropagation()}
+                                      onMouseDown={e => e.stopPropagation()}
+                                    >
+                                      <BotaoAtivoComplemento
+                                        ativo={comp.isAtivo()}
+                                        disabled={
+                                          !gruposPersistidosIds.includes(grupo.id) ||
+                                          isSaving ||
+                                          Boolean(salvandoAtivoChave[chaveValorNoMenu(grupo.id, comp.getId())])
+                                        }
+                                        title={
+                                          gruposPersistidosIds.includes(grupo.id)
+                                            ? undefined
+                                            : 'Salve o grupo para pausar ou ativar este complemento.'
+                                        }
+                                        onToggle={() => void gravarAtivoNoMenu(grupo.id, comp)}
+                                      />
+                                    </div>
+                                  ) : null}
                                   {showAtivoComplemento ? (
                                     <div
                                       className="flex justify-end self-center"

@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, type ReactNode } from 'react'
-import { MdSearch } from 'react-icons/md'
+import { MdPause, MdPlayArrow, MdSearch } from 'react-icons/md'
 import type { ComplementoUsoNoMenu } from '@/src/domain/complemento/tipos'
 import { listarMenuProdutosViaBffUseCase } from '@/src/application/use-cases/menus/menuBffUseCases'
 import { useMenu } from '@/src/presentation/hooks/menus/useMenus'
@@ -14,6 +14,7 @@ import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { cn } from '@/src/shared/utils/cn'
 import type { MenuProduto } from '@/src/shared/types/menus'
+import { BotaoAtivoComplemento } from '@/src/presentation/components/features/complementos/BotaoAtivoComplemento'
 import {
   buscarComplementoCompleto,
   gravarOverridesComplemento,
@@ -56,6 +57,7 @@ type LinhaProduto = {
   grupoId: string
   grupoNome: string
   valorAtual: number
+  complementoAtivo: boolean
 }
 
 function formatarMoeda(valor: number): string {
@@ -201,6 +203,7 @@ function montarLinhas(
       grupoId: uso.grupoComplementos.id,
       grupoNome: uso.grupoComplementos.nome,
       valorAtual: uso.complementoConfig.valor,
+      complementoAtivo: uso.complementoConfig.ativo,
     })
   }
   return [...porChave.values()].sort((a, b) => {
@@ -261,6 +264,8 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
   const [novoValor, setNovoValor] = useState('')
   const [selecionados, setSelecionados] = useState<Set<string>>(() => new Set())
   const [salvando, setSalvando] = useState(false)
+  const [pausandoChave, setPausandoChave] = useState<string | null>(null)
+  const [ativoOverride, setAtivoOverride] = useState<Record<string, boolean>>({})
   const [buscaComplemento, setBuscaComplemento] = useState('')
   const [buscaGrupo, setBuscaGrupo] = useState('')
   const [buscaProduto, setBuscaProduto] = useState('')
@@ -315,6 +320,7 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
     linhasFiltradas.length > 0 && linhasFiltradas.every(item => selecionados.has(item.chave))
   const algumMarcado = linhasFiltradas.some(item => selecionados.has(item.chave))
   const podeAplicar = selecionados.size > 0 && novoValor.trim() !== '' && !salvando
+  const podeAtivoLote = selecionados.size > 0 && !salvando && !pausandoChave
 
   const escolherComplemento = (id: string) => {
     setComplementoId(id)
@@ -322,6 +328,7 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
     setModoValor('alterar')
     setNovoValor('')
     setSelecionados(new Set())
+    setAtivoOverride({})
     setBuscaGrupo('')
     setBuscaProduto('')
   }
@@ -358,6 +365,92 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
       }
       return next
     })
+  }
+
+  const complementoAtivoDaLinha = (item: LinhaProduto) =>
+    item.chave in ativoOverride ? ativoOverride[item.chave] : item.complementoAtivo
+
+  const alternarAtivoLinha = async (item: LinhaProduto) => {
+    if (!complementoId || pausandoChave) return
+    const proximo = !complementoAtivoDaLinha(item)
+    setPausandoChave(item.chave)
+    setAtivoOverride(prev => ({ ...prev, [item.chave]: proximo }))
+    try {
+      await gravarOverridesComplemento({
+        vinculos: [
+          {
+            menuId,
+            produtoId: item.produtoId,
+            complementoId,
+            grupoComplementoId: item.grupoId,
+            ativo: proximo,
+          },
+        ],
+      })
+      showToast.success(
+        proximo ? 'Complemento ativado neste produto.' : 'Complemento pausado neste produto.'
+      )
+    } catch (error) {
+      setAtivoOverride(prev => {
+        const next = { ...prev }
+        delete next[item.chave]
+        return next
+      })
+      showToast.error(handleApiError(error))
+    } finally {
+      setPausandoChave(null)
+      await invalidate(['menu-complemento-usos', menuId, complementoId])
+    }
+  }
+
+  const aplicarAtivoLote = async (ativo: boolean) => {
+    if (!complementoId || !podeAtivoLote) return
+    const marcados = linhas.filter(item => selecionados.has(item.chave))
+    if (marcados.length === 0) return
+    const paraAtualizar = marcados.filter(item => complementoAtivoDaLinha(item) !== ativo)
+    if (paraAtualizar.length === 0) {
+      showToast.success(
+        ativo
+          ? 'Os itens marcados já estavam ativos.'
+          : 'Os itens marcados já estavam pausados.'
+      )
+      return
+    }
+    const overrideAnterior = { ...ativoOverride }
+    setSalvando(true)
+    setAtivoOverride(prev => {
+      const next = { ...prev }
+      for (const item of paraAtualizar) next[item.chave] = ativo
+      return next
+    })
+    try {
+      const vinculos = paraAtualizar.map(item => ({
+        menuId,
+        produtoId: item.produtoId,
+        complementoId,
+        grupoComplementoId: item.grupoId,
+        ativo,
+      }))
+      for (const lote of partirEmLotes(vinculos, LIMITE_VINCULOS)) {
+        await gravarOverridesComplemento({ vinculos: lote })
+      }
+      setSelecionados(new Set())
+      showToast.success(
+        ativo
+          ? paraAtualizar.length === 1
+            ? 'Complemento ativado em 1 item.'
+            : `Complemento ativado em ${paraAtualizar.length} itens.`
+          : paraAtualizar.length === 1
+            ? 'Complemento pausado em 1 item.'
+            : `Complemento pausado em ${paraAtualizar.length} itens.`
+      )
+    } catch (error) {
+      setAtivoOverride(overrideAnterior)
+      showToast.error(handleApiError(error))
+    } finally {
+      setSalvando(false)
+      await invalidate(['menu-complemento-usos', menuId, complementoId])
+    }
   }
 
   const aplicar = async () => {
@@ -398,27 +491,55 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
       <div className="flex items-center justify-between gap-3 px-2 pt-2 md:px-4">
         <h1 className="text-lg font-semibold text-primary md:text-xl">Alterar valor do complemento em lote</h1>
         {gruposSelecionados.size > 0 && complemento ? (
-          <div
-            className="inline-flex h-8 shrink-0 items-center rounded-lg border border-secondary bg-white p-[3px]"
-            role="group"
-            aria-label="Como aplicar o valor"
-          >
-            {MODOS_VALOR_LOTE.map(modo => (
+          <div className="flex shrink-0 items-center gap-2">
+            <div
+              className="inline-flex h-8 items-center rounded-lg border border-secondary bg-white p-[3px]"
+              role="group"
+              aria-label="Como aplicar o valor"
+            >
+              {MODOS_VALOR_LOTE.map(modo => (
+                <button
+                  key={modo.id}
+                  type="button"
+                  disabled={salvando}
+                  onClick={() => setModoValor(modo.id)}
+                  className={cn(
+                    'flex h-full items-center rounded-md px-3 text-xs font-semibold leading-none transition-colors',
+                    modoValor === modo.id
+                      ? 'bg-secondary text-white'
+                      : 'text-secondary hover:bg-secondary/10 hover:text-secondary'
+                  )}
+                >
+                  {modo.label}
+                </button>
+              ))}
+            </div>
+            <div
+              className="inline-flex h-8 items-center gap-1 rounded-lg border border-secondary bg-white p-[3px]"
+              role="group"
+              aria-label="Pausar ou ativar em lote"
+            >
               <button
-                key={modo.id}
                 type="button"
-                disabled={salvando}
-                onClick={() => setModoValor(modo.id)}
-                className={cn(
-                  'flex h-full items-center rounded-md px-3 text-xs font-semibold leading-none transition-colors',
-                  modoValor === modo.id
-                    ? 'bg-secondary text-white'
-                    : 'text-secondary hover:bg-secondary/10 hover:text-secondary'
-                )}
+                disabled={!podeAtivoLote}
+                onClick={() => void aplicarAtivoLote(false)}
+                aria-label="Pausar complemento nos produtos marcados"
+                title="Pausar nos marcados"
+                className="flex h-full w-8 items-center justify-center rounded-md text-red-600 transition-colors hover:bg-red-600/10 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {modo.label}
+                <MdPause size={18} />
               </button>
-            ))}
+              <button
+                type="button"
+                disabled={!podeAtivoLote}
+                onClick={() => void aplicarAtivoLote(true)}
+                aria-label="Ativar complemento nos produtos marcados"
+                title="Ativar nos marcados"
+                className="flex h-full w-8 items-center justify-center rounded-md text-accent5 transition-colors hover:bg-accent5/10 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <MdPlayArrow size={20} />
+              </button>
+            </div>
           </div>
         ) : null}
       </div>
@@ -583,37 +704,47 @@ export function MenuAlterarValorComplementos({ menuId }: MenuAlterarValorComplem
                 ) : null
               }
             >
-              {linhasFiltradas.map(item => (
-                <li key={item.chave}>
-                  <label
-                    className={cn(
-                      'flex cursor-pointer items-center gap-2 rounded-lg border-2 px-2 py-2 transition-colors',
-                      selecionados.has(item.chave)
-                        ? 'border-secondary bg-gray-100'
-                        : 'border-gray-200 hover:border-gray-300'
-                    )}
-                  >
-                    <Checkbox
-                      {...iconesCheckboxLote}
-                      size="small"
-                      checked={selecionados.has(item.chave)}
-                      disabled={salvando}
-                      onChange={() => alternarProdutos([item.chave])}
-                      inputProps={{ 'aria-label': `Marcar ${item.produtoNome} em ${item.grupoNome}` }}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm text-primary-text">
-                        {item.produtoNome}
-                        {item.produtoAtivo ? null : (
-                          <span className="ml-2 text-xs text-secondary-text">inativo</span>
-                        )}
-                      </span>
-                      <span className="block truncate text-xs text-alternate">{item.grupoNome}</span>
-                    </span>
-                    <span className="shrink-0 text-sm text-primary-text">{formatarMoeda(item.valorAtual)}</span>
-                  </label>
-                </li>
-              ))}
+              {linhasFiltradas.map(item => {
+                const complementoAtivo = complementoAtivoDaLinha(item)
+                return (
+                  <li key={item.chave}>
+                    <div
+                      className={cn(
+                        'flex items-center gap-2 rounded-lg border-2 px-2 py-2 transition-colors',
+                        selecionados.has(item.chave)
+                          ? 'border-secondary bg-gray-100'
+                          : 'border-gray-200 hover:border-gray-300'
+                      )}
+                    >
+                      <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
+                        <Checkbox
+                          {...iconesCheckboxLote}
+                          size="small"
+                          checked={selecionados.has(item.chave)}
+                          disabled={salvando}
+                          onChange={() => alternarProdutos([item.chave])}
+                          inputProps={{ 'aria-label': `Marcar ${item.produtoNome} em ${item.grupoNome}` }}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm text-primary-text">
+                            {item.produtoNome}
+                            {item.produtoAtivo ? null : (
+                              <span className="ml-2 text-xs text-secondary-text">inativo</span>
+                            )}
+                          </span>
+                          <span className="block truncate text-xs text-alternate">{item.grupoNome}</span>
+                        </span>
+                        <span className="shrink-0 text-sm text-primary-text">{formatarMoeda(item.valorAtual)}</span>
+                      </label>
+                      <BotaoAtivoComplemento
+                        ativo={complementoAtivo}
+                        disabled={salvando || pausandoChave === item.chave}
+                        onToggle={() => void alternarAtivoLinha(item)}
+                      />
+                    </div>
+                  </li>
+                )
+              })}
             </Coluna>
           </div>
         </div>
