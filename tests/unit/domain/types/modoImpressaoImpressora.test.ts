@@ -123,4 +123,17 @@ describe('Impressora.fromJSON modoImpressao', () => {
     expect(impressora.getModoImpressaoDaEstacao('est-caixa')).toBe('agrupado')
     expect(impressora.getModoImpressaoDaEstacao('outra')).toBe('normal')
   })
+
+  it('preserva imprimirSenha falso vindo da API', () => {
+    const impressora = Impressora.fromJSON({
+      id: 'imp-1',
+      nome: 'Cozinha',
+      terminaisConfig: [
+        { terminalId: 't1', ativo: true, imprimirSenha: false },
+        { terminalId: 't2', ativo: true, imprimirSenha: true },
+      ],
+    })
+
+    expect(impressora.toJSON().terminais?.map(t => t.imprimirSenha)).toEqual([false, true])
+  })
 })

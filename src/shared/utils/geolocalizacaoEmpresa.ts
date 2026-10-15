@@ -135,12 +135,12 @@ export function assinaturaEnderecoEmpresaGeocode(input: EnderecoEmpresaGeocodeIn
 export type ResolucaoPinEmpresa =
   | { acao: 'manter'; point: GeoJsonPoint; providerEnderecoId: string | null }
   | { acao: 'geocodificar' }
-  | { acao: 'bloquear'; motivo: string }
+  | { acao: 'pular' }
 
 /**
- * Ao salvar a empresa: geocodifica se o endereço está completo.
- * Exceção: Places nesta sessão (pin já alinhado ao formulário novo).
- * Endereço já salvo com pin antigo (ex.: mudou de cidade antes) também geocodifica.
+ * A aba Empresa grava o endereço. O pin vive na cobertura.
+ * Aqui só tentamos geocodificar em segundo plano quando o endereço está completo.
+ * Places nesta sessão (pin alinhado) não precisa geocodificar de novo.
  */
 export function resolverPinAoSalvarEmpresa(params: {
   enderecoAtual: EnderecoEmpresaGeocodeInput
@@ -156,18 +156,14 @@ export function resolverPinAoSalvarEmpresa(params: {
       assinaturaEnderecoEmpresaGeocode(params.enderecoSalvo)
 
   if (!minimo) {
-    if (enderecoMudou || !params.pinAtual) {
+    if (params.pinAtual && !enderecoMudou) {
       return {
-        acao: 'bloquear',
-        motivo:
-          'Preencha rua, número, cidade e estado. Ao mudar o endereço, a localização da loja é atualizada automaticamente.',
+        acao: 'manter',
+        point: params.pinAtual,
+        providerEnderecoId: params.providerEnderecoId,
       }
     }
-    return {
-      acao: 'manter',
-      point: params.pinAtual,
-      providerEnderecoId: params.providerEnderecoId,
-    }
+    return { acao: 'pular' }
   }
 
   if (params.pinAlinhadoAoFormulario && params.pinAtual && enderecoMudou) {

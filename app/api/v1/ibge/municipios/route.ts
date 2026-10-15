@@ -4,7 +4,7 @@ import { listarMunicipiosPorEstado } from '@/src/infrastructure/ibge/ibgeLocalid
 
 /**
  * GET /api/v1/ibge/municipios?uf=SP
- * Lista todos os municípios de um estado (API pública do IBGE).
+ * Lista todos os municípios de um estado (BrasilAPI, códigos oficiais do IBGE).
  */
 export async function GET(request: NextRequest) {
   try {

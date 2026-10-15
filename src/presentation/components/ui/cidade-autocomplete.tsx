@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Input, type InputProps } from './input'
 
 interface Municipio {
@@ -306,17 +307,17 @@ export function CidadeAutocomplete({
   const carregarMunicipios = async (uf: string) => {
     try {
       setIsLoadingMunicipios(true)
-      const response = await fetch(`/api/v1/ibge/municipios?uf=${uf}`)
-
-      if (response.ok) {
-        const data = await response.json()
-        setAllMunicipios(data.municipios || [])
-      } else {
-        setAllMunicipios([])
+      setErro(null)
+      const response = await fetchGestorApi(`/api/v1/ibge/municipios?uf=${uf}`)
+      if (!response.ok) {
+        throw new Error('Falha ao listar municípios')
       }
+      const data = await response.json()
+      setAllMunicipios(data.municipios || [])
     } catch (error) {
       console.error('Erro ao carregar municípios:', error)
       setAllMunicipios([])
+      setErro('Não foi possível carregar as cidades. Tente novamente.')
     } finally {
       setIsLoadingMunicipios(false)
     }
@@ -586,35 +587,28 @@ export function CidadeAutocomplete({
 
     try {
       setIsValidating(true)
-      const response = await fetch(
+      const response = await fetchGestorApi(
         `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(nomeCidade)}&uf=${estado}`
       )
 
-      if (response.ok) {
-        const data = await response.json()
-        const valido = data.valido === true
+      if (cidadeSelecionadaDuranteBlurRef.current || selectedFromList) {
+        return
+      }
 
-        // Verificar novamente antes de atualizar o estado
-        // (pode ter sido selecionada durante a requisição)
-        if (cidadeSelecionadaDuranteBlurRef.current || selectedFromList) {
-          return // Cidade foi selecionada durante a validação, não atualizar
-        }
-
-        setIsValid(valido)
-        setErro(valido ? null : `Cidade "${nomeCidade}" não encontrada no estado ${estado}`)
-        onValidationChangeRef.current?.(valido)
-      } else {
-        // Verificar novamente antes de atualizar o estado
-        if (cidadeSelecionadaDuranteBlurRef.current || selectedFromList) {
-          return
-        }
+      if (!response.ok) {
         setIsValid(false)
         setErro('Erro ao validar cidade')
         onValidationChangeRef.current?.(false)
+        return
       }
+
+      const data = await response.json()
+      const valido = data.valido === true
+      setIsValid(valido)
+      setErro(valido ? null : `Cidade "${nomeCidade}" não encontrada no estado ${estado}`)
+      onValidationChangeRef.current?.(valido)
     } catch (error) {
       console.error('Erro ao validar cidade:', error)
-      // Verificar novamente antes de atualizar o estado
       if (cidadeSelecionadaDuranteBlurRef.current || selectedFromList) {
         return
       }
