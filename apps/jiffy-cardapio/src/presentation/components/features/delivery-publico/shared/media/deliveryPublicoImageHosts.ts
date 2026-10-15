@@ -24,10 +24,20 @@ export function isDeliveryPublicoImageHost(hostname: string): boolean {
   )
 }
 
-/** Host conhecido do storage: Next/Vercel pode redimensionar. Outros caem no original. */
+function caminhoDaImagem(src: string): string {
+  const semHash = src.split('#')[0] ?? src
+  return (semHash.split('?')[0] ?? semHash).toLowerCase()
+}
+
+/**
+ * SVG e GIF não compensam transformação (vetor / animação).
+ * Host conhecido do storage: Next/Vercel pode redimensionar. Outros caem no original.
+ */
 export function deveUsarOtimizadorImagem(src: string): boolean {
   const trimmed = src.trim()
   if (!trimmed) return false
+  const caminho = caminhoDaImagem(trimmed)
+  if (caminho.endsWith('.svg') || caminho.endsWith('.gif')) return false
   if (trimmed.startsWith('/')) return true
   try {
     const url = new URL(trimmed)

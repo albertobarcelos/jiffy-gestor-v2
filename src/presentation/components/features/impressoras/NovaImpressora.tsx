@@ -702,7 +702,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
             imprimirSenha:
               config.imprimirSenha === true ||
               config.imprimirSenha === 'true' ||
-              config.imprimirSenha === undefined,
+              config.imprimirSenha === 1,
             ativo: config.ativo === true || config.ativo === 'true' || config.ativo === undefined,
             isHovering: false,
             bloqueado,
@@ -1193,7 +1193,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
             ativo: config.ativo !== undefined ? config.ativo : true,
             modoImpressao: config.modoImpressao || 'normal',
             modoFicha: modoFichaDerivado(config.modoImpressao || 'normal'),
-            imprimirSenha: config.imprimirSenha !== undefined ? config.imprimirSenha : true,
+            imprimirSenha: config.imprimirSenha === true,
             tipoConexao: 'ethernet',
             ip: config.ip || '192.168.1.100',
             porta: config.porta || '9100',

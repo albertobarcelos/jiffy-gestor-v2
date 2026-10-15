@@ -1,5 +1,6 @@
-import { fetchGestorApi } from '@/src/infrastructure/api/fetchGestorApi'
 import { FiscalPainelMapper } from '@/src/application/mappers/FiscalPainelMapper'
+import { fetchGestorApi } from '@/src/infrastructure/api/fetchGestorApi'
+import { validarCidadeNoEstado } from '@/src/infrastructure/ibge/ibgeLocalidadesClient'
 import { ConfiguracaoEmissao } from '@/src/domain/entities/painel-contador/ConfiguracaoEmissao'
 import type {
   IFiscalPainelRepository,
@@ -265,14 +266,7 @@ export class FiscalPainelApiRepository implements IFiscalPainelRepository {
   }
 
   async validarCidade(cidade: string, uf: string): Promise<boolean> {
-    try {
-      const data = await this.get<{ valido?: boolean }>(
-        `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(cidade)}&uf=${encodeURIComponent(uf)}`
-      )
-      return data.valido === true
-    } catch {
-      return false
-    }
+    return validarCidadeNoEstado(cidade, uf)
   }
 
   async listarReformaTributaria(): Promise<ReformaTributariaItem[]> {
