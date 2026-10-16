@@ -1,7 +1,9 @@
 export {
   VALOR_PROMOCIONAL_MINIMO,
   arredondarCentavos,
+  arredondarPercentualUmaCasa,
   descontoPercentualFromPrecos,
+  findDescontoPercentualExato,
   isValorPromocionalValido,
   produtoTemPromocaoPreenchida,
   valorPromocionalFromDesconto,

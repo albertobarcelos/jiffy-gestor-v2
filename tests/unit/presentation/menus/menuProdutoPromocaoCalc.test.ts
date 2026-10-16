@@ -15,12 +15,17 @@ describe('menuProdutoPromocaoCalc', () => {
 
   it('calcula % a partir do normal e do promocional', () => {
     expect(descontoPercentualFromPrecos(100, 80)).toBe(20)
-    expect(descontoPercentualFromPrecos(39.9, 29.9)).toBe(25.06)
+    expect(descontoPercentualFromPrecos(39.9, 29.9)).toBe(25.1)
   })
 
   it('calcula promocional a partir do %', () => {
     expect(valorPromocionalFromDesconto(100, 20)).toBe(80)
     expect(valorPromocionalFromDesconto(40, 50)).toBe(20)
+  })
+
+  it('ida e volta estável para % digitado', () => {
+    const promo = valorPromocionalFromDesconto(39.9, 15)
+    expect(descontoPercentualFromPrecos(39.9, promo!)).toBe(15)
   })
 
   it('retorna null quando o preço normal é inválido', () => {

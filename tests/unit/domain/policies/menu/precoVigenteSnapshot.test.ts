@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   arredondarCentavos,
+  arredondarPercentualUmaCasa,
   descontoPercentualFromPrecos,
+  findDescontoPercentualExato,
   isValorPromocionalValido,
   produtoTemPromocaoPreenchida,
   promocaoSnapshotVigente,
@@ -15,14 +17,31 @@ describe('precoVigenteSnapshot', () => {
     expect(arredondarCentavos(19.994)).toBe(19.99)
   })
 
-  it('calcula % a partir do normal e do promocional', () => {
-    expect(descontoPercentualFromPrecos(100, 80)).toBe(20)
-    expect(descontoPercentualFromPrecos(39.9, 29.9)).toBe(25.06)
+  it('arredonda percentual em 1 casa', () => {
+    expect(arredondarPercentualUmaCasa(15.04)).toBe(15)
+    expect(arredondarPercentualUmaCasa(15.05)).toBe(15.1)
+    expect(arredondarPercentualUmaCasa(25.06)).toBe(25.1)
   })
 
-  it('calcula promocional a partir do %', () => {
+  it('calcula promocional a partir do % (1 casa) e centavos', () => {
     expect(valorPromocionalFromDesconto(100, 20)).toBe(80)
     expect(valorPromocionalFromDesconto(40, 50)).toBe(20)
+    expect(valorPromocionalFromDesconto(39.9, 15)).toBe(33.92)
+    expect(valorPromocionalFromDesconto(100, 15.5)).toBe(84.5)
+  })
+
+  it('ida e volta estável quando o promo veio do %', () => {
+    const normal = 39.9
+    const promo = valorPromocionalFromDesconto(normal, 15)
+    expect(promo).toBe(33.92)
+    expect(descontoPercentualFromPrecos(normal, promo!)).toBe(15)
+    expect(findDescontoPercentualExato(normal, promo!)).toBe(15)
+  })
+
+  it('calcula % a partir do normal e do promocional', () => {
+    expect(descontoPercentualFromPrecos(100, 80)).toBe(20)
+    // Promo digitado sem match exato de 0,1% → fallback a 1 casa
+    expect(descontoPercentualFromPrecos(39.9, 29.9)).toBe(25.1)
   })
 
   it('retorna null quando o preço normal é inválido', () => {
