@@ -10,11 +10,16 @@ describe('menuCardapioPath', () => {
   it('categorias fica sob o mesmo menu', () => {
     expect(menuCardapioPath('menu-1', 'categorias')).toBe('/menus/menu-1/categorias')
   })
+
+  it('complementos fica sob o mesmo menu', () => {
+    expect(menuCardapioPath('menu-1', 'complementos')).toBe('/menus/menu-1/complementos')
+  })
 })
 
 describe('resolverMenuCardapioAba', () => {
   it('reconhece categorias no path do módulo', () => {
     expect(resolverMenuCardapioAba('/menus/abc/categorias')).toBe('categorias')
+    expect(resolverMenuCardapioAba('/menus/abc/complementos')).toBe('complementos')
   })
 
   it('qualquer outra rota do menu é produtos', () => {

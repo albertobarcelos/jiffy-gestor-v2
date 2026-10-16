@@ -45,6 +45,20 @@ export function grupoTemLimitesDeCadastro(grupo: {
   )
 }
 
+function parseAtivoComplementoResumo(value: unknown): boolean {
+  if (value === false || value === 'false' || value === 0 || value === '0') return false
+  return true
+}
+
+function parseOrdemComplementoResumo(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim() !== '') {
+    const n = parseInt(value, 10)
+    return Number.isFinite(n) ? n : undefined
+  }
+  return undefined
+}
+
 function mapComplementoResumo(raw: unknown): MenuProdutoComplementoItemResumo | null {
   const rec = asPlainRecord(raw)
   const id = rec.id != null ? String(rec.id).trim() : ''
@@ -53,13 +67,30 @@ function mapComplementoResumo(raw: unknown): MenuProdutoComplementoItemResumo | 
   const valor =
     typeof rec.valor === 'number' ? rec.valor : rec.valor != null ? Number(rec.valor) || 0 : 0
   const tipo = rec.tipoImpactoPreco
+  const ordem = parseOrdemComplementoResumo(rec.ordem)
   return {
     id,
     nome: nome || 'Complemento',
     valor,
     tipoImpactoPreco:
       tipo === 'aumenta' || tipo === 'diminui' || tipo === 'nenhum' ? tipo : 'nenhum',
+    ativo: parseAtivoComplementoResumo(rec.ativo),
+    ...(ordem != null ? { ordem } : {}),
   }
+}
+
+/** Ordem efetiva do cardápio; sem ordem, cai no nome. */
+export function ordenarComplementosResumoCatalogo(
+  itens: readonly MenuProdutoComplementoItemResumo[]
+): MenuProdutoComplementoItemResumo[] {
+  return [...itens].sort((a, b) => {
+    const oa = a.ordem
+    const ob = b.ordem
+    if (oa != null && ob != null && oa !== ob) return oa - ob
+    if (oa != null && ob == null) return -1
+    if (oa == null && ob != null) return 1
+    return a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' })
+  })
 }
 
 export function mapMenuGruposComplementosToProduto(
@@ -77,9 +108,11 @@ export function mapMenuGruposComplementosToProduto(
         qtdMaxima: parseQuantidadeLimiteGrupo(grupo.qtdMaxima),
         limitesDoCadastro: grupoTemLimitesDeCadastro(grupo),
         complementos: Array.isArray(grupo.complementos)
-          ? grupo.complementos
-              .map(mapComplementoResumo)
-              .filter((item): item is MenuProdutoComplementoItemResumo => item != null)
+          ? ordenarComplementosResumoCatalogo(
+              grupo.complementos
+                .map(mapComplementoResumo)
+                .filter((item): item is MenuProdutoComplementoItemResumo => item != null)
+            )
           : [],
       },
     ]
@@ -109,16 +142,19 @@ export function mapGrupoComplementoJsonToProdutoGrupo(
     qtdMaxima: parseQuantidadeLimiteGrupo(rec.qtdMaxima),
     limitesDoCadastro: true,
     complementos: Array.isArray(rec.complementos)
-      ? rec.complementos
-          .map(mapComplementoResumo)
-          .filter((item): item is MenuProdutoComplementoItemResumo => item != null)
+      ? ordenarComplementosResumoCatalogo(
+          rec.complementos
+            .map(mapComplementoResumo)
+            .filter((item): item is MenuProdutoComplementoItemResumo => item != null)
+        )
       : [],
   }
 }
 
 /**
- * Reaproveita itens e limites do cadastro do produto quando o snapshot do menu
- * só trouxe id/nome — evita um GET extra por grupo na primeira abertura.
+ * Completa limites (e itens só se o menu veio slim).
+ * Itens já presentes no snapshot do menu — valor/ativo/ordem efetivos — nunca
+ * são trocados pelo cadastro do grupo.
  */
 export function mesclarGrupoComplementoMenuComCadastro(
   grupoMenu: ProdutoGrupoComplementoCatalogo,
@@ -127,8 +163,7 @@ export function mesclarGrupoComplementoMenuComCadastro(
   if (!gruposComplementosPrecisamHidratacao([grupoMenu])) return grupoMenu
   if (!grupoCadastro) return grupoMenu
 
-  const complementos =
-    grupoMenu.complementos.length > 0 ? grupoMenu.complementos : grupoCadastro.complementos
+  const temItensNoMenu = grupoMenu.complementos.length > 0
   const limitesDoCadastro =
     grupoMenu.limitesDoCadastro === true || grupoCadastro.limitesDoCadastro === true
 
@@ -138,7 +173,7 @@ export function mesclarGrupoComplementoMenuComCadastro(
     qtdMinima: grupoMenu.limitesDoCadastro === true ? grupoMenu.qtdMinima : grupoCadastro.qtdMinima,
     qtdMaxima: grupoMenu.limitesDoCadastro === true ? grupoMenu.qtdMaxima : grupoCadastro.qtdMaxima,
     limitesDoCadastro,
-    complementos,
+    complementos: temItensNoMenu ? grupoMenu.complementos : grupoCadastro.complementos,
   }
 }
 

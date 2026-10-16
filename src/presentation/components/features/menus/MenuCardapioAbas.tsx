@@ -11,6 +11,7 @@ import {
 const ABAS: Array<{ id: MenuCardapioAba; label: string }> = [
   { id: 'produtos', label: 'Produtos' },
   { id: 'categorias', label: 'Categorias' },
+  { id: 'complementos', label: 'Complementos' },
 ]
 
 type Props = {
