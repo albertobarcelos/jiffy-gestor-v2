@@ -80,6 +80,8 @@ export interface CatalogProductRowProps {
   hidePauseAndPrice?: boolean
   /** Esconde o selo COD. */
   hideCodigo?: boolean
+  /** Nome em cinza quando a categoria está desativada neste cardápio. */
+  nomeInativo?: boolean
 }
 
 function CatalogProductRowInner({
@@ -106,6 +108,7 @@ function CatalogProductRowInner({
   onChangeImage,
   hidePauseAndPrice = false,
   hideCodigo = false,
+  nomeInativo = false,
 }: CatalogProductRowProps) {
   const [imagemExpandida, setImagemExpandida] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -291,6 +294,7 @@ function CatalogProductRowInner({
               'truncate text-sm font-normal tracking-wide text-primary-text md:text-base'
             )}
             title={nomeTruncado ? nome : undefined}
+            style={nomeInativo ? { color: '#9CA3AF' } : undefined}
           >
             {nomeExibicao}
           </span>
@@ -303,7 +307,7 @@ function CatalogProductRowInner({
               'flex min-w-0 flex-nowrap items-center',
               hideCodigo
                 ? 'justify-self-end md:justify-self-center'
-                : 'w-full justify-start md:w-auto md:justify-center'
+                : 'w-full justify-start md:justify-center'
             )}
           >
             {actionsSlot}
@@ -449,7 +453,8 @@ function arePropsEqual(prev: CatalogProductRowProps, next: CatalogProductRowProp
     prev.onRemove === next.onRemove &&
     prev.onChangeImage === next.onChangeImage &&
     prev.hidePauseAndPrice === next.hidePauseAndPrice &&
-    prev.hideCodigo === next.hideCodigo
+    prev.hideCodigo === next.hideCodigo &&
+    prev.nomeInativo === next.nomeInativo
   )
 }
 

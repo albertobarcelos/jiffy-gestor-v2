@@ -25,7 +25,10 @@ import { sxEntradaCompactaProduto } from '@/src/presentation/components/features
 import { brToEUA } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
 import { cn } from '@/src/shared/utils/cn'
-import { uniaoIdsVinculosDosAlvos } from '@/src/shared/helpers/filtroVinculoLote'
+import {
+  intersecaoIdsVinculosDosAlvos,
+  uniaoIdsVinculosDosAlvos,
+} from '@/src/shared/helpers/filtroVinculoLote'
 import type { ModoVinculoLote } from '@/src/shared/helpers/filtroVinculoLote'
 import { TEXTOS_VINCULO_GRUPOS_COMPLEMENTOS } from '@/src/shared/helpers/filtroVinculoLote'
 import type { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
@@ -39,6 +42,12 @@ import {
   atualizarMenuProdutosBatchViaBffUseCase,
 } from '@/src/application/use-cases/menus/menuBffUseCases'
 import type { SnapshotProdutoPropagavel } from '@/src/shared/types/propagarAlteracaoProduto'
+import {
+  ehMenuPrincipal,
+  idMenuPrincipalDeLista,
+  syncCadastroComMenuPrincipalAtivo,
+} from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
+import { buscarMenusDaEmpresa } from '@/src/presentation/utils/uploadImagemProdutoMenus'
 
 const BATCH_CHUNK = 100
 const MONEY = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -177,16 +186,18 @@ export function MenuProdutosLote({ menuId }: MenuProdutosLoteProps) {
     [produtos, selecionados]
   )
 
-  const idsComplJaVinculados = useMemo(
-    () =>
-      uniaoIdsVinculosDosAlvos(
-        produtos,
-        selecionados,
-        p => p.produtoId,
-        p => (p.gruposComplementos ?? []).map(g => g.id)
-      ),
-    [produtos, selecionados]
-  )
+  const idsComplJaVinculados = useMemo(() => {
+    const calcular =
+      modoComplemento === 'adicionar'
+        ? intersecaoIdsVinculosDosAlvos
+        : uniaoIdsVinculosDosAlvos
+    return calcular(
+      produtos,
+      selecionados,
+      p => p.produtoId,
+      p => (p.gruposComplementos ?? []).map(g => g.id)
+    )
+  }, [produtos, selecionados, modoComplemento])
 
   const listaCompl = useListaVinculoLote({
     catalogo: gruposComplementos,
@@ -224,17 +235,39 @@ export function MenuProdutosLote({ menuId }: MenuProdutosLoteProps) {
       const primeiroId = update[0]?.produtoId
       if (!primeiroId) return
 
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!token) throw new Error('Token não encontrado')
+
+      let principalId: string | null = null
+      try {
+        principalId = idMenuPrincipalDeLista(await buscarMenusDaEmpresa({ token }))
+      } catch {
+        principalId = null
+      }
+      const origemEhPrincipal =
+        syncCadastroComMenuPrincipalAtivo() && ehMenuPrincipal(menuId, principalId)
+
       const destinos = await pedirConfirmacao({
         origem: 'menu',
         produtoId: primeiroId,
         menuIdAtual: menuId,
         fonteMenus: 'empresa',
       })
-      if (!destinos) return
-      if (!destinos.aplicarNoCadastroBase && destinos.menuIds.length === 0) return
 
-      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-      if (!token) throw new Error('Token não encontrado')
+      const espelharCadastro = origemEhPrincipal || Boolean(destinos?.aplicarNoCadastroBase)
+      if (espelharCadastro) {
+        for (const item of update) {
+          const { produtoId, ...rest } = item
+          const snapshot: SnapshotProdutoPropagavel = { ...rest }
+          await aplicarNosDestinos({
+            produtoId,
+            snapshot,
+            destinos: { aplicarNoCadastroBase: true, menuIds: [] },
+          })
+        }
+      }
+
+      if (!destinos || destinos.menuIds.length === 0) return
 
       for (const alvoMenuId of destinos.menuIds) {
         try {
@@ -253,18 +286,6 @@ export function MenuProdutosLote({ menuId }: MenuProdutosLoteProps) {
               data: input,
             })
           }
-        }
-      }
-
-      if (destinos.aplicarNoCadastroBase) {
-        for (const item of update) {
-          const { produtoId, ...rest } = item
-          const snapshot: SnapshotProdutoPropagavel = { ...rest }
-          await aplicarNosDestinos({
-            produtoId,
-            snapshot,
-            destinos: { aplicarNoCadastroBase: true, menuIds: [] },
-          })
         }
       }
     },

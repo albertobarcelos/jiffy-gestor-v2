@@ -39,10 +39,10 @@ export function syncCadastroComMenuPrincipalAtivo(): boolean {
 export function idMenuPrincipalDeLista(
   menus: ReadonlyArray<{ id: string; tipo?: string | null }>
 ): string | null {
-  const comTipoPrincipal = menus.find(menu => menu.tipo === 'principal')
+  const comTipoPrincipal = menus.find(menu => menu.tipo === 'principal' && menu.id)
   if (comTipoPrincipal?.id) return comTipoPrincipal.id
-  if (menus.length === 1 && menus[0]?.id) return menus[0].id
-  return null
+  const primeiro = menus.find(menu => Boolean(menu.id))
+  return primeiro?.id ?? null
 }
 
 export function ehMenuPrincipal(
