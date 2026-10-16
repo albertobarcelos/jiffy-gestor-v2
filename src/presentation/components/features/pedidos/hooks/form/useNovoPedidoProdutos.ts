@@ -5,6 +5,7 @@ import type { Produto } from '@/src/domain/entities/Produto'
 import type { ModalLancamentoProdutoPainelConfirmPayload, ModalLancamentoProdutoPainelModo } from '../../components/ModalLancamentoProdutoPainel'
 import type { ComplementoSelecionado, ProdutoSelecionado } from '../../types'
 import {
+  type ComplementoTabKey,
   type ComplementosTabsModalState,
 } from '@/src/presentation/components/features/complementos/ComplementosTabsModal'
 import {
@@ -121,7 +122,7 @@ export function useNovoPedidoProdutos({
     }))
   }, [])
 
-  const handleTabChangeComplementoTabsModalPainel = useCallback((tab: 'complemento') => {
+  const handleTabChangeComplementoTabsModalPainel = useCallback((tab: ComplementoTabKey) => {
     setComplementoTabsModalPainelState(prev => ({ ...prev, tab }))
   }, [])
 

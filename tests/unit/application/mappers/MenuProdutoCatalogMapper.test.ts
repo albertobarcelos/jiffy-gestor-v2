@@ -101,9 +101,50 @@ describe('MenuProdutoCatalogMapper — complementos do produto do menu', () => {
       })
     )
     expect(produto.getGruposComplementos()[0]?.complementos).toEqual([
-      { id: 'c-menu', nome: 'Bacon do menu', valor: 4, tipoImpactoPreco: 'aumenta' },
+      {
+        id: 'c-menu',
+        nome: 'Bacon do menu',
+        valor: 4,
+        tipoImpactoPreco: 'aumenta',
+        ativo: true,
+      },
     ])
     expect(gruposComplementosPrecisamHidratacao(produto.getGruposComplementos())).toBe(true)
+  })
+
+  it('preserva valor, ativo e ordem efetivos do menu e ordena por ordem', () => {
+    const produto = menuProdutoToProduto(
+      snapshotMenu({
+        gruposComplementos: [
+          {
+            id: 'g-menu',
+            nome: 'Extras',
+            complementos: [
+              { id: 'c2', nome: 'Ovo', valor: 3, tipoImpactoPreco: 'aumenta', ativo: true, ordem: 2 },
+              { id: 'c1', nome: 'Bacon', valor: 8.5, tipoImpactoPreco: 'aumenta', ativo: false, ordem: 1 },
+            ],
+          },
+        ],
+      })
+    )
+    expect(produto.getGruposComplementos()[0]?.complementos).toEqual([
+      {
+        id: 'c1',
+        nome: 'Bacon',
+        valor: 8.5,
+        tipoImpactoPreco: 'aumenta',
+        ativo: false,
+        ordem: 1,
+      },
+      {
+        id: 'c2',
+        nome: 'Ovo',
+        valor: 3,
+        tipoImpactoPreco: 'aumenta',
+        ativo: true,
+        ordem: 2,
+      },
+    ])
   })
 
   it('não hidrata de novo quando o snapshot já traz itens e limites do cadastro', () => {
@@ -142,7 +183,15 @@ describe('MenuProdutoCatalogMapper — complementos do produto do menu', () => {
       qtdMinima: 1,
       qtdMaxima: 2,
       limitesDoCadastro: true,
-      complementos: [{ id: 'c-menu', nome: 'Bacon do menu', valor: 4, tipoImpactoPreco: 'nenhum' }],
+      complementos: [
+        {
+          id: 'c-menu',
+          nome: 'Bacon do menu',
+          valor: 4,
+          tipoImpactoPreco: 'nenhum',
+          ativo: true,
+        },
+      ],
     })
     expect(mapMenuGruposComplementosToProduto(undefined)).toEqual([])
   })

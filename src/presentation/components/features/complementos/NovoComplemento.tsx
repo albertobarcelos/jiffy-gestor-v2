@@ -527,7 +527,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Input
-                    label="Valor (R$)"
+                    label="Preço Base"
                     value={valor}
                     onChange={(e) => setValor(formatValorInput(e.target.value))}
                     size="small"

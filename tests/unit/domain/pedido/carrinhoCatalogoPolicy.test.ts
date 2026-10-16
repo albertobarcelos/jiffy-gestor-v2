@@ -106,14 +106,14 @@ describe('CarrinhoCatalogoPolicy — complementos da venda', () => {
     expect(cacheProdutoCatalogoAtendePedido(undefined, { requireComplementos: true })).toBe(false)
   })
 
-  it('permite hidratar só os grupos quando a grade já trouxe os ids', () => {
+  it('não permite hidratar só pelo grupo — precisa do snapshot do menu', () => {
     expect(produtoTemIdsGruposComplementoParaHidratacao(produtoSlimComGrupos())).toBe(true)
     expect(produtoTemIdsGruposComplementoParaHidratacao(produtoSlim())).toBe(false)
     expect(
       catalogoPermiteHidratacaoSomenteGrupos(produtoSlimComGrupos(), {
         requireComplementos: true,
       })
-    ).toBe(true)
+    ).toBe(false)
     expect(
       catalogoPermiteHidratacaoSomenteGrupos(produtoSlim(), { requireComplementos: true })
     ).toBe(false)
@@ -121,12 +121,6 @@ describe('CarrinhoCatalogoPolicy — complementos da venda', () => {
     expect(
       catalogoPermiteHidratacaoSomenteGrupos(produtoComComplementos(), {
         requireComplementos: true,
-      })
-    ).toBe(false)
-    expect(
-      catalogoPermiteHidratacaoSomenteGrupos(produtoSlimComGrupos(), {
-        requireComplementos: true,
-        forceRefresh: true,
       })
     ).toBe(false)
   })

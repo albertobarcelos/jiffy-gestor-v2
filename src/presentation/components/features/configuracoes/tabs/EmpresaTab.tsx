@@ -7,15 +7,13 @@ import { Cliente } from '@/src/domain/entities/Cliente'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
+import { consultarCodigoCidadeIbge } from '@/src/presentation/utils/consultarCodigoCidadeIbge'
 import { Input } from '@/src/presentation/components/ui/input'
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
 import { MenuItem } from '@mui/material'
 import { LogoImpressaoCropModal } from '../LogoImpressaoCropModal'
-import { EnderecoPlacesAutocomplete } from '@/src/presentation/components/shared/geolocalizacao/EnderecoPlacesAutocomplete'
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import {
-  assinaturaEnderecoEmpresaGeocode,
-  enderecoEmpresaGeocodeMinimo,
   geocodificarEnderecoEmpresaViaGoogle,
   lerEnderecoLocalizacaoDoPayloadEmpresa,
   montarPatchEnderecoGeolocalizacao,
@@ -25,11 +23,6 @@ import {
 import { escolherPinAposGeocode } from '@/src/shared/utils/ajustePinEmpresa'
 import { dispararEmpresaDeliveryAtualizada } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
-import {
-  placeDetailsParaEnderecoGeocode,
-  type PlaceDetailsResult,
-} from '@/src/shared/utils/geolocalizacaoPlaces'
-import { formatarCepMascara } from '@/src/shared/utils/consultaCep'
 import {
   LOGO_IMPRESSAO_HEIGHT,
   LOGO_IMPRESSAO_WIDTH,
@@ -178,7 +171,6 @@ export function EmpresaTab() {
   const [codigoCidadeIbge, setCodigoCidadeIbge] = useState<string | null>(null)
   const [enderecoLocalizacao, setEnderecoLocalizacao] = useState<GeoJsonPoint | null>(null)
   const [providerEnderecoId, setProviderEnderecoId] = useState<string | null>(null)
-  const [buscaPlacesEmpresa, setBuscaPlacesEmpresa] = useState('')
   /** Valor exibido no select (IANA); vem de `parametroEmpresa.timezone` no GET /empresas/me. */
   const [timezone, setTimezone] = useState('')
   /** Snapshot de `parametroEmpresa` para PATCH preservar tipos impressão/cobrança etc. */
@@ -186,7 +178,7 @@ export function EmpresaTab() {
   const invalidateQueries = useInvalidateTenantQueries()
   /** Endereço persistido — usado para saber se o save precisa geocodificar de novo. */
   const enderecoSalvoRef = useRef<EnderecoEmpresaGeocodeInput | null>(null)
-  /** True se o pin atual corresponde ao formulário (carregado da API ou escolhido no Places). */
+  /** True se o pin atual ainda corresponde ao formulário carregado. */
   const pinAlinhadoAoFormularioRef = useRef(true)
 
   const [logoDragActive, setLogoDragActive] = useState(false)
@@ -208,39 +200,6 @@ export function EmpresaTab() {
 
   // Ref para rastrear o último valor de cidade usado para buscar código IBGE
   const ultimaCidadeBuscada = useRef<string>('')
-
-  const enderecoGeocodeInput = useMemo<EnderecoEmpresaGeocodeInput>(
-    () => ({
-      rua,
-      numero,
-      bairro,
-      cidade: ultimaCidadeBuscada.current || cidade,
-      estado,
-      cep,
-      complemento,
-    }),
-    [rua, numero, bairro, cidade, estado, cep, complemento]
-  )
-
-  const aplicarPlaceDetailsEmpresa = useCallback((place: PlaceDetailsResult) => {
-    const fields = placeDetailsParaEnderecoGeocode(place)
-    if (fields.rua) setRua(maiusculasPt(fields.rua))
-    if (fields.numero) setNumero(maiusculasPt(fields.numero))
-    if (fields.bairro) setBairro(maiusculasPt(fields.bairro))
-    if (fields.cidade) {
-      setCidade(maiusculasPt(fields.cidade))
-      ultimaCidadeBuscada.current = fields.cidade
-    }
-    if (fields.estado) setEstado(fields.estado.toUpperCase().slice(0, 2))
-    if (fields.cep) setCep(maiusculasPt(formatarCepMascara(fields.cep)))
-    setEnderecoLocalizacao(place.enderecoLocalizacao)
-    setProviderEnderecoId(place.providerEnderecoId)
-    pinAlinhadoAoFormularioRef.current = true
-    setBuscaPlacesEmpresa(
-      [fields.rua, fields.numero].filter(Boolean).join(', ') || place.enderecoFormatado || ''
-    )
-    showToast.success('Endereço aplicado. Ao salvar, a localização da loja acompanha este endereço.')
-  }, [])
 
   useEffect(() => {
     loadEmpresa()
@@ -498,52 +457,14 @@ export function EmpresaTab() {
     ultimaCidadeBuscada.current = nomeCidade
 
     try {
-      // Buscar lista de municípios do estado
-      const response = await fetchGestorApi(`/api/v1/ibge/municipios?uf=${uf}`)
-      if (response.ok) {
-        const data = await response.json()
-        const municipios = data.municipios || []
-
-        // Normalizar nome da cidade para comparação (remover acentos, converter para minúsculas)
-        const normalizar = (str: string) =>
-          str
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .toLowerCase()
-
-        const cidadeNormalizada = normalizar(nomeCidade.trim())
-
-        // Buscar município correspondente
-        const municipio = municipios.find(
-          (m: any) => normalizar(m.nomeCidade) === cidadeNormalizada
-        )
-
-        if (municipio && municipio.codigoCidadeIbge) {
-          setCodigoCidadeIbge(municipio.codigoCidadeIbge)
-          return true
-        } else {
-          // Se não encontrou na lista, tentar via API de validação
-          const validacaoResponse = await fetchGestorApi(
-            `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(nomeCidade.trim())}&uf=${uf}`
-          )
-          if (validacaoResponse.ok) {
-            const validacaoData = await validacaoResponse.json()
-            if (validacaoData.codigoCidadeIbge) {
-              setCodigoCidadeIbge(validacaoData.codigoCidadeIbge)
-              return true
-            } else {
-              setCodigoCidadeIbge(null)
-              return false
-            }
-          } else {
-            setCodigoCidadeIbge(null)
-            return false
-          }
-        }
-      } else {
-        setCodigoCidadeIbge(null)
-        return false
+      const codigo = await consultarCodigoCidadeIbge(nomeCidade, uf)
+      if (codigo) {
+        setCodigoCidadeIbge(codigo)
+        return true
       }
+
+      setCodigoCidadeIbge(null)
+      return false
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
       console.warn(`Erro ao buscar código IBGE: ${msg}`)
@@ -755,11 +676,9 @@ export function EmpresaTab() {
                 )
                 return
               }
-              // Buscar código IBGE se não estiver definido
               if (!codigoCidadeIbge) {
                 await buscarCodigoIbge(nomeCidadeParaValidar, estado)
               }
-              // Atualizar formulário com o nome oficial se diferente
               if (nomeCidadeParaValidar !== cidade.trim()) {
                 setCidade(nomeCidadeParaValidar)
               }
@@ -814,10 +733,6 @@ export function EmpresaTab() {
           providerEnderecoId,
           pinAlinhadoAoFormulario: pinAlinhadoAoFormularioRef.current,
         })
-        if (resolucaoPin.acao === 'bloquear') {
-          showToast.error(resolucaoPin.motivo)
-          return
-        }
 
         let pinParaSalvar = enderecoLocalizacao
         let providerParaSalvar = providerEnderecoId
@@ -825,13 +740,7 @@ export function EmpresaTab() {
         if (resolucaoPin.acao === 'manter') {
           pinParaSalvar = resolucaoPin.point
           providerParaSalvar = resolucaoPin.providerEnderecoId
-        } else {
-          if (!enderecoEmpresaGeocodeMinimo(enderecoAtual)) {
-            showToast.error(
-              'Preencha rua, número, cidade e estado. Ao mudar o endereço, a localização da loja é atualizada automaticamente.'
-            )
-            return
-          }
+        } else if (resolucaoPin.acao === 'geocodificar') {
           try {
             const geocode = await geocodificarEnderecoEmpresaViaGoogle(enderecoAtual)
             const escolha = escolherPinAposGeocode(
@@ -846,19 +755,8 @@ export function EmpresaTab() {
               setProviderEnderecoId(geocode.providerEnderecoId)
               pinAlinhadoAoFormularioRef.current = true
             }
-          } catch (error) {
-            const enderecoMudou =
-              !enderecoSalvoRef.current ||
-              assinaturaEnderecoEmpresaGeocode(enderecoAtual) !==
-                assinaturaEnderecoEmpresaGeocode(enderecoSalvoRef.current)
-            if (!enderecoLocalizacao || enderecoMudou) {
-              showToast.error(
-                error instanceof Error
-                  ? error.message
-                  : 'Não foi possível localizar o novo endereço. Corrija o endereço e tente de novo.'
-              )
-              return
-            }
+          } catch {
+            // Pin é da cobertura. Falha no mapa não impede gravar o endereço da empresa.
           }
         }
 
@@ -1249,18 +1147,6 @@ export function EmpresaTab() {
           <div>
             <h4 className="mb-2 text-lg font-semibold text-primary">Endereço</h4>
             <div className="space-y-6">
-              {isEditing ? (
-                <EnderecoPlacesAutocomplete
-                  variant="gestor"
-                  floatingLabel={false}
-                  label="Buscar endereço no Google"
-                  placeholder="Digite rua, bairro ou cidade…"
-                  value={buscaPlacesEmpresa}
-                  onChange={setBuscaPlacesEmpresa}
-                  onSelect={aplicarPlaceDetailsEmpresa}
-                />
-              ) : null}
-
               {/* Linha 1: CEP + Rua */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <Input

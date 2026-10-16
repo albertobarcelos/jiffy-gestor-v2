@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ComplementoRepository } from '@/src/infrastructure/database/repositories/ComplementoRepository'
+import { ComplementoOverrideRepository } from '@/src/infrastructure/database/repositories/ComplementoOverrideRepository'
 import { BuscarComplementoPorIdUseCase } from '@/src/application/use-cases/complementos/BuscarComplementoPorIdUseCase'
+import { BuscarComplementoCompletoUseCase } from '@/src/application/use-cases/complementos/BuscarComplementoCompletoUseCase'
 import { AtualizarComplementoUseCase } from '@/src/application/use-cases/complementos/AtualizarComplementoUseCase'
 import { DeletarComplementoUseCase } from '@/src/application/use-cases/complementos/DeletarComplementoUseCase'
 import { AtualizarComplementoSchema } from '@/src/application/dto/AtualizarComplementoDTO'
@@ -24,6 +26,16 @@ export async function GET(
     const { id } = await params
     if (!id) {
       return NextResponse.json({ error: 'ID do complemento é obrigatório' }, { status: 400 })
+    }
+
+    if (request.nextUrl.searchParams.get('retorno') === 'completo') {
+      const completo = await new BuscarComplementoCompletoUseCase(
+        new ComplementoOverrideRepository(undefined, tokenInfo.token)
+      ).execute(id)
+      if (!completo) {
+        return NextResponse.json({ error: 'Complemento não encontrado' }, { status: 404 })
+      }
+      return NextResponse.json(completo)
     }
 
     const repository = new ComplementoRepository(undefined, tokenInfo.token)

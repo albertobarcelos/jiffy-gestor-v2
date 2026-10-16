@@ -22,7 +22,15 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { arrayMove } from '@dnd-kit/sortable'
+import type { DragEndEvent } from '@dnd-kit/core'
 import { MdClose, MdSearch, MdAdd, MdKeyboardArrowDown } from 'react-icons/md'
+import {
+  AlcaArraste,
+  ListaArrastavel,
+  LinhaArrastavel,
+  type ArrasteControle,
+} from './ComplementosListaArrastavel'
 import {
   GruposComplementosTabsModal,
   GruposComplementosTabsModalState,
@@ -32,6 +40,13 @@ import {
   type ComplementosTabsModalState,
 } from '../complementos/ComplementosTabsModal'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
+import {
+  gravarOverridesComplemento,
+  reordenarComplementoNoMenu,
+  reordenarGrupoComplementoNoMenu,
+} from '@/src/presentation/components/features/complementos/complementoOverrideApi'
+import { BotaoAtivoComplemento } from '@/src/presentation/components/features/complementos/BotaoAtivoComplemento'
+import { normalizarTipoImpactoPreco } from '@/src/domain/complemento/tipos'
 import { cn } from '@/src/shared/utils/cn'
 import type { JiffySidePanelFooterActions } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
@@ -101,8 +116,55 @@ function mapApiGrupoToGrupoComplemento(grupo: any): GrupoComplementoItem {
   }
 }
 
-function formatarValorComplemento(valor: number): string {
+function formatarMoedaBrl(valor: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
+}
+
+function formatarDigitacaoMoeda(value: string): string {
+  const digits = value.replace(/\D/g, '')
+  if (!digits) return formatarMoedaBrl(0)
+  return formatarMoedaBrl(parseInt(digits, 10) / 100)
+}
+
+function lerMoeda(value: string): number {
+  const normalized = value
+    .replace(/[+\-]/g, '')
+    .replace(/R\$/g, '')
+    .trim()
+    .replace(/\./g, '')
+    .replace(',', '.')
+  const parsed = parseFloat(normalized)
+  if (Number.isNaN(parsed)) return 0
+  return Math.round(parsed * 100) / 100
+}
+
+/** Prefixo visual do valor conforme o impacto do complemento no grupo. */
+function prefixoImpactoValor(tipoImpactoPreco: unknown): '+' | '-' | null {
+  const tipo = normalizarTipoImpactoPreco(tipoImpactoPreco)
+  if (tipo === 'aumenta') return '+'
+  if (tipo === 'diminui') return '-'
+  return null
+}
+
+/** Ex.: `+ R$ 4,00`, `- R$ 8,50` ou `R$ 0,00` (nenhum). */
+function formatarMoedaComImpacto(valor: number, tipoImpactoPreco: unknown): string {
+  const moeda = formatarMoedaBrl(valor)
+  const prefixo = prefixoImpactoValor(tipoImpactoPreco)
+  return prefixo ? `${prefixo} ${moeda}` : moeda
+}
+
+function formatarDigitacaoMoedaComImpacto(value: string, tipoImpactoPreco: unknown): string {
+  return formatarMoedaComImpacto(lerMoeda(formatarDigitacaoMoeda(value)), tipoImpactoPreco)
+}
+
+function chaveValorNoMenu(grupoId: string, complementoId: string): string {
+  return `${grupoId}:${complementoId}`
+}
+
+/** No cardápio, sem ordem gravada a lista já vem na ordem efetiva da API. */
+function ordenarComplementosDoCardapio(lista: Complemento[]): Complemento[] {
+  if (!lista.some(item => item.getOrdem() != null)) return lista
+  return ordenarComplementosParaExibicao(lista)
 }
 
 /** Ordenação alinhada ao modal de grupo (ordem explícita, depois nome) */
@@ -115,6 +177,44 @@ function ordenarComplementosParaExibicao(lista: Complemento[]): Complemento[] {
     if (oa == null && ob != null) return 1
     return (a.getNome() || '').localeCompare(b.getNome() || '', 'pt-BR', { sensitivity: 'base' })
   })
+}
+
+/** Regrava a ordem 1-based para a lista não voltar à ordem anterior no próximo render. */
+function aplicarOrdemNaLista(lista: Complemento[]): Complemento[] {
+  return lista.map((c, index) =>
+    Complemento.create(
+      c.getId(),
+      c.getNome(),
+      c.getDescricao(),
+      c.getValor(),
+      c.isAtivo(),
+      c.getTipoImpactoPreco(),
+      index + 1,
+      c.getImagemUrl()
+    )
+  )
+}
+
+/** Atualiza só o valor daquele complemento, sem tocar nos outros grupos. */
+function atualizarValorNaLista(
+  complementos: Complemento[],
+  complementoId: string,
+  valor: number
+): Complemento[] {
+  return complementos.map(c =>
+    c.getId() !== complementoId
+      ? c
+      : Complemento.create(
+          c.getId(),
+          c.getNome(),
+          c.getDescricao(),
+          valor,
+          c.isAtivo(),
+          c.getTipoImpactoPreco(),
+          c.getOrdem(),
+          c.getImagemUrl()
+        )
+  )
 }
 
 /** Atualiza apenas o flag ativo para refletir o PATCH sem recarregar o grupo inteiro */
@@ -273,9 +373,9 @@ export const ComplementosMultiSelectDialog = forwardRef<
   /** Salvando todos os vínculos pendentes (botão Salvar). */
   const [isSaving, setIsSaving] = useState(false)
   /** IDs persistidos no backend — comparação define dirty. */
-  const baselineGruposIdsRef = useRef<string[]>(
-    mapResumoToGrupos(initialGruposResumo).map(g => g.id)
-  )
+  const baselineInicial = mapResumoToGrupos(initialGruposResumo).map(g => g.id)
+  const baselineGruposIdsRef = useRef<string[]>(baselineInicial)
+  const [gruposPersistidosIds, setGruposPersistidosIds] = useState<string[]>(baselineInicial)
   const isDirtyRef = useRef(false)
   const [allSelectableGroups, setAllSelectableGroups] = useState<GrupoCatalogoItem[]>([])
   const [isLoadingSelectableGroups, setIsLoadingSelectableGroups] = useState(false)
@@ -292,6 +392,14 @@ export const ComplementosMultiSelectDialog = forwardRef<
   >({})
   const [loadingDetalheGrupoId, setLoadingDetalheGrupoId] = useState<string | null>(null)
   const [togglingComplementoId, setTogglingComplementoId] = useState<string | null>(null)
+  /** Rascunho do valor enquanto o campo está em edição. A chave inclui o grupo. */
+  const [valoresDigitados, setValoresDigitados] = useState<Record<string, string>>({})
+  const valoresDigitadosRef = useRef<Record<string, string>>({})
+  const [salvandoValorChave, setSalvandoValorChave] = useState<Record<string, boolean>>({})
+  const salvandoValorRef = useRef<Set<string>>(new Set())
+  const [salvandoAtivoChave, setSalvandoAtivoChave] = useState<Record<string, boolean>>({})
+  const salvandoAtivoRef = useRef<Set<string>>(new Set())
+  const listaLimiteRef = useRef<HTMLDivElement>(null)
   const [abrindoGrupoComplementosId, setAbrindoGrupoComplementosId] = useState<string | null>(
     null
   )
@@ -316,6 +424,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
   const sessionCatalogOrderRef = useRef<string[] | null>(null)
   /** Incrementa quando a ordem estável da sessão é definida (ref sozinha não dispara render). */
   const [sessionOrderTick, setSessionOrderTick] = useState(0)
+  const [reordenandoChave, setReordenandoChave] = useState<string | null>(null)
 
   const loadGroups = useCallback(
     async (options?: { silent?: boolean; signal?: AbortSignal }) => {
@@ -372,7 +481,9 @@ export const ComplementosMultiSelectDialog = forwardRef<
           )
         } else {
           setGroups(grupos)
-          baselineGruposIdsRef.current = grupos.map(g => g.id)
+          const idsPersistidos = grupos.map(g => g.id)
+          baselineGruposIdsRef.current = idsPersistidos
+          setGruposPersistidosIds(idsPersistidos)
           isDirtyRef.current = false
         }
       } catch (err) {
@@ -388,6 +499,172 @@ export const ComplementosMultiSelectDialog = forwardRef<
       }
     },
     [open, produtoId, menuId]
+  )
+
+  const reordenarNoMenu = useCallback(
+    async (
+      acao:
+        | {
+            tipo: 'grupo'
+            grupoComplementoId: string
+            novaPosicao: number
+          }
+        | {
+            tipo: 'complemento'
+            grupoComplementoId: string
+            complementoId: string
+            novaPosicao: number
+          },
+      chave: string
+    ): Promise<boolean> => {
+      if (!menuId || !produtoId) return false
+      if (isDirtyRef.current) {
+        showToast.error('Salve os vínculos antes de alterar a ordem.')
+        return false
+      }
+      setReordenandoChave(chave)
+      try {
+        if (acao.tipo === 'grupo') {
+          await reordenarGrupoComplementoNoMenu({
+            menuId,
+            produtoId,
+            grupoComplementoId: acao.grupoComplementoId,
+            novaPosicao: acao.novaPosicao,
+          })
+        } else {
+          await reordenarComplementoNoMenu({
+            menuId,
+            produtoId,
+            grupoComplementoId: acao.grupoComplementoId,
+            complementoId: acao.complementoId,
+            novaPosicao: acao.novaPosicao,
+          })
+        }
+        await loadGroups({ silent: true })
+        return true
+      } catch (err) {
+        showToast.error(err instanceof Error ? err.message : 'Erro ao reordenar')
+        return false
+      } finally {
+        setReordenandoChave(null)
+      }
+    },
+    [loadGroups, menuId, produtoId]
+  )
+
+  useEffect(() => {
+    valoresDigitadosRef.current = {}
+    setValoresDigitados({})
+  }, [menuId, produtoId])
+
+  const definirValorDigitado = useCallback((chave: string, texto: string) => {
+    valoresDigitadosRef.current = { ...valoresDigitadosRef.current, [chave]: texto }
+    setValoresDigitados(valoresDigitadosRef.current)
+  }, [])
+
+  const limparValorDigitado = useCallback((chave: string) => {
+    if (!(chave in valoresDigitadosRef.current)) return
+    const next = { ...valoresDigitadosRef.current }
+    delete next[chave]
+    valoresDigitadosRef.current = next
+    setValoresDigitados(next)
+  }, [])
+
+  const gravarValorNoMenu = useCallback(
+    async (grupoId: string, comp: Complemento) => {
+      if (!menuId || !produtoId) return
+      if (!baselineGruposIdsRef.current.includes(grupoId)) return
+      const chave = chaveValorNoMenu(grupoId, comp.getId())
+      const texto = valoresDigitadosRef.current[chave]
+      if (texto == null || salvandoValorRef.current.has(chave)) return
+      const novoValor = lerMoeda(texto)
+      const valorAtual = Math.round(comp.getValor() * 100) / 100
+      if (novoValor === valorAtual) {
+        limparValorDigitado(chave)
+        return
+      }
+      salvandoValorRef.current.add(chave)
+      setSalvandoValorChave(prev => ({ ...prev, [chave]: true }))
+      try {
+        await gravarOverridesComplemento({
+          vinculos: [
+            {
+              menuId,
+              produtoId,
+              complementoId: comp.getId(),
+              grupoComplementoId: grupoId,
+              valor: novoValor,
+            },
+          ],
+        })
+        setGroups(prev =>
+          prev.map(grupo =>
+            grupo.id === grupoId
+              ? {
+                  ...grupo,
+                  complementos: atualizarValorNaLista(grupo.complementos, comp.getId(), novoValor),
+                }
+              : grupo
+          )
+        )
+        limparValorDigitado(chave)
+        showToast.success('Valor atualizado neste produto e neste grupo.')
+      } catch (err) {
+        showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar o valor.')
+        definirValorDigitado(
+          chave,
+          formatarMoedaComImpacto(comp.getValor(), comp.getTipoImpactoPreco())
+        )
+      } finally {
+        salvandoValorRef.current.delete(chave)
+        setSalvandoValorChave(prev => ({ ...prev, [chave]: false }))
+      }
+    },
+    [definirValorDigitado, limparValorDigitado, menuId, produtoId]
+  )
+
+  const gravarAtivoNoMenu = useCallback(
+    async (grupoId: string, comp: Complemento) => {
+      if (!menuId || !produtoId) return
+      if (!baselineGruposIdsRef.current.includes(grupoId)) return
+      const chave = chaveValorNoMenu(grupoId, comp.getId())
+      if (salvandoAtivoRef.current.has(chave)) return
+      const proximo = !comp.isAtivo()
+      salvandoAtivoRef.current.add(chave)
+      setSalvandoAtivoChave(prev => ({ ...prev, [chave]: true }))
+      try {
+        await gravarOverridesComplemento({
+          vinculos: [
+            {
+              menuId,
+              produtoId,
+              complementoId: comp.getId(),
+              grupoComplementoId: grupoId,
+              ativo: proximo,
+            },
+          ],
+        })
+        setGroups(prev =>
+          prev.map(grupo =>
+            grupo.id === grupoId
+              ? {
+                  ...grupo,
+                  complementos: atualizarAtivoNaLista(grupo.complementos, comp.getId(), proximo),
+                }
+              : grupo
+          )
+        )
+        showToast.success(
+          proximo ? 'Complemento ativado neste produto.' : 'Complemento pausado neste produto.'
+        )
+      } catch (err) {
+        showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar o complemento.')
+      } finally {
+        salvandoAtivoRef.current.delete(chave)
+        setSalvandoAtivoChave(prev => ({ ...prev, [chave]: false }))
+      }
+    },
+    [menuId, produtoId]
   )
 
   const loadSelectableGroups = useCallback(async (signal?: AbortSignal) => {
@@ -681,6 +958,14 @@ export const ComplementosMultiSelectDialog = forwardRef<
           ? bySearch.filter(g => !gruposVinculadosIds.includes(g.id))
           : bySearch
 
+    if (filterTab === 'vinculados' && vinculoNoMenu) {
+      const ordem = new Map(groups.map((grupo, index) => [grupo.id, index]))
+      return [...filtrados].sort(
+        (a, b) =>
+          (ordem.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (ordem.get(b.id) ?? Number.MAX_SAFE_INTEGER)
+      )
+    }
+
     if (filterTab !== 'todos') {
       return [...filtrados].sort((a, b) =>
         (a.nome || '').localeCompare(b.nome || '', 'pt-BR', { sensitivity: 'base' })
@@ -706,9 +991,77 @@ export const ComplementosMultiSelectDialog = forwardRef<
     catalogSearch,
     filterTab,
     gruposVinculadosIds,
+    groups,
+    vinculoNoMenu,
     open,
     sessionOrderTick,
   ])
+
+  const podeReordenarNoMenu =
+    Boolean(menuId && produtoId) &&
+    filterTab === 'vinculados' &&
+    !catalogSearch.trim() &&
+    sameIdSet(gruposVinculadosIds, gruposPersistidosIds)
+
+  const handleDragEndGrupos = useCallback(
+    async (event: DragEndEvent) => {
+      const { active, over } = event
+      if (!over || active.id === over.id || reordenandoChave) return
+      const ids = gruposCatalogoParaLista.map(grupo => grupo.id)
+      const oldIndex = ids.indexOf(String(active.id))
+      const newIndex = ids.indexOf(String(over.id))
+      if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return
+      const anterior = groups
+      const nextIds = arrayMove(ids, oldIndex, newIndex)
+      setGroups(prev => {
+        const byId = new Map(prev.map(grupo => [grupo.id, grupo]))
+        const ordered = nextIds
+          .map(id => byId.get(id))
+          .filter((grupo): grupo is GrupoComplementoItem => Boolean(grupo))
+        const restantes = prev.filter(grupo => !nextIds.includes(grupo.id))
+        return [...ordered, ...restantes]
+      })
+      const ok = await reordenarNoMenu(
+        {
+          tipo: 'grupo',
+          grupoComplementoId: String(active.id),
+          novaPosicao: newIndex + 1,
+        },
+        `grupo:${String(active.id)}`
+      )
+      if (!ok) setGroups(anterior)
+    },
+    [groups, gruposCatalogoParaLista, reordenandoChave, reordenarNoMenu]
+  )
+
+  const handleDragEndComplementos = useCallback(
+    async (grupoId: string, complementos: Complemento[], event: DragEndEvent) => {
+      const { active, over } = event
+      if (!over || active.id === over.id || reordenandoChave) return
+      const ids = complementos.map(comp => comp.getId())
+      const oldIndex = ids.indexOf(String(active.id))
+      const newIndex = ids.indexOf(String(over.id))
+      if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return
+      const anterior = groups
+      const reordenados = aplicarOrdemNaLista(arrayMove(complementos, oldIndex, newIndex))
+      setGroups(prev =>
+        prev.map(grupo =>
+          grupo.id === grupoId ? { ...grupo, complementos: reordenados } : grupo
+        )
+      )
+      const ok = await reordenarNoMenu(
+        {
+          tipo: 'complemento',
+          grupoComplementoId: grupoId,
+          complementoId: String(active.id),
+          novaPosicao: newIndex + 1,
+        },
+        `comp:${grupoId}:${String(active.id)}`
+      )
+      if (!ok) setGroups(anterior)
+    },
+    [groups, reordenandoChave, reordenarNoMenu]
+  )
 
   const persistGruposSelection = useCallback(
     async (
@@ -940,7 +1293,9 @@ export const ComplementosMultiSelectDialog = forwardRef<
         }
       )
       if (ok) {
-        baselineGruposIdsRef.current = [...currentIds]
+        const idsPersistidos = [...currentIds]
+        baselineGruposIdsRef.current = idsPersistidos
+        setGruposPersistidosIds(idsPersistidos)
         isDirtyRef.current = false
         onEmbedStateChange?.({ isDirty: false, isSaving: false })
       } else {
@@ -1267,6 +1622,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
         return
       }
       baselineGruposIdsRef.current = nextIds
+      setGruposPersistidosIds(nextIds)
       isDirtyRef.current = false
       onEmbedStateChange?.({ isDirty: false, isSaving: false })
       setFilterTab('vinculados')
@@ -1377,7 +1733,10 @@ export const ComplementosMultiSelectDialog = forwardRef<
               })}
             </div>
           </div>
-          <div className="scrollbar-hide max-h-[280px] min-h-0 overflow-y-auto rounded-lg border border-gray-100 bg-gray-50/50 md:max-h-[360px]">
+          <div
+            ref={listaLimiteRef}
+            className="scrollbar-hide max-h-[280px] min-h-0 overflow-x-hidden overflow-y-auto overscroll-y-contain rounded-lg border border-gray-100 bg-gray-50/50 md:max-h-[360px]"
+          >
             {isLoadingSelectableGroups &&
             gruposCatalogoParaLista.length === 0 &&
             filterTab !== 'vinculados' ? (
@@ -1385,8 +1744,9 @@ export const ComplementosMultiSelectDialog = forwardRef<
                 Carregando grupos...
               </p>
             ) : gruposCatalogoParaLista.length ? (
-              <ul className="divide-y divide-gray-100">
-                {gruposCatalogoParaLista.map(grupo => {
+              (() => {
+                const linhasGrupos = gruposCatalogoParaLista.map(grupo => {
+                  const renderGrupo = (arrasteGrupo: ArrasteControle | null) => {
                   const vinculado = gruposVinculadosIds.includes(grupo.id)
                   const expandido = expandedGrupoIds.has(grupo.id)
                   const grupoVinculado = groups.find(g => g.id === grupo.id)
@@ -1394,7 +1754,10 @@ export const ComplementosMultiSelectDialog = forwardRef<
                     (grupoVinculado?.complementos?.length
                       ? grupoVinculado.complementos
                       : detalhesComplementosCache[grupo.id] ?? grupo.complementos) ?? []
-                  const complementosOrdenados = ordenarComplementosParaExibicao(complementosLista)
+                  const complementosOrdenados =
+                    vinculoNoMenu && grupoVinculado?.complementos?.length
+                      ? ordenarComplementosDoCardapio(grupoVinculado.complementos)
+                      : ordenarComplementosParaExibicao(complementosLista)
                   const qtdComplementosConhecida =
                     (grupoVinculado?.complementos?.length ?? 0) > 0
                       ? grupoVinculado!.complementos.length
@@ -1409,7 +1772,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
                     !(grupoVinculado?.complementos?.length)
 
                   return (
-                    <li key={grupo.id}>
+                    <>
                       <div
                         className={cn(
                           'flex items-center justify-between gap-2 px-2 py-1.5 hover:bg-white/80',
@@ -1459,11 +1822,20 @@ export const ComplementosMultiSelectDialog = forwardRef<
                             </div>
                           </button>
                         </div>
-                        <div
-                          className="shrink-0 self-center"
-                          onClick={e => e.stopPropagation()}
-                          onMouseDown={e => e.stopPropagation()}
-                        >
+                        <div className="flex shrink-0 items-center gap-1">
+                          {arrasteGrupo ? (
+                            <AlcaArraste
+                              label={grupo.nome || 'Grupo'}
+                              attributes={arrasteGrupo.attributes}
+                              listeners={arrasteGrupo.listeners}
+                              disabled={reordenandoChave !== null}
+                            />
+                          ) : null}
+                          <div
+                            className="shrink-0 self-center"
+                            onClick={e => e.stopPropagation()}
+                            onMouseDown={e => e.stopPropagation()}
+                          >
                           <JiffyIconSwitch
                             checked={vinculado}
                             onChange={e => {
@@ -1483,6 +1855,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
                               onClick: e => e.stopPropagation(),
                             }}
                           />
+                        </div>
                         </div>
                       </div>
                       {expandido ? (
@@ -1536,27 +1909,134 @@ export const ComplementosMultiSelectDialog = forwardRef<
                                   Nenhum complemento neste grupo.
                                 </p>
                               ) : null}
-                              {complementosOrdenados.map(comp => (
-                                <div
-                                  key={comp.getId()}
-                                  className={cn(
+                              {(() => {
+                                const mostrarAlcaComplemento =
+                                  podeReordenarNoMenu && vinculado
+                                const mostrarPauseNoMenu = Boolean(vinculoNoMenu && produtoId && vinculado)
+                                const temControleAtivo = showAtivoComplemento || mostrarPauseNoMenu
+                                const linhasComplemento = complementosOrdenados.map(comp => {
+                                  const gridClass = cn(
                                     'grid items-center gap-2 border-b border-gray-200 p-2 transition-colors hover:bg-primary-bg/60',
-                                    showAtivoComplemento
-                                      ? 'grid-cols-[minmax(0,1fr)_auto_auto]'
-                                      : 'grid-cols-[minmax(0,1fr)_auto]'
-                                  )}
-                                >
-                                  <p
-                                    className={cn(
-                                      'min-w-0 truncate text-sm font-normal text-primary-text',
-                                      !comp.isAtivo() && 'text-secondary-text line-through'
-                                    )}
-                                  >
-                                    {comp.getNome()}
-                                  </p>
-                                  <div className="min-w-[100px] rounded border border-gray-200 bg-white px-2 py-1 text-right text-xs font-normal tabular-nums text-primary-text">
-                                    {formatarValorComplemento(comp.getValor())}
-                                  </div>
+                                    mostrarAlcaComplemento && temControleAtivo
+                                      ? 'grid-cols-[auto_minmax(0,1fr)_auto_auto]'
+                                      : mostrarAlcaComplemento
+                                        ? 'grid-cols-[auto_minmax(0,1fr)_auto]'
+                                        : temControleAtivo
+                                          ? 'grid-cols-[minmax(0,1fr)_auto_auto]'
+                                          : 'grid-cols-[minmax(0,1fr)_auto]'
+                                  )
+                                  const conteudo = (arraste: ArrasteControle | null) => (
+                                    <>
+                                      {arraste ? (
+                                        <AlcaArraste
+                                          label={comp.getNome()}
+                                          attributes={arraste.attributes}
+                                          listeners={arraste.listeners}
+                                          disabled={reordenandoChave !== null}
+                                        />
+                                      ) : null}
+                                      <p
+                                        className={cn(
+                                          'min-w-0 truncate text-sm font-normal text-primary-text',
+                                          !comp.isAtivo() && 'text-secondary-text line-through'
+                                        )}
+                                      >
+                                        {comp.getNome()}
+                                      </p>
+                                  {(() => {
+                                    const tipoImpacto = normalizarTipoImpactoPreco(
+                                      comp.getTipoImpactoPreco()
+                                    )
+                                    const valorRiscado = tipoImpacto === 'nenhum'
+                                    const valorMoeda =
+                                      valoresDigitados[chaveValorNoMenu(grupo.id, comp.getId())] ??
+                                      formatarMoedaComImpacto(comp.getValor(), tipoImpacto)
+
+                                    if (vinculoNoMenu && produtoId && vinculado) {
+                                      return (
+                                        <input
+                                          type="text"
+                                          inputMode="numeric"
+                                          value={valorMoeda}
+                                          onChange={event =>
+                                            definirValorDigitado(
+                                              chaveValorNoMenu(grupo.id, comp.getId()),
+                                              formatarDigitacaoMoedaComImpacto(
+                                                event.target.value,
+                                                tipoImpacto
+                                              )
+                                            )
+                                          }
+                                          onFocus={event => event.target.select()}
+                                          onBlur={() => void gravarValorNoMenu(grupo.id, comp)}
+                                          onKeyDown={event => {
+                                            if (event.key === 'Enter') event.currentTarget.blur()
+                                          }}
+                                          disabled={
+                                            !gruposPersistidosIds.includes(grupo.id) ||
+                                            isSaving ||
+                                            salvandoValorChave[
+                                              chaveValorNoMenu(grupo.id, comp.getId())
+                                            ]
+                                          }
+                                          title={
+                                            gruposPersistidosIds.includes(grupo.id)
+                                              ? valorRiscado
+                                                ? 'Impacto nenhum: este valor não altera o preço'
+                                                : undefined
+                                              : 'Salve o grupo para alterar este valor.'
+                                          }
+                                          aria-label={
+                                            gruposPersistidosIds.includes(grupo.id)
+                                              ? `Valor de ${comp.getNome()} em ${grupo.nome || 'grupo'}`
+                                              : `Valor de ${comp.getNome()} em ${grupo.nome || 'grupo'}. Salve o grupo para editar.`
+                                          }
+                                          className={cn(
+                                            'w-[8.5rem] rounded border border-gray-200 bg-white px-2 py-1 text-right text-xs font-normal tabular-nums text-primary-text focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-50',
+                                            valorRiscado && 'line-through opacity-70'
+                                          )}
+                                        />
+                                      )
+                                    }
+
+                                    return (
+                                      <div
+                                        className={cn(
+                                          'min-w-[100px] rounded border border-gray-200 bg-white px-2 py-1 text-right text-xs font-normal tabular-nums text-primary-text',
+                                          valorRiscado && 'line-through opacity-70'
+                                        )}
+                                        title={
+                                          valorRiscado
+                                            ? 'Impacto nenhum: este valor não altera o preço'
+                                            : undefined
+                                        }
+                                      >
+                                        {formatarMoedaComImpacto(comp.getValor(), tipoImpacto)}
+                                      </div>
+                                    )
+                                  })()}
+                                  {mostrarPauseNoMenu ? (
+                                    <div
+                                      className="flex justify-end self-center"
+                                      onClick={e => e.stopPropagation()}
+                                      onMouseDown={e => e.stopPropagation()}
+                                    >
+                                      <BotaoAtivoComplemento
+                                        ativo={comp.isAtivo()}
+                                        disabled={
+                                          !gruposPersistidosIds.includes(grupo.id) ||
+                                          isSaving ||
+                                          Boolean(salvandoAtivoChave[chaveValorNoMenu(grupo.id, comp.getId())])
+                                        }
+                                        title={
+                                          gruposPersistidosIds.includes(grupo.id)
+                                            ? undefined
+                                            : 'Salve o grupo para pausar ou ativar este complemento.'
+                                        }
+                                        onToggle={() => void gravarAtivoNoMenu(grupo.id, comp)}
+                                      />
+                                    </div>
+                                  ) : null}
                                   {showAtivoComplemento ? (
                                     <div
                                       className="flex justify-end self-center"
@@ -1586,16 +2066,81 @@ export const ComplementosMultiSelectDialog = forwardRef<
                                       />
                                     </div>
                                   ) : null}
-                                </div>
-                              ))}
+                                    </>
+                                  )
+                                  if (!mostrarAlcaComplemento) {
+                                    return (
+                                      <div key={comp.getId()} className={gridClass}>
+                                        {conteudo(null)}
+                                      </div>
+                                    )
+                                  }
+                                  return (
+                                    <LinhaArrastavel
+                                      key={comp.getId()}
+                                      id={comp.getId()}
+                                      as="div"
+                                      className={gridClass}
+                                      disabled={reordenandoChave !== null}
+                                    >
+                                      {conteudo}
+                                    </LinhaArrastavel>
+                                  )
+                                })
+                                if (!mostrarAlcaComplemento || complementosOrdenados.length === 0) {
+                                  return linhasComplemento
+                                }
+                                return (
+                                  <ListaArrastavel
+                                    ids={complementosOrdenados.map(item => item.getId())}
+                                    onDragEnd={event =>
+                                      void handleDragEndComplementos(
+                                        grupo.id,
+                                        complementosOrdenados,
+                                        event
+                                      )
+                                    }
+                                    limiteRef={listaLimiteRef}
+                                    as="div"
+                                  >
+                                    {linhasComplemento}
+                                  </ListaArrastavel>
+                                )
+                              })()}
                             </>
                           )}
                         </div>
                       ) : null}
-                    </li>
+                    </>
                   )
-                })}
-              </ul>
+                  }
+                  if (!podeReordenarNoMenu) {
+                    return <li key={grupo.id}>{renderGrupo(null)}</li>
+                  }
+                  return (
+                    <LinhaArrastavel
+                      key={grupo.id}
+                      id={grupo.id}
+                      as="li"
+                      disabled={reordenandoChave !== null}
+                    >
+                      {renderGrupo}
+                    </LinhaArrastavel>
+                  )
+                })
+                return podeReordenarNoMenu ? (
+                  <ListaArrastavel
+                    ids={gruposCatalogoParaLista.map(item => item.id)}
+                    onDragEnd={event => void handleDragEndGrupos(event)}
+                    limiteRef={listaLimiteRef}
+                    className="divide-y divide-gray-100"
+                  >
+                    {linhasGrupos}
+                  </ListaArrastavel>
+                ) : (
+                  <ul className="divide-y divide-gray-100">{linhasGrupos}</ul>
+                )
+              })()
             ) : (
               <p className="py-8 text-center text-xs text-secondary-text">
                 {allSelectableGroups.length === 0
@@ -1641,8 +2186,9 @@ export const ComplementosMultiSelectDialog = forwardRef<
             </div>
             {vinculoNoMenu ? (
               <p className="mt-2 text-xs text-secondary-text">
-                Os grupos marcados valem só neste cardápio. Nome e valor dos complementos se
-                alteram no cadastro do grupo, não aqui.
+                Os grupos marcados valem só neste cardápio. Salve o grupo para alterar o valor de
+                cada complemento; esse valor vale só neste produto e neste grupo. O nome continua
+                no cadastro do complemento.
               </p>
             ) : (
               <p className="mt-2 text-xs text-secondary-text">
