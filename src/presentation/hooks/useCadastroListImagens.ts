@@ -119,17 +119,62 @@ export function useCadastroListImagens<TItem>(options: {
     })()
   }, [applyUrls, getId, getUrl, items, media])
 
+  const limparImagemDaLista = useCallback(
+    (savedId: string) => {
+      const id = savedId.trim()
+      if (!id) return
+      media.lembrar(id, null)
+      pendentesRef.current.delete(id)
+      concluidosRef.current.add(id)
+      setUrlsPorId(prev => {
+        if (!(id in prev)) return prev
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+      if (!empresaId) return
+
+      queryClient.setQueriesData<InfiniteData<PaginaComItens<TItem>>>(
+        { queryKey: buildTenantQueryKey(empresaId, queryKeyBase), exact: false },
+        old => {
+          if (!old?.pages) return old
+          let changed = false
+          const pages = old.pages.map(page => {
+            const list = page[pageItemsKey]
+            if (!Array.isArray(list)) return page
+            let pageChanged = false
+            const nextList = (list as TItem[]).map(item => {
+              if (getId(item) !== id) return item
+              const updated = withUrl(item, null)
+              if (updated !== item) pageChanged = true
+              return updated
+            })
+            if (!pageChanged) return page
+            changed = true
+            return { ...page, [pageItemsKey]: nextList }
+          })
+          return changed ? { ...old, pages } : old
+        }
+      )
+    },
+    [empresaId, getId, media, pageItemsKey, queryClient, queryKeyBase, withUrl]
+  )
+
   const applyAfterSave = useCallback(
     async (savedId?: string, imagemUrl?: string | null) => {
       const id = savedId?.trim()
       if (!id) return
+      if (imagemUrl === null) {
+        limparImagemDaLista(id)
+        return
+      }
       const imediata = urlImagemHttp(imagemUrl) ?? media.conhecida(id)
       if (imediata) {
         concluidosRef.current.add(id)
         applyUrls({ [id]: imediata })
       }
     },
-    [applyUrls, media]
+    [applyUrls, limparImagemDaLista, media]
   )
 
   const refreshOne = useCallback(
@@ -142,9 +187,11 @@ export function useCadastroListImagens<TItem>(options: {
       if (persistida) {
         concluidosRef.current.add(id)
         applyUrls({ [id]: persistida })
+        return
       }
+      limparImagemDaLista(id)
     },
-    [applyUrls, media]
+    [applyUrls, limparImagemDaLista, media]
   )
 
   const uploadFromList = useCallback(

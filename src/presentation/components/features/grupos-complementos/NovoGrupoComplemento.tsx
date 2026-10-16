@@ -135,6 +135,7 @@ export const NovoGrupoComplemento = forwardRef<
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingGrupo, setIsLoadingGrupo] = useState(false)
   const [isUploadingImagem, setIsUploadingImagem] = useState(false)
+  const [removendoImagem, setRemovendoImagem] = useState(false)
   const [serverImagemUrl, setServerImagemUrl] = useState<string | null>(null)
   const [imageId, setImageId] = useState<string | null>(null)
   const [imagemPreviewUrl, setImagemPreviewUrl] = useState<string | null>(null)
@@ -502,20 +503,23 @@ export const NovoGrupoComplemento = forwardRef<
       showToast.error('Token não encontrado')
       return
     }
+    setRemovendoImagem(true)
     setIsUploadingImagem(true)
     const toastId = showToast.loading('Removendo imagem...')
     try {
       await removerImagemUseCase().execute({ imageId, token })
+      if (grupoId) grupoComplementoImagemMedia.lembrar(grupoId, null)
       setImageId(null)
       applyImagemUrl(null)
       showToast.successLoading(toastId, 'Imagem removida.')
-      onReload?.()
+      await onReload?.(grupoId, null)
     } catch (error) {
       showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
     } finally {
+      setRemovendoImagem(false)
       setIsUploadingImagem(false)
     }
-  }, [applyImagemUrl, handleClearImagemPreview, imageId, imagemPreviewUrl, onReload, serverImagemUrl])
+  }, [applyImagemUrl, grupoId, handleClearImagemPreview, imageId, imagemPreviewUrl, onReload, serverImagemUrl])
 
   if (isLoadingGrupo) {
     return (
@@ -626,6 +630,7 @@ export const NovoGrupoComplemento = forwardRef<
                 label="Foto do grupo"
                 disabled={!isEditing}
                 busy={isUploadingImagem}
+                busyLabel={removendoImagem ? 'Removendo imagem…' : 'Enviando foto…'}
                 previewUrl={imagemPreviewUrl}
                 cropPreset={DELIVERY_GRUPO_COMPLEMENTO_CROP_PRESET}
                 helperText={

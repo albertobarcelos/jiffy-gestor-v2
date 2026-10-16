@@ -32,6 +32,7 @@ export function ProdutoImagemPanel({
   const { auth } = useAuthStore()
   const [isLoading, setIsLoading] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [removendoImagem, setRemovendoImagem] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [serverUrl, setServerUrl] = useState<string | null>(null)
   const [imageId, setImageId] = useState<string | null>(null)
@@ -144,6 +145,7 @@ export function ProdutoImagemPanel({
       showToast.error('Token não encontrado')
       return
     }
+    setRemovendoImagem(true)
     setIsUploading(true)
     const toastId = showToast.loading('Removendo imagem...')
     try {
@@ -155,6 +157,7 @@ export function ProdutoImagemPanel({
     } catch (error) {
       showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
     } finally {
+      setRemovendoImagem(false)
       setIsUploading(false)
     }
   }, [applyImagemUrl, auth, handleClearPreview, imageId, onReload, previewUrl, serverUrl])
@@ -190,6 +193,7 @@ export function ProdutoImagemPanel({
         <DeliveryImageUploadField
           label="Imagem (cardápio digital)"
           busy={isUploading}
+          busyLabel={removendoImagem ? 'Removendo imagem…' : 'Enviando foto…'}
           previewUrl={previewUrl}
           cropPreset={DELIVERY_PRODUTO_CROP_PRESET}
           helperText="Após escolher o arquivo, ajuste o recorte (máx. 280×280). JPEG, PNG ou WebP até 1 MB."

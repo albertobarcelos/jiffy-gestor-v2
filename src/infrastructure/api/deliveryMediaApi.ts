@@ -57,8 +57,13 @@ const knownImagemUrlsPorGrupoComplementoId = new Map<string, string>()
 
 function rememberImagemUrl(store: Map<string, string>, id: string, url: string | null | undefined): string | null {
   const key = id.trim()
+  if (!key) return null
+  if (url === null) {
+    store.delete(key)
+    return null
+  }
   const value = urlImagemHttp(url)
-  if (!key || !value) return store.get(key) ?? null
+  if (!value) return store.get(key) ?? null
   store.set(key, value)
   return value
 }
@@ -432,7 +437,8 @@ export async function fetchGruposComplementoImagemUrlsBatch(
           knownImagemUrlsPorGrupoComplementoId.set(id, fromCatalog)
           return [id, fromCatalog] as const
         }
-        return [id, knownImagemUrlsPorGrupoComplementoId.get(id) ?? null] as const
+        knownImagemUrlsPorGrupoComplementoId.delete(id)
+        return [id, null] as const
       })
     )
   })().finally(() => {

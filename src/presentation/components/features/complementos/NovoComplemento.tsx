@@ -132,6 +132,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingComplemento, setIsLoadingComplemento] = useState(false)
   const [isUploadingImagem, setIsUploadingImagem] = useState(false)
+  const [removendoImagem, setRemovendoImagem] = useState(false)
   const [serverImagemUrl, setServerImagemUrl] = useState<string | null>(null)
   const [imagemPreviewUrl, setImagemPreviewUrl] = useState<string | null>(null)
   const [imageId, setImageId] = useState<string | null>(null)
@@ -345,6 +346,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
       showToast.error('Token não encontrado')
       return
     }
+    setRemovendoImagem(true)
     setIsUploadingImagem(true)
     const toastId = showToast.loading('Removendo imagem...')
     try {
@@ -355,6 +357,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
     } catch (error) {
       showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
     } finally {
+      setRemovendoImagem(false)
       setIsUploadingImagem(false)
     }
   }, [applyImagemUrl, handleClearImagemPreview, imageId, imagemPreviewUrl, serverImagemUrl])
@@ -620,6 +623,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
                 label="Foto do complemento"
                 disabled={!isEditing}
                 busy={isUploadingImagem}
+                busyLabel={removendoImagem ? 'Removendo imagem…' : 'Enviando foto…'}
                 previewUrl={imagemPreviewUrl}
                 cropPreset={DELIVERY_COMPLEMENTO_CROP_PRESET}
                 helperText={
