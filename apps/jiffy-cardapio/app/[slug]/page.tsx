@@ -1,6 +1,5 @@
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
-import { notFound } from 'next/navigation'
 import { HydrationBoundary } from '@tanstack/react-query'
 import { DeliveryPublicoHomeScreen } from '@/src/presentation/components/features/delivery-publico/public/screens/DeliveryPublicoHomeScreen'
 import { dehydrateCatalogoPrimeiraPagina } from '@/src/infrastructure/api/dehydrateCatalogoPrimeiraPagina'
@@ -10,7 +9,7 @@ import {
   metadataCardapioNaoIndexavel,
   metadataCardapioSlug,
 } from '@/src/infrastructure/seo/cardapioSlugMetadata'
-import { isReservedCardapioSlug } from '@/src/infrastructure/seo/reservedCardapioSlugs'
+import { exigirSlugPublicoDaPagina } from '@/src/infrastructure/seo/exigirSlugPublicoDaPagina'
 import { CardapioSlugJsonLd } from '@/src/presentation/components/features/delivery-publico/shared/seo/CardapioSlugJsonLd'
 
 export { generateStaticParams } from './catalogoSlugCache'
@@ -25,7 +24,7 @@ type PageProps = {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug: rawSlug } = await params
-  const slug = rawSlug?.trim() ?? ''
+  const slug = exigirSlugPublicoDaPagina(rawSlug)
   const empresa = await carregarEmpresaPublicaSeo(slug)
   if (!empresa) return metadataCardapioNaoIndexavel
   return metadataCardapioSlug(empresa)
@@ -44,8 +43,7 @@ function HomeFallback() {
 
 export default async function CardapioSlugPage({ params }: PageProps) {
   const { slug: rawSlug } = await params
-  const slug = rawSlug?.trim() ?? ''
-  if (!slug || isReservedCardapioSlug(slug)) notFound()
+  const slug = exigirSlugPublicoDaPagina(rawSlug)
 
   const [state, empresa] = await Promise.all([
     dehydrateCatalogoPrimeiraPagina(slug),

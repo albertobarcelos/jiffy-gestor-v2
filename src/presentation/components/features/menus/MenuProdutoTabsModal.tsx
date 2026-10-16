@@ -118,13 +118,30 @@ export function MenuProdutoTabsModal({
     )
   }, [state.produto, state.grupo])
 
-  const handleSave = useCallback(async () => {
-    let ok = false
-    if (state.tab === 'produto') ok = (await produtoRef.current?.save()) ?? false
-    else if (state.tab === 'menus') ok = (await menusRef.current?.save()) ?? false
-    else ok = (await complementosRef.current?.save()) ?? false
-    if (ok) onClose()
-  }, [state.tab, onClose])
+  const salvandoRef = useRef(false)
+  const [acaoSalvar, setAcaoSalvar] = useState<'ficar' | 'fechar' | null>(null)
+
+  const salvarAbaAtual = useCallback(async () => {
+    if (state.tab === 'produto') return (await produtoRef.current?.save()) ?? false
+    if (state.tab === 'menus') return (await menusRef.current?.save()) ?? false
+    return (await complementosRef.current?.save()) ?? false
+  }, [state.tab])
+
+  const executarSalvar = useCallback(
+    async (fechar: boolean) => {
+      if (salvandoRef.current) return
+      salvandoRef.current = true
+      setAcaoSalvar(fechar ? 'fechar' : 'ficar')
+      try {
+        const ok = await salvarAbaAtual()
+        if (ok && fechar) onClose()
+      } finally {
+        salvandoRef.current = false
+        setAcaoSalvar(null)
+      }
+    },
+    [onClose, salvarAbaAtual]
+  )
 
   const currentDirty =
     state.tab === 'produto'
@@ -139,17 +156,38 @@ export function MenuProdutoTabsModal({
         ? embedMenus.isSaving
         : saving
 
-  const footerActions: JiffySidePanelFooterActions = {
-    showCancel: true,
-    cancelLabel: 'Fechar',
-    cancelVariant: MENU_MODAL_CANCEL_VARIANT,
-    onCancel: onClose,
-    showSave: true,
-    saveLabel: 'Salvar e fechar',
-    onSave: () => void handleSave(),
-    saveLoading: currentSaving,
-    saveDisabled: !currentDirty || currentSaving,
-  }
+  const naAbaComplementos = state.tab === 'complementos'
+  const ocupado = currentSaving || acaoSalvar !== null
+  const footerActions: JiffySidePanelFooterActions = naAbaComplementos
+    ? {
+        barActionOrder: ['cancel', 'save', 'saveAndClose'],
+        showCancel: true,
+        cancelLabel: 'Fechar',
+        cancelVariant: MENU_MODAL_CANCEL_VARIANT,
+        onCancel: onClose,
+        showSave: true,
+        saveBarVariant: 'primaryMuted',
+        saveLabel: 'Salvar',
+        onSave: () => void executarSalvar(false),
+        saveLoading: acaoSalvar === 'ficar',
+        saveDisabled: !currentDirty || ocupado,
+        showSaveAndClose: true,
+        saveAndCloseLabel: 'Salvar e fechar',
+        onSaveAndClose: () => void executarSalvar(true),
+        saveAndCloseLoading: acaoSalvar === 'fechar',
+        saveAndCloseDisabled: !currentDirty || ocupado,
+      }
+    : {
+        showCancel: true,
+        cancelLabel: 'Fechar',
+        cancelVariant: MENU_MODAL_CANCEL_VARIANT,
+        onCancel: onClose,
+        showSave: true,
+        saveLabel: 'Salvar e fechar',
+        onSave: () => void executarSalvar(true),
+        saveLoading: currentSaving || acaoSalvar === 'fechar',
+        saveDisabled: !currentDirty || ocupado,
+      }
 
   const produtoEnabled = Boolean(state.produto)
   const complementosEnabled = Boolean(state.produto)

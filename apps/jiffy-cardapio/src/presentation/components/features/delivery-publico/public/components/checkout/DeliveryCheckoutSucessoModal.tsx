@@ -94,6 +94,7 @@ export function DeliveryCheckoutSucessoModal({
               sizes="112px"
               className="object-contain"
               priority
+              unoptimized
             />
           </div>
 

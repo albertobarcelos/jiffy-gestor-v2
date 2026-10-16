@@ -38,6 +38,7 @@ import {
   GruposComplementosTabsModal,
   GruposComplementosTabsModalState,
 } from './GruposComplementosTabsModal'
+import { GrupoAlterarImpactoComplementosLote } from './GrupoAlterarImpactoComplementosLote'
 
 interface GruposComplementosListProps {
   onReload?: () => void
@@ -438,6 +439,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
     mode: 'create',
     grupo: undefined,
   })
+  const [impactoLoteOpen, setImpactoLoteOpen] = useState(false)
 
   const handleActionsReload = useCallback(async () => {
     await refetch()
@@ -619,19 +621,29 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
               Total {grupos.length} de {totalGrupos}
             </p>
           </div>
-          <button
-            onClick={() =>
-              openTabsModal({
-                tab: 'grupo',
-                mode: 'create',
-                grupo: undefined,
-              })
-            }
-            className="h-8 md:px-[30px] px-4 bg-primary text-info rounded-lg font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
-          >
-            Novo
-            <span className="text-lg">+</span>
-          </button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setImpactoLoteOpen(true)}
+              className="h-8 md:px-4 px-3 rounded-lg border border-primary/40 bg-white text-primary font-semibold text-sm hover:bg-primary/5 transition-colors"
+            >
+              Alterar impacto em lote
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                openTabsModal({
+                  tab: 'grupo',
+                  mode: 'create',
+                  grupo: undefined,
+                })
+              }
+              className="h-8 md:px-[30px] px-4 bg-primary text-info rounded-lg font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+            >
+              Novo
+              <span className="text-lg">+</span>
+            </button>
+          </div>
         </div>
       </div>
       <div className="h-[2px] border-t-2 border-primary/70 flex-shrink-0"></div>
@@ -722,6 +734,10 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
         onClose={closeTabsModal}
         onReload={handleTabsModalReload}
         onTabChange={handleTabsModalTabChange}
+      />
+      <GrupoAlterarImpactoComplementosLote
+        open={impactoLoteOpen}
+        onClose={() => setImpactoLoteOpen(false)}
       />
       {grupoComplementoCropModal}
       </CadastroListShell>
