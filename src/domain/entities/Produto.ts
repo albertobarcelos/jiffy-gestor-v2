@@ -15,6 +15,10 @@ interface ProdutoComplementoResumo {
   nome: string
   valor?: number
   tipoImpactoPreco?: 'aumenta' | 'diminui' | 'nenhum'
+  /** Efetivo no produto deste cardápio. Ausente = ativo. */
+  ativo?: boolean
+  /** Ordem efetiva neste produto/grupo do cardápio. */
+  ordem?: number
 }
 
 interface ProdutoGrupoComplementoResumo {
@@ -290,12 +294,39 @@ export class Produto {
                   ? false
                   : grupo.qtdMinima != null || grupo.qtdMaxima != null,
             complementos: Array.isArray(grupo.complementos)
-              ? grupo.complementos.map((comp: any) => ({
-                  id: comp.id?.toString() || '',
-                  nome: comp.nome?.toString() || '',
-                  valor: typeof comp.valor === 'number' ? comp.valor : (comp.valor ? parseFloat(comp.valor) : 0),
-                  tipoImpactoPreco: comp.tipoImpactoPreco || 'nenhum',
-                }))
+              ? grupo.complementos.map((comp: any) => {
+                  const ativoRaw = comp.ativo
+                  const ativo =
+                    ativoRaw === false ||
+                    ativoRaw === 'false' ||
+                    ativoRaw === 0 ||
+                    ativoRaw === '0'
+                      ? false
+                      : true
+                  const ordemRaw = comp.ordem
+                  const ordem =
+                    typeof ordemRaw === 'number' && Number.isFinite(ordemRaw)
+                      ? ordemRaw
+                      : typeof ordemRaw === 'string' && ordemRaw.trim()
+                        ? (() => {
+                            const n = parseInt(ordemRaw, 10)
+                            return Number.isFinite(n) ? n : undefined
+                          })()
+                        : undefined
+                  return {
+                    id: comp.id?.toString() || '',
+                    nome: comp.nome?.toString() || '',
+                    valor:
+                      typeof comp.valor === 'number'
+                        ? comp.valor
+                        : comp.valor
+                          ? parseFloat(comp.valor)
+                          : 0,
+                    tipoImpactoPreco: comp.tipoImpactoPreco || 'nenhum',
+                    ativo,
+                    ...(ordem != null ? { ordem } : {}),
+                  }
+                })
               : [],
           }))
         : [],

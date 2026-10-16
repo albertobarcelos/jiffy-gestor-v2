@@ -23,6 +23,22 @@ export type CatalogoPublicoGrupoComplementoDTO = {
   complementoIds: string[]
 }
 
+/** Lean efetivo do complemento neste produto (todas as páginas do catálogo). */
+export type CatalogoPublicoComplementoNoProdutoDTO = {
+  id: string
+  valor: number
+  ativo: boolean
+  ordem: number
+  tipoImpactoPreco: string
+}
+
+/** Lean do grupo neste produto: ordem efetiva + complementos com override. */
+export type CatalogoPublicoGrupoComplementoNoProdutoDTO = {
+  id: string
+  ordem: number
+  complementos: CatalogoPublicoComplementoNoProdutoDTO[]
+}
+
 export type CatalogoPublicoProdutoDTO = {
   id: string
   nome: string
@@ -38,6 +54,11 @@ export type CatalogoPublicoProdutoDTO = {
   favorito: boolean
   abreComplementos: boolean
   grupoComplementosIds: string[]
+  /**
+   * Overrides efetivos (valor/ativo/ordem/tipoImpactoPreco). Join com o dicionário
+   * da 1ª página para nome/imagem/regras do grupo.
+   */
+  gruposComplementos: CatalogoPublicoGrupoComplementoNoProdutoDTO[]
 }
 
 export type CatalogoPublicoGrupoProdutoDTO = {

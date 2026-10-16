@@ -37,13 +37,13 @@ describe('Impressora.fromJSON', () => {
     expect(impressora.toJSON().terminais?.[0]?.imprimirSenha).toBe(false)
   })
 
-  it('trata ausência de imprimirSenha como ligado', () => {
+  it('trata ausência de imprimirSenha como desligado', () => {
     const impressora = Impressora.fromJSON({
       id: 'imp-1',
       nome: 'PDV',
       terminais: [{ terminalId: 't-1', ativo: true }],
     })
 
-    expect(impressora.toJSON().terminais?.[0]?.imprimirSenha).toBe(true)
+    expect(impressora.toJSON().terminais?.[0]?.imprimirSenha).toBe(false)
   })
 })

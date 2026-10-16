@@ -5,6 +5,7 @@ import {
   metadataCardapioNaoIndexavel,
   metadataCardapioSlug,
 } from '@/src/infrastructure/seo/cardapioSlugMetadata'
+import { exigirSlugPublicoDaPagina } from '@/src/infrastructure/seo/exigirSlugPublicoDaPagina'
 
 type PageProps = {
   params: Promise<{ slug: string; codigo: string }>
@@ -23,8 +24,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function CardapioPedidoConfirmadoPage({ params }: PageProps) {
   const { slug: rawSlug, codigo: rawCodigo } = await params
-  const slug = rawSlug?.trim() ?? ''
   const codigo = rawCodigo?.trim() ?? ''
+  const slug = exigirSlugPublicoDaPagina(rawSlug, `/pedido/${encodeURIComponent(codigo)}`)
 
   return <DeliveryPublicoPedidoConfirmadoScreen slug={slug} codigo={codigo} />
 }

@@ -113,7 +113,7 @@ describe('resolverPinAoSalvarEmpresa', () => {
     })
   })
 
-  it('bloqueia save sem rua/número/cidade/estado quando precisa geocodificar', () => {
+  it('não bloqueia o save da empresa quando o endereço está incompleto', () => {
     const r = resolverPinAoSalvarEmpresa({
       enderecoAtual: { rua: '', numero: '', cidade: 'NOVA MUTUM', estado: 'MT' },
       enderecoSalvo: BARRA_DO_BUGRES,
@@ -121,7 +121,7 @@ describe('resolverPinAoSalvarEmpresa', () => {
       providerEnderecoId: null,
       pinAlinhadoAoFormulario: false,
     })
-    expect(r.acao).toBe('bloquear')
+    expect(r.acao).toBe('pular')
   })
 
   it('geocodifica se ainda não há pin', () => {

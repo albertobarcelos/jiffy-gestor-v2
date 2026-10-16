@@ -14,10 +14,18 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   images: {
-    formats: ['image/avif', 'image/webp'],
-    deviceSizes: [390, 430, 768, 1080, 1280],
-    imageSizes: [48, 64, 96, 128, 160, 256, 384],
-    minimumCacheTTL: 60 * 60 * 24,
+    /**
+     * Cota de Image Optimization na Vercel: cada URL + largura + formato +
+     * qualidade é uma transformação e uma escrita de cache.
+     * Foto nova ganha imageId novo na URL, então cache de 31 dias não segura
+     * a imagem anterior no cardápio.
+     * imageSizes ficam abaixo do menor deviceSize (exigência do Next).
+     */
+    formats: ['image/webp'],
+    qualities: [75],
+    deviceSizes: [640, 1080, 1280],
+    imageSizes: [64, 128, 256, 384],
+    minimumCacheTTL: 2678400,
     remotePatterns: [
       {
         protocol: 'http',

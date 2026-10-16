@@ -255,14 +255,20 @@ export function footerBarPrimaryMutedSx(isFirstColumn: boolean) {
     borderRadius: 0,
     ...bl,
     boxShadow: 'none',
-    borderWidth: 0,
+    border: 'none',
     backgroundColor: 'color-mix(in srgb, var(--color-primary) 15%, transparent)',
     color: 'var(--color-primary)',
     fontWeight: 600,
     '&:hover': {
       backgroundColor: 'color-mix(in srgb, var(--color-primary) 22%, transparent)',
       boxShadow: 'none',
+      border: 'none',
       ...bl,
+    },
+    '&.Mui-disabled': {
+      border: 'none',
+      backgroundColor: 'color-mix(in srgb, var(--color-primary) 15%, transparent)',
+      color: 'color-mix(in srgb, var(--color-primary) 45%, transparent)',
     },
   }
 }

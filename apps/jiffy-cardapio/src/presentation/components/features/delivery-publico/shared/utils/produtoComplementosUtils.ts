@@ -17,19 +17,32 @@ export function chaveComplemento(grupoId: string, complementoId: string): string
   return `${grupoId}-${complementoId}`
 }
 
-/** Produto com ao menos um grupo de complemento ativo (abre tela de detalhes). */
-export function produtoTemComplementosAtivos(
-  produto: Pick<CatalogoPublicoProdutoDTO, 'abreComplementos' | 'grupoComplementosIds'>
-): boolean {
-  return produto.abreComplementos && produto.grupoComplementosIds.length > 0
+function leanGruposDoProduto(
+  produto: Pick<CatalogoPublicoProdutoDTO, 'gruposComplementos'> | { gruposComplementos?: CatalogoPublicoProdutoDTO['gruposComplementos'] }
+) {
+  return Array.isArray(produto.gruposComplementos) ? produto.gruposComplementos : []
 }
 
-export function resolveGruposComplementos(
-  cache: ComplementosCatalogoCache | null,
+/**
+ * Produto com ao menos um complemento ativo para exibir no delivery público.
+ * Ignora `abreComplementos` (flag só de gestor/PDV); usa vínculo no menu + lean ativo.
+ */
+export function produtoTemComplementosAtivos(
+  produto: Pick<CatalogoPublicoProdutoDTO, 'grupoComplementosIds'> & {
+    gruposComplementos?: CatalogoPublicoProdutoDTO['gruposComplementos']
+  }
+): boolean {
+  const lean = leanGruposDoProduto(produto)
+  if (lean.length > 0) {
+    return lean.some(grupo => grupo.complementos.some(comp => comp.ativo !== false))
+  }
+  return produto.grupoComplementosIds.length > 0
+}
+
+function resolveGruposViaTemplate(
+  cache: ComplementosCatalogoCache,
   produto: CatalogoPublicoProdutoDTO
 ): GrupoComplementoResolvido[] {
-  if (!cache || !produto.abreComplementos) return []
-
   const complementoMap = new Map(cache.complementos.map(c => [c.id, c]))
 
   return produto.grupoComplementosIds
@@ -43,6 +56,61 @@ export function resolveGruposComplementos(
     }))
     .filter(g => g.complementos.length > 0)
     .sort((a, b) => a.ordem - b.ordem)
+}
+
+/**
+ * Join dicionário (metadados) + lean do produto (valor/ativo/ordem/impacto).
+ * Sem lean (payload antigo), cai no join só por `grupoComplementosIds`.
+ * Não usa `abreComplementos` — no público vale o vínculo ativo no cardápio.
+ */
+export function resolveGruposComplementos(
+  cache: ComplementosCatalogoCache | null,
+  produto: CatalogoPublicoProdutoDTO
+): GrupoComplementoResolvido[] {
+  if (!cache) return []
+
+  const lean = leanGruposDoProduto(produto)
+  if (lean.length === 0) {
+    return resolveGruposViaTemplate(cache, produto)
+  }
+
+  const complementoMap = new Map(cache.complementos.map(c => [c.id, c]))
+  const grupoMap = new Map(cache.gruposComplementos.map(g => [g.id, g]))
+
+  return lean
+    .slice()
+    .sort((a, b) => a.ordem - b.ordem)
+    .flatMap(grupoLean => {
+      const meta = grupoMap.get(grupoLean.id)
+      if (!meta) return []
+
+      const complementos = grupoLean.complementos
+        .filter(comp => comp.ativo !== false)
+        .slice()
+        .sort((a, b) => a.ordem - b.ordem)
+        .flatMap(compLean => {
+          const template = complementoMap.get(compLean.id)
+          if (!template) return []
+          return [
+            {
+              ...template,
+              valor: compLean.valor,
+              tipoImpactoPreco: compLean.tipoImpactoPreco,
+            },
+          ]
+        })
+
+      if (complementos.length === 0) return []
+
+      return [
+        {
+          ...meta,
+          ordem: grupoLean.ordem,
+          complementoIds: complementos.map(c => c.id),
+          complementos,
+        },
+      ]
+    })
 }
 
 /**

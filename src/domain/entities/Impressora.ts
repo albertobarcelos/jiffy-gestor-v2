@@ -17,14 +17,13 @@ export type ImpressoraTerminalConfig = {
   tipoConexao?: string
 }
 
+function flagLigada(valor: unknown): boolean {
+  return valor === true || valor === 'true' || valor === 1 || valor === '1'
+}
+
 function asRecord(v: unknown): Record<string, unknown> | null {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return null
   return v as Record<string, unknown>
-}
-
-/** `false` explícito permanece desligado; campo ausente fica ligado (padrão da API). */
-function flagComPadraoLigado(value: unknown): boolean {
-  return value !== false && value !== 'false'
 }
 
 function mapTerminalConfig(raw: unknown): ImpressoraTerminalConfig {
@@ -43,7 +42,7 @@ function mapTerminalConfig(raw: unknown): ImpressoraTerminalConfig {
     ativo,
     modoImpressao,
     modoFicha: modoFichaDerivado(modoImpressao),
-    imprimirSenha: flagComPadraoLigado(imprimirSenhaRaw),
+    imprimirSenha: flagLigada(imprimirSenhaRaw),
     modelo: r.modelo != null ? String(r.modelo) : undefined,
     ip: r.ip != null ? String(r.ip) : undefined,
     porta: r.porta != null ? String(r.porta) : undefined,

@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useConfiguracaoEmpresaCompleta } from '@/src/presentation/hooks/painel-contador/useConfiguracaoEmpresaCompleta'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { consultarCodigoCidadeIbge } from '@/src/presentation/utils/consultarCodigoCidadeIbge'
 import { showToast } from '@/src/shared/utils/toast'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
@@ -472,51 +472,14 @@ export function ConfiguracaoEmpresaCompleta() {
     ultimaCidadeBuscada.current = nomeCidade
 
     try {
-      // Buscar lista de municípios do estado
-      const response = await fetchGestorApi(`/api/v1/ibge/municipios?uf=${uf}`)
-      if (response.ok) {
-        const data = await response.json()
-        const municipios = data.municipios || []
-        
-        // Normalizar nome da cidade para comparação (remover acentos, converter para minúsculas)
-        const normalizar = (str: string) => 
-          str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-        
-        const cidadeNormalizada = normalizar(nomeCidade.trim())
-        
-        // Buscar município correspondente
-        const municipio = municipios.find((m: any) => 
-          normalizar(m.nomeCidade) === cidadeNormalizada
-        )
-        
-        if (municipio && municipio.codigoCidadeIbge) {
-          console.log('✅ Código IBGE encontrado na lista:', municipio.codigoCidadeIbge, 'para', nomeCidade, uf)
-          atualizarCodigoIbge(municipio.codigoCidadeIbge)
-          return true
-        } else {
-          // Se não encontrou na lista, tentar via API de validação
-          const validacaoResponse = await fetchGestorApi(
-            `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(nomeCidade.trim())}&uf=${uf}`
-          )
-          if (validacaoResponse.ok) {
-            const validacaoData = await validacaoResponse.json()
-            if (validacaoData.codigoCidadeIbge) {
-              console.log('✅ Código IBGE encontrado via API:', validacaoData.codigoCidadeIbge, 'para', nomeCidade, uf)
-              atualizarCodigoIbge(validacaoData.codigoCidadeIbge)
-              return true
-            } else {
-              atualizarCodigoIbge(null)
-              return false
-            }
-          } else {
-            atualizarCodigoIbge(null)
-            return false
-          }
-        }
-      } else {
-        atualizarCodigoIbge(null)
-        return false
+      const codigo = await consultarCodigoCidadeIbge(nomeCidade, uf)
+      if (codigo) {
+        atualizarCodigoIbge(codigo)
+        return true
       }
+
+      atualizarCodigoIbge(null)
+      return false
     } catch (error) {
       console.error('Erro ao buscar código IBGE:', error)
       atualizarCodigoIbge(null)

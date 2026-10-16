@@ -8,6 +8,7 @@ import {
   metadataCardapioNaoIndexavel,
   metadataCardapioSlug,
 } from '@/src/infrastructure/seo/cardapioSlugMetadata'
+import { exigirSlugPublicoDaPagina } from '@/src/infrastructure/seo/exigirSlugPublicoDaPagina'
 
 export { generateStaticParams } from '../catalogoSlugCache'
 
@@ -43,7 +44,7 @@ function HomeFallback() {
 
 export default async function CardapioCarrinhoPage({ params }: PageProps) {
   const { slug: rawSlug } = await params
-  const slug = rawSlug?.trim() ?? ''
+  const slug = exigirSlugPublicoDaPagina(rawSlug, '/carrinho')
   const state = await dehydrateCatalogoPrimeiraPagina(slug)
 
   return (
