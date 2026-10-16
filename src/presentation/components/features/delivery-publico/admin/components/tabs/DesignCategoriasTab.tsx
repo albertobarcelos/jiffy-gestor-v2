@@ -23,6 +23,10 @@ import { DELIVERY_GRUPO_BANNER_CROP_PRESET } from '@/src/presentation/constants/
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { mensagemLegivelDeliveryMediaError } from '@/src/infrastructure/api/deliveryMediaApi'
+import { removerImagemUseCase } from '@/src/presentation/hooks/media/criarImagemMediaUseCases'
+import { previewImagemEhLocal } from '@/src/presentation/utils/previewImagemLocal'
 import type { DeliveryPublicoDesignConfig } from '../../../shared/types/deliveryPublicoDesignConfig'
 import type { DesignCategoriaGrupo } from '../../../shared/types/designCategoriaGrupo'
 import { resolveDesignPaletteColors } from '../../../shared/constants/colorPalettes'
@@ -53,6 +57,7 @@ export function DesignCategoriasTab({
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
   const [localGrupos, setLocalGrupos] = useState(grupos)
   const [imagemPreviewUrl, setImagemPreviewUrl] = useState<string | null>(null)
+  const { auth } = useAuthStore()
 
   const {
     reordenarGrupo,
@@ -151,12 +156,17 @@ export function DesignCategoriasTab({
       })
 
       try {
-        const imagemUrl = await uploadImagemGrupo(selectedCategoryId, file)
-        const nextGrupos = patchGrupoImagemUrl(localGrupos, selectedCategoryId, imagemUrl)
+        const salva = await uploadImagemGrupo(selectedCategoryId, file)
+        const nextGrupos = patchGrupoImagemUrl(
+          localGrupos,
+          selectedCategoryId,
+          salva.imagemUrl,
+          salva.imageId
+        )
         updateGrupos(nextGrupos)
         setImagemPreviewUrl(prev => {
           if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
-          return imagemUrl ?? preview
+          return salva.imagemUrl ?? preview
         })
       } catch {
         setImagemPreviewUrl(prev => {
@@ -181,6 +191,46 @@ export function DesignCategoriasTab({
       return selectedImagemUrl ?? null
     })
   }, [selectedImagemUrl])
+
+  const handleRemoverImagem = useCallback(async () => {
+    const previewLocal = previewImagemEhLocal(imagemPreviewUrl, selectedImagemUrl)
+    if (previewLocal) {
+      handleClearImagemPreview()
+      return
+    }
+    const idImagem = selectedCategory?.imageId?.trim()
+    if (!idImagem || !selectedCategoryId) {
+      showToast.error('Não foi possível identificar a imagem para remover.')
+      return
+    }
+    const token = auth?.getAccessToken()
+    if (!token) {
+      showToast.error('Token não encontrado')
+      return
+    }
+    const toastId = showToast.loading('Removendo imagem...')
+    try {
+      await removerImagemUseCase().execute({ imageId: idImagem, token })
+      updateGrupos(patchGrupoImagemUrl(localGrupos, selectedCategoryId, null, null))
+      setImagemPreviewUrl(prev => {
+        if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+        return null
+      })
+      showToast.successLoading(toastId, 'Imagem removida.')
+    } catch (error) {
+      showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+    }
+  }, [
+    auth,
+    handleClearImagemPreview,
+    imagemPreviewUrl,
+    localGrupos,
+    patchGrupoImagemUrl,
+    selectedCategory?.imageId,
+    selectedCategoryId,
+    selectedImagemUrl,
+    updateGrupos,
+  ])
 
   if (isLoading) {
     return (
@@ -423,9 +473,12 @@ export function DesignCategoriasTab({
                     emptyHint="Arraste uma imagem ou clique para selecionar"
                     onFileSelected={handleImagemUpload}
                     onClearPreview={
-                      imagemPreviewUrl?.startsWith('blob:') &&
-                      imagemPreviewUrl !== selectedImagemUrl
-                        ? handleClearImagemPreview
+                      (imagemPreviewUrl?.startsWith('blob:') &&
+                        imagemPreviewUrl !== selectedImagemUrl) ||
+                      selectedCategory?.imageId
+                        ? () => {
+                            void handleRemoverImagem()
+                          }
                         : undefined
                     }
                   />

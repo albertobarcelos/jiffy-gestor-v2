@@ -6,6 +6,7 @@ import type { ProdutoMenuResumo } from '@/src/shared/types/menus'
 import {
   parseQuantidadeLimiteGrupo,
 } from '@/src/domain/policies/pedido/GrupoComplementoLimitesPolicy'
+import { parseImageIdProdutoIndex } from '@/src/shared/utils/catalogoProdutoIndex'
 
 /**
  * Entidade de domínio representando um Produto
@@ -162,7 +163,8 @@ export class Produto {
     private readonly indicadorProducaoEscala?: string | null,
     private readonly unidadeMedida: UnidadeMedidaProduto = 'UN',
     private readonly menus?: ProdutoMenuResumo[],
-    private readonly imagemUrl?: string | null
+    private readonly imagemUrl?: string | null,
+    private readonly imageId?: string | null
   ) {}
 
   static create(
@@ -193,7 +195,8 @@ export class Produto {
     indicadorProducaoEscala?: string | null,
     unidadeMedida?: UnidadeMedidaProduto,
     menus?: ProdutoMenuResumo[],
-    imagemUrl?: string | null
+    imagemUrl?: string | null,
+    imageId?: string | null
   ): Produto {
     if (!id || !nome) {
       throw new Error('ID e nome são obrigatórios')
@@ -227,7 +230,8 @@ export class Produto {
       indicadorProducaoEscala,
       normalizarUnidadeMedidaProduto(unidadeMedida),
       menus,
-      imagemUrl ?? null
+      imagemUrl ?? null,
+      imageId ?? null
     )
   }
 
@@ -346,7 +350,10 @@ export class Produto {
         if (typeof raw !== 'string') return null
         const trimmed = raw.trim()
         return trimmed || null
-      })()
+      })(),
+      parseImageIdProdutoIndex(
+        data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
+      )
     )
   }
 
@@ -468,6 +475,11 @@ export class Produto {
     return url ? url : null
   }
 
+  getImageId(): string | null {
+    const id = this.imageId?.trim()
+    return id || null
+  }
+
   /** Retorna cópia com campos fiscais atualizados (edição inline / lote). */
   withDadosFiscais(partial: {
     ncm?: string
@@ -551,6 +563,7 @@ export class Produto {
       unidadeMedida: this.unidadeMedida,
       menus: this.menus ?? [],
       imagemUrl: this.imagemUrl ?? null,
+      imageId: this.getImageId(),
     }
   }
 }

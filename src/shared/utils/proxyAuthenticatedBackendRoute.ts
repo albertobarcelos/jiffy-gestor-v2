@@ -23,6 +23,29 @@ export function handleAuthenticatedBackendError(
   return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
 }
 
+export async function proxyAuthenticatedBackendDelete(
+  upstreamPath: string,
+  token: string
+): Promise<NextResponse> {
+  try {
+    const apiClient = new ApiClient()
+    const response = await apiClient.request<unknown>(upstreamPath, {
+      method: 'DELETE',
+      headers: authJsonHeaders(token),
+    })
+
+    if ((response.status || 204) === 204) {
+      return new NextResponse(null, { status: 204 })
+    }
+
+    return NextResponse.json(response.data ?? {}, {
+      status: response.status || 200,
+    })
+  } catch (error) {
+    return handleAuthenticatedBackendError(error, `Erro no proxy DELETE ${upstreamPath}:`)
+  }
+}
+
 export async function proxyAuthenticatedBackendPost(
   upstreamPath: string,
   token: string,

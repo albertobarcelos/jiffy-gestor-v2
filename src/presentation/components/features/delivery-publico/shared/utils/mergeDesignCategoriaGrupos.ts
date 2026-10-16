@@ -10,10 +10,14 @@ export function mergeDesignCategoriaGrupos(
     const preserved = previousById.get(grupo.id)
     const incomingUrl = grupo.imagemUrl?.trim() || null
     const preservedUrl = preserved?.imagemUrl?.trim() || null
+    const incomingId = grupo.imageId?.trim() || null
+    const preservedId = preserved?.imageId?.trim() || null
+    const imagemUrl = incomingUrl ?? preservedUrl
 
     return {
       ...grupo,
-      imagemUrl: incomingUrl ?? preservedUrl,
+      imagemUrl,
+      imageId: imagemUrl ? (incomingId ?? preservedId) : null,
     }
   })
 }
