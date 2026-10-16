@@ -49,7 +49,11 @@ function configDeTerminal(
     ativo: raw.ativo !== false && raw.ativo !== 'false',
     modoImpressao: modo,
     modoFicha: modoFichaDerivado(modo),
-    imprimirSenha: raw.imprimirSenha !== false && raw.imprimirSenha !== 'false',
+    imprimirSenha:
+      raw.imprimirSenha === true ||
+      raw.imprimirSenha === 'true' ||
+      raw.imprimir_senha === true ||
+      raw.imprimir_senha === 'true',
     tipoConexao: String(raw.tipoConexao ?? 'ethernet') || 'ethernet',
     ip: String(raw.ip ?? '192.168.1.100') || '192.168.1.100',
     porta: String(raw.porta ?? '9100') || '9100',

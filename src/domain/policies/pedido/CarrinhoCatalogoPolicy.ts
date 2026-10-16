@@ -46,18 +46,16 @@ export function cacheProdutoCatalogoAtendePedido(
 }
 
 /**
- * Lançar com `requireComplementos`: o slim da grade basta para completar grupos
- * (cache de sessão ou GET por id). Evita GET cadastro + GET snapshot.
+ * @deprecated Não usar no lançamento.
+ * Hidratar só com GET do grupo ignora valor/ativo/ordem efetivos do cardápio
+ * (`ComplementoMenuConfig`). O pedido deve ir por `buscarProdutoPorId` (snapshot do menu).
+ * Mantido retornando sempre `false` para não reativar o atalho por engano.
  */
 export function catalogoPermiteHidratacaoSomenteGrupos(
-  produto: Produto | undefined,
-  options?: CarregarProdutoCatalogoOptions
-): produto is Produto {
-  if (options?.forceRefresh) return false
-  if (!options?.requireComplementos) return false
-  if (!produto) return false
-  if (produtoTemComplementosCarregados(produto)) return false
-  return produtoTemIdsGruposComplementoParaHidratacao(produto)
+  _produto: Produto | undefined,
+  _options?: CarregarProdutoCatalogoOptions
+): _produto is Produto {
+  return false
 }
 
 /**

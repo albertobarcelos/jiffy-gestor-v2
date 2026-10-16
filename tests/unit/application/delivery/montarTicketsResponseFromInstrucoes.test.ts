@@ -88,6 +88,19 @@ describe('montarTicketsResponseFromInstrucoes', () => {
     expect(result.modoImpressaoDelivery).toBe('unificado')
     expect(result.cliente?.nome).toBe('Maria')
     expect(result.cliente?.telefone).toBe('65999998888')
+    expect(result.dataPedido).toBe('2026-06-15T10:00:00.000Z')
+    expect(result.dataInicioPreparo).toBeNull()
+  })
+
+  it('carrega dataInicioPreparo do pedido para o cupom de produção', () => {
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: { mapeamentos: [], warnings: [] },
+      pedido: { ...pedidoBase, dataInicioPreparo: '2026-06-15T10:22:00.000Z' },
+      prefs: DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      empresa: { id: 'emp-1', nomeExibicao: 'Loja Teste' },
+    })
+    expect(result.dataPedido).toBe('2026-06-15T10:00:00.000Z')
+    expect(result.dataInicioPreparo).toBe('2026-06-15T10:22:00.000Z')
   })
 
   it('modo separado gera tickets de produção e expedição com todos os itens', () => {
@@ -233,7 +246,40 @@ describe('montarTicketsResponseFromInstrucoes', () => {
     })
 
     expect(result.pagamento?.trocoParaLevar).toBe(10.1)
-    expect(result.pagamento?.valorCobrarNaEntrega).toBe(50)
+    expect(result.pagamento?.valorCobrarNaEntrega).toBe(39.9)
+    expect(result.pagamento?.meios).toEqual([
+      { nome: 'Dinheiro', valor: 39.9, naEntrega: true },
+    ])
+  })
+
+  it('COBRAR usa o valor do pedido, não a cédula, quando há troco', () => {
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: { mapeamentos: [], warnings: [] },
+      pedido: {
+        ...pedidoBase,
+        valorFinal: 45,
+        totalPago: 0,
+        totalFaltaPagar: 45,
+        troco: 0,
+        cobrancas: [
+          {
+            id: 'cob-1',
+            meioPagamentoId: 'mp-dinheiro',
+            valor: 145,
+            momentoCobranca: 'na_entrega',
+            status: 'pendente',
+          },
+        ],
+      },
+      prefs: DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      nomesMeiosPagamentoPorId: { 'mp-dinheiro': 'Dinheiro' },
+    })
+
+    expect(result.pagamento?.trocoParaLevar).toBe(100)
+    expect(result.pagamento?.valorCobrarNaEntrega).toBe(45)
+    expect(result.pagamento?.meios).toEqual([
+      { nome: 'Dinheiro', valor: 45, naEntrega: true },
+    ])
   })
 
   it('nao leva troco no cupom quando a cobranca na entrega e PIX', () => {

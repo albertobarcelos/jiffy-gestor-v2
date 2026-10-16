@@ -1,3 +1,6 @@
+/** Fallback da versão impressa no cupom quando o agente local não responde. */
+export const JIFFY_PRINT_VERSION_FALLBACK = '1.1.5'
+
 /** Instalador estável no R2 (nome fixo; substituir o ficheiro a cada versão). */
 export const DEFAULT_JIFFY_PRINT_SETUP_URL =
   'https://pub-f30dc155e8504591ac42219788281ee9.r2.dev/JiffyPrint-setup.exe'
