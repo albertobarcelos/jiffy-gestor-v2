@@ -1,9 +1,9 @@
-import type { CreatePedidoPublicoResponseDTO } from '@/src/application/dto/delivery-publico/CreatePedidoPublicoResponseDTO'
+import type { PedidoDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/PedidoDeliveryPublicoDTO'
 import type { CotacaoPedidoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { ClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 
 export type EnviarPedidoCheckoutResult =
-  | { ok: true; pedido: CreatePedidoPublicoResponseDTO }
+  | { ok: true; pedido: PedidoDeliveryPublicoDTO }
   | {
       ok: false
       reason: 'cotacao_desatualizada'

@@ -57,7 +57,10 @@ const DeliveryProdutoModal = dynamic(
   { ssr: false }
 )
 import { DeliveryLojaInfoModal } from '../../shared/components/DeliveryLojaInfoModal'
-import { DeliveryWhatsAppFab } from '../../shared/components/DeliveryWhatsAppFab'
+import {
+  DeliveryWhatsAppFab,
+  telefoneWhatsAppCanalConectado,
+} from '../../shared/components/DeliveryWhatsAppFab'
 import { DeliveryPublicoCarrinhoScreen } from './DeliveryPublicoCarrinhoScreen'
 import { useFlyToCart } from '../../shared/hooks/useFlyToCart'
 import type { FlySourceRect } from '../../shared/components/FlyingProduct'
@@ -71,7 +74,7 @@ import {
   deliveryPublicoHomePath,
   deliveryPublicoPedidoPath,
 } from '../../shared/utils/deliveryPublicoRoutes'
-import { lerUltimoPedidoPublicoConfirmado } from '../../shared/utils/pedidoConfirmadoStorage'
+import { lerUltimoPedidoPublico } from '../../shared/utils/pedidoConfirmadoStorage'
 import { showToast } from '@/src/shared/utils/toast'
 
 type DeliveryPublicoHomeScreenProps = {
@@ -126,10 +129,7 @@ export function DeliveryPublicoHomeScreen({
   const canalWhatsApp = data?.pages[0]?.canalWhatsApp ?? null
   const lojaAberta = funcionamento?.aberta ?? true
 
-  const telefoneWhatsAppFab =
-    canalWhatsApp?.conectado && canalWhatsApp.telefone
-      ? canalWhatsApp.telefone
-      : null
+  const telefoneWhatsAppFab = telefoneWhatsAppCanalConectado(canalWhatsApp)
 
   // Preferência: localizacao do catálogo (P3). Fallback: geocode FE 1×/sessão.
   useLocalizacaoEmpresaPublica(
@@ -357,12 +357,12 @@ export function DeliveryPublicoHomeScreen({
   }, [abrirCarrinho])
 
   const handleMeuPedidoClick = useCallback(() => {
-    const ultimo = lerUltimoPedidoPublicoConfirmado(slug)
+    const ultimo = lerUltimoPedidoPublico(slug)
     if (!ultimo) {
       showToast.info('Nenhum pedido recente neste dispositivo.')
       return
     }
-    router.push(deliveryPublicoPedidoPath(slug, ultimo.codigo))
+    router.push(deliveryPublicoPedidoPath(slug, ultimo.id))
   }, [router, slug])
 
   const handleIrParaCarrinhoAposAdicionar = useCallback(() => {

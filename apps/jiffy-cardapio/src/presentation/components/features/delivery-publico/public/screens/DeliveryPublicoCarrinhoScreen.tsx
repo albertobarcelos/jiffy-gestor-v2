@@ -16,6 +16,10 @@ import { clienteAtingiuMaxEnderecosDelivery } from '@/src/shared/constants/deliv
 import { DeliveryCarrinhoItemCard } from '../../shared/components/DeliveryCarrinhoItemCard'
 import { DeliveryCarrinhoSwipeableItem } from '../../shared/components/DeliveryCarrinhoSwipeableItem'
 import { DeliveryButton } from '../../shared/components/DeliveryButton'
+import {
+  DeliveryWhatsAppFab,
+  telefoneWhatsAppCanalConectado,
+} from '../../shared/components/DeliveryWhatsAppFab'
 import { DELIVERY_MSG_CELULAR_COMPLETO } from '../../shared/constants/deliveryPublicoPlaceholders'
 import { useDeliveryBodyScrollLock } from '../../shared/hooks/useDeliveryBodyScrollLock'
 import { useDeliveryCheckout } from '../../shared/hooks/useDeliveryCheckout'
@@ -25,8 +29,8 @@ import {
   type DeliveryCarrinhoItem,
 } from '../../shared/stores/deliveryCarrinhoStore'
 import {
-  mapPedidoPublicoCriadoParaConfirmado,
-  type PedidoPublicoConfirmadoSnapshot,
+  mapPedidoDeliveryPublicoParaConfirmado,
+  type PedidoPublicoConfirmadoView,
 } from '@/src/application/mappers/PedidoPublicoConfirmadoMapper'
 import type { CotacaoPedidoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { DELIVERY_PAIS_TELEFONE_PADRAO } from '@/src/shared/constants/deliveryPaisesTelefone'
@@ -42,7 +46,7 @@ import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPu
 import { formatDeliveryCurrency } from '../../shared/utils/formatDeliveryCurrency'
 import { isTokenCotacaoExpirado, MARGEM_RENOVACAO_TOKEN_COTACAO_MS } from '../../shared/utils/deliveryCheckoutCotacaoUtils'
 import { deliveryPublicoPedidoPath } from '../../shared/utils/deliveryPublicoRoutes'
-import { salvarPedidoPublicoConfirmado } from '../../shared/utils/pedidoConfirmadoStorage'
+import { salvarUltimoPedidoPublico } from '../../shared/utils/pedidoConfirmadoStorage'
 import { useLocalizacaoEmpresaPublica } from '../../shared/hooks/useLocalizacaoEmpresaPublica'
 import { DeliveryProdutoModal } from '../components/DeliveryProdutoModal'
 import { DeliveryComplementosObrigatoriosAlertDialog } from '../components/DeliveryComplementosObrigatoriosAlertDialog'
@@ -182,7 +186,7 @@ export function DeliveryPublicoCarrinhoScreen({
   const [aberto, setAberto] = useState(true)
   const [removingIds, setRemovingIds] = useState<Set<string>>(() => new Set())
   const [pedidoConfirmado, setPedidoConfirmado] =
-    useState<PedidoPublicoConfirmadoSnapshot | null>(null)
+    useState<PedidoPublicoConfirmadoView | null>(null)
   const [cotacaoDesatualizada, setCotacaoDesatualizada] = useState<{
     message: string
     cotacao: CotacaoPedidoPublicoDTO
@@ -212,6 +216,9 @@ export function DeliveryPublicoCarrinhoScreen({
 
   const catalogQuery = usePublicDeliveryCatalogInfinite(slug)
   const empresa = catalogQuery.data?.pages[0]?.empresa ?? null
+  const telefoneWhatsApp = telefoneWhatsAppCanalConectado(
+    catalogQuery.data?.pages[0]?.canalWhatsApp
+  )
   const exigeCpfVenda = empresa?.exigeCpfVenda === true
 
   const {
@@ -480,25 +487,6 @@ export function DeliveryPublicoCarrinhoScreen({
       return
     }
 
-    const fallback = {
-      tipoEntrega: form.tipoEntrega,
-      modoTempo: form.modoTempo,
-      nome: nomeClienteExibicao,
-      telefone: telefoneClienteExibicao,
-      telefonePaisIso2: form.telefonePaisIso2 || DELIVERY_PAIS_TELEFONE_PADRAO,
-      enderecoCliente: enderecoParaRevisao,
-      enderecoEmpresaTexto,
-      itensCarrinho: itens.map(item => ({
-        ...item,
-        complementos: [...item.complementos],
-      })),
-      total: totalCheckout,
-      pagamentos: pagamentosRevisao.map(p => ({ ...p })),
-      observacaoPedido: form.observacaoPedido,
-      cpfNotaFiscal: form.cpfNotaFiscal,
-      meiosPagamento,
-    }
-
     const resultado = await enviarPedido()
     if (!resultado.ok) {
       if ('reason' in resultado && resultado.reason === 'cotacao_desatualizada') {
@@ -510,29 +498,21 @@ export function DeliveryPublicoCarrinhoScreen({
       return
     }
 
-    const snapshot = mapPedidoPublicoCriadoParaConfirmado(resultado.pedido, fallback)
-    const codigoRota =
-      snapshot.codigoVenda?.trim() || snapshot.pedidoId?.trim() || ''
-
+    const pedido = mapPedidoDeliveryPublicoParaConfirmado(resultado.pedido)
     limparCarrinhoAposPedido()
 
-    if (codigoRota) {
-      salvarPedidoPublicoConfirmado(slug, codigoRota, {
-        snapshot,
-        meta: {
-          telefoneEmpresa: empresa?.telefone ?? null,
-          nomeEmpresa: empresa?.nomeFantasia ?? null,
-          localizacaoEmpresa,
-        },
+    if (pedido.id) {
+      salvarUltimoPedidoPublico(slug, {
+        id: pedido.id,
+        codigoVenda: pedido.codigoVenda,
       })
       // Não fecha o checkout aqui: o clique de "enviar" ainda está no ar e
       // fecharia a tela de sucesso na rota nova. replace evita voltar ao checkout vazio.
-      router.replace(deliveryPublicoPedidoPath(slug, codigoRota))
+      router.replace(deliveryPublicoPedidoPath(slug, pedido.id))
       return
     }
 
-    // Fallback raro: API sem id/código — mantém modal no checkout.
-    setPedidoConfirmado(snapshot)
+    setPedidoConfirmado(pedido)
     marcarSucesso()
   }
 
@@ -1010,13 +990,14 @@ export function DeliveryPublicoCarrinhoScreen({
           <DeliveryCheckoutSucessoModal
             nomeCliente={pedidoConfirmado.nome}
             tipoEntrega={pedidoConfirmado.tipoEntrega}
-            modoTempo={pedidoConfirmado.modoTempo}
+            modoTempo="imediato"
             enderecoCliente={pedidoConfirmado.enderecoCliente}
             enderecoEmpresaTexto={pedidoConfirmado.enderecoEmpresaTexto}
-            localizacaoEmpresa={localizacaoEmpresa}
-            telefoneEmpresa={empresa?.telefone ?? null}
-            nomeEmpresa={empresa?.nomeFantasia ?? null}
+            localizacaoEmpresa={pedidoConfirmado.localizacaoEmpresa}
             codigoVenda={pedidoConfirmado.codigoVenda}
+            statusDelivery={pedidoConfirmado.statusDelivery}
+            transicoesStatus={pedidoConfirmado.transicoesStatus}
+            canalWhatsAppAtivo={catalogQuery.data?.pages[0]?.canalWhatsApp?.conectado === true}
             onVerPedido={() => goToCheckoutStep('pedidoDetalhe')}
             onVoltarAoCardapio={concluirAposSucesso}
           />
@@ -1028,12 +1009,16 @@ export function DeliveryPublicoCarrinhoScreen({
             tipoEntrega={pedidoConfirmado.tipoEntrega}
             nome={pedidoConfirmado.nome}
             telefone={pedidoConfirmado.telefone}
-            telefonePaisIso2={pedidoConfirmado.telefonePaisIso2}
+            telefonePaisIso2={DELIVERY_PAIS_TELEFONE_PADRAO}
             enderecoCliente={pedidoConfirmado.enderecoCliente}
             enderecoEmpresaTexto={pedidoConfirmado.enderecoEmpresaTexto}
-            localizacaoEmpresa={localizacaoEmpresa}
+            localizacaoEmpresa={pedidoConfirmado.localizacaoEmpresa}
             itens={pedidoConfirmado.itens}
             total={pedidoConfirmado.total}
+            subtotalOficial={pedidoConfirmado.subtotal}
+            taxaEntregaOficial={pedidoConfirmado.taxaEntrega}
+            totalOficial={pedidoConfirmado.total}
+            trocoOficial={pedidoConfirmado.troco}
             pagamentos={pedidoConfirmado.pagamentos}
             observacaoPedido={pedidoConfirmado.observacaoPedido}
             cpfNotaFiscal={pedidoConfirmado.cpfNotaFiscal}
@@ -1042,6 +1027,13 @@ export function DeliveryPublicoCarrinhoScreen({
           />
         ) : null}
       </DeliveryCheckoutShell>
+
+      <DeliveryWhatsAppFab
+        telefone={telefoneWhatsApp}
+        nomeLoja={pedidoConfirmado?.nomeEmpresa ?? empresa?.nomeFantasia}
+        visible={checkoutStep === 'sucesso'}
+        bottomOffset="8rem"
+      />
 
       {cotacaoDesatualizada ? (
         <DeliveryCotacaoDesatualizadaDialog
