@@ -156,7 +156,13 @@ export function FlyingProduct({
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={imageUrl} alt="" className="h-full w-full object-cover" draggable={false} />
+        <img
+          src={imageUrl}
+          alt=""
+          decoding="async"
+          className="h-full w-full object-cover"
+          draggable={false}
+        />
       </motion.div>
     </div>,
     document.body

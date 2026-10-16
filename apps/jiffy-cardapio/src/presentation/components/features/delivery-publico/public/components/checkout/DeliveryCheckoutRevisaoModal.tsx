@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Camera, MapPin, Pencil, UserRound } from 'lucide-react'
 import { MdDeliveryDining } from 'react-icons/md'
 import { TbPaperBag } from 'react-icons/tb'
@@ -61,6 +61,12 @@ type DeliveryCheckoutRevisaoModalProps = {
   cpfNotaFiscal: string
   /** Loja exige CPF para finalizar — campo obrigatório, sem opção de pular. */
   exigeCpfVenda?: boolean
+  /**
+   * CPF do cadastro do cliente (só dígitos ou mascarado).
+   * Usado para pré-preencher quando a loja exige CPF, ou quando o cliente
+   * opta por nota fiscal com a flag desligada.
+   */
+  cpfClienteCadastrado?: string | null
   enviando?: boolean
   etapaEnvio?: 'validando' | 'salvando_endereco' | 'enviando_pedido' | null
   onClose?: () => void
@@ -169,6 +175,7 @@ export function DeliveryCheckoutRevisaoModal({
   observacaoPedido,
   cpfNotaFiscal,
   exigeCpfVenda = false,
+  cpfClienteCadastrado = null,
   enviando = false,
   etapaEnvio = null,
   onClose: _onClose,
@@ -187,13 +194,38 @@ export function DeliveryCheckoutRevisaoModal({
   const [adicionarObservacao, setAdicionarObservacao] = useState(
     () => observacaoPedido.trim().length > 0
   )
-  const [desejaNotaFiscal, setDesejaNotaFiscal] = useState(
-    () => exigeCpfVenda || cpfNotaFiscal.replace(/\D/g, '').length > 0
-  )
+  const [desejaNotaFiscal, setDesejaNotaFiscal] = useState(() => exigeCpfVenda)
+
+  const cpfCadastroRef = useRef('')
+  if (!cpfCadastroRef.current) {
+    const fromProp = (cpfClienteCadastrado ?? '').replace(/\D/g, '').slice(0, 11)
+    const fromForm = cpfNotaFiscal.replace(/\D/g, '').slice(0, 11)
+    const digits = fromProp.length === 11 ? fromProp : fromForm.length === 11 ? fromForm : ''
+    if (digits) cpfCadastroRef.current = formatarCpfCnpjInput(digits)
+  }
+  const cpfCadastroMascarado = cpfCadastroRef.current
 
   useEffect(() => {
-    if (exigeCpfVenda) setDesejaNotaFiscal(true)
-  }, [exigeCpfVenda])
+    if (somenteLeitura) return
+    if (exigeCpfVenda) {
+      setDesejaNotaFiscal(true)
+      if (
+        onChangeCpfNotaFiscal &&
+        cpfNotaFiscal.replace(/\D/g, '').length !== 11 &&
+        cpfCadastroMascarado
+      ) {
+        onChangeCpfNotaFiscal(cpfCadastroMascarado)
+      }
+      return
+    }
+    // Flag desligada: nota fiscal só se o cliente optar; limpa CPF herdado do cadastro.
+    setDesejaNotaFiscal(false)
+    if (onChangeCpfNotaFiscal && cpfNotaFiscal.replace(/\D/g, '').length > 0) {
+      onChangeCpfNotaFiscal('')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só reage à flag / modo
+  }, [exigeCpfVenda, somenteLeitura])
+
   const telefoneTrim = telefone.trim()
   const telefoneExibicao = telefoneTrim
     ? formatarTelefoneExibicao(telefone, telefonePaisIso2)
@@ -221,7 +253,8 @@ export function DeliveryCheckoutRevisaoModal({
   const IconePagamento = obterIconeMeioPagamento(primeiroMeioNome)
   const observacaoTrim = observacaoPedido.trim()
   const cpfTrim = cpfNotaFiscal.replace(/\D/g, '')
-  const cpfObrigatorioIncompleto = exigeCpfVenda && cpfTrim.length !== 11
+  const cpfObrigatorio = exigeCpfVenda || desejaNotaFiscal
+  const cpfObrigatorioIncompleto = cpfObrigatorio && cpfTrim.length !== 11
   const pagamentosGate = validarPagamentosPedidoPublico(
     pagamentos.map(p => ({ meioPagamentoId: p.meioPagamentoId, valor: p.valor })),
     totalExibicao
@@ -241,6 +274,10 @@ export function DeliveryCheckoutRevisaoModal({
     setDesejaNotaFiscal(checked)
     if (!checked) {
       onChangeCpfNotaFiscal('')
+      return
+    }
+    if (cpfCadastroMascarado) {
+      onChangeCpfNotaFiscal(cpfCadastroMascarado)
     }
   }
 
@@ -642,7 +679,7 @@ export function DeliveryCheckoutRevisaoModal({
                       className="block text-sm font-medium delivery-text-primary"
                       htmlFor="cpf-nota-fiscal"
                     >
-                      CPF
+                      CPF <span className="text-red-500">*</span>
                     </label>
                     <input
                       id="cpf-nota-fiscal"
@@ -655,6 +692,7 @@ export function DeliveryCheckoutRevisaoModal({
                       onChange={e => handleCpfChange(e.target.value)}
                       maxLength={14}
                       aria-label="CPF para nota fiscal"
+                      aria-required
                     />
                     <p className="text-right text-[11px] delivery-text-secondary">
                       {cpfNotaFiscal.replace(/\D/g, '').length}/11

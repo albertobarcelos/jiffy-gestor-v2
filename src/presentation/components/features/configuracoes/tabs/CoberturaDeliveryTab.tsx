@@ -5,6 +5,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   MdDeleteOutline,
+  MdKeyboardArrowDown,
+  MdKeyboardArrowUp,
+  MdLocalOffer,
   MdMap,
   MdMyLocation,
   MdWarning,
@@ -103,7 +106,10 @@ import {
   parseTaxaDraftCobertura,
   type CoberturaPainelAba,
 } from '@/src/presentation/components/features/configuracoes/coberturaPainelAbas'
+import { CoberturaBotaoSalvarTaxasLote } from '@/src/presentation/components/features/configuracoes/CoberturaBotaoSalvarTaxasLote'
+import { CoberturaTaxasManuaisPainel } from '@/src/presentation/components/features/configuracoes/CoberturaTaxasManuaisPainel'
 import { useReportarCoberturaSuja } from '@/src/presentation/components/features/configuracoes/coberturaSairGuard'
+import { useTaxasInfinite } from '@/src/presentation/hooks/useTaxas'
 
 const NENHUM_RAIO: RaioEntregaDTO[] = []
 const NENHUMA_AREA: AreaEntregaDTO[] = []
@@ -200,33 +206,6 @@ function CampoPrazoInline({
   )
 }
 
-function BotaoSalvarTaxasLote({
-  pendente,
-  disabled,
-  salvando,
-  onClick,
-}: {
-  pendente: boolean
-  disabled: boolean
-  salvando: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`w-full rounded-lg px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed ${
-        pendente
-          ? 'bg-primary text-white hover:bg-primary/90 disabled:opacity-50'
-          : 'bg-gray-200 text-gray-600'
-      }`}
-    >
-      {salvando ? 'Salvando…' : pendente ? 'Salvar' : 'Tudo certo'}
-    </button>
-  )
-}
-
 function NomeAreaInline({
   area,
   salvando,
@@ -299,6 +278,11 @@ export function CoberturaDeliveryTab() {
   const areasQuery = useAreasEntregaDelivery({
     enabled: empresaDeliveryQuery.isSuccess && empresaDeliveryQuery.data != null,
   })
+  const taxasCatalogoQuery = useTaxasInfinite({
+    limit: 50,
+    staleTime: 15_000,
+    enabled: empresaDeliveryQuery.isSuccess && empresaDeliveryQuery.data != null,
+  })
   const criarRaiosLoteMutation = useCriarRaiosEntregaEmLote()
   const atualizarRaioMutation = useAtualizarRaioEntregaDelivery()
   const atualizarRaiosLoteMutation = useAtualizarRaiosEntregaEmLote()
@@ -343,6 +327,7 @@ export function CoberturaDeliveryTab() {
   const [rascunhoPaths, setRascunhoPaths] = useState<LatLngLiteral[] | null>(null)
   const [mapaVisivel, setMapaVisivel] = useState(true)
   const [painelAba, setPainelAba] = useState<CoberturaPainelAba>('raios')
+  const [painelRecolhido, setPainelRecolhido] = useState(false)
   const [areaFormaEditandoId, setAreaFormaEditandoId] = useState<string | null>(null)
   const [formaPathsRascunho, setFormaPathsRascunho] = useState<LatLngLiteral[] | null>(null)
   const [formaAlterada, setFormaAlterada] = useState(false)
@@ -411,7 +396,11 @@ export function CoberturaDeliveryTab() {
     {
       onSuccess: async () => {
         await invalidateQueries(['empresa', 'endereco-geo'])
+        await invalidateQueries(['empresas', 'me'])
         await invalidateQueries(EMPRESA_DELIVERY_ME_QUERY_KEY)
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('jiffy:empresa-me-updated'))
+        }
         dispararEmpresaDeliveryAtualizada()
       },
     }
@@ -420,6 +409,12 @@ export function CoberturaDeliveryTab() {
   const empresaDelivery = empresaDeliveryQuery.data
   const raios = raiosQuery.data ?? []
   const areas = areasQuery.data ?? []
+  const qtdTaxasManuais = useMemo(() => {
+    const pages = taxasCatalogoQuery.data?.pages ?? []
+    return pages
+      .flatMap(page => page.taxas)
+      .filter(taxa => taxa.getTipo().toLowerCase() === 'entrega').length
+  }, [taxasCatalogoQuery.data])
   const raiosComDraft = useMemo(
     () => raios.map(raio => ({ ...raio, ativo: ativosDraft[raio.id] ?? raio.ativo })),
     [ativosDraft, raios]
@@ -842,6 +837,7 @@ export function CoberturaDeliveryTab() {
 
   const handlePinMovido = useCallback(
     (point: GeoJsonPoint) => {
+      setPainelRecolhido(false)
       const centro = centroEnderecoGeo ?? origemGeo
       if (!centro) {
         setPinRascunho(point)
@@ -1321,9 +1317,29 @@ export function CoberturaDeliveryTab() {
         </div>
 
         <div className="pointer-events-none absolute inset-0 z-20 flex items-start p-3 md:p-4">
-          <div className="pointer-events-auto relative mr-14 flex max-h-full w-full max-w-[380px] flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+          <div
+            className={`pointer-events-auto relative mr-14 flex w-full max-w-[380px] flex-col overflow-hidden rounded-2xl bg-white shadow-xl ${
+              painelRecolhido ? '' : 'max-h-full'
+            }`}
+          >
             <div className="shrink-0 px-4 pt-3">
-              <h2 className="text-base font-semibold text-primary-text">Áreas de Entrega</h2>
+              <div className="flex items-start justify-between gap-2">
+                <h2 className="text-base font-semibold text-primary-text">Áreas de Entrega</h2>
+                <button
+                  type="button"
+                  aria-expanded={!painelRecolhido}
+                  aria-controls="cobertura-painel-conteudo"
+                  aria-label={painelRecolhido ? 'Expandir painel' : 'Ocultar painel'}
+                  onClick={() => setPainelRecolhido(recolhido => !recolhido)}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-gray-100 hover:text-primary-text"
+                >
+                  {painelRecolhido ? (
+                    <MdKeyboardArrowDown className="h-5 w-5" aria-hidden />
+                  ) : (
+                    <MdKeyboardArrowUp className="h-5 w-5" aria-hidden />
+                  )}
+                </button>
+              </div>
               <nav
                 className="mt-2 flex flex-wrap gap-3 border-b border-gray-100"
                 aria-label="Painel de cobertura"
@@ -1332,7 +1348,10 @@ export function CoberturaDeliveryTab() {
                   <button
                     key={aba.id}
                     type="button"
-                    onClick={() => setPainelAba(aba.id)}
+                    onClick={() => {
+                      setPainelAba(aba.id)
+                      if (painelRecolhido) setPainelRecolhido(false)
+                    }}
                     className={`-mb-px border-b-2 pb-2 text-xs font-semibold ${
                       painelAba === aba.id
                         ? 'border-primary text-primary'
@@ -1345,6 +1364,15 @@ export function CoberturaDeliveryTab() {
               </nav>
             </div>
 
+            <div
+              id="cobertura-painel-conteudo"
+              className={`flex min-h-0 flex-col overflow-hidden transition-[max-height,opacity] duration-300 ease-out ${
+                painelRecolhido
+                  ? 'max-h-0 opacity-0 pointer-events-none'
+                  : 'h-[min(52vh,400px)] opacity-100'
+              }`}
+              aria-hidden={painelRecolhido}
+            >
             {setupInicial ? (
               <div className="mx-3 mt-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5">
                 <p className="text-sm font-semibold text-primary-text">Confirme a loja e o alcance</p>
@@ -1517,24 +1545,16 @@ export function CoberturaDeliveryTab() {
             {painelAba === 'resumo' ? (
               <div className="flex min-h-0 flex-1 flex-col">
                 <div className="grid grid-cols-2 gap-2 px-3 py-3">
-                  <div
-                    className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 text-center"
-                    onMouseEnter={() => destacarNaLista({ tipo: 'areas', id: null })}
-                    onMouseLeave={() => destacarNaLista(null)}
-                  >
-                    <MdMap className="mx-auto h-5 w-5 text-primary-text" aria-hidden />
-                    <p className="mt-1 text-2xl font-bold text-primary-text">{areas.length}</p>
-                    <p className="text-[11px] font-semibold text-primary-text">Cobertura Área</p>
-                    <p className="mt-0.5 text-[10px] text-secondary-text">Atalhos à direita</p>
-                  </div>
-                  <div
-                    className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 text-center"
+                  <button
+                    type="button"
+                    onClick={() => setPainelAba('raios')}
                     onMouseEnter={() =>
                       raioAlcance
                         ? destacarNaLista({ tipo: 'raio', id: raioAlcance.id })
                         : destacarNaLista(null)
                     }
                     onMouseLeave={() => destacarNaLista(null)}
+                    className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 text-center transition-colors hover:border-primary/30 hover:bg-primary/5"
                   >
                     <MdMyLocation className="mx-auto h-5 w-5 text-primary-text" aria-hidden />
                     <p className="mt-1 text-2xl font-bold leading-none text-primary-text">
@@ -1542,13 +1562,41 @@ export function CoberturaDeliveryTab() {
                     </p>
                     <p className="mt-1 text-[11px] font-semibold text-primary-text">Cobertura Raio</p>
                     <p className="mt-0.5 text-[10px] text-secondary-text">Faixas de 1 em 1 km</p>
-                  </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPainelAba('areas')}
+                    onMouseEnter={() => destacarNaLista({ tipo: 'areas', id: null })}
+                    onMouseLeave={() => destacarNaLista(null)}
+                    className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 text-center transition-colors hover:border-primary/30 hover:bg-primary/5"
+                  >
+                    <MdMap className="mx-auto h-5 w-5 text-primary-text" aria-hidden />
+                    <p className="mt-1 text-2xl font-bold text-primary-text">{areas.length}</p>
+                    <p className="text-[11px] font-semibold text-primary-text">Cobertura Área</p>
+                    <p className="mt-0.5 text-[10px] text-secondary-text">Atalhos à direita</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPainelAba('manuais')}
+                    className="col-span-2 rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 text-center transition-colors hover:border-primary/30 hover:bg-primary/5"
+                  >
+                    <MdLocalOffer className="mx-auto h-5 w-5 text-primary-text" aria-hidden />
+                    <p className="mt-1 text-2xl font-bold text-primary-text">
+                      {taxasCatalogoQuery.isPending ? '…' : qtdTaxasManuais}
+                    </p>
+                    <p className="text-[11px] font-semibold text-primary-text">Taxas Manuais</p>
+                    <p className="mt-0.5 text-[10px] text-secondary-text">
+                      Catálogo tipo entrega
+                    </p>
+                  </button>
                 </div>
                 <p className="px-3 pb-3 text-[11px] leading-snug text-secondary-text">
-                  Use Taxas por Área para polígonos e Taxas por Raio para as faixas de km. O alcance
-                  do raio é definido na aba Taxas por Raio.
+                  Use Taxas por Área para polígonos, Taxas por Raio para as faixas de km e Taxas
+                  Manuais para valores fixos do catálogo.
                 </p>
               </div>
+            ) : painelAba === 'manuais' ? (
+              <CoberturaTaxasManuaisPainel />
             ) : painelAba === 'areas' ? (
               <div className="flex min-h-0 flex-1 flex-col">
                 <p className="px-4 pt-2 text-[11px] leading-snug text-secondary-text">
@@ -1638,7 +1686,7 @@ export function CoberturaDeliveryTab() {
                   )}
                 </div>
                 <div className="shrink-0 space-y-2 border-t border-gray-100 px-3 py-2">
-                  <BotaoSalvarTaxasLote
+                  <CoberturaBotaoSalvarTaxasLote
                     pendente={taxasPrazosAreaPendentes}
                     disabled={salvando || areas.length === 0 || !taxasPrazosAreaPendentes}
                     salvando={atualizarAreasLoteMutation.isPending}
@@ -1776,7 +1824,7 @@ export function CoberturaDeliveryTab() {
                   )}
                 </div>
                 <div className="shrink-0 space-y-2 border-t border-gray-100 px-3 py-2">
-                  <BotaoSalvarTaxasLote
+                  <CoberturaBotaoSalvarTaxasLote
                     pendente={taxasPrazosPendentes}
                     disabled={salvando || raiosOrdenados.length === 0 || !taxasPrazosPendentes}
                     salvando={atualizarRaiosLoteMutation.isPending}
@@ -1813,6 +1861,7 @@ export function CoberturaDeliveryTab() {
                 />
               </div>
             ) : null}
+            </div>
           </div>
         </div>
       </div>

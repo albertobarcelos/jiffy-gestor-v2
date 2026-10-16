@@ -157,6 +157,43 @@ export function intervaloAgendaEhValido(abreEm: string, fechaEm: string): boolea
   return abre !== fecha
 }
 
+function horarioParaMinutos(hhmm: string): number {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim())
+  if (!match) return 0
+  const horas = Math.min(23, Math.max(0, Number(match[1])))
+  const minutos = Math.min(59, Math.max(0, Number(match[2])))
+  return horas * 60 + minutos
+}
+
+/** True quando fechaEm é “antes” de abreEm no relógio (ex.: 19:00–02:00). */
+export function intervaloCruzaMeiaNoite(abreEm: string, fechaEm: string): boolean {
+  const abre = arredondarHorarioFuncionamento15Min(abreEm)
+  const fecha = arredondarHorarioFuncionamento15Min(fechaEm)
+  return horarioParaMinutos(fecha) < horarioParaMinutos(abre)
+}
+
+export const TEXTO_FECHA_DIA_SEGUINTE = 'Fecha no dia seguinte'
+
+export function proximoDiaDaSemana(dia: DiaDaSemanaApi): DiaDaSemanaApi {
+  const idx = DIAS_DA_SEMANA_API.indexOf(dia)
+  if (idx < 0) return dia
+  return DIAS_DA_SEMANA_API[(idx + 1) % DIAS_DA_SEMANA_API.length]!
+}
+
+/**
+ * Hint de virada. Com um único dia de abertura: "Fecha na terça".
+ * Com vários dias (ou sem dia): "Fecha no dia seguinte".
+ */
+export function textoHintViradaMeiaNoite(
+  diaAbertura?: DiaDaSemanaApi | null
+): string {
+  if (!diaAbertura) return TEXTO_FECHA_DIA_SEGUINTE
+  const proximo = proximoDiaDaSemana(diaAbertura)
+  const label = LABEL_DIA_DA_SEMANA[proximo].toLowerCase()
+  const artigo = proximo === 'SABADO' || proximo === 'DOMINGO' ? 'no' : 'na'
+  return `Fecha ${artigo} ${label}`
+}
+
 /** Card visual: dias que compartilham o mesmo intervalo. */
 export type GrupoHorarioAgenda = {
   id: string
@@ -210,8 +247,20 @@ export function formatarDiasGrupoCurto(dias: DiaDaSemanaApi[]): string {
     .join(', ')
 }
 
+/** Apenas o intervalo HH:mm – HH:mm (sem sufixo de virada). */
 export function formatarIntervaloGrupo(abreEm: string, fechaEm: string): string {
   return `${arredondarHorarioFuncionamento15Min(abreEm)} – ${arredondarHorarioFuncionamento15Min(fechaEm)}`
+}
+
+/** Intervalo com sufixo quando cruza meia-noite (útil em aria-label / texto único). */
+export function formatarIntervaloGrupoComVirada(
+  abreEm: string,
+  fechaEm: string,
+  diaAbertura?: DiaDaSemanaApi | null
+): string {
+  const base = formatarIntervaloGrupo(abreEm, fechaEm)
+  if (!intervaloCruzaMeiaNoite(abreEm, fechaEm)) return base
+  return `${base} · ${textoHintViradaMeiaNoite(diaAbertura)}`
 }
 
 export function agendaTemDiaAberto(agendaSemanal: FuncionamentoDoDiaDTO[] | undefined): boolean {
@@ -233,7 +282,9 @@ function diaDaSemanaHoje(): DiaDaSemanaApi {
 }
 
 function formatarIntervalo(abreEm: string, fechaEm: string): string {
-  return `das ${abreEm} às ${fechaEm}`
+  const base = `das ${abreEm} às ${fechaEm}`
+  if (!intervaloCruzaMeiaNoite(abreEm, fechaEm)) return base
+  return `${base} (dia seguinte)`
 }
 
 function buscarIntervaloHoje(

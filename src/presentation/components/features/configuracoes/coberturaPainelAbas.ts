@@ -1,6 +1,7 @@
 export const COBERTURA_PAINEL_ABAS = [
   { id: 'raios', label: 'Taxas por Raio' },
   { id: 'areas', label: 'Taxas por Área' },
+  { id: 'manuais', label: 'Taxas Manuais' },
   { id: 'resumo', label: 'Resumo' },
 ] as const
 
@@ -12,6 +13,7 @@ export function camadasMapaCobertura(aba: CoberturaPainelAba): {
 } {
   if (aba === 'raios') return { raios: true, areas: false }
   if (aba === 'areas') return { raios: false, areas: true }
+  // Manuais e resumo: mantém as duas camadas visíveis no mapa.
   return { raios: true, areas: true }
 }
 
