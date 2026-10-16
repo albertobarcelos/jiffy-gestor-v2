@@ -23,6 +23,7 @@ export function mapMenuGruposToDesignCategorias(
       iconName: grupo.grupoBase.iconName || 'restaurant',
       cor: grupo.grupoBase.corHex || '#CCCCCC',
       imagemUrl: imagemUrlDoMenuGrupo(grupo),
+      imageId: grupo.image?.imageId?.trim() || null,
     }))
 }
 

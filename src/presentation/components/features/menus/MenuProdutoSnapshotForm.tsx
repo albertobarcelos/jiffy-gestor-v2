@@ -17,6 +17,11 @@ import { UppercaseLocaleInput } from '@/src/presentation/components/ui/Uppercase
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { useMenuMutations } from '@/src/presentation/hooks/menus/useMenuMutations'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { mensagemLegivelDeliveryMediaError } from '@/src/infrastructure/api/deliveryMediaApi'
+import { removerImagemUseCase } from '@/src/presentation/hooks/media/criarImagemMediaUseCases'
+import { previewImagemEhLocal } from '@/src/presentation/utils/previewImagemLocal'
 import { usePropagarAlteracaoProduto } from '@/src/presentation/hooks/produtos/usePropagarAlteracaoProduto'
 import { showToast } from '@/src/shared/utils/toast'
 import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
@@ -123,9 +128,12 @@ export const MenuProdutoSnapshotForm = forwardRef<
   ref
 ) {
   const { updateProduto, uploadImagemProduto } = useMenuMutations(menuId)
+  const invalidate = useInvalidateTenantQueries()
+  const { auth } = useAuthStore()
   const categoriaRef = useRef<MenuCategoriaNesteCardapioHandle>(null)
   const [categoriaDirty, setCategoriaDirty] = useState(false)
   const [imagemPreviewOverride, setImagemPreviewOverride] = useState<string | null>(null)
+  const [imageIdOculto, setImageIdOculto] = useState<string | null>(null)
   const { pedirConfirmacao, aplicarNosDestinos, aplicarImagemNosDestinos, dialog: dialogPropagacao } =
     usePropagarAlteracaoProduto()
   const [nome, setNome] = useState(produto.nome)
@@ -230,6 +238,36 @@ export const MenuProdutoSnapshotForm = forwardRef<
     },
     [uploadImagemProduto, produto.produtoId, menuId, pedirConfirmacao, aplicarImagemNosDestinos]
   )
+
+  const handleRemoverImagem = useCallback(async () => {
+    if (previewImagemEhLocal(imagemPreviewOverride)) {
+      setImagemPreviewOverride(prev => {
+        if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+        return null
+      })
+      return
+    }
+    const idImagem = produto.image?.imageId?.trim()
+    if (!idImagem) {
+      showToast.error('Não foi possível identificar a imagem para remover.')
+      return
+    }
+    const token = auth?.getAccessToken()
+    if (!token) {
+      showToast.error('Token não encontrado')
+      return
+    }
+    const toastId = showToast.loading('Removendo imagem...')
+    try {
+      await removerImagemUseCase().execute({ imageId: idImagem, token })
+      setImageIdOculto(idImagem)
+      setImagemPreviewOverride(null)
+      await invalidate(['menu-produtos', menuId])
+      showToast.successLoading(toastId, 'Imagem removida deste cardápio.')
+    } catch (error) {
+      showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+    }
+  }, [auth, imagemPreviewOverride, invalidate, menuId, produto.image?.imageId])
 
   const handleValorNormalChange = (raw: string) => {
     const next = formatCurrency(raw)
@@ -416,7 +454,10 @@ export const MenuProdutoSnapshotForm = forwardRef<
       descontoPercentual:
         promoVigente && Number.isFinite(descontoNum) && descontoNum > 0 ? descontoNum : null,
       descricao,
-      imagemUrl: imagemPreviewOverride ?? produto.image?.imageUrl ?? null,
+      imagemUrl:
+        imageIdOculto && produto.image?.imageId === imageIdOculto
+          ? null
+          : imagemPreviewOverride ?? produto.image?.imageUrl ?? null,
     }
   }, [
     nome,
@@ -427,6 +468,8 @@ export const MenuProdutoSnapshotForm = forwardRef<
     descontoPct,
     descricao,
     imagemPreviewOverride,
+    imageIdOculto,
+    produto.image?.imageId,
     produto.image?.imageUrl,
   ])
 
@@ -436,8 +479,18 @@ export const MenuProdutoSnapshotForm = forwardRef<
       busy: uploadImagemProduto.isPending,
       hint: 'Arraste ou clique para recortar e enviar',
       onUpload: handlePreviewImageUpload,
+      onClear:
+        imagemPreviewOverride || produto.image?.imageId
+          ? handleRemoverImagem
+          : undefined,
     }),
-    [handlePreviewImageUpload, uploadImagemProduto.isPending]
+    [
+      handlePreviewImageUpload,
+      handleRemoverImagem,
+      imagemPreviewOverride,
+      produto.image?.imageId,
+      uploadImagemProduto.isPending,
+    ]
   )
 
   return (
