@@ -2,6 +2,7 @@ import {
   normalizeOrigemApi,
   rotuloOrigemParaExibicao as rotuloOrigemNormalizado,
 } from '@/src/application/mappers/VendaApiNormalizer'
+import { valorCobrancaDeCedula } from '@/src/domain/services/pedido/CalculadoraPagamentoPedido'
 import {
   pagamentoEstaCancelado,
   pagamentoPendenteNaEntrega,
@@ -215,11 +216,14 @@ export function montarLinhasResumoPagamentoPedido(
   return linhas
 }
 
-export function totalCobrarNaEntregaPagamentos(pagamentos: PagamentoSelecionado[]): number {
+export function totalCobrarNaEntregaPagamentos(
+  pagamentos: PagamentoSelecionado[],
+  troco = 0
+): number {
   const total = pagamentos
     .filter(p => !pagamentoEstaCancelado(p) && pagamentoPendenteNaEntrega(p))
     .reduce((sum, p) => sum + (Number(p.valor) || 0), 0)
-  return total > 0 ? Math.round(total * 100) / 100 : 0
+  return valorCobrancaDeCedula(total, troco)
 }
 
 export function formatarCpfCnpjExibicao(valor: string | null | undefined): string {

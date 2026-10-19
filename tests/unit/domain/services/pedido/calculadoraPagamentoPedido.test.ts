@@ -7,6 +7,7 @@ import {
   resolverStatusPagamentoExibicaoPedido,
   totalPagamentosLancados,
   usarTrocoLancamentoPedido,
+  valorCobrancaDeCedula,
 } from '@/src/domain/services/pedido/CalculadoraPagamentoPedido'
 
 describe('cálculo de lançamento misto', () => {
@@ -100,6 +101,13 @@ describe('cálculo de lançamento misto', () => {
         considerarApenasNaoCancelados: true,
       })
     ).toBe(0)
+  })
+
+  it('cobrança na entrega é o pedido, não a cédula', () => {
+    expect(valorCobrancaDeCedula(100, 37)).toBe(63)
+    expect(valorCobrancaDeCedula(145, 100)).toBe(45)
+    expect(valorCobrancaDeCedula(63, 0)).toBe(63)
+    expect(valorCobrancaDeCedula(37, 37)).toBe(0)
   })
 
   it('usa troco dos lançamentos quando a aba atual é Já foi pago mas há cobrança na entrega', () => {

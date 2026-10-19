@@ -11,6 +11,7 @@ import {
   extrairContextoEntregaDeVendaData,
 } from '@/src/application/mappers/ContextoEntregaDeliveryMapper'
 import { resolverTrocoLevarPedidoEntrega } from '@/src/application/mappers/resolverTrocoLevarPedidoEntrega'
+import { valorCobrancaDeCedula } from '@/src/domain/services/pedido/CalculadoraPagamentoPedido'
 import { mapearPagamentoDetalheVenda } from '@/src/application/mappers/VendaDetalhePagamentoMapper'
 
 function isoString(value: unknown): string | null {
@@ -119,6 +120,11 @@ export function adaptPedidoDeliveryToVendaGestorApiResponse(
   )
 
   const pedidoDeliveryFinalizado = statusDelivery === 'FINALIZADO'
+  const troco = resolverTrocoLevarPedidoEntrega(registro, pagamentosSelecionados)
+  const somaCedulaNaEntrega = pagamentosNaEntrega.reduce(
+    (soma, p) => soma + (Number(p.valor) || 0),
+    0
+  )
 
   const contextoEntrega = extrairContextoEntregaDeVendaData(registro)
   const enderecoSnapshot = contextoEntrega?.enderecoEntrega
@@ -157,7 +163,7 @@ export function adaptPedidoDeliveryToVendaGestorApiResponse(
     ultimoResponsavelId: atorUsuarioId(registro.ultimoResponsavel),
     canceladoPorId: atorUsuarioId(registro.canceladoPor),
     valorFinal: registro.valorFinal as VendaGestorApiResponse['valorFinal'],
-    troco: resolverTrocoLevarPedidoEntrega(registro, pagamentosSelecionados) as VendaGestorApiResponse['troco'],
+    troco: troco as VendaGestorApiResponse['troco'],
     totalDesconto: registro.totalDesconto,
     totalAcrescimo: registro.totalAcrescimo,
     taxasLancadas: Array.isArray(registro.taxasLancadas) ? registro.taxasLancadas : [],
@@ -172,10 +178,7 @@ export function adaptPedidoDeliveryToVendaGestorApiResponse(
       valorReceber: Number(registro.valorFinal ?? 0) || 0,
       valorRecebido: Number(registro.totalPago ?? 0) || 0,
       valorFaltante: totalFaltaPagar,
-      valorCobrarNaEntrega: pagamentosNaEntrega.reduce(
-        (soma, p) => soma + (Number(p.valor) || 0),
-        0
-      ),
+      valorCobrarNaEntrega: valorCobrancaDeCedula(somaCedulaNaEntrega, troco),
     },
   }
 }

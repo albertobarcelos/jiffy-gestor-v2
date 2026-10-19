@@ -55,8 +55,11 @@ export interface PedidoKanbanQuickViewData {
   observacaoPedido: string | null
 }
 
-function calcularTotalAReceberPagamentos(pagamentos: PagamentoSelecionado[]): number {
-  return totalCobrarNaEntregaPagamentos(pagamentos)
+function calcularTotalAReceberPagamentos(
+  pagamentos: PagamentoSelecionado[],
+  troco: number
+): number {
+  return totalCobrarNaEntregaPagamentos(pagamentos, troco)
 }
 
 function resolverFluxoPagamentoEntrega(
@@ -315,7 +318,7 @@ export class CarregarPedidoKanbanQuickViewUseCase {
     } else if (detalhesEntrega.trocoApi) {
       detalhesEntrega = { ...detalhesEntrega, trocoApi: null }
     }
-    const totalAReceber = calcularTotalAReceberPagamentos(pagamentos)
+    const totalAReceber = calcularTotalAReceberPagamentos(pagamentos, troco)
     const tipoPagamento = formatarTipoPagamentoDetalhe(pagamentos, [], nomesMeiosPagamento)
     const linhasPagamento = montarLinhasResumoPagamentoPedido(
       pagamentos,
