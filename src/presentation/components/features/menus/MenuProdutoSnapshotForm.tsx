@@ -26,12 +26,15 @@ import {
   type MenuCategoriaNesteCardapioHandle,
 } from './MenuCategoriaNesteCardapioCampos'
 import { MenuProdutoPromocaoControl } from './MenuProdutoPromocaoControl'
+import { deveTravarPrecoNormal } from '@/src/domain/policies/menu/atualizarPrecoNormalSnapshot'
 import {
   VALOR_PROMOCIONAL_MINIMO,
   descontoPercentualFromPrecos,
   isValorPromocionalValido,
   produtoTemPromocaoPreenchida,
+  promocaoSnapshotVigente,
   valorPromocionalFromDesconto,
+  type SnapshotPrecoMenu,
 } from '@/src/domain/policies/menu/precoVigenteSnapshot'
 import { ProdutoFormWithPreviewLayout } from '@/src/presentation/components/features/produtos/preview/ProdutoFormWithPreviewLayout'
 import { parsePrecoPreviewFromInput } from '@/src/presentation/components/features/produtos/preview/produtoPreviewModel'
@@ -72,6 +75,19 @@ function parseCurrency(value: string): number {
   const digits = value.replace(/\D/g, '')
   if (!digits) return NaN
   return parseFloat(digits) / 100
+}
+
+function snapshotPrecoDoForm(
+  valor: string,
+  valorPromocional: string,
+  promocaoAtiva: boolean,
+  modoPromocao: boolean
+): SnapshotPrecoMenu {
+  return {
+    valor: parseCurrency(valor),
+    valorPromocional: parseCurrency(valorPromocional),
+    promocaoAtiva: modoPromocao && promocaoAtiva,
+  }
 }
 
 function formatDescontoPct(value: number | null): string {
@@ -154,6 +170,11 @@ export const MenuProdutoSnapshotForm = forwardRef<
   )
   const [ativo, setAtivo] = useState(produto.ativo)
   const [favorito, setFavorito] = useState(produto.favorito)
+  const snapshotPreco = useMemo(
+    () => snapshotPrecoDoForm(valor, valorPromocional, promocaoAtiva, modoPromocao),
+    [valor, valorPromocional, promocaoAtiva, modoPromocao]
+  )
+  const precoNormalTravado = deveTravarPrecoNormal(snapshotPreco)
 
   const syncFromProduto = useCallback((next: MenuProduto) => {
     setNome(next.nome)
@@ -245,10 +266,14 @@ export const MenuProdutoSnapshotForm = forwardRef<
   )
 
   const handleValorNormalChange = (raw: string) => {
-    // Com promoção configurada o normal fica travado (mesmo pausada).
-    if (modoPromocao) return
+    if (precoNormalTravado) return
     const next = formatCurrency(raw)
     setValor(next)
+    if (!modoPromocao) return
+    const pct = parseDescontoPct(descontoPct)
+    const promo = valorPromocionalFromDesconto(parseCurrency(next), pct)
+    if (promo == null) return
+    setValorPromocional(formatCurrencyFromNumber(promo))
   }
 
   const handleValorPromocionalChange = (raw: string) => {
@@ -323,15 +348,13 @@ export const MenuProdutoSnapshotForm = forwardRef<
       showToast.error('Informe um preço válido')
       return false
     }
-    if (modoPromocao) {
+    if (modoPromocao && !isValorPromocionalValido(promoNum, valorNum)) {
       if (!Number.isFinite(promoNum) || promoNum <= VALOR_PROMOCIONAL_MINIMO) {
         showToast.error('Informe um preço promocional maior que R$ 1,00')
         return false
       }
-      if (promoNum >= valorNum) {
-        showToast.error('O preço promocional precisa ser menor que o preço normal')
-        return false
-      }
+      showToast.error('O preço promocional precisa ser menor que o preço normal')
+      return false
     }
 
     const destinos = await pedirConfirmacao({
@@ -409,12 +432,7 @@ export const MenuProdutoSnapshotForm = forwardRef<
   const precoNormalPreview = parsePrecoPreviewFromInput(valor)
   const precoPromoPreview = parsePrecoPreviewFromInput(valorPromocional)
   const previewProduto = useMemo(() => {
-    const promoVigente =
-      modoPromocao &&
-      promocaoAtiva &&
-      precoPromoPreview != null &&
-      precoNormalPreview != null &&
-      isValorPromocionalValido(precoPromoPreview, precoNormalPreview)
+    const promoVigente = promocaoSnapshotVigente(snapshotPreco)
     const descontoNum = parseDescontoPct(descontoPct)
 
     return {
@@ -431,8 +449,7 @@ export const MenuProdutoSnapshotForm = forwardRef<
     nome,
     precoNormalPreview,
     precoPromoPreview,
-    modoPromocao,
-    promocaoAtiva,
+    snapshotPreco,
     descontoPct,
     descricao,
     imagemPreviewOverride,
@@ -498,8 +515,12 @@ export const MenuProdutoSnapshotForm = forwardRef<
                       placeholder="R$ 0,00"
                       className="bg-white"
                       sx={sxEntradaCompactaProduto}
-                      disabled
-                      title="Remova a promoção para alterar o preço normal"
+                      disabled={precoNormalTravado}
+                      title={
+                        precoNormalTravado
+                          ? 'Pause ou remova a promoção para alterar o preço normal'
+                          : undefined
+                      }
                       inputProps={inputPropsSelecionarConteudo}
                     />
                     <Input

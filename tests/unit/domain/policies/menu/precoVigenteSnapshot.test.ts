@@ -51,6 +51,7 @@ describe('precoVigenteSnapshot', () => {
 
   it('trata promocional 0 como sem promo (desconto 0)', () => {
     expect(descontoPercentualFromPrecos(50, 0)).toBe(0)
+    expect(descontoPercentualFromPrecos(39.9, 0)).toBe(0)
   })
 
   it('limita o desconto entre 0 e 100%', () => {
@@ -62,17 +63,21 @@ describe('precoVigenteSnapshot', () => {
     expect(produtoTemPromocaoPreenchida(0)).toBe(false)
     expect(produtoTemPromocaoPreenchida(1)).toBe(false)
     expect(produtoTemPromocaoPreenchida(1.01)).toBe(true)
+    expect(produtoTemPromocaoPreenchida(29.9)).toBe(true)
     expect(produtoTemPromocaoPreenchida(undefined)).toBe(false)
   })
 
   it('valida preço promocional maior que 1 e menor que o normal', () => {
+    expect(isValorPromocionalValido(0, 20)).toBe(false)
+    expect(isValorPromocionalValido(1, 20)).toBe(false)
     expect(isValorPromocionalValido(1.01, 20)).toBe(true)
     expect(isValorPromocionalValido(20, 20)).toBe(false)
     expect(isValorPromocionalValido(25, 20)).toBe(false)
-    expect(isValorPromocionalValido(1, 20)).toBe(false)
+    expect(isValorPromocionalValido(1.01, 0)).toBe(false)
+    expect(isValorPromocionalValido(NaN, 20)).toBe(false)
   })
 
-  it('vigente só com flag ligada e promo menor que o normal', () => {
+  it('vigente só com flag ligada e preço promocional válido', () => {
     expect(
       promocaoSnapshotVigente({ valor: 39.9, valorPromocional: 27.93, promocaoAtiva: true })
     ).toBe(true)
@@ -81,6 +86,9 @@ describe('precoVigenteSnapshot', () => {
     ).toBe(false)
     expect(
       promocaoSnapshotVigente({ valor: 20, valorPromocional: 25, promocaoAtiva: true })
+    ).toBe(false)
+    expect(
+      promocaoSnapshotVigente({ valor: 20, valorPromocional: 0.5, promocaoAtiva: true })
     ).toBe(false)
   })
 

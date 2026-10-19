@@ -15,6 +15,7 @@ import { ProdutoNomeInput } from '@/src/presentation/components/features/produto
 import { MenuProdutoPauseControl } from '@/src/presentation/components/features/menus/MenuProdutoPauseControl'
 import { cn } from '@/src/shared/utils/cn'
 import { formatBRLFromMaskedInput } from '@/src/shared/utils/formatters'
+import { deveTravarPrecoNormal } from '@/src/domain/policies/menu/atualizarPrecoNormalSnapshot'
 import {
   produtoTemPromocaoPreenchida,
   promocaoSnapshotVigente,
@@ -123,15 +124,10 @@ function CatalogProductRowInner({
   const podeEditarNome = Boolean(onNomeChange)
   const podeEditarValor = Boolean(onValorChange)
   const promoNum = Number(valorPromocional ?? 0)
+  const snapshotPreco = { valor, valorPromocional, promocaoAtiva }
   const temPromocaoPreenchida = isMenu && produtoTemPromocaoPreenchida(valorPromocional)
-  const valorNormalBloqueadoPorPromocao = temPromocaoPreenchida
-  const promocaoVigente =
-    isMenu &&
-    promocaoSnapshotVigente({
-      valor,
-      valorPromocional,
-      promocaoAtiva,
-    })
+  const promocaoVigente = isMenu && promocaoSnapshotVigente(snapshotPreco)
+  const valorNormalBloqueadoPorPromocao = isMenu && deveTravarPrecoNormal(snapshotPreco)
   /** Promo configurada mas pausada: ainda exibe o valor, em vermelho riscado. */
   const promocaoPausadaNaLista = temPromocaoPreenchida && !promocaoVigente
   const mostrarBadgePromocional = promocaoVigente || promocaoPausadaNaLista
@@ -384,7 +380,7 @@ function CatalogProductRowInner({
                     disabled={Boolean(isSavingValor) || valorNormalBloqueadoPorPromocao}
                     title={
                       valorNormalBloqueadoPorPromocao
-                        ? 'Remova a promoção para alterar o preço normal'
+                        ? 'Pause ou remova a promoção para alterar o preço normal'
                         : undefined
                     }
                     className={

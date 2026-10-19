@@ -25,7 +25,7 @@ export function arredondarPercentualUmaCasa(valor: number): number {
   return Math.round((valor + Number.EPSILON) * 10) / 10
 }
 
-/** True quando o snapshot já tem um valor promocional preenchido (critério de UI do form). */
+/** True quando o snapshot já tem preço promocional configurado (mesmo pausado). */
 export function produtoTemPromocaoPreenchida(valorPromocional: number | null | undefined): boolean {
   const n = Number(valorPromocional ?? 0)
   return Number.isFinite(n) && n > VALOR_PROMOCIONAL_MINIMO
@@ -112,18 +112,13 @@ export function descontoPercentualFromPrecos(
 }
 
 /**
- * Promo vigente neste cardápio: flag ligada e promocional menor que o normal.
- * Usada para exibir e para cobrar — não para validar o form (isso é `isValorPromocionalValido`).
+ * Promo vigente neste cardápio: flag ligada e preço promocional válido.
+ * Usada para exibir, cobrar e travar o preço normal.
  */
 export function promocaoSnapshotVigente(input: SnapshotPrecoMenu): boolean {
-  const valor = Number(input.valor)
-  const valorPromocional = Number(input.valorPromocional ?? 0)
   return (
     input.promocaoAtiva === true &&
-    Number.isFinite(valor) &&
-    Number.isFinite(valorPromocional) &&
-    valorPromocional > 0 &&
-    valorPromocional < valor
+    isValorPromocionalValido(Number(input.valorPromocional ?? 0), Number(input.valor))
   )
 }
 
