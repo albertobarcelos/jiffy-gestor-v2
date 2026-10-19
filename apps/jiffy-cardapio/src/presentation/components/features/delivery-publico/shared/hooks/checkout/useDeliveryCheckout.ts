@@ -114,6 +114,7 @@ export function useDeliveryCheckout(slug: string, options?: UseDeliveryCheckoutO
     cotacaoSeqRef: cotacaoApi.cotacaoSeqRef,
     setCotacao: cotacaoApi.setCotacao,
     setCotacaoLoading: cotacaoApi.setCotacaoLoading,
+    exigeCpfVenda: options?.exigeCpfVenda === true,
   })
 
   const {
@@ -198,6 +199,7 @@ export function useDeliveryCheckout(slug: string, options?: UseDeliveryCheckoutO
     telefoneDigitsRef,
     recotarPedido: cotacaoApi.recotarPedido,
     setForaCoberturaDialogAberto: cotacaoApi.setForaCoberturaDialogAberto,
+    setProdutoIndisponivel: cotacaoApi.setProdutoIndisponivel,
   })
 
   const totalOficial = cotacaoApi.cotacao?.valorFinal ?? null
@@ -250,6 +252,9 @@ export function useDeliveryCheckout(slug: string, options?: UseDeliveryCheckoutO
     limparCarrinhoAposPedido,
     foraCoberturaDialogAberto: cotacaoApi.foraCoberturaDialogAberto,
     fecharForaCoberturaDialog: cotacaoApi.fecharForaCoberturaDialog,
+    produtoIndisponivel: cotacaoApi.produtoIndisponivel,
+    setProdutoIndisponivel: cotacaoApi.setProdutoIndisponivel,
+    fecharProdutoIndisponivelDialog: cotacaoApi.fecharProdutoIndisponivelDialog,
     form,
     updateForm,
     clienteLookup,
