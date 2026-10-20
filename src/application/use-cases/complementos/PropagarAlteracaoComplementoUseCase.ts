@@ -4,7 +4,11 @@ import {
   usosParaPropagar,
   type OrigemUsoComplemento,
 } from '@/src/domain/policies/complemento/propagarAlteracaoComplemento'
-import type { VinculoComplementoOverride } from '@/src/domain/repositories/IComplementoOverrideRepository'
+import type {
+  ImpactoComplementoNoGrupo,
+  ResultadoOverridesComplemento,
+  VinculoComplementoOverride,
+} from '@/src/domain/repositories/IComplementoOverrideRepository'
 
 function exigirToken(token: string): string {
   const valor = token.trim()
@@ -71,5 +75,31 @@ export class PropagarAlteracaoComplementoUseCase {
       .filter((item): item is VinculoComplementoOverride => item != null)
     if (vinculos.length === 0) return
     await this.porta.gravarVinculos(vinculos, token)
+  }
+
+  async aplicarOverrides(params: {
+    token: string
+    vinculos?: VinculoComplementoOverride[]
+    grupos?: ImpactoComplementoNoGrupo[]
+  }): Promise<ResultadoOverridesComplemento> {
+    const token = exigirToken(params.token)
+    const vinculos = (params.vinculos ?? [])
+      .map(vinculoPronto)
+      .filter((item): item is VinculoComplementoOverride => item != null)
+    const grupos = (params.grupos ?? []).filter(
+      grupo =>
+        grupo.grupoComplementoId.trim() !== '' &&
+        grupo.complementoId.trim() !== ''
+    )
+    if (vinculos.length === 0 && grupos.length === 0) {
+      return { message: 'Nada para gravar', atualizados: 0 }
+    }
+    return this.porta.gravarOverrides(
+      {
+        ...(vinculos.length > 0 ? { vinculos } : {}),
+        ...(grupos.length > 0 ? { grupos } : {}),
+      },
+      token
+    )
   }
 }

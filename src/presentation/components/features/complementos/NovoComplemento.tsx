@@ -10,8 +10,7 @@ import {
 } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import { Complemento } from '@/src/domain/entities/Complemento'
+import { criarPersistirCadastroComplementoUseCase } from '@/src/presentation/hooks/complementos/criarPersistirCadastroComplementoUseCase'
 import { FormControl, InputLabel, MenuItem, Select } from '@mui/material'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
@@ -255,18 +254,14 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
 
     const loadComplemento = async () => {
       try {
-        const response = await fetchGestorApi(`/api/complementos/${complementoId}`, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
+        const complemento = await criarPersistirCadastroComplementoUseCase().buscar({
+          id: complementoId,
+          token: accessToken,
         })
 
         if (cancelled) return
 
-        if (response.ok) {
-          const data = await response.json()
-          const complemento = Complemento.fromJSON(data)
+        if (complemento) {
 
           setNome(complemento.getNome().toUpperCase())
           setDescricao((complemento.getDescricao() || '').toUpperCase())
@@ -414,35 +409,19 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
       const nomeUpper = nome.trim().toUpperCase()
       const descUpper = descricao.trim().toUpperCase()
 
-      const body: any = {
+      const dados = {
         nome: nomeUpper,
         descricao: descUpper || undefined,
         valor: valorNumero,
         ativo,
         tipoImpactoPreco,
       }
-
-      const url = isEditing
-        ? `/api/complementos/${complementoId}`
-        : '/api/complementos'
-      const method = isEditing ? 'PATCH' : 'POST'
-
-      const response = await fetchGestorApi(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || 'Erro ao salvar complemento')
-      }
-
-      const savedData = (await response.json().catch(() => ({}))) as { id?: string }
-      const savedId = savedData?.id?.toString() || complementoId
+      const cadastro = criarPersistirCadastroComplementoUseCase()
+      const salvo =
+        isEditing && complementoId
+          ? await cadastro.atualizar({ token, id: complementoId, dados })
+          : await cadastro.criar({ token, dados })
+      const savedId = salvo.getId() || complementoId
       showToast.success(isEditing ? 'Complemento atualizado com sucesso!' : 'Complemento criado com sucesso!')
       if (vinculosParaCopiar.length > 0) {
         try {

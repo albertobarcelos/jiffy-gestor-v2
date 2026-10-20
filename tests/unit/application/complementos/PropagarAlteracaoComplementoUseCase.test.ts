@@ -27,6 +27,7 @@ function porta(overrides: Partial<IPropagacaoComplemento> = {}): IPropagacaoComp
   return {
     buscarCompleto: vi.fn(),
     gravarVinculos: vi.fn(),
+    gravarOverrides: vi.fn().mockResolvedValue({ message: 'ok', atualizados: 1 }),
     ...overrides,
   }
 }
@@ -132,5 +133,34 @@ describe('PropagarAlteracaoComplementoUseCase', () => {
       useCase.listarUsosParaPropagar({ complementoId: '  ', token: 'token' })
     ).rejects.toThrow('ID do complemento é obrigatório')
     expect(buscarCompleto).not.toHaveBeenCalled()
+  })
+
+  it('grava impacto de grupo no mesmo PATCH de overrides', async () => {
+    const gravarOverrides = vi.fn().mockResolvedValue({ message: 'ok', atualizados: 1 })
+    const useCase = new PropagarAlteracaoComplementoUseCase(porta({ gravarOverrides }))
+
+    await useCase.aplicarOverrides({
+      token: 'token',
+      grupos: [
+        {
+          grupoComplementoId: ' grupo-1 ',
+          complementoId: 'comp-1',
+          tipoImpactoPreco: 'aumenta',
+        },
+      ],
+    })
+
+    expect(gravarOverrides).toHaveBeenCalledWith(
+      {
+        grupos: [
+          {
+            grupoComplementoId: ' grupo-1 ',
+            complementoId: 'comp-1',
+            tipoImpactoPreco: 'aumenta',
+          },
+        ],
+      },
+      'token'
+    )
   })
 })
