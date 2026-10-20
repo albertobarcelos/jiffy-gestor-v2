@@ -8,7 +8,7 @@ import {
 import { exigirSlugPublicoDaPagina } from '@/src/infrastructure/seo/exigirSlugPublicoDaPagina'
 
 type PageProps = {
-  params: Promise<{ slug: string; codigo: string }>
+  params: Promise<{ slug: string; id: string }>
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -23,9 +23,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function CardapioPedidoConfirmadoPage({ params }: PageProps) {
-  const { slug: rawSlug, codigo: rawCodigo } = await params
-  const codigo = rawCodigo?.trim() ?? ''
-  const slug = exigirSlugPublicoDaPagina(rawSlug, `/pedido/${encodeURIComponent(codigo)}`)
+  const { slug: rawSlug, id: rawId } = await params
+  const pedidoId = rawId?.trim() ?? ''
+  const slug = exigirSlugPublicoDaPagina(rawSlug, `/pedido/${encodeURIComponent(pedidoId)}`)
 
-  return <DeliveryPublicoPedidoConfirmadoScreen slug={slug} codigo={codigo} />
+  return <DeliveryPublicoPedidoConfirmadoScreen slug={slug} pedidoId={pedidoId} />
 }

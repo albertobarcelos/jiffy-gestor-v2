@@ -4,6 +4,20 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { montarLinkWhatsapp, telefoneValidoParaWhatsapp } from '@/src/shared/utils/whatsappLink'
 
+type CanalWhatsAppParaFab = {
+  conectado: boolean
+  telefone: string | null
+} | null | undefined
+
+/**
+ * Telefone do botão flutuante: só o canal conectado no gestor.
+ * Canal ausente ou desconectado não exibe o botão, mesmo com telefone da empresa.
+ */
+export function telefoneWhatsAppCanalConectado(canal: CanalWhatsAppParaFab): string | null {
+  if (!canal?.conectado || !canal.telefone) return null
+  return canal.telefone
+}
+
 type DeliveryWhatsAppFabProps = {
   telefone: string | null | undefined
   /** Nome da loja para a mensagem pré-preenchida. */
