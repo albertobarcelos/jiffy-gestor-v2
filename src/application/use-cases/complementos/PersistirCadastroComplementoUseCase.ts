@@ -2,6 +2,8 @@ import type {
   DadosCadastroComplemento,
   ICadastroComplemento,
 } from '@/src/application/ports/ICadastroComplemento'
+import type { ICadastroImagemMedia } from '@/src/application/ports/ICadastroImagemMedia'
+import { hidratarComplemento } from '@/src/application/services/cadastroImagem'
 import { Complemento } from '@/src/domain/entities/Complemento'
 
 const LIMITE_MAX = 2000
@@ -22,12 +24,12 @@ function exigirId(id: string): string {
   return valor
 }
 
-function hidratar(payload: unknown): Complemento {
+function hidratar(payload: unknown, media: ICadastroImagemMedia): Complemento {
   const complemento = Complemento.fromJSON(payload)
   if (!complemento.getId()) {
     throw new Error('Complemento sem identificador')
   }
-  return complemento
+  return hidratarComplemento(media, complemento)
 }
 
 function limiteLista(valor: number | undefined, padrao: number): number {
@@ -41,7 +43,10 @@ function offsetLista(valor: number | undefined): number {
 }
 
 export class PersistirCadastroComplementoUseCase {
-  constructor(private readonly porta: ICadastroComplemento) {}
+  constructor(
+    private readonly porta: ICadastroComplemento,
+    private readonly media: ICadastroImagemMedia
+  ) {}
 
   async listar(params: {
     token: string
@@ -64,7 +69,7 @@ export class PersistirCadastroComplementoUseCase {
     return {
       complementos: items.flatMap(item => {
         try {
-          const complemento = Complemento.fromJSON(item)
+          const complemento = hidratar(item, this.media)
           return complemento.getId() ? [complemento] : []
         } catch {
           return []
@@ -76,7 +81,7 @@ export class PersistirCadastroComplementoUseCase {
 
   async buscar(params: { id: string; token: string }): Promise<Complemento> {
     const payload = await this.porta.buscar(exigirId(params.id), exigirToken(params.token))
-    return hidratar(payload)
+    return hidratar(payload, this.media)
   }
 
   async criar(params: {
@@ -84,7 +89,7 @@ export class PersistirCadastroComplementoUseCase {
     dados: DadosCadastroComplemento
   }): Promise<Complemento> {
     const payload = await this.porta.criar(params.dados, exigirToken(params.token))
-    return hidratar(payload)
+    return hidratar(payload, this.media)
   }
 
   async atualizar(params: {
@@ -97,6 +102,6 @@ export class PersistirCadastroComplementoUseCase {
       params.dados,
       exigirToken(params.token)
     )
-    return hidratar(payload)
+    return hidratar(payload, this.media)
   }
 }

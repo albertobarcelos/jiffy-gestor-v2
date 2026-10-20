@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ICadastroComplemento } from '@/src/application/ports/ICadastroComplemento'
+import type { ICadastroImagemMedia } from '@/src/application/ports/ICadastroImagemMedia'
 import { PersistirCadastroComplementoUseCase } from '@/src/application/use-cases/complementos/PersistirCadastroComplementoUseCase'
 
 function porta(overrides: Partial<ICadastroComplemento> = {}): ICadastroComplemento {
@@ -12,6 +13,17 @@ function porta(overrides: Partial<ICadastroComplemento> = {}): ICadastroCompleme
   }
 }
 
+function media(conhecida: Record<string, string> = {}): ICadastroImagemMedia {
+  return {
+    resolverLote: vi.fn(async () => ({})),
+    resolverUma: vi.fn(async () => null),
+    resolverDoCadastro: vi.fn(async () => ({})),
+    enviar: vi.fn(async () => null),
+    lembrar: vi.fn((id, url) => url ?? null),
+    conhecida: vi.fn(id => conhecida[id] ?? null),
+  }
+}
+
 describe('PersistirCadastroComplementoUseCase', () => {
   it('hidrata o cadastro buscado', async () => {
     const buscar = vi.fn(async () => ({
@@ -20,7 +32,7 @@ describe('PersistirCadastroComplementoUseCase', () => {
       valor: 4,
       ativo: true,
     }))
-    const useCase = new PersistirCadastroComplementoUseCase(porta({ buscar }))
+    const useCase = new PersistirCadastroComplementoUseCase(porta({ buscar }), media())
 
     const complemento = await useCase.buscar({ id: ' comp-1 ', token: ' token ' })
 
@@ -32,7 +44,7 @@ describe('PersistirCadastroComplementoUseCase', () => {
   it('cria e atualiza sem HTTP na tela', async () => {
     const criar = vi.fn(async () => ({ id: 'novo', nome: 'QUEIJO', valor: 2, ativo: true }))
     const atualizar = vi.fn(async () => ({ id: 'comp-1', nome: 'BACON', valor: 5, ativo: false }))
-    const useCase = new PersistirCadastroComplementoUseCase(porta({ criar, atualizar }))
+    const useCase = new PersistirCadastroComplementoUseCase(porta({ criar, atualizar }), media())
 
     const criado = await useCase.criar({
       token: 'token',
@@ -51,7 +63,7 @@ describe('PersistirCadastroComplementoUseCase', () => {
 
   it('não chama a porta sem token ou id', async () => {
     const buscar = vi.fn()
-    const useCase = new PersistirCadastroComplementoUseCase(porta({ buscar }))
+    const useCase = new PersistirCadastroComplementoUseCase(porta({ buscar }), media())
 
     await expect(useCase.buscar({ id: 'comp-1', token: '  ' })).rejects.toThrow(
       'Token não encontrado'
@@ -70,7 +82,7 @@ describe('PersistirCadastroComplementoUseCase', () => {
       ],
       count: 2,
     }))
-    const useCase = new PersistirCadastroComplementoUseCase(porta({ listar }))
+    const useCase = new PersistirCadastroComplementoUseCase(porta({ listar }), media())
 
     const resultado = await useCase.listar({
       token: ' token ',
@@ -86,5 +98,20 @@ describe('PersistirCadastroComplementoUseCase', () => {
       { q: 'bac', ativo: true, limit: 2000, offset: 0 },
       'token'
     )
+  })
+
+  it('reaplica foto conhecida quando o cadastro vem sem URL', async () => {
+    const listar = vi.fn(async () => ({
+      items: [{ id: 'comp-1', nome: 'Bacon', valor: 4, ativo: true }],
+      count: 1,
+    }))
+    const useCase = new PersistirCadastroComplementoUseCase(
+      porta({ listar }),
+      media({ 'comp-1': 'https://cdn.example/bacon.jpg' })
+    )
+
+    const { complementos } = await useCase.listar({ token: 'token' })
+
+    expect(complementos[0]?.getImagemUrl()).toBe('https://cdn.example/bacon.jpg')
   })
 })

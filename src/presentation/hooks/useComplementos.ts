@@ -4,8 +4,6 @@ import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQu
 import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { Complemento } from '@/src/domain/entities/Complemento'
-import { hidratarComplemento } from '@/src/application/services/cadastroImagem'
-import { complementoImagemMedia } from '@/src/infrastructure/api/deliveryMediaApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { criarPersistirCadastroComplementoUseCase } from '@/src/presentation/hooks/complementos/criarPersistirCadastroComplementoUseCase'
 import { invalidarCatalogoVendaQueries } from '@/src/presentation/cache/catalogoVendaQueryCache'
@@ -18,10 +16,6 @@ interface ComplementosQueryParams {
   offset?: number
 }
 
-function hidratarLista(complementos: Complemento[]): Complemento[] {
-  return complementos.map(item => hidratarComplemento(complementoImagemMedia, item))
-}
-
 /**
  * Hook para buscar complementos com paginação infinita
  */
@@ -30,14 +24,13 @@ export function useComplementosInfinite(params: Omit<ComplementosQueryParams, 'o
     ['complementos', 'infinite', params],
     async ({ token }, pageParam) => {
       const limit = params.limit || 10
-      const { complementos: brutos, total } = await criarPersistirCadastroComplementoUseCase().listar({
+      const { complementos, total } = await criarPersistirCadastroComplementoUseCase().listar({
         token,
         q: params.q,
         ativo: params.ativo,
         limit,
         offset: Number(pageParam) || 0,
       })
-      const complementos = hidratarLista(brutos)
       const hasMore = complementos.length === limit
       const nextOffset = hasMore ? Number(pageParam) + complementos.length : null
 
@@ -71,7 +64,7 @@ export function useComplementos(params: { ativo?: boolean; limit?: number } = {}
         limit: normalizedLimit,
         offset: 0,
       })
-      return hidratarLista(complementos)
+      return complementos
     },
     { staleTime: 1000 * 60 * 10 }
   )
@@ -85,11 +78,10 @@ export function useComplemento(id: string) {
   return useSecureTenantQuery<Complemento>(
     ['complemento', id],
     async ({ token }) => {
-      const complemento = await criarPersistirCadastroComplementoUseCase().buscar({
+      return criarPersistirCadastroComplementoUseCase().buscar({
         id,
         token,
       })
-      return hidratarComplemento(complementoImagemMedia, complemento)
     },
     { staleTime: 1000 * 60 * 5, enabled: !!id }
   )
