@@ -23,6 +23,10 @@ import { DELIVERY_GRUPO_BANNER_CROP_PRESET } from '@/src/presentation/constants/
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { mensagemLegivelDeliveryMediaError } from '@/src/infrastructure/api/deliveryMediaApi'
+import { removerImagemUseCase } from '@/src/presentation/hooks/media/criarImagemMediaUseCases'
+import { previewImagemEhLocal } from '@/src/presentation/utils/previewImagemLocal'
 import type { DeliveryPublicoDesignConfig } from '../../../shared/types/deliveryPublicoDesignConfig'
 import type { DesignCategoriaGrupo } from '../../../shared/types/designCategoriaGrupo'
 import { resolveDesignPaletteColors } from '../../../shared/constants/colorPalettes'
@@ -53,6 +57,7 @@ export function DesignCategoriasTab({
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
   const [localGrupos, setLocalGrupos] = useState(grupos)
   const [imagemPreviewUrl, setImagemPreviewUrl] = useState<string | null>(null)
+  const { auth } = useAuthStore()
 
   const {
     reordenarGrupo,
@@ -151,12 +156,17 @@ export function DesignCategoriasTab({
       })
 
       try {
-        const imagemUrl = await uploadImagemGrupo(selectedCategoryId, file)
-        const nextGrupos = patchGrupoImagemUrl(localGrupos, selectedCategoryId, imagemUrl)
+        const salva = await uploadImagemGrupo(selectedCategoryId, file)
+        const nextGrupos = patchGrupoImagemUrl(
+          localGrupos,
+          selectedCategoryId,
+          salva.imagemUrl,
+          salva.imageId
+        )
         updateGrupos(nextGrupos)
         setImagemPreviewUrl(prev => {
           if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
-          return imagemUrl ?? preview
+          return salva.imagemUrl ?? preview
         })
       } catch {
         setImagemPreviewUrl(prev => {
@@ -182,44 +192,88 @@ export function DesignCategoriasTab({
     })
   }, [selectedImagemUrl])
 
+  const handleRemoverImagem = useCallback(async () => {
+    const previewLocal = previewImagemEhLocal(imagemPreviewUrl, selectedImagemUrl)
+    if (previewLocal) {
+      handleClearImagemPreview()
+      return
+    }
+    const idImagem = selectedCategory?.imageId?.trim()
+    if (!idImagem || !selectedCategoryId) {
+      showToast.error('Não foi possível identificar a imagem para remover.')
+      return
+    }
+    const token = auth?.getAccessToken()
+    if (!token) {
+      showToast.error('Token não encontrado')
+      return
+    }
+    const toastId = showToast.loading('Removendo imagem...')
+    try {
+      await removerImagemUseCase().execute({ imageId: idImagem, token })
+      updateGrupos(patchGrupoImagemUrl(localGrupos, selectedCategoryId, null, null))
+      setImagemPreviewUrl(prev => {
+        if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+        return null
+      })
+      showToast.successLoading(toastId, 'Imagem removida.')
+    } catch (error) {
+      showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+    }
+  }, [
+    auth,
+    handleClearImagemPreview,
+    imagemPreviewUrl,
+    localGrupos,
+    patchGrupoImagemUrl,
+    selectedCategory?.imageId,
+    selectedCategoryId,
+    selectedImagemUrl,
+    updateGrupos,
+  ])
+
   if (isLoading) {
     return (
-      <div className="flex min-h-[240px] items-center justify-center">
-        <JiffyLoading />
+      <div className="space-y-5">
+        <div className="flex min-h-[240px] items-center justify-center">
+          <JiffyLoading />
+        </div>
       </div>
     )
   }
 
   if (!hasMenu) {
     return (
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-        <p className="font-semibold">Cardápio do delivery não configurado</p>
-        <p className="mt-1 text-xs">
-          Em Delivery, escolha o cardápio publicado. As categorias desta tela vêm desse
-          menu.
-        </p>
-        <Link
-          href="/config/delivery"
-          className="mt-3 inline-flex text-sm font-semibold text-primary underline-offset-2 hover:underline"
-        >
-          Ir para Delivery
-        </Link>
+      <div className="space-y-5">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-semibold">Cardápio do delivery não configurado</p>
+          <p className="mt-1 text-xs">
+            Em Delivery, escolha o cardápio publicado. As categorias desta tela vêm desse
+            menu.
+          </p>
+          <Link
+            href="/config/delivery/design?secao=nome-cardapio"
+            className="mt-3 inline-flex text-sm font-semibold text-primary underline-offset-2 hover:underline"
+          >
+            Configurar nome e cardápio
+          </Link>
+        </div>
       </div>
     )
   }
 
   if (isError) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-        Não foi possível carregar os grupos do cardápio publicado. Tente recarregar a página.
+      <div className="space-y-5">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          Não foi possível carregar os grupos do cardápio publicado. Tente recarregar a página.
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-2">
-      <h3 className="text-base font-semibold text-primary">Categorias</h3>
-
+    <div className="space-y-5">
       <div className="space-y-2 rounded-xl border border-gray-200 bg-white p-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-1 items-start gap-2">
@@ -423,9 +477,12 @@ export function DesignCategoriasTab({
                     emptyHint="Arraste uma imagem ou clique para selecionar"
                     onFileSelected={handleImagemUpload}
                     onClearPreview={
-                      imagemPreviewUrl?.startsWith('blob:') &&
-                      imagemPreviewUrl !== selectedImagemUrl
-                        ? handleClearImagemPreview
+                      (imagemPreviewUrl?.startsWith('blob:') &&
+                        imagemPreviewUrl !== selectedImagemUrl) ||
+                      selectedCategory?.imageId
+                        ? () => {
+                            void handleRemoverImagem()
+                          }
                         : undefined
                     }
                   />

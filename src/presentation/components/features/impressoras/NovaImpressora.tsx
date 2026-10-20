@@ -615,11 +615,9 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
 
         const configs: TerminalConfig[] = []
 
-        // Se não há terminais configurados, apenas define lista vazia
+        // Sem terminal vinculado: encerra o loading e mostra o estado vazio.
         if (!Array.isArray(terminaisConfigData) || terminaisConfigData.length === 0) {
-          console.warn('Nenhum terminal configurado encontrado na impressora')
           setTerminaisConfig([])
-          setIsLoadingImpressora(false)
           return
         }
 
@@ -718,7 +716,10 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
         setTerminaisConfig(configs)
       } catch (error) {
         console.error('Erro ao carregar impressora:', error)
+        showToast.error(error instanceof Error ? error.message : 'Erro ao carregar impressora')
+        setTerminaisConfig([])
       } finally {
+        hasLoadedTerminaisRef.current = true
         setIsLoadingImpressora(false)
       }
     }, [isEditing, isCopyMode, impressoraId])

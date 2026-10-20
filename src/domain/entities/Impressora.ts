@@ -28,18 +28,21 @@ function asRecord(v: unknown): Record<string, unknown> | null {
 
 function mapTerminalConfig(raw: unknown): ImpressoraTerminalConfig {
   const r = asRecord(raw) ?? {}
+  const nested = asRecord(r.config) ?? {}
   const modoImpressao = parseModoImpressaoImpressora(
     r.modoImpressao ?? r.modo_impressao,
     r.modoFicha === true || r.modoFicha === 'true' || r.modo_ficha === true || r.modo_ficha === 'true'
   )
   const ativo = r.ativo === true || r.ativo === 'true' || r.ativo === undefined
   const terminalIdRaw = r.terminalId ?? r.estacaoId ?? r.estacaoImpressaoId
+  const imprimirSenhaRaw =
+    r.imprimirSenha ?? nested.imprimirSenha ?? r.imprimir_senha ?? nested.imprimir_senha
   return {
     terminalId: terminalIdRaw != null ? String(terminalIdRaw) : undefined,
     ativo,
     modoImpressao,
     modoFicha: modoFichaDerivado(modoImpressao),
-    imprimirSenha: flagLigada(r.imprimirSenha ?? r.imprimir_senha),
+    imprimirSenha: flagLigada(imprimirSenhaRaw),
     modelo: r.modelo != null ? String(r.modelo) : undefined,
     ip: r.ip != null ? String(r.ip) : undefined,
     porta: r.porta != null ? String(r.porta) : undefined,

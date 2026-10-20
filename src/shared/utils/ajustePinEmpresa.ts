@@ -3,6 +3,10 @@ import { distanciaMetrosEntrePontos } from '@/src/shared/utils/calcularTaxaCober
 
 /** Ajuste fino do pin da loja — não é mudança de endereço. */
 export const RAIO_AJUSTE_PIN_METROS = 1000
+/** Rua encontrada sem o número: dá margem para chegar na porta. */
+export const RAIO_AJUSTE_PIN_RUA_METROS = 5_000
+/** Só cidade ou CEP: o pin pode ser marcado em qualquer ponto do município. */
+export const RAIO_AJUSTE_PIN_CIDADE_METROS = 20_000
 
 export function pinDentroDoRaioPermitido(
   centroEndereco: GeoJsonPoint,

@@ -25,7 +25,10 @@ import { urlImagemHttp } from '@/src/application/services/cadastroImagem'
 import {
   grupoComplementoImagemMedia,
   mensagemLegivelDeliveryMediaError,
+  uploadGrupoComplementoImagem,
 } from '@/src/infrastructure/api/deliveryMediaApi'
+import { removerImagemUseCase } from '@/src/presentation/hooks/media/criarImagemMediaUseCases'
+import { previewImagemEhLocal } from '@/src/presentation/utils/previewImagemLocal'
 
 /** Labels outlined em preto (MUI usa cinza por padrão) — igual NovoComplemento */
 const sxOutlinedLabelTextoEscuro = {
@@ -132,7 +135,9 @@ export const NovoGrupoComplemento = forwardRef<
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingGrupo, setIsLoadingGrupo] = useState(false)
   const [isUploadingImagem, setIsUploadingImagem] = useState(false)
+  const [removendoImagem, setRemovendoImagem] = useState(false)
   const [serverImagemUrl, setServerImagemUrl] = useState<string | null>(null)
+  const [imageId, setImageId] = useState<string | null>(null)
   const [imagemPreviewUrl, setImagemPreviewUrl] = useState<string | null>(null)
   const hasLoadedGrupoRef = useRef(false)
   const baselineSerializedRef = useRef<string>('')
@@ -252,6 +257,7 @@ export const NovoGrupoComplemento = forwardRef<
             const ids = grupo.getComplementosIds() ?? []
             setVinculadosCount(ids.length || (grupo.getComplementos()?.length ?? 0))
 
+            setImageId(grupo.getImageId())
             if (grupoId) {
               const deliveryImagemUrl = await grupoComplementoImagemMedia.resolverUma(grupoId, token)
               applyImagemUrl(deliveryImagemUrl ?? grupo.getImagemUrl() ?? null)
@@ -456,7 +462,9 @@ export const NovoGrupoComplemento = forwardRef<
       const toastId = showToast.loading('Enviando imagem...')
 
       try {
-        const persistedUrl = await grupoComplementoImagemMedia.enviar(grupoId, file, token)
+        const confirmado = await uploadGrupoComplementoImagem(grupoId, file, token)
+        setImageId(confirmado.imageId)
+        const persistedUrl = await grupoComplementoImagemMedia.resolverUma(grupoId, token)
         applyImagemUrl(persistedUrl ?? preview)
         showToast.successLoading(toastId, 'Imagem enviada com sucesso!')
         onReload?.()
@@ -479,6 +487,39 @@ export const NovoGrupoComplemento = forwardRef<
       return serverImagemUrl
     })
   }, [serverImagemUrl])
+
+  const handleRemoverImagem = useCallback(async () => {
+    const previewLocal = previewImagemEhLocal(imagemPreviewUrl, serverImagemUrl)
+    if (previewLocal) {
+      handleClearImagemPreview()
+      return
+    }
+    if (!imageId) {
+      showToast.error('Não foi possível identificar a imagem para remover.')
+      return
+    }
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+    if (!token) {
+      showToast.error('Token não encontrado')
+      return
+    }
+    setRemovendoImagem(true)
+    setIsUploadingImagem(true)
+    const toastId = showToast.loading('Removendo imagem...')
+    try {
+      await removerImagemUseCase().execute({ imageId, token })
+      if (grupoId) grupoComplementoImagemMedia.lembrar(grupoId, null)
+      setImageId(null)
+      applyImagemUrl(null)
+      showToast.successLoading(toastId, 'Imagem removida.')
+      await onReload?.(grupoId, null)
+    } catch (error) {
+      showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+    } finally {
+      setRemovendoImagem(false)
+      setIsUploadingImagem(false)
+    }
+  }, [applyImagemUrl, grupoId, handleClearImagemPreview, imageId, imagemPreviewUrl, onReload, serverImagemUrl])
 
   if (isLoadingGrupo) {
     return (
@@ -589,6 +630,7 @@ export const NovoGrupoComplemento = forwardRef<
                 label="Foto do grupo"
                 disabled={!isEditing}
                 busy={isUploadingImagem}
+                busyLabel={removendoImagem ? 'Removendo imagem…' : 'Enviando foto…'}
                 previewUrl={imagemPreviewUrl}
                 cropPreset={DELIVERY_GRUPO_COMPLEMENTO_CROP_PRESET}
                 helperText={
@@ -603,9 +645,11 @@ export const NovoGrupoComplemento = forwardRef<
                 }
                 onFileSelected={handleImagemUpload}
                 onClearPreview={
-                  imagemPreviewUrl?.startsWith('blob:') &&
-                  imagemPreviewUrl !== serverImagemUrl
-                    ? handleClearImagemPreview
+                  (imagemPreviewUrl?.startsWith('blob:') && imagemPreviewUrl !== serverImagemUrl) ||
+                  imageId
+                    ? () => {
+                        void handleRemoverImagem()
+                      }
                     : undefined
                 }
               />

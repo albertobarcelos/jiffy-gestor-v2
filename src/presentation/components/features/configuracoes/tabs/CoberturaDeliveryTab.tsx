@@ -5,6 +5,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   MdDeleteOutline,
+  MdKeyboardArrowDown,
+  MdKeyboardArrowUp,
+  MdLocalOffer,
   MdMap,
   MdMyLocation,
   MdWarning,
@@ -18,12 +21,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/src/presentation/components/ui/dialog'
-import {
-  dispararEmpresaDeliveryAtualizada,
-  EMPRESA_DELIVERY_ME_QUERY_KEY,
-  useEmpresaDeliveryMe,
-} from '@/src/presentation/hooks/useEmpresaDeliveryMe'
-import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
+import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
+import { useEmpresaEnderecoGeo } from '@/src/presentation/hooks/useEmpresaEnderecoGeo'
 import { useAtualizarRaioEntregaDelivery, useAtualizarRaiosEntregaEmLote, useCriarRaiosEntregaEmLote, useExcluirRaiosEntregaEmLote, useRaiosEntregaDelivery } from '@/src/presentation/hooks/useRaiosEntregaDelivery'
 import {
   useAreasEntregaDelivery,
@@ -32,9 +31,6 @@ import {
   useCriarAreaEntregaDelivery,
   useExcluirAreaEntregaDelivery,
 } from '@/src/presentation/hooks/useAreasEntregaDelivery'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
-import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { showToast } from '@/src/shared/utils/toast'
 import { DELIVERY_HUB_PATH, configuracoesTabPath } from '@/src/shared/constants/configuracoesRoutes'
 import {
@@ -49,13 +45,12 @@ import {
 import {
   enderecoEmpresaGeocodeMinimo,
   geocodificarEnderecoEmpresaViaGoogle,
-  lerCamposEnderecoEmpresa,
-  lerEnderecoLocalizacaoDoPayloadEmpresa,
-  montarPatchEnderecoGeolocalizacao,
+  raioAjustePinPorPrecisao,
+  textoAproximacaoPinEmpresa,
 } from '@/src/shared/utils/geolocalizacaoEmpresa'
 import type {
-  EnderecoEmpresaGeocodeInput,
   GeocodeEmpresaResult,
+  PrecisaoGeocodeEmpresa,
 } from '@/src/shared/utils/geolocalizacaoEmpresa'
 import { pontosGeoIguais, type GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import {
@@ -72,7 +67,6 @@ import {
   limitarPontoAoRaio,
   pinDentroDoRaioPermitido,
   pinEmpresaDeveSeguirNovoEndereco,
-  RAIO_AJUSTE_PIN_METROS,
 } from '@/src/shared/utils/ajustePinEmpresa'
 import type {
   AcoesDesenhoCobertura,
@@ -103,7 +97,10 @@ import {
   parseTaxaDraftCobertura,
   type CoberturaPainelAba,
 } from '@/src/presentation/components/features/configuracoes/coberturaPainelAbas'
+import { CoberturaBotaoSalvarTaxasLote } from '@/src/presentation/components/features/configuracoes/CoberturaBotaoSalvarTaxasLote'
+import { CoberturaTaxasManuaisPainel } from '@/src/presentation/components/features/configuracoes/CoberturaTaxasManuaisPainel'
 import { useReportarCoberturaSuja } from '@/src/presentation/components/features/configuracoes/coberturaSairGuard'
+import { useTaxasInfinite } from '@/src/presentation/hooks/useTaxas'
 
 const NENHUM_RAIO: RaioEntregaDTO[] = []
 const NENHUMA_AREA: AreaEntregaDTO[] = []
@@ -123,16 +120,6 @@ const CoberturaDeliveryMap = dynamic(
 
 const TEMPO_PADRAO_FAIXA_KM = 45
 const ALCANCE_INICIAL_KM = 4
-const CAMPOS_ENDERECO_PIN = [
-  'cep',
-  'rua',
-  'numero',
-  'complemento',
-  'bairro',
-  'cidade',
-  'estado',
-  'codigoCidadeIbge',
-] as const
 
 function mensagemErroArea(error: unknown): string {
   const msg = error instanceof Error ? error.message : 'Não foi possível salvar a área.'
@@ -197,33 +184,6 @@ function CampoPrazoInline({
       />
       <span className="pr-1.5 text-[10px] text-secondary-text">min</span>
     </div>
-  )
-}
-
-function BotaoSalvarTaxasLote({
-  pendente,
-  disabled,
-  salvando,
-  onClick,
-}: {
-  pendente: boolean
-  disabled: boolean
-  salvando: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`w-full rounded-lg px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed ${
-        pendente
-          ? 'bg-primary text-white hover:bg-primary/90 disabled:opacity-50'
-          : 'bg-gray-200 text-gray-600'
-      }`}
-    >
-      {salvando ? 'Salvando…' : pendente ? 'Salvar' : 'Tudo certo'}
-    </button>
   )
 }
 
@@ -299,6 +259,11 @@ export function CoberturaDeliveryTab() {
   const areasQuery = useAreasEntregaDelivery({
     enabled: empresaDeliveryQuery.isSuccess && empresaDeliveryQuery.data != null,
   })
+  const taxasCatalogoQuery = useTaxasInfinite({
+    limit: 50,
+    staleTime: 15_000,
+    enabled: empresaDeliveryQuery.isSuccess && empresaDeliveryQuery.data != null,
+  })
   const criarRaiosLoteMutation = useCriarRaiosEntregaEmLote()
   const atualizarRaioMutation = useAtualizarRaioEntregaDelivery()
   const atualizarRaiosLoteMutation = useAtualizarRaiosEntregaEmLote()
@@ -307,35 +272,7 @@ export function CoberturaDeliveryTab() {
   const atualizarAreaMutation = useAtualizarAreaEntregaDelivery()
   const atualizarAreasLoteMutation = useAtualizarAreasEntregaEmLote()
   const excluirAreaMutation = useExcluirAreaEntregaDelivery()
-
-  const geoQuery = useSecureTenantQuery<{
-    enderecoLocalizacao: GeoJsonPoint | null
-    providerEnderecoId: string | null
-    endereco: EnderecoEmpresaGeocodeInput
-  }>(
-    ['empresa', 'endereco-geo'],
-    async ({ token }) => {
-      const res = await fetchGestorApi('/api/empresas/me', {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: 'no-store',
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(typeof body.error === 'string' ? body.error : `Erro ${res.status}`)
-      }
-      const data = await res.json()
-      const endereco =
-        data.endereco && typeof data.endereco === 'object' && !Array.isArray(data.endereco)
-          ? data.endereco
-          : null
-      const loc = lerEnderecoLocalizacaoDoPayloadEmpresa(endereco)
-      return {
-        ...loc,
-        endereco: lerCamposEnderecoEmpresa(endereco),
-      }
-    },
-    { staleTime: 1000 * 60 * 2, refetchOnWindowFocus: false }
-  )
+  const { geoQuery, atualizarOrigemMutation } = useEmpresaEnderecoGeo()
 
   const [areaExcluindo, setAreaExcluindo] = useState<AreaEntregaDTO | null>(null)
   const [ferramenta, setFerramenta] = useState<FerramentaCobertura>('navegar')
@@ -343,6 +280,7 @@ export function CoberturaDeliveryTab() {
   const [rascunhoPaths, setRascunhoPaths] = useState<LatLngLiteral[] | null>(null)
   const [mapaVisivel, setMapaVisivel] = useState(true)
   const [painelAba, setPainelAba] = useState<CoberturaPainelAba>('raios')
+  const [painelRecolhido, setPainelRecolhido] = useState(false)
   const [areaFormaEditandoId, setAreaFormaEditandoId] = useState<string | null>(null)
   const [formaPathsRascunho, setFormaPathsRascunho] = useState<LatLngLiteral[] | null>(null)
   const [formaAlterada, setFormaAlterada] = useState(false)
@@ -361,65 +299,23 @@ export function CoberturaDeliveryTab() {
   const [pinRascunho, setPinRascunho] = useState<GeoJsonPoint | null>(null)
   const [pinSnapEpoch, setPinSnapEpoch] = useState(0)
   const [centroEnderecoGeo, setCentroEnderecoGeo] = useState<GeoJsonPoint | null>(null)
+  const [erroGeocodeEndereco, setErroGeocodeEndereco] = useState<string | null>(null)
+  const [precisaoGeocode, setPrecisaoGeocode] = useState<PrecisaoGeocodeEmpresa | null>(null)
+  const [geocodeTentativa, setGeocodeTentativa] = useState(0)
   const geocodeResultadoRef = useRef<GeocodeEmpresaResult | null>(null)
   const geocodeAssinaturaRef = useRef('')
   const [mapaIndisponivel, setMapaIndisponivel] = useState(mapaGoogleAuthFalhou)
   const acoesDesenhoRef = useRef<AcoesDesenhoCobertura | null>(null)
-  const invalidateQueries = useInvalidateTenantQueries()
-
-  const atualizarOrigemMutation = useSecureTenantMutation<
-    void,
-    { point: GeoJsonPoint; providerEnderecoId?: string | null }
-  >(
-    async ({ token }, { point, providerEnderecoId }) => {
-      const getRes = await fetchGestorApi('/api/empresas/me', {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: 'no-store',
-      })
-      if (!getRes.ok) throw new Error('Não foi possível ler o endereço da empresa.')
-      const data: unknown = await getRes.json()
-      const payload = data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
-      const empresaId = payload.id != null ? String(payload.id) : ''
-      if (!empresaId) throw new Error('Não foi possível identificar a empresa.')
-      const atual =
-        payload.endereco && typeof payload.endereco === 'object' && !Array.isArray(payload.endereco)
-          ? (payload.endereco as Record<string, unknown>)
-          : {}
-      const endereco: Record<string, unknown> = {}
-      for (const campo of CAMPOS_ENDERECO_PIN) {
-        const valor = atual[campo]
-        if (valor != null && valor !== '') endereco[campo] = valor
-      }
-      Object.assign(endereco, montarPatchEnderecoGeolocalizacao(point, providerEnderecoId) ?? {})
-      const res = await fetchGestorApi(`/api/empresas/${encodeURIComponent(empresaId)}`, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ endereco }),
-      })
-      if (!res.ok) {
-        const body: unknown = await res.json().catch(() => ({}))
-        const erro =
-          body && typeof body === 'object' && 'error' in body && typeof body.error === 'string'
-            ? body.error
-            : 'Não foi possível atualizar o pin da loja.'
-        throw new Error(erro)
-      }
-    },
-    {
-      onSuccess: async () => {
-        await invalidateQueries(['empresa', 'endereco-geo'])
-        await invalidateQueries(EMPRESA_DELIVERY_ME_QUERY_KEY)
-        dispararEmpresaDeliveryAtualizada()
-      },
-    }
-  )
 
   const empresaDelivery = empresaDeliveryQuery.data
   const raios = raiosQuery.data ?? []
   const areas = areasQuery.data ?? []
+  const qtdTaxasManuais = useMemo(() => {
+    const pages = taxasCatalogoQuery.data?.pages ?? []
+    return pages
+      .flatMap(page => page.taxas)
+      .filter(taxa => taxa.getTipo().toLowerCase() === 'entrega').length
+  }, [taxasCatalogoQuery.data])
   const raiosComDraft = useMemo(
     () => raios.map(raio => ({ ...raio, ativo: ativosDraft[raio.id] ?? raio.ativo })),
     [ativosDraft, raios]
@@ -437,11 +333,14 @@ export function CoberturaDeliveryTab() {
   const pinPendente = Boolean(pinRascunho && !pontosGeoIguais(pinRascunho, origemGeo))
   const salvandoPin = atualizarOrigemMutation.isPending && !confirmandoSetup
   const pinParaConfirmar = pinRascunho ?? centroEnderecoGeo ?? origemGeo
-  const centroAjustePin = centroEnderecoGeo ?? origemGeo
+  const centroAjustePin = centroEnderecoGeo
+  const raioAjustePin = precisaoGeocode ? raioAjustePinPorPrecisao(precisaoGeocode) : null
+  const ajusteLivre = Boolean(erroGeocodeEndereco && !centroEnderecoGeo)
+  const avisoAproximacao = precisaoGeocode ? textoAproximacaoPinEmpresa(precisaoGeocode) : null
   const pinSalvoForaDoRaio = Boolean(
     centroEnderecoGeo &&
       origemGeo &&
-      !pinDentroDoRaioPermitido(centroEnderecoGeo, origemGeo)
+      !pinDentroDoRaioPermitido(centroEnderecoGeo, origemGeo, raioAjustePin ?? undefined)
   )
   const enderecoPreenchido = enderecoEmpresaGeocodeMinimo(
     enderecoEmpresa ?? { rua: '', numero: '' }
@@ -553,6 +452,8 @@ export function CoberturaDeliveryTab() {
   useEffect(() => {
     if (!enderecoEmpresa || !enderecoEmpresaGeocodeMinimo(enderecoEmpresa)) {
       setCentroEnderecoGeo(null)
+      setErroGeocodeEndereco(null)
+      setPrecisaoGeocode(null)
       geocodeResultadoRef.current = null
       geocodeAssinaturaRef.current = ''
       if (!origemGeo) setPinRascunho(null)
@@ -568,6 +469,8 @@ export function CoberturaDeliveryTab() {
         if (cancelado) return
         geocodeAssinaturaRef.current = enderecoAssinatura
         geocodeResultadoRef.current = resultado
+        setErroGeocodeEndereco(null)
+        setPrecisaoGeocode(resultado.precisao)
         setCentroEnderecoGeo(resultado.enderecoLocalizacao)
         if (
           !origemGeo ||
@@ -582,7 +485,6 @@ export function CoberturaDeliveryTab() {
         }
       } catch (error) {
         if (cancelado) return
-        geocodeAssinaturaRef.current = enderecoAssinatura
         if (isFalhaServicoMapaGoogle(error)) {
           setMapaIndisponivel(true)
           avisarMapaIndisponivelCliente('cobertura geocode', error)
@@ -590,13 +492,19 @@ export function CoberturaDeliveryTab() {
         }
         geocodeResultadoRef.current = null
         setCentroEnderecoGeo(null)
+        setPrecisaoGeocode(null)
+        setErroGeocodeEndereco(
+          error instanceof Error
+            ? error.message
+            : 'Não foi possível localizar o endereço da empresa.'
+        )
         if (!origemGeo) setPinRascunho(null)
       }
     })()
     return () => {
       cancelado = true
     }
-  }, [enderecoAssinatura, enderecoEmpresa, mapaIndisponivel, origemGeo])
+  }, [enderecoAssinatura, enderecoEmpresa, geocodeTentativa, mapaIndisponivel, origemGeo])
 
   useEffect(() => {
     if (!centroEnderecoGeo) return
@@ -613,8 +521,20 @@ export function CoberturaDeliveryTab() {
     return () => window.removeEventListener('jiffy:empresa-me-updated', onEmpresaAtualizada)
   }, [geoQuery.refetch])
 
+  const tentarGeocodeDeNovo = useCallback(() => {
+    geocodeAssinaturaRef.current = ''
+    setErroGeocodeEndereco(null)
+    setGeocodeTentativa(tentativa => tentativa + 1)
+  }, [])
+
   const alertas = useMemo(() => {
-    const items: { titulo: string; descricao: string; href?: string; label?: string }[] = []
+    const items: {
+      titulo: string
+      descricao: string
+      href?: string
+      label?: string
+      onAcao?: () => void
+    }[] = []
     if (!empresaDelivery) {
       items.push({
         titulo: 'Delivery não configurado',
@@ -630,6 +550,15 @@ export function CoberturaDeliveryTab() {
         descricao: MENSAGEM_MAPA_INDISPONIVEL_SUPORTE,
       })
     }
+    if (empresaDelivery && erroGeocodeEndereco && !mapaIndisponivel) {
+      items.push({
+        titulo: 'Não foi possível localizar o endereço',
+        descricao:
+          'Não encontramos esse endereço. Mova o mapa e clique para marcar a loja. Depois salve a localização.',
+        label: 'Buscar de novo',
+        onAcao: tentarGeocodeDeNovo,
+      })
+    }
     if (
       empresaDelivery &&
       !mapaIndisponivel &&
@@ -641,7 +570,7 @@ export function CoberturaDeliveryTab() {
       items.push({
         titulo: 'Marque a loja no mapa',
         descricao:
-          'Clique no mapa para marcar a loja, até 1 km do endereço. Depois confirme a loja e o alcance no card.',
+          'Clique no mapa para marcar a loja. Depois confirme a loja e o alcance no card.',
       })
     }
     if (
@@ -652,7 +581,7 @@ export function CoberturaDeliveryTab() {
       items.push({
         titulo: 'Pin fora do endereço',
         descricao:
-          'O pin está a mais de 1 km do endereço da empresa. Recentre no endereço atual e salve a localização.',
+          'O pin está fora do raio permitido do ponto encontrado. Recentre no endereço atual e salve a localização.',
       })
     }
     if (
@@ -673,6 +602,7 @@ export function CoberturaDeliveryTab() {
   }, [
     empresaDelivery,
     enderecoPreenchido,
+    erroGeocodeEndereco,
     geoConfigurada,
     geoQuery.isPending,
     mapaIndisponivel,
@@ -683,6 +613,7 @@ export function CoberturaDeliveryTab() {
     areasQuery.isPending,
     setupInicial,
     temCoberturaAtiva,
+    tentarGeocodeDeNovo,
   ])
 
   const limparEdicaoForma = useCallback(() => {
@@ -842,20 +773,27 @@ export function CoberturaDeliveryTab() {
 
   const handlePinMovido = useCallback(
     (point: GeoJsonPoint) => {
-      const centro = centroEnderecoGeo ?? origemGeo
-      if (!centro) {
+      setPainelRecolhido(false)
+      if (!centroEnderecoGeo || raioAjustePin == null) {
+        if (!erroGeocodeEndereco && origemGeo) {
+          showToast.error('Aguarde a localização do endereço para mover o pin.')
+          return
+        }
         setPinRascunho(point)
         setPinSnapEpoch(n => n + 1)
         return
       }
-      const { ponto, limitado } = limitarPontoAoRaio(centro, point, RAIO_AJUSTE_PIN_METROS)
+      const { ponto, limitado } = limitarPontoAoRaio(centroEnderecoGeo, point, raioAjustePin)
       if (limitado) {
-        showToast.error('O pin só pode ser ajustado até 1 km do endereço da empresa.')
+        const km = raioAjustePin / 1000
+        showToast.error(
+          `O pin só pode ser ajustado até ${km} km do ponto encontrado para o endereço.`
+        )
       }
       setPinRascunho(ponto)
       setPinSnapEpoch(n => n + 1)
     },
-    [centroEnderecoGeo, origemGeo]
+    [centroEnderecoGeo, erroGeocodeEndereco, origemGeo, raioAjustePin]
   )
 
   const handleCancelarPinRascunho = useCallback(() => {
@@ -865,9 +803,17 @@ export function CoberturaDeliveryTab() {
 
   const handleSalvarLocalizacaoPin = useCallback(async () => {
     if (!pinRascunho) return
-    const centro = centroEnderecoGeo ?? origemGeo
-    if (centro && !pinDentroDoRaioPermitido(centro, pinRascunho)) {
-      showToast.error('O pin só pode ser salvo até 1 km do endereço da empresa.')
+    if (!centroEnderecoGeo && !erroGeocodeEndereco) {
+      showToast.error('Aguarde a localização do endereço.')
+      return
+    }
+    if (
+      centroEnderecoGeo &&
+      raioAjustePin != null &&
+      !pinDentroDoRaioPermitido(centroEnderecoGeo, pinRascunho, raioAjustePin)
+    ) {
+      const km = raioAjustePin / 1000
+      showToast.error(`O pin só pode ser salvo até ${km} km do ponto encontrado para o endereço.`)
       return
     }
     try {
@@ -878,7 +824,14 @@ export function CoberturaDeliveryTab() {
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Não foi possível salvar a localização.')
     }
-  }, [atualizarOrigemMutation, centroEnderecoGeo, geoQuery, origemGeo, pinRascunho])
+  }, [
+    atualizarOrigemMutation,
+    centroEnderecoGeo,
+    erroGeocodeEndereco,
+    geoQuery,
+    pinRascunho,
+    raioAjustePin,
+  ])
 
   const handleToggleRaioAtivo = useCallback((raioId: string, ativo: boolean) => {
     setAtivosDraft(prev => ({ ...prev, [raioId]: ativo }))
@@ -1132,12 +1085,24 @@ export function CoberturaDeliveryTab() {
     }
     const ponto = pinRascunho ?? centroEnderecoGeo ?? origemGeo
     if (!ponto) {
-      showToast.error('Marque a loja no mapa, até 1 km do endereço, e confirme.')
+      showToast.error(
+        erroGeocodeEndereco
+          ? 'Mova o mapa e clique para marcar a loja, depois confirme.'
+          : 'Marque a loja no mapa e confirme.'
+      )
       return
     }
-    const centro = centroEnderecoGeo ?? origemGeo
-    if (centro && !pinDentroDoRaioPermitido(centro, ponto)) {
-      showToast.error('O pin só pode ser salvo até 1 km do endereço da empresa.')
+    if (!centroEnderecoGeo && !erroGeocodeEndereco) {
+      showToast.error('Aguarde a localização do endereço.')
+      return
+    }
+    if (
+      centroEnderecoGeo &&
+      raioAjustePin != null &&
+      !pinDentroDoRaioPermitido(centroEnderecoGeo, ponto, raioAjustePin)
+    ) {
+      const km = raioAjustePin / 1000
+      showToast.error(`O pin só pode ser salvo até ${km} km do ponto encontrado para o endereço.`)
       return
     }
     const km = parsed.km
@@ -1191,7 +1156,9 @@ export function CoberturaDeliveryTab() {
     atualizarOrigemMutation,
     centroEnderecoGeo,
     criarRaiosLoteMutation,
+    erroGeocodeEndereco,
     excluirRaiosLoteMutation,
+    raioAjustePin,
     geoQuery,
     origemGeo,
     pinRascunho,
@@ -1308,6 +1275,8 @@ export function CoberturaDeliveryTab() {
                     pinRascunho={pinRascunho}
                     pinSnapEpoch={pinSnapEpoch}
                     centroAjustePin={centroAjustePin}
+                    raioAjustePinMetros={raioAjustePin ?? undefined}
+                    ajusteLivre={ajusteLivre}
                     onPinMovido={handlePinMovido}
                     onDesenhoEstadoChange={handleDesenhoEstadoChange}
                     onAcoesDesenhoProntas={handleAcoesDesenhoProntas}
@@ -1321,9 +1290,29 @@ export function CoberturaDeliveryTab() {
         </div>
 
         <div className="pointer-events-none absolute inset-0 z-20 flex items-start p-3 md:p-4">
-          <div className="pointer-events-auto relative mr-14 flex max-h-full w-full max-w-[380px] flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+          <div
+            className={`pointer-events-auto relative mr-14 flex w-full max-w-[380px] flex-col overflow-hidden rounded-2xl bg-white shadow-xl ${
+              painelRecolhido ? '' : 'max-h-full'
+            }`}
+          >
             <div className="shrink-0 px-4 pt-3">
-              <h2 className="text-base font-semibold text-primary-text">Áreas de Entrega</h2>
+              <div className="flex items-start justify-between gap-2">
+                <h2 className="text-base font-semibold text-primary-text">Áreas de Entrega</h2>
+                <button
+                  type="button"
+                  aria-expanded={!painelRecolhido}
+                  aria-controls="cobertura-painel-conteudo"
+                  aria-label={painelRecolhido ? 'Expandir painel' : 'Ocultar painel'}
+                  onClick={() => setPainelRecolhido(recolhido => !recolhido)}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-gray-100 hover:text-primary-text"
+                >
+                  {painelRecolhido ? (
+                    <MdKeyboardArrowDown className="h-5 w-5" aria-hidden />
+                  ) : (
+                    <MdKeyboardArrowUp className="h-5 w-5" aria-hidden />
+                  )}
+                </button>
+              </div>
               <nav
                 className="mt-2 flex flex-wrap gap-3 border-b border-gray-100"
                 aria-label="Painel de cobertura"
@@ -1332,7 +1321,10 @@ export function CoberturaDeliveryTab() {
                   <button
                     key={aba.id}
                     type="button"
-                    onClick={() => setPainelAba(aba.id)}
+                    onClick={() => {
+                      setPainelAba(aba.id)
+                      if (painelRecolhido) setPainelRecolhido(false)
+                    }}
                     className={`-mb-px border-b-2 pb-2 text-xs font-semibold ${
                       painelAba === aba.id
                         ? 'border-primary text-primary'
@@ -1345,6 +1337,15 @@ export function CoberturaDeliveryTab() {
               </nav>
             </div>
 
+            <div
+              id="cobertura-painel-conteudo"
+              className={`flex min-h-0 flex-col overflow-hidden transition-[max-height,opacity] duration-300 ease-out ${
+                painelRecolhido
+                  ? 'max-h-0 opacity-0 pointer-events-none'
+                  : 'h-[min(52vh,400px)] opacity-100'
+              }`}
+              aria-hidden={painelRecolhido}
+            >
             {setupInicial ? (
               <div className="mx-3 mt-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5">
                 <p className="text-sm font-semibold text-primary-text">Confirme a loja e o alcance</p>
@@ -1375,11 +1376,17 @@ export function CoberturaDeliveryTab() {
               </div>
             ) : pinPendente ? (
               <div className="mx-3 mt-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5">
-                <p className="text-sm font-semibold text-primary-text">Pin movido</p>
+                <p className="text-sm font-semibold text-primary-text">
+                  {avisoAproximacao ? 'Localização aproximada' : 'Pin movido'}
+                </p>
                 <p className="mt-0.5 text-xs text-secondary-text">
-                  {pinSalvoForaDoRaio
-                    ? 'O endereço da empresa mudou. Salve para mover o pin e recentrar os raios no novo local.'
-                    : 'Salve para recentrar os raios a partir do novo ponto. Até lá, a cobertura continua no endereço gravado.'}
+                  {avisoAproximacao
+                    ? avisoAproximacao
+                    : pinSalvoForaDoRaio
+                      ? 'O endereço da empresa mudou. Salve para mover o pin e recentrar os raios no novo local.'
+                      : ajusteLivre
+                        ? 'Marque a loja no mapa e salve. Até lá, os raios continuam no ponto antigo.'
+                        : 'Salve para recentrar os raios a partir do novo ponto. Até lá, a cobertura continua no endereço gravado.'}
                 </p>
                 <div className="mt-2.5 flex gap-1.5">
                   {pinSalvoForaDoRaio ? null : (
@@ -1423,6 +1430,14 @@ export function CoberturaDeliveryTab() {
                         >
                           {alerta.label}
                         </Link>
+                      ) : alerta.onAcao && alerta.label ? (
+                        <button
+                          type="button"
+                          onClick={alerta.onAcao}
+                          className="mt-1 inline-block text-xs font-semibold text-secondary underline-offset-2 hover:underline"
+                        >
+                          {alerta.label}
+                        </button>
                       ) : null}
                     </div>
                   </section>
@@ -1517,24 +1532,16 @@ export function CoberturaDeliveryTab() {
             {painelAba === 'resumo' ? (
               <div className="flex min-h-0 flex-1 flex-col">
                 <div className="grid grid-cols-2 gap-2 px-3 py-3">
-                  <div
-                    className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 text-center"
-                    onMouseEnter={() => destacarNaLista({ tipo: 'areas', id: null })}
-                    onMouseLeave={() => destacarNaLista(null)}
-                  >
-                    <MdMap className="mx-auto h-5 w-5 text-primary-text" aria-hidden />
-                    <p className="mt-1 text-2xl font-bold text-primary-text">{areas.length}</p>
-                    <p className="text-[11px] font-semibold text-primary-text">Cobertura Área</p>
-                    <p className="mt-0.5 text-[10px] text-secondary-text">Atalhos à direita</p>
-                  </div>
-                  <div
-                    className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 text-center"
+                  <button
+                    type="button"
+                    onClick={() => setPainelAba('raios')}
                     onMouseEnter={() =>
                       raioAlcance
                         ? destacarNaLista({ tipo: 'raio', id: raioAlcance.id })
                         : destacarNaLista(null)
                     }
                     onMouseLeave={() => destacarNaLista(null)}
+                    className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 text-center transition-colors hover:border-primary/30 hover:bg-primary/5"
                   >
                     <MdMyLocation className="mx-auto h-5 w-5 text-primary-text" aria-hidden />
                     <p className="mt-1 text-2xl font-bold leading-none text-primary-text">
@@ -1542,13 +1549,41 @@ export function CoberturaDeliveryTab() {
                     </p>
                     <p className="mt-1 text-[11px] font-semibold text-primary-text">Cobertura Raio</p>
                     <p className="mt-0.5 text-[10px] text-secondary-text">Faixas de 1 em 1 km</p>
-                  </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPainelAba('areas')}
+                    onMouseEnter={() => destacarNaLista({ tipo: 'areas', id: null })}
+                    onMouseLeave={() => destacarNaLista(null)}
+                    className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 text-center transition-colors hover:border-primary/30 hover:bg-primary/5"
+                  >
+                    <MdMap className="mx-auto h-5 w-5 text-primary-text" aria-hidden />
+                    <p className="mt-1 text-2xl font-bold text-primary-text">{areas.length}</p>
+                    <p className="text-[11px] font-semibold text-primary-text">Cobertura Área</p>
+                    <p className="mt-0.5 text-[10px] text-secondary-text">Atalhos à direita</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPainelAba('manuais')}
+                    className="col-span-2 rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 text-center transition-colors hover:border-primary/30 hover:bg-primary/5"
+                  >
+                    <MdLocalOffer className="mx-auto h-5 w-5 text-primary-text" aria-hidden />
+                    <p className="mt-1 text-2xl font-bold text-primary-text">
+                      {taxasCatalogoQuery.isPending ? '…' : qtdTaxasManuais}
+                    </p>
+                    <p className="text-[11px] font-semibold text-primary-text">Taxas Manuais</p>
+                    <p className="mt-0.5 text-[10px] text-secondary-text">
+                      Catálogo tipo entrega
+                    </p>
+                  </button>
                 </div>
                 <p className="px-3 pb-3 text-[11px] leading-snug text-secondary-text">
-                  Use Taxas por Área para polígonos e Taxas por Raio para as faixas de km. O alcance
-                  do raio é definido na aba Taxas por Raio.
+                  Use Taxas por Área para polígonos, Taxas por Raio para as faixas de km e Taxas
+                  Manuais para valores fixos do catálogo.
                 </p>
               </div>
+            ) : painelAba === 'manuais' ? (
+              <CoberturaTaxasManuaisPainel />
             ) : painelAba === 'areas' ? (
               <div className="flex min-h-0 flex-1 flex-col">
                 <p className="px-4 pt-2 text-[11px] leading-snug text-secondary-text">
@@ -1638,7 +1673,7 @@ export function CoberturaDeliveryTab() {
                   )}
                 </div>
                 <div className="shrink-0 space-y-2 border-t border-gray-100 px-3 py-2">
-                  <BotaoSalvarTaxasLote
+                  <CoberturaBotaoSalvarTaxasLote
                     pendente={taxasPrazosAreaPendentes}
                     disabled={salvando || areas.length === 0 || !taxasPrazosAreaPendentes}
                     salvando={atualizarAreasLoteMutation.isPending}
@@ -1776,7 +1811,7 @@ export function CoberturaDeliveryTab() {
                   )}
                 </div>
                 <div className="shrink-0 space-y-2 border-t border-gray-100 px-3 py-2">
-                  <BotaoSalvarTaxasLote
+                  <CoberturaBotaoSalvarTaxasLote
                     pendente={taxasPrazosPendentes}
                     disabled={salvando || raiosOrdenados.length === 0 || !taxasPrazosPendentes}
                     salvando={atualizarRaiosLoteMutation.isPending}
@@ -1813,6 +1848,7 @@ export function CoberturaDeliveryTab() {
                 />
               </div>
             ) : null}
+            </div>
           </div>
         </div>
       </div>

@@ -110,7 +110,7 @@ export function DesignCabecalhoTab({
 
       <section>
         <h3 className="text-base font-semibold text-primary">Capa</h3>
-        <div className="mt-2 max-w-md">
+        <div className="mt-2 w-full max-w-xl">
           <DeliveryImageUploadField
             variant="banner"
             previewUrl={cabecalho.capaUrl}
