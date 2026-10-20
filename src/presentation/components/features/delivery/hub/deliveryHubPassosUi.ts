@@ -1,6 +1,6 @@
 import type { IconType } from 'react-icons'
 import type { DeliveryEtapaId } from '@/src/shared/constants/configuracoesRoutes'
-import type { DeliveryHubProgresso } from '@/src/presentation/components/features/delivery/hub/deliveryHubProgresso'
+import type { DeliveryHubProgresso } from '@/src/application/delivery/calcularDeliveryHubProgresso'
 import { DELIVERY_HUB_ETAPAS } from '@/src/presentation/components/features/delivery/hub/deliveryHubEtapas'
 import type { DeliveryHubPassosExtras } from '@/src/presentation/components/features/delivery/hub/deliveryHubCadastros'
 

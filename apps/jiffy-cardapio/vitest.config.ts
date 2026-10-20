@@ -18,6 +18,10 @@ export default defineConfig({
         __dirname,
         '../../src/domain/policies/menu/precoVigenteSnapshot.ts'
       ),
+      '@jiffy/intervalo-horario': path.resolve(
+        __dirname,
+        '../../src/shared/utils/intervaloHorario.ts'
+      ),
     },
   },
 })

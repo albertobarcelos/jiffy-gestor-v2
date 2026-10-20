@@ -6,6 +6,7 @@ import type {
   SubstituirAgendaFuncionamentoDeliveryRequest,
 } from '@/src/application/dto/delivery/FuncionamentoDeliveryDTO'
 import { DIAS_DA_SEMANA_API } from '@/src/application/dto/delivery/FuncionamentoDeliveryDTO'
+import { intervaloCruzaMeiaNoite as intervaloCruzaMeiaNoiteCru } from '@/src/shared/utils/intervaloHorario'
 
 /** Ordem exibida na UI (Segunda → Domingo). */
 export const DIAS_DA_SEMANA_ORDEM_UI: DiaDaSemanaApi[] = [
@@ -157,19 +158,11 @@ export function intervaloAgendaEhValido(abreEm: string, fechaEm: string): boolea
   return abre !== fecha
 }
 
-function horarioParaMinutos(hhmm: string): number {
-  const match = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim())
-  if (!match) return 0
-  const horas = Math.min(23, Math.max(0, Number(match[1])))
-  const minutos = Math.min(59, Math.max(0, Number(match[2])))
-  return horas * 60 + minutos
-}
-
 /** True quando fechaEm é “antes” de abreEm no relógio (ex.: 19:00–02:00). */
 export function intervaloCruzaMeiaNoite(abreEm: string, fechaEm: string): boolean {
   const abre = arredondarHorarioFuncionamento15Min(abreEm)
   const fecha = arredondarHorarioFuncionamento15Min(fechaEm)
-  return horarioParaMinutos(fecha) < horarioParaMinutos(abre)
+  return intervaloCruzaMeiaNoiteCru(abre, fecha)
 }
 
 export const TEXTO_FECHA_DIA_SEGUINTE = 'Fecha no dia seguinte'

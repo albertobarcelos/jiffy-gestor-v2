@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calcularDeliveryHubProgresso } from '@/src/presentation/components/features/delivery/hub/deliveryHubProgresso'
+import { calcularDeliveryHubProgresso } from '@/src/application/delivery/calcularDeliveryHubProgresso'
 import { EMPRESA_DELIVERY_PENDENCIA_TYPES } from '@/src/shared/constants/empresaDeliveryPendencias'
 
 const IDS_OBRIGATORIOS = [

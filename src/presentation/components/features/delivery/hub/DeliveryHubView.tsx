@@ -15,7 +15,7 @@ import { temCoberturaEntregaAtiva } from '@/src/application/mappers/CoberturaEnt
 import { agendaTemDiaAberto } from '@/src/shared/utils/funcionamentoDelivery'
 import { deliveryHubEtapaPath } from '@/src/shared/constants/configuracoesRoutes'
 import { getDeliveryEtapaById, type DeliveryEtapaId } from './deliveryHubEtapas'
-import { calcularDeliveryHubProgresso } from './deliveryHubProgresso'
+import { calcularDeliveryHubProgresso } from '@/src/application/delivery/calcularDeliveryHubProgresso'
 import { DeliveryHubHome } from './DeliveryHubHome'
 import type { DeliveryHubPassoUi } from './deliveryHubPassosUi'
 

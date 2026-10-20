@@ -14,37 +14,13 @@ import {
   DialogTitle,
 } from '@/src/presentation/components/ui/dialog'
 import { Taxa } from '@/src/domain/entities/Taxa'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
-import { useTaxasInfinite } from '@/src/presentation/hooks/useTaxas'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { useCoberturaTaxasManuais } from '@/src/presentation/hooks/useCoberturaTaxasManuais'
 import { showToast } from '@/src/shared/utils/toast'
 
 const COLUNAS_LISTA =
   'grid-cols-[minmax(0,2fr)_minmax(3.5rem,1fr)_1.4rem_2.75rem]'
 
 type DraftLinha = { nome: string; valor: string }
-
-function terminaisConfigDoDetalhe(detalhe: Record<string, unknown>) {
-  const raw = detalhe.terminaisConfig
-  if (!Array.isArray(raw)) return undefined
-  const items = raw
-    .map(item => {
-      if (!item || typeof item !== 'object') return null
-      const o = item as Record<string, unknown>
-      const terminalId = o.terminalId != null ? String(o.terminalId) : ''
-      if (!terminalId) return null
-      return {
-        terminalId,
-        ativo: o.ativo === true || o.ativo === 'true',
-        automatico: o.automatico === true || o.automatico === 'true',
-        mesa: o.mesa === true || o.mesa === 'true',
-        balcao: o.balcao === true || o.balcao === 'true',
-      }
-    })
-    .filter((item): item is NonNullable<typeof item> => item != null)
-  return items.length > 0 ? items : undefined
-}
 
 function valorTextoDaTaxa(taxa: Taxa): string {
   const v = taxa.getValor()
@@ -60,69 +36,12 @@ function linhaTaxaManualPendente(taxa: Taxa, draft: DraftLinha | undefined): boo
   return nomeDraft !== taxa.getNome().trim() || valorDraft !== taxa.getValor()
 }
 
-async function patchTaxaEntrega(args: {
-  token: string
-  taxa: Taxa
-  nome: string
-  valor: number
-  ativo: boolean
-}): Promise<void> {
-  const { token, taxa, nome, valor, ativo } = args
-  const getRes = await fetchGestorApi(`/api/taxas/${encodeURIComponent(taxa.getId())}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!getRes.ok) {
-    const err = await getRes.json().catch(() => ({}))
-    throw new Error(
-      (typeof err.error === 'string' && err.error) ||
-        (typeof err.message === 'string' && err.message) ||
-        'Não foi possível carregar a taxa.'
-    )
-  }
-
-  const detalhe = (await getRes.json()) as Record<string, unknown>
-  const dataAtualizacao =
-    typeof detalhe.dataAtualizacao === 'string' && detalhe.dataAtualizacao
-      ? detalhe.dataAtualizacao
-      : new Date().toISOString()
-  const ncmRaw = detalhe.ncm
-  const ncm =
-    ncmRaw === null || ncmRaw === undefined || ncmRaw === '' ? null : String(ncmRaw)
-
-  const patchRes = await fetchGestorApi(`/api/taxas/${encodeURIComponent(taxa.getId())}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      nome,
-      valor,
-      tipo: 'entrega',
-      ativo,
-      tributado: detalhe.tributado === true || detalhe.tributado === 'true',
-      ncm,
-      dataAtualizacao,
-      terminaisConfig: terminaisConfigDoDetalhe(detalhe),
-    }),
-  })
-
-  if (!patchRes.ok) {
-    const err = await patchRes.json().catch(() => ({}))
-    throw new Error(
-      (typeof err.error === 'string' && err.error) ||
-        (typeof err.message === 'string' && err.message) ||
-        'Erro ao atualizar taxa.'
-    )
-  }
-}
-
 /**
  * Aba Taxas Manuais do painel de cobertura: cria taxas do catálogo com `tipo: "entrega"`.
  */
 export function CoberturaTaxasManuaisPainel() {
-  const invalidate = useInvalidateTenantQueries()
-  const taxasQuery = useTaxasInfinite({ limit: 50, staleTime: 15_000 })
+  const { taxasQuery, taxasEntrega, criar, atualizar, excluir, invalidarTaxas } =
+    useCoberturaTaxasManuais()
   const [nome, setNome] = useState('')
   const [valorTexto, setValorTexto] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -133,13 +52,6 @@ export function CoberturaTaxasManuaisPainel() {
   const [taxaExcluindo, setTaxaExcluindo] = useState<Taxa | null>(null)
   const [excluindo, setExcluindo] = useState(false)
   const excluirLockRef = useRef(false)
-
-  const taxasEntrega = useMemo(() => {
-    const pages = taxasQuery.data?.pages ?? []
-    return pages
-      .flatMap(page => page.taxas)
-      .filter(taxa => taxa.getTipo().toLowerCase() === 'entrega')
-  }, [taxasQuery.data])
 
   const assinaturaTaxas = useMemo(
     () =>
@@ -182,56 +94,22 @@ export function CoberturaTaxasManuaisPainel() {
       return
     }
 
-    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-    if (!token) {
-      showToast.error('Sessão inválida. Faça login novamente.')
-      return
-    }
-
     setEnviando(true)
     try {
-      const response = await fetchGestorApi('/api/taxas', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          nome: nomeTrim,
-          valor,
-          tipo: 'entrega',
-          ativo: true,
-          tributado: false,
-          ncm: null,
-        }),
-      })
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}))
-        const msg =
-          (typeof err.error === 'string' && err.error) ||
-          (typeof err.message === 'string' && err.message) ||
-          'Erro ao criar taxa'
-        throw new Error(msg)
-      }
+      await criar({ nome: nomeTrim, valor })
       showToast.success('Taxa manual criada.')
       setNome('')
       setValorTexto('')
-      await invalidate(['taxas'], { refetchType: 'all' })
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Erro ao criar taxa')
     } finally {
       setEnviando(false)
     }
-  }, [invalidate, nome, valorTexto])
+  }, [criar, nome, valorTexto])
 
   const handleToggleAtivo = useCallback(
     async (taxa: Taxa, novoAtivo: boolean) => {
       if (savingAtivoLockRef.current || salvandoLista) return
-      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-      if (!token) {
-        showToast.error('Sessão inválida. Faça login novamente.')
-        return
-      }
 
       savingAtivoLockRef.current = true
       setSavingAtivoParaId(taxa.getId())
@@ -240,15 +118,12 @@ export function CoberturaTaxasManuaisPainel() {
         const nomeAtual = (draft?.nome ?? taxa.getNome()).trim() || taxa.getNome()
         const valorAtual =
           parseTaxaDraftCobertura(draft?.valor ?? valorTextoDaTaxa(taxa)) ?? taxa.getValor()
-        await patchTaxaEntrega({
-          token,
-          taxa,
+        await atualizar(taxa, {
           nome: nomeAtual,
           valor: valorAtual,
           ativo: novoAtivo,
         })
         showToast.success(novoAtivo ? 'Taxa ativada.' : 'Taxa desativada.')
-        await invalidate(['taxas'], { refetchType: 'all' })
       } catch (error) {
         showToast.error(error instanceof Error ? error.message : 'Erro ao atualizar taxa.')
       } finally {
@@ -256,16 +131,11 @@ export function CoberturaTaxasManuaisPainel() {
         setSavingAtivoParaId(null)
       }
     },
-    [drafts, invalidate, salvandoLista]
+    [atualizar, drafts, salvandoLista]
   )
 
   const handleSalvarEdicoesLista = useCallback(async () => {
     if (!edicoesPendentes || salvandoLista) return
-    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-    if (!token) {
-      showToast.error('Sessão inválida. Faça login novamente.')
-      return
-    }
 
     const pendentes = taxasEntrega.filter(taxa =>
       linhaTaxaManualPendente(taxa, drafts[taxa.getId()])
@@ -294,21 +164,23 @@ export function CoberturaTaxasManuaisPainel() {
         const nomeTrim = (draft?.nome ?? taxa.getNome()).trim()
         const valor = parseTaxaDraftCobertura(draft?.valor ?? valorTextoDaTaxa(taxa))
         if (valor === null) continue
-        await patchTaxaEntrega({
-          token,
+        await atualizar(
           taxa,
-          nome: nomeTrim,
-          valor,
-          ativo: taxa.isAtivo(),
-        })
+          {
+            nome: nomeTrim,
+            valor,
+            ativo: taxa.isAtivo(),
+          },
+          { invalidar: false }
+        )
         ok += 1
       }
-      await invalidate(['taxas'], { refetchType: 'all' })
+      await invalidarTaxas()
       showToast.success(
         ok === 1 ? 'Taxa atualizada.' : `${ok} taxas atualizadas.`
       )
     } catch (error) {
-      await invalidate(['taxas'], { refetchType: 'all' })
+      await invalidarTaxas()
       showToast.error(
         error instanceof Error
           ? ok > 0
@@ -319,50 +191,29 @@ export function CoberturaTaxasManuaisPainel() {
     } finally {
       setSalvandoLista(false)
     }
-  }, [drafts, edicoesPendentes, invalidate, salvandoLista, taxasEntrega])
+  }, [atualizar, drafts, edicoesPendentes, invalidarTaxas, salvandoLista, taxasEntrega])
 
   const handleConfirmarExclusao = useCallback(async () => {
     const taxa = taxaExcluindo
     if (!taxa || excluirLockRef.current) return
 
-    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-    if (!token) {
-      showToast.error('Sessão inválida. Faça login novamente.')
-      return
-    }
-
     excluirLockRef.current = true
     setExcluindo(true)
     try {
-      const res = await fetchGestorApi(`/api/taxas/${encodeURIComponent(taxa.getId())}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+      await excluir(taxa)
+      showToast.success('Taxa removida.')
+      setDrafts(prev => {
+        const { [taxa.getId()]: _, ...rest } = prev
+        return rest
       })
-
-      if (res.status === 204 || res.ok) {
-        showToast.success('Taxa removida.')
-        setDrafts(prev => {
-          const { [taxa.getId()]: _, ...rest } = prev
-          return rest
-        })
-        await invalidate(['taxas'], { refetchType: 'all' })
-        setTaxaExcluindo(null)
-        return
-      }
-
-      const err = await res.json().catch(() => ({}))
-      const msg =
-        (typeof err.error === 'string' && err.error) ||
-        (typeof err.message === 'string' && err.message) ||
-        'Erro ao excluir taxa.'
-      throw new Error(msg)
+      setTaxaExcluindo(null)
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Erro ao excluir taxa.')
     } finally {
       excluirLockRef.current = false
       setExcluindo(false)
     }
-  }, [invalidate, taxaExcluindo])
+  }, [excluir, taxaExcluindo])
 
   const ocupado = enviando || salvandoLista || excluindo
 

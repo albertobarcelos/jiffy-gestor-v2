@@ -1,4 +1,4 @@
-﻿import {
+import {
   pendenciaEhObrigatoria,
   type EmpresaDeliveryPendenciaItem,
   EMPRESA_DELIVERY_PENDENCIA_TYPES,

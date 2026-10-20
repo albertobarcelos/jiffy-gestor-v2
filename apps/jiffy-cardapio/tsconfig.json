@@ -18,6 +18,9 @@
       "@/*": ["./*"],
       "@jiffy/preco-vigente-snapshot": [
         "../../src/domain/policies/menu/precoVigenteSnapshot.ts"
+      ],
+      "@jiffy/intervalo-horario": [
+        "../../src/shared/utils/intervaloHorario.ts"
       ]
     }
   },

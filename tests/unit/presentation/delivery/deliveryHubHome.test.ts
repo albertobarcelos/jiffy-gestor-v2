@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { montarPassosHubDelivery } from '@/src/presentation/components/features/delivery/hub/deliveryHubPassosUi'
-import { calcularDeliveryHubProgresso } from '@/src/presentation/components/features/delivery/hub/deliveryHubProgresso'
+import { calcularDeliveryHubProgresso } from '@/src/application/delivery/calcularDeliveryHubProgresso'
 import { resumirCoberturaHub } from '@/src/presentation/components/features/delivery/hub/deliveryHubResumoCobertura'
 import {
   DELIVERY_HUB_ETAPAS,

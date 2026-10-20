@@ -3,7 +3,7 @@
 import { MdCheck, MdPalette } from 'react-icons/md'
 import { useMemo } from 'react'
 import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
-import { calcularDeliveryHubProgresso } from '@/src/presentation/components/features/delivery/hub/deliveryHubProgresso'
+import { calcularDeliveryHubProgresso } from '@/src/application/delivery/calcularDeliveryHubProgresso'
 import { DESIGN_SECTIONS, type DesignSectionId } from '../../shared/constants/designTabs'
 
 type DesignSectionCardsProps = {

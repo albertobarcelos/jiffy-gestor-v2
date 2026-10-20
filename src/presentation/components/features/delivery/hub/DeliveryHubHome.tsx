@@ -6,7 +6,7 @@ import { MdCheck, MdChevronLeft, MdChevronRight, MdSettings } from 'react-icons/
 import { cn } from '@/src/shared/utils/cn'
 import { colors } from '@/src/shared/theme/colors'
 import type { DeliveryEtapaId } from '@/src/shared/constants/configuracoesRoutes'
-import type { DeliveryHubProgresso } from './deliveryHubProgresso'
+import type { DeliveryHubProgresso } from '@/src/application/delivery/calcularDeliveryHubProgresso'
 import {
   montarPassosHubDelivery,
   type DeliveryHubPassoUi,

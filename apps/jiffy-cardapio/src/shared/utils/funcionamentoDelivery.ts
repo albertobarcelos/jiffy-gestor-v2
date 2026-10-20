@@ -6,6 +6,10 @@ import type {
   SubstituirAgendaFuncionamentoDeliveryRequest,
 } from '@/src/application/dto/delivery/FuncionamentoDeliveryDTO'
 import { DIAS_DA_SEMANA_API } from '@/src/application/dto/delivery/FuncionamentoDeliveryDTO'
+import {
+  horarioParaMinutos,
+  intervaloCruzaMeiaNoite,
+} from '@jiffy/intervalo-horario'
 
 /** Ordem exibida na UI (Segunda → Domingo). */
 export const DIAS_DA_SEMANA_ORDEM_UI: DiaDaSemanaApi[] = [
@@ -150,10 +154,6 @@ function formatarIntervalo(abreEm: string, fechaEm: string): string {
   return `${base} (dia seguinte)`
 }
 
-function intervaloCruzaMeiaNoite(abreEm: string, fechaEm: string): boolean {
-  return horarioParaMinutos(fechaEm) < horarioParaMinutos(abreEm)
-}
-
 function buscarIntervaloHoje(
   agendaSemanal: FuncionamentoPublicoDiaDTO[] | FuncionamentoDoDiaDTO[],
   agora: Date = new Date()
@@ -161,14 +161,6 @@ function buscarIntervaloHoje(
   const hoje = diaDaSemanaEm(agora)
   const dia = agendaSemanal.find(d => d.diaDaSemana === hoje)
   return dia?.intervalos[0] ?? null
-}
-
-function horarioParaMinutos(hhmm: string): number {
-  const match = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim())
-  if (!match) return 0
-  const horas = Math.min(23, Math.max(0, Number(match[1])))
-  const minutos = Math.min(59, Math.max(0, Number(match[2])))
-  return horas * 60 + minutos
 }
 
 function agoraEmMinutos(agora: Date = new Date()): number {
