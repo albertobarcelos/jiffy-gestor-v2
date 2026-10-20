@@ -39,6 +39,15 @@ describe('resumo de pagamento misto', () => {
       ])
     ).toBe(15)
   })
+
+  it('cobra o pedido, não a cédula, quando há troco', () => {
+    expect(
+      totalCobrarNaEntregaPagamentos(
+        [{ meioPagamentoId: 'mp-dinheiro', valor: 100, cobrarNaEntrega: true, naoEfetivo: true }],
+        37
+      )
+    ).toBe(63)
+  })
 })
 
 describe('formatarUsuarioPorId', () => {

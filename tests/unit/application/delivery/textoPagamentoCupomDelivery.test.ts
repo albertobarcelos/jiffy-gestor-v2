@@ -29,19 +29,19 @@ describe('textoPagamentoCupomDelivery', () => {
     })
   })
 
-  it('não coloca a cédula na linha COBRAR quando há troco', () => {
+  it('imprime o valor já resolvido pelo domínio, sem recalcular troco', () => {
     expect(
       avisoCobrancaEntregadorCupom(
         {
           cobrarCliente: true,
-          valorCobrarNaEntrega: 145,
-          trocoParaLevar: 100,
-          meios: [{ nome: 'Dinheiro', valor: 145, naEntrega: true }],
+          valorCobrarNaEntrega: 63,
+          trocoParaLevar: 37,
+          meios: [{ nome: 'Dinheiro', valor: 63, naEntrega: true }],
         },
         formatar
       )
     ).toEqual({
-      linhas: [{ left: 'COBRAR DINHEIRO', right: 'R$ 45,00' }],
+      linhas: [{ left: 'COBRAR DINHEIRO', right: 'R$ 63,00' }],
     })
   })
 })

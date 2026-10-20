@@ -139,7 +139,13 @@ export function PedidoDetalhesVisaoUnica() {
     nomesMeiosPagamentoPedido ?? {},
     transformarParaReal
   )
-  const valorCobrarNaEntrega = totalCobrarNaEntregaPagamentos(pagamentos)
+  const troco =
+    detalhesEntregaPedido?.trocoApi != null && detalhesEntregaPedido.trocoApi > 0
+      ? detalhesEntregaPedido.trocoApi
+      : trocoLancamento > 0
+        ? trocoLancamento
+        : 0
+  const valorCobrarNaEntrega = totalCobrarNaEntregaPagamentos(pagamentos, troco)
   const total =
     valorFinalVenda != null && !Number.isNaN(Number(valorFinalVenda))
       ? Number(valorFinalVenda)
@@ -164,12 +170,6 @@ export function PedidoDetalhesVisaoUnica() {
     detalhesEntregaPedido?.entregadorTelefone?.trim() ||
     entregadorDaLista?.telefone?.trim() ||
     ''
-  const troco =
-    detalhesEntregaPedido?.trocoApi != null && detalhesEntregaPedido.trocoApi > 0
-      ? detalhesEntregaPedido.trocoApi
-      : trocoLancamento > 0
-        ? trocoLancamento
-        : 0
 
   const dadosWhatsapp: PedidoKanbanQuickViewData = {
     numeroVenda: numero ?? null,

@@ -34,7 +34,10 @@ import {
 } from '@/src/application/delivery/planejarTicketsProducaoImpressora'
 import { normalizeTipoImpactoPreco } from '@/src/application/mappers/VendaApiNormalizer'
 import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
-import { meioNomeEhDinheiro } from '@/src/domain/services/pedido/CalculadoraPagamentoPedido'
+import {
+  meioNomeEhDinheiro,
+  valorCobrancaDeCedula,
+} from '@/src/domain/services/pedido/CalculadoraPagamentoPedido'
 
 function asRecord(v: unknown): Record<string, unknown> | null {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return null
@@ -56,10 +59,6 @@ function isoOrEmpty(v: unknown): string {
 function numeroFinito(v: unknown): number {
   const n = Number(v)
   return Number.isFinite(n) ? n : 0
-}
-
-function roundCentavos(valor: number): number {
-  return Math.round(valor * 100) / 100
 }
 
 function numeroOpcional(v: unknown): number | null {
@@ -254,7 +253,7 @@ function buildPagamento(
     0
   )
   const valorCobrarNaEntrega = cobrancasAtivas.length
-    ? Math.max(0, roundCentavos(somaCedulaNaEntrega - Math.max(0, troco)))
+    ? valorCobrancaDeCedula(somaCedulaNaEntrega, troco)
     : totalFaltaPagar
   const cobrarCliente = valorCobrarNaEntrega > 0
 
@@ -302,7 +301,7 @@ function buildPagamento(
     const valorCedula = numeroFinito(r.valor)
     const valor =
       naEntrega && cobrancaCedulaComTroco === r
-        ? Math.max(0, roundCentavos(valorCedula - troco))
+        ? valorCobrancaDeCedula(valorCedula, troco)
         : valorCedula
     meios.push({
       nome,
