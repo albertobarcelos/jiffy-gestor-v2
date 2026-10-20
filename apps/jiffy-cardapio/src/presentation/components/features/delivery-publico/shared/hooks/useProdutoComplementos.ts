@@ -11,6 +11,7 @@ import {
 import type { DeliveryCarrinhoComplemento } from '../stores/deliveryCarrinhoStore'
 import { showToast } from '@/src/shared/utils/toast'
 import {
+  cacheComplementosCobreProduto,
   chaveComplemento,
   listarGruposComplementosPendentes,
   produtoTemComplementosAtivos,
@@ -19,6 +20,7 @@ import {
   type GrupoComplementoPendente,
   type GrupoComplementoResolvido,
 } from '../utils/produtoComplementosUtils'
+import { resolverPrecosDeliveryProduto } from '../utils/resolverPrecosDeliveryProduto'
 
 function buildInitialQuantidades(
   complementos?: DeliveryCarrinhoComplemento[]
@@ -40,9 +42,11 @@ export function useProdutoComplementos(
 ) {
   const cacheComplementos = usePublicDeliveryComplementosStore(s => s.porSlug[slug] ?? null)
   const precisaComplementos = produtoTemComplementosAtivos(produto)
+  const cacheCobreProduto = cacheComplementosCobreProduto(cacheComplementos, produto)
   const { isLoading: carregandoComplementos } = useEnsureComplementosCatalogo(
     slug,
-    precisaComplementos && !cacheComplementos
+    precisaComplementos && !cacheCobreProduto,
+    { forceRefetch: Boolean(precisaComplementos && cacheComplementos && !cacheCobreProduto) }
   )
 
   const [quantidadesComplementos, setQuantidadesComplementos] = useState<Record<string, number>>(
@@ -74,11 +78,12 @@ export function useProdutoComplementos(
 
   const valorComplementosUnitario = useMemo(() => {
     if (complementosSelecionados.length === 0) return 0
+    const valorBase = resolverPrecosDeliveryProduto(produto).preco
     return calcularTotalComplementos({
       produtoId: produto.id,
       nome: produto.nome,
       quantidade: 1,
-      valorUnitario: produto.valor,
+      valorUnitario: valorBase,
       complementos: complementosSelecionados.map(c => ({
         id: c.complementoId,
         grupoId: c.grupoComplementoId,
@@ -88,7 +93,14 @@ export function useProdutoComplementos(
         tipoImpactoPreco: normalizeTipoImpactoPreco(c.tipoImpactoPreco),
       })),
     })
-  }, [complementosSelecionados, produto.id, produto.nome, produto.valor])
+  }, [
+    complementosSelecionados,
+    produto.id,
+    produto.nome,
+    produto.valor,
+    produto.valorPromocional,
+    produto.promocaoAtiva,
+  ])
 
   const ajustarQuantidadeComplemento = useCallback(
     (grupo: GrupoComplementoResolvido, complementoId: string, delta: number) => {

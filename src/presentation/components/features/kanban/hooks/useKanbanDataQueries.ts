@@ -24,7 +24,14 @@ import {
   KANBAN_VENDAS_REFETCH_INTERVAL_MS,
 } from '../utils/kanbanVendasListagem'
 import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
-import type { ColunaKanbanFiltroExtra, ColunaKanbanId, TipoEntregaFiltro, Venda } from '../types'
+import type {
+  ColunaKanbanFiltroExtra,
+  ColunaKanbanId,
+  OrigemFiltro,
+  TipoCanalFiltro,
+  TipoEntregaFiltro,
+  Venda,
+} from '../types'
 
 type TerminalOpcao = { id: string; nome: string }
 
@@ -42,6 +49,10 @@ export interface UseKanbanDataQueriesParams {
   getEtapaKanbanParaExibicaoRef: React.MutableRefObject<(v: Venda) => string>
   tipoEntregaFilter: TipoEntregaFiltro
   setTipoEntregaFilter: React.Dispatch<React.SetStateAction<TipoEntregaFiltro>>
+  tipoCanalFilter: TipoCanalFiltro
+  setTipoCanalFilter: React.Dispatch<React.SetStateAction<TipoCanalFiltro>>
+  origemFilter: OrigemFiltro
+  setOrigemFilter: React.Dispatch<React.SetStateAction<OrigemFiltro>>
   colunaKanbanFiltro?: ColunaKanbanFiltroExtra
 }
 
@@ -51,6 +62,10 @@ export function useKanbanDataQueries({
   getEtapaKanbanParaExibicaoRef,
   tipoEntregaFilter,
   setTipoEntregaFilter,
+  tipoCanalFilter,
+  setTipoCanalFilter,
+  origemFilter,
+  setOrigemFilter,
   colunaKanbanFiltro = '',
 }: UseKanbanDataQueriesParams) {
   const isModoDeliveryKanban = modoKanbanVendas === 'delivery'
@@ -177,6 +192,24 @@ export function useKanbanDataQueries({
       setTipoEntregaFilter('')
     }
   }, [isModoDeliveryKanban, tipoEntregaFilter, setTipoEntregaFilter])
+
+  useEffect(() => {
+    if (isModoDeliveryKanban && tipoCanalFilter) {
+      setTipoCanalFilter('')
+    }
+  }, [isModoDeliveryKanban, tipoCanalFilter, setTipoCanalFilter])
+
+  useEffect(() => {
+    if (!isModoDeliveryKanban && tipoCanalFilter === 'DELIVERY') {
+      setTipoCanalFilter('')
+    }
+  }, [isModoDeliveryKanban, tipoCanalFilter, setTipoCanalFilter])
+
+  useEffect(() => {
+    if (isModoDeliveryKanban && origemFilter === 'PDV') {
+      setOrigemFilter('')
+    }
+  }, [isModoDeliveryKanban, origemFilter, setOrigemFilter])
 
   const usaFiltroTerminal = !!terminalFilter.trim() && !isModoDeliveryKanban
 

@@ -18,13 +18,12 @@ import {
   EntityListThumbnail,
 } from '@/src/presentation/components/ui/cadastro-list'
 import { useComplementosInfinite } from '@/src/presentation/hooks/useComplementos'
+import { useCadastroListImagens } from '@/src/presentation/hooks/useCadastroListImagens'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { DELIVERY_IMAGE_ACCEPT } from '@/src/shared/constants/deliveryImageUpload'
 import {
-  fetchComplementoImagemUrl,
-  fetchComplementosImagemUrlsBatch,
+  complementoImagemMedia,
   mensagemLegivelDeliveryMediaError,
-  uploadComplementoImagem,
 } from '@/src/infrastructure/api/deliveryMediaApi'
 import { DELIVERY_COMPLEMENTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
 import { useEntityImageCropUpload } from '@/src/presentation/hooks/useEntityImageCropUpload'
@@ -32,6 +31,11 @@ import {
   ComplementosTabsModal,
   ComplementosTabsModalState,
 } from './ComplementosTabsModal'
+
+const complementoListId = (c: Complemento) => c.getId()
+const complementoListUrl = (c: Complemento) => c.getImagemUrl()
+const complementoWithImagem = (c: Complemento, url: string | null) => c.withImagemUrl(url)
+const COMPLEMENTOS_INFINITE_KEY = ['complementos', 'infinite'] as const
 
 interface ComplementosListProps {
   onReload?: () => void
@@ -131,11 +135,9 @@ const ComplementoRow = memo(function ComplementoRow({
   onValorSubmit,
   onValorKeyDown,
   onValorFocus,
-  onTipoChange,
   onToggleStatus,
   onRowClick,
   savingValor,
-  savingTipo,
   togglingStatus,
   imagemUrl,
   isUploadingImagem,
@@ -148,11 +150,9 @@ const ComplementoRow = memo(function ComplementoRow({
   onValorSubmit: (id: string) => void
   onValorKeyDown: (id: string, e: React.KeyboardEvent<HTMLInputElement>) => void
   onValorFocus: (e: React.FocusEvent<HTMLInputElement>) => void
-  onTipoChange: (id: string, v: 'nenhum' | 'aumenta' | 'diminui') => void
   onToggleStatus: (c: Complemento, novo: boolean) => void
   onRowClick: (c: Complemento) => void
   savingValor: boolean
-  savingTipo: boolean
   togglingStatus: boolean
   imagemUrl?: string | null
   isUploadingImagem?: boolean
@@ -200,24 +200,6 @@ const ComplementoRow = memo(function ComplementoRow({
         </div>
       </div>
 
-      <div className="min-w-0" onClick={e => e.stopPropagation()}>
-        <select
-          value={(complemento.getTipoImpactoPreco() || 'nenhum').toLowerCase()}
-          onChange={e =>
-            onTipoChange(complemento.getId(), e.target.value as 'nenhum' | 'aumenta' | 'diminui')
-          }
-          onClick={e => e.stopPropagation()}
-          disabled={savingTipo}
-          className={`w-full rounded-lg border border-gray-300 bg-white px-1 py-1 text-center text-[10px] font-normal text-primary-text focus:border-primary focus:outline-none md:text-sm ${
-            savingTipo ? 'cursor-not-allowed opacity-70' : ''
-          }`}
-        >
-          <option value="nenhum">NENHUM</option>
-          <option value="aumenta">AUMENTA</option>
-          <option value="diminui">DIMINUI</option>
-        </select>
-      </div>
-
       <div
         className="flex items-center justify-center"
         onClick={e => e.stopPropagation()}
@@ -253,7 +235,6 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
   const [togglingStatus, setTogglingStatus] = useState<Record<string, boolean>>({})
   const [valorInputs, setValorInputs] = useState<Record<string, string>>({})
   const [savingValorMap, setSavingValorMap] = useState<Record<string, boolean>>({})
-  const [savingTipoMap, setSavingTipoMap] = useState<Record<string, boolean>>({})
   const [tabsModalState, setTabsModalState] = useState<ComplementosTabsModalState>({
     open: false,
     tab: 'complemento',
@@ -302,58 +283,35 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
 
   const totalComplementos = useMemo(() => data?.pages[0]?.count ?? 0, [data])
 
-  const [imagensPorComplementoId, setImagensPorComplementoId] = useState<
-    Record<string, string | null>
-  >({})
-  const [uploadingImagemComplementoId, setUploadingImagemComplementoId] = useState<string | null>(
-    null
-  )
-
-  useEffect(() => {
-    const idsFaltantes = complementos
-      .map(c => c.getId())
-      .filter(id => !(id in imagensPorComplementoId))
-
-    if (idsFaltantes.length === 0) return
-
-    let cancelled = false
-    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-    if (!token) return
-
-    void fetchComplementosImagemUrlsBatch(idsFaltantes, token).then(resolved => {
-      if (cancelled) return
-      setImagensPorComplementoId(prev => ({ ...prev, ...resolved }))
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [complementos, imagensPorComplementoId])
+  const {
+    uploadingId: uploadingImagemComplementoId,
+    uploadFromList,
+    applyAfterSave,
+    refreshOne,
+    urlDaLista,
+  } = useCadastroListImagens({
+    media: complementoImagemMedia,
+    items: complementos,
+    getId: complementoListId,
+    getUrl: complementoListUrl,
+    withUrl: complementoWithImagem,
+    queryKeyBase: COMPLEMENTOS_INFINITE_KEY,
+    pageItemsKey: 'complementos',
+  })
 
   const handleUploadImagem = useCallback(async (complementoId: string, file: File) => {
-    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-    if (!token) {
-      showToast.error('Token não encontrado')
-      return
-    }
-
-    setUploadingImagemComplementoId(complementoId)
     const toastId = showToast.loading('Enviando imagem...')
-
     try {
-      await uploadComplementoImagem(complementoId, file, token)
-      const persistedUrl = await fetchComplementoImagemUrl(complementoId, token)
-      setImagensPorComplementoId(prev => ({
-        ...prev,
-        [complementoId]: persistedUrl,
-      }))
+      await uploadFromList(complementoId, file)
       showToast.successLoading(toastId, 'Imagem salva com sucesso!')
     } catch (uploadError) {
+      if (uploadError instanceof Error && uploadError.message === 'Token não encontrado') {
+        showToast.errorLoading(toastId, 'Token não encontrado')
+        return
+      }
       showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(uploadError))
-    } finally {
-      setUploadingImagemComplementoId(null)
     }
-  }, [])
+  }, [uploadFromList])
 
   const { selectForEntity: selectComplementoImagem, cropModal: complementoCropModal } =
     useEntityImageCropUpload({
@@ -575,61 +533,6 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
     handleValorSubmitRef.current = handleValorSubmit
   }, [handleValorSubmit])
 
-  const handleTipoImpactoChange = useCallback(
-    async (complementoId: string, novoTipo: 'nenhum' | 'aumenta' | 'diminui') => {
-      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-      if (!token) {
-        showToast.error('Token não encontrado. Faça login novamente.')
-        return
-      }
-
-      const complementoAtual = complementos.find(item => item.getId() === complementoId)
-      if (!complementoAtual) {
-        showToast.error('Complemento não encontrado.')
-        return
-      }
-
-      const tipoAtual = (complementoAtual.getTipoImpactoPreco() || 'nenhum').toLowerCase()
-      if (tipoAtual === novoTipo) {
-        return
-      }
-
-      setSavingTipoMap(prev => ({ ...prev, [complementoId]: true }))
-
-      try {
-        const payloadTipo = novoTipo.toLowerCase()
-        const response = await fetchGestorApi(`/api/complementos/${complementoId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ tipoImpactoPreco: payloadTipo }),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.message || 'Erro ao atualizar tipo de impacto')
-        }
-
-        showToast.success('Tipo de impacto atualizado com sucesso!')
-        await refetch()
-        onReload?.()
-      } catch (err: unknown) {
-        console.error('Erro ao atualizar tipo de impacto:', err)
-        const message =
-          err instanceof Error ? err.message : 'Erro ao atualizar tipo de impacto'
-        showToast.error(message)
-      } finally {
-        setSavingTipoMap(prev => {
-          const { [complementoId]: _, ...rest } = prev
-          return rest
-        })
-      }
-    },
-    [complementos, refetch, onReload]
-  )
-
   const handleToggleComplementoStatus = useCallback(
     async (complemento: Complemento, novoStatus: boolean) => {
       const token = useAuthStore.getState().tenantAuth?.getAccessToken()
@@ -703,12 +606,13 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
     await invalidate(['complementos'])
   }, [router, searchParams, pathname, invalidate])
 
-  const handleTabsModalReload = useCallback(async () => {
-    setImagensPorComplementoId({})
+  const handleTabsModalReload = useCallback(async (savedId?: string, imagemUrl?: string | null) => {
+    await applyAfterSave(savedId, imagemUrl)
     await handleActionsReload()
-  }, [handleActionsReload])
+    await refreshOne(savedId)
+  }, [applyAfterSave, handleActionsReload, refreshOne])
 
-  const handleTabsModalTabChange = useCallback((tab: 'complemento') => {
+  const handleTabsModalTabChange = useCallback((tab: ComplementosTabsModalState['tab']) => {
     setTabsModalState(prev => ({
       ...prev,
       tab,
@@ -801,8 +705,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
           <CadastroListThumbSpacer />
           <CadastroListHeaderLabel>Nome</CadastroListHeaderLabel>
           <CadastroListHeaderLabel hideOnMobile>Descrição</CadastroListHeaderLabel>
-          <CadastroListHeaderLabel>Valor</CadastroListHeaderLabel>
-          <CadastroListHeaderLabel className="text-center">Impacto</CadastroListHeaderLabel>
+          <CadastroListHeaderLabel>Preço Base</CadastroListHeaderLabel>
           <CadastroListHeaderLabel className="text-center">Status</CadastroListHeaderLabel>
         </CadastroListHeader>
       </div>
@@ -835,13 +738,11 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
             onValorSubmit={handleValorSubmit}
             onValorKeyDown={handleValorKeyDown}
             onValorFocus={e => e.target.select()}
-            onTipoChange={handleTipoImpactoChange}
             onToggleStatus={handleToggleComplementoStatus}
             onRowClick={handleRowOpenEdit}
             savingValor={!!savingValorMap[complemento.getId()]}
-            savingTipo={!!savingTipoMap[complemento.getId()]}
             togglingStatus={!!togglingStatus[complemento.getId()]}
-            imagemUrl={imagensPorComplementoId[complemento.getId()] ?? null}
+            imagemUrl={urlDaLista(complemento.getId(), complemento.getImagemUrl())}
             isUploadingImagem={uploadingImagemComplementoId === complemento.getId()}
             onUploadImagem={selectComplementoImagem}
           />

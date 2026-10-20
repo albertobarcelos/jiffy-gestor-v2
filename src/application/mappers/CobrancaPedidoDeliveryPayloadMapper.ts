@@ -4,8 +4,28 @@ import type {
   MomentoCobrancaDeliveryApi,
 } from '@/src/application/dto/api/pedidoDeliveryApi'
 import type { FluxoPagamentoEntrega } from '@/src/domain/types/vendaDetalhe'
-import { pagamentoEstaCancelado } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
+import {
+  pagamentoEstaCancelado,
+  pagamentoPendenteNaEntrega,
+} from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
+
+export function cobrancaPedidoFromPagamento(
+  pagamento: PagamentoSelecionado
+): CobrancaPedidoDeliveryApi {
+  const momentoCobranca: MomentoCobrancaDeliveryApi = pagamentoPendenteNaEntrega(pagamento)
+    ? 'na_entrega'
+    : 'antecipado'
+  const item: CobrancaPedidoDeliveryApi = {
+    meioPagamentoId: pagamento.meioPagamentoId,
+    valor: pagamento.valor,
+    momentoCobranca,
+  }
+  if (momentoCobranca === 'antecipado') {
+    item.pagamentoEfetivado = { confirmar: true }
+  }
+  return item
+}
 
 export type PagamentoCobrancaPatchItem = {
   meioPagamentoId: string
@@ -69,9 +89,6 @@ export function buildAtualizarCobrancasPedidoDeliveryPatch(args: {
   pagamentos: PagamentoSelecionado[]
   fluxoPagamentoEntrega: FluxoPagamentoEntrega
 }): AtualizarCobrancasPedidoDeliveryApi {
-  const momentoCobranca: MomentoCobrancaDeliveryApi =
-    args.fluxoPagamentoEntrega === 'cobrar_entregador' ? 'na_entrega' : 'antecipado'
-
   const ativos = args.pagamentos.filter(p => !pagamentoEstaCancelado(p))
   const idsAtivosNoFormulario = new Set(
     ativos
@@ -85,29 +102,17 @@ export function buildAtualizarCobrancasPedidoDeliveryPatch(args: {
 
   const add: CobrancaPedidoDeliveryApi[] = ativos
     .filter(p => !p.id?.trim())
-    .map(p => {
-      const item: CobrancaPedidoDeliveryApi = {
-        meioPagamentoId: p.meioPagamentoId,
-        valor: p.valor,
-        momentoCobranca,
-      }
-      if (momentoCobranca === 'antecipado') {
-        item.pagamentoEfetivado = { confirmar: true }
-      }
-      return item
-    })
+    .map(cobrancaPedidoFromPagamento)
 
-  const confirm =
-    momentoCobranca === 'antecipado'
-      ? ativos
-          .filter(
-            p =>
-              p.id?.trim() &&
-              idsAtivosNoFormulario.has(p.id!) &&
-              args.cobrancaIdsPendentes.includes(p.id!)
-          )
-          .map(p => ({ cobrancaId: p.id! }))
-      : []
+  const confirm = ativos
+    .filter(
+      p =>
+        !pagamentoPendenteNaEntrega(p) &&
+        Boolean(p.id?.trim()) &&
+        idsAtivosNoFormulario.has(p.id!) &&
+        args.cobrancaIdsPendentes.includes(p.id!)
+    )
+    .map(p => ({ cobrancaId: p.id! }))
 
   const cobrancas: AtualizarCobrancasPedidoDeliveryApi['cobrancas'] = {}
   if (cancel.length > 0) cobrancas.cancel = cancel

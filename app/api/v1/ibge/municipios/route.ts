@@ -4,7 +4,7 @@ import { listarMunicipiosPorEstado } from '@/src/infrastructure/ibge/ibgeLocalid
 
 /**
  * GET /api/v1/ibge/municipios?uf=SP
- * Lista todos os municípios de um estado (API pública do IBGE).
+ * Lista municípios do catálogo local do Gestor.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -20,7 +20,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'UF é obrigatório e deve ter 2 caracteres' }, { status: 400 })
     }
 
-    const municipios = await listarMunicipiosPorEstado(uf)
+    const municipios = listarMunicipiosPorEstado(uf)
+    if (municipios.length === 0) {
+      return NextResponse.json({ error: 'UF sem municípios no catálogo' }, { status: 400 })
+    }
 
     return NextResponse.json({
       uf: uf.toUpperCase(),

@@ -16,6 +16,8 @@ import {
   formatarDataHoraRelatorio,
   formatarDataHoraRelatorioNoFuso,
   formatarTaxasLancadasCelulaExport,
+  codigoTerminalCelulaRelatorio,
+  nomeLancadorRelatorio,
   obterStatusVendaLabel,
   obterTipoVendaLabel,
 } from './vendasListCalculos'
@@ -113,7 +115,7 @@ function adicionarLinhasFiltros(
   }
   if (filters.usuarioAbertoPorFilter) {
     pares.push([
-      'Usuário PDV',
+      'Usuário',
       usuariosPorId.get(filters.usuarioAbertoPorFilter) ?? filters.usuarioAbertoPorFilter,
     ])
   }
@@ -143,11 +145,11 @@ function montarAbaResumo(
   const totalCancelado = calcularTotalCanceladoLista(vendas)
   const efetivadas = metricas?.countVendasEfetivadas ?? 0
   const canceladas = metricas?.countVendasCanceladas ?? 0
-  const produtos = metricas?.countProdutosVendidos ?? 0
+  const produtos = metricas?.countProdutosVendidos
   const faturado = metricas?.totalFaturado ?? 0
 
   const titulo = sheet.getCell(1, 1)
-  titulo.value = 'Relatório de Vendas'
+  titulo.value = 'Relatório de Vendas Detalhado'
   aplicarEstiloTitulo(titulo)
   sheet.mergeCells(1, 1, 1, 2)
 
@@ -171,7 +173,7 @@ function montarAbaResumo(
       valor: efetivadas,
     },
     { label: 'Vendas canceladas (qtd.)', valor: canceladas },
-    { label: 'Produtos vendidos', valor: produtos },
+    { label: 'Produtos vendidos', valor: produtos == null ? '—' : produtos },
     { label: 'Total faturado', valor: faturado, moeda: true, destaque: true },
     { label: 'Total cancelado (R$)', valor: totalCancelado, moeda: true, destaque: true },
     { label: 'Linhas exportadas', valor: vendas.length },
@@ -280,7 +282,7 @@ function montarAbaVendas(
     'Tipo venda',
     'Qtd. produtos',
     'Terminal',
-    'Usuário PDV',
+    'Usuário',
     'Forma(s) de pagamento',
     'Taxas lançadas',
     'Valor taxas (R$)',
@@ -314,8 +316,8 @@ function montarAbaVendas(
     row.getCell(5).value = obterTipoVendaLabel(venda)
     row.getCell(6).value = qtdProdutos
     row.getCell(6).numFmt = EXCEL_FMT.inteiro
-    row.getCell(7).value = venda.codigoTerminal ?? ''
-    row.getCell(8).value = usuariosPorId.get(venda.abertoPorId) ?? venda.abertoPorId
+    row.getCell(7).value = codigoTerminalCelulaRelatorio(venda)
+    row.getCell(8).value = nomeLancadorRelatorio(venda, usuariosPorId)
 
     const formasPagamento = formatarFormasPagamentoCelulaExport(
       pagamentosPorVendaId.get(venda.id),

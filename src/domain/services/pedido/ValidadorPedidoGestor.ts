@@ -1,17 +1,28 @@
 import { validarQuantidadesComplementosLinha } from '@/src/domain/policies/pedido/ComplementoQuantidadeLinhaPolicy'
 import { clienteCadastradoNestaEmpresa } from '@/src/domain/policies/pedido/ClienteEntregaPolicy'
 import {
+  mensagemBloqueioForaDaCobertura,
   mensagemBloqueioTaxaAutomatica,
   type StatusCoberturaEntregaPedido,
   type TaxaEntregaOverrideModoPolicy,
 } from '@/src/domain/policies/pedido/cotacaoEntregaPolicy'
-import { pagamentosCobremTotalPedido } from '@/src/domain/services/pedido/CalculadoraPagamentoPedido'
+import {
+  pagamentosCobremTotalPedido,
+  totalPagamentosLancados,
+} from '@/src/domain/services/pedido/CalculadoraPagamentoPedido'
+import { pedidoTemCobrancaPendenteNaEntrega } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import type { PagamentoSelecionado, ProdutoSelecionado, StatusVenda } from '@/src/domain/types/pedido'
 
 export type ValidacaoErroPedido = {
   message: string
   goToStep?: 1 | 2 | 3
-  code?: 'pagamentos_total' | 'produtos' | 'complementos' | 'entrega' | 'pagamento_entrega'
+  code?:
+    | 'pagamentos_total'
+    | 'produtos'
+    | 'complementos'
+    | 'entrega'
+    | 'pagamento_entrega'
+    | 'cobertura'
 }
 
 export type ValidarPedidoGestorInput = {
@@ -70,6 +81,14 @@ export function validarInformacoesPedidoEntrega(params: {
     return { message: 'Selecione ou cadastre o endereço de entrega.', goToStep: 2 }
   }
 
+  const bloqueioCobertura = mensagemBloqueioForaDaCobertura({
+    pedidoComEntrega: params.pedidoComEntrega,
+    enderecoEntregaCoberturaStatus: params.enderecoEntregaCoberturaStatus,
+  })
+  if (bloqueioCobertura) {
+    return { message: bloqueioCobertura, goToStep: 2, code: 'cobertura' }
+  }
+
   const bloqueioTaxa = mensagemBloqueioTaxaAutomatica({
     pedidoComEntrega: params.pedidoComEntrega,
     taxaEntregaOverride: params.taxaEntregaOverride,
@@ -109,10 +128,21 @@ function validarPagamentosObrigatorios(
 
 function validarTotaisPagamento(input: ValidarPedidoGestorInput): ValidacaoErroPedido | null {
   if (input.pedidoEntregaAceitaPagamentoPendente) {
-    if (input.entregaComCobrancaPeloEntregador) {
+    const temCobrancaNaEntrega =
+      input.entregaComCobrancaPeloEntregador ||
+      pedidoTemCobrancaPendenteNaEntrega(input.pagamentos)
+    if (temCobrancaNaEntrega) {
       if (input.produtosCount === 0 || input.pagamentosCount === 0) {
         return {
           message: 'Informe produtos e forma de pagamento para cobrança na entrega.',
+          goToStep: 3,
+        }
+      }
+      const valorLancado = totalPagamentosLancados(input.pagamentos)
+      if (!pagamentosCobremTotalPedido(input.totalProdutos, valorLancado, input.troco)) {
+        return {
+          message: 'Valor dos pagamentos não corresponde ao total do pedido.',
+          code: 'pagamentos_total',
           goToStep: 3,
         }
       }

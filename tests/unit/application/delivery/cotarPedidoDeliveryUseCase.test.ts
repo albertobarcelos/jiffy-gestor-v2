@@ -8,17 +8,14 @@ import type { ICotacaoPedidoDeliveryRepository } from '@/src/domain/repositories
 import { ApiError } from '@/src/infrastructure/api/apiClient'
 
 describe('CotacaoPedidoDeliveryMapper', () => {
-  it('monta payload público com slug e sem origem', () => {
+  it('monta payload autenticado sem slug e sem origem', () => {
     const payload = montarCotacaoPedidoDeliveryBackend({
-      slug: 'minha-pizzaria',
-      body: {
-        tipoEntrega: 'entrega',
-        cliente: { telefone: '65999998888', enderecoIdEntrega: 'end-1' },
-        produtos: [{ produtoId: 'prod-1', quantidade: 1 }],
-      },
+      tipoEntrega: 'entrega',
+      cliente: { telefone: '65999998888', enderecoIdEntrega: 'end-1' },
+      produtos: [{ produtoId: 'prod-1', quantidade: 1 }],
     })
 
-    expect(payload.slug).toBe('minha-pizzaria')
+    expect(payload).not.toHaveProperty('slug')
     expect(payload).not.toHaveProperty('origem')
     expect(payload.cliente.enderecoIdEntrega).toBe('end-1')
   })
@@ -40,12 +37,9 @@ describe('CotacaoPedidoDeliveryMapper', () => {
 })
 
 describe('CotarPedidoDeliveryUseCase', () => {
-  it('injeta o slug da empresa autenticada e não envia origem', async () => {
-    const cotarPublico = vi.fn().mockResolvedValue({ entrega: { taxaEntrega: 8 } })
-    const repo: ICotacaoPedidoDeliveryRepository = {
-      buscarSlugEmpresaDelivery: vi.fn().mockResolvedValue('top-cmtu8c7v'),
-      cotarPublico,
-    }
+  it('encaminha o JWT e não busca slug nem envia origem', async () => {
+    const cotar = vi.fn().mockResolvedValue({ entrega: { taxaEntrega: 8 } })
+    const repo: ICotacaoPedidoDeliveryRepository = { cotar }
     const useCase = new CotarPedidoDeliveryUseCase(repo)
 
     const resultado = await useCase.execute(
@@ -58,21 +52,20 @@ describe('CotarPedidoDeliveryUseCase', () => {
     )
 
     expect(resultado).toEqual({ status: 'ok', valorTaxa: 8 })
-    expect(cotarPublico).toHaveBeenCalledWith(
+    expect(cotar).toHaveBeenCalledWith(
       expect.objectContaining({
-        slug: 'top-cmtu8c7v',
         tipoEntrega: 'entrega',
-      })
+        cliente: { telefone: '65999998888', enderecoIdEntrega: 'end-1' },
+      }),
+      'token-test'
     )
-    expect(cotarPublico.mock.calls[0][0]).not.toHaveProperty('origem')
+    expect(cotar.mock.calls[0][0]).not.toHaveProperty('slug')
+    expect(cotar.mock.calls[0][0]).not.toHaveProperty('origem')
   })
 
   it('propaga fora da cobertura', async () => {
     const repo: ICotacaoPedidoDeliveryRepository = {
-      buscarSlugEmpresaDelivery: vi.fn().mockResolvedValue('top-cmtu8c7v'),
-      cotarPublico: vi
-        .fn()
-        .mockRejectedValue(new ApiError('Endereço fora da cobertura', 400, {})),
+      cotar: vi.fn().mockRejectedValue(new ApiError('Endereço fora da cobertura', 400, {})),
     }
     const useCase = new CotarPedidoDeliveryUseCase(repo)
 

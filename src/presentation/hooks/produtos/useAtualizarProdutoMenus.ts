@@ -1,7 +1,10 @@
 'use client'
 
+import { useQueryClient } from '@tanstack/react-query'
+import { invalidarCatalogoVendaQueries } from '@/src/presentation/cache/catalogoVendaQueryCache'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import type { UpdateProdutoMenusInput } from '@/src/shared/types/menus'
@@ -20,6 +23,8 @@ async function parseError(response: Response, fallback: string) {
  */
 export function useAtualizarProdutoMenus(produtoId: string | undefined) {
   const invalidate = useInvalidateTenantQueries()
+  const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
 
   return useSecureTenantMutation(
     async ({ token }, input: UpdateProdutoMenusInput) => {
@@ -48,6 +53,10 @@ export function useAtualizarProdutoMenus(produtoId: string | undefined) {
         await invalidate(['menu-produtos'])
         await invalidate(['menu-grupos'])
         await invalidate(['menu-produto'])
+        invalidarCatalogoVendaQueries(queryClient, empresaId, {
+          tipo: 'vinculo-menu',
+          produtoId: produtoId ?? '',
+        })
       },
     }
   )

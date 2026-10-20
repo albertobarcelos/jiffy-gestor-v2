@@ -37,24 +37,25 @@ describe('mapContagemOperacionalParaColunas', () => {
 describe('derivarContagensColunasFiscaisKanban', () => {
   const getEtapa = (v: VendaUnificadaDTO) => v.getEtapaKanban()
 
-  it('sem próxima página usa contagem exata do pool carregado', () => {
+  it('sem próxima página conta o pool inteiro na coluna Entregues', () => {
     const pool = [
       vendaMock('FINALIZADAS'),
       vendaMock('PENDENTE_EMISSAO'),
       vendaMock('COM_FISCAL'),
+      vendaMock('REJEITADAS'),
     ]
 
     expect(
       derivarContagensColunasFiscaisKanban(10, pool, getEtapa, false)
-    ).toEqual({ FINALIZADAS: 2, COM_FISCAL: 1 })
+    ).toEqual({ FINALIZADAS: 4, COM_FISCAL: 0 })
   })
 
-  it('com próxima página estima proporção do total FINALIZADO da API', () => {
+  it('com próxima página usa o total FINALIZADO da API na coluna Entregues', () => {
     const pool = [vendaMock('FINALIZADAS'), vendaMock('COM_FISCAL')]
 
     expect(
       derivarContagensColunasFiscaisKanban(100, pool, getEtapa, true)
-    ).toEqual({ FINALIZADAS: 50, COM_FISCAL: 50 })
+    ).toEqual({ FINALIZADAS: 100, COM_FISCAL: 0 })
   })
 })
 
@@ -108,8 +109,8 @@ describe('combinarContagensColunasDeliveryKanban', () => {
       EM_PREPARO: 3,
       PRONTO_ENTREGA: 2,
       EM_ROTA: 1,
-      FINALIZADAS: 1,
-      COM_FISCAL: 2,
+      FINALIZADAS: 3,
+      COM_FISCAL: 0,
     })
   })
 })

@@ -1,35 +1,15 @@
+import type { ColunaKanbanOperacionalId } from '@/src/domain/types/kanbanPedido'
+
 /** Modo configurado na empresa (`parametroEmpresa.modoImpressaoDelivery`). Canônicos: `unificado` | `separado`. */
 export type ModoImpressaoDelivery = 'unificado' | 'separado'
 
 /**
  * Tipo de cupom gerado em memória (layout).
  * - `producao_completa`: modo unificado — cupom completo em `iniciar_preparo`.
- * - `producao_cozinha`: modo separado — produção em `iniciar_preparo` (impressoras por produto: roadmap).
+ * - `producao_cozinha`: modo separado — produção em `iniciar_preparo` (impressoras por produto).
  * - `expedicao`: modo separado — expedição em `marcar_pronto`.
  */
 export type TipoCupomDelivery = 'producao_completa' | 'producao_cozinha' | 'expedicao'
-
-export interface ItemCupomDelivery {
-  /** Para agrupar produção por impressora (`GET /api/produtos/:id` → `impressoras`). */
-  produtoId?: string
-  descricao: string
-  quantidade: number
-  valorUnitario?: number
-  valorFinal?: number
-  observacao?: string
-}
-
-/** Entrada estável para montagem do HTML — independente do formato cru da API. */
-export interface VendaGestorCupomDTO {
-  id: string
-  numeroVenda: number
-  codigoVenda?: string
-  valorFinal: number
-  tipoVenda?: string | null
-  cliente: { nome?: string; telefone?: string } | null
-  produtos: ItemCupomDelivery[]
-  observacaoGeral?: string
-}
 
 /**
  * Preferências de impressão delivery em `parametroEmpresa` (`GET /empresas/me`).
@@ -42,8 +22,6 @@ export interface PreferenciasImpressaoDelivery {
   imprimirAoReceber: boolean
   imprimirAoFicarPronto: boolean
   impressoraExpedicaoId: string | null
-  /** Campo legado; impressão física fica no agente Windows. */
-  impressoraPadraoNome: string | null
 }
 
 export const DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY: PreferenciasImpressaoDelivery = {
@@ -53,7 +31,6 @@ export const DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY: PreferenciasImpressaoDeliv
   imprimirAoReceber: true,
   imprimirAoFicarPronto: true,
   impressoraExpedicaoId: null,
-  impressoraPadraoNome: null,
 }
 
 export type DecidirImpressaoResultado = {
@@ -65,7 +42,7 @@ export type DecidirImpressaoResultado = {
 /** Usado pelo hook de reimpressão manual (inferência pela coluna atual). */
 export function tipoCupomParaReimpressao(
   modo: ModoImpressaoDelivery,
-  colunaOperacional: 'NOVOS_PEDIDOS' | 'EM_PREPARO' | 'PRONTO_ENTREGA' | 'EM_ROTA'
+  colunaOperacional: ColunaKanbanOperacionalId
 ): TipoCupomDelivery {
   if (modo === 'unificado') {
     return 'producao_completa'

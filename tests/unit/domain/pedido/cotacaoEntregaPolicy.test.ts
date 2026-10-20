@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  mensagemBloqueioForaDaCobertura,
   mensagemBloqueioTaxaAutomatica,
   resolverResultadoCotacaoTaxaUi,
 } from '@/src/domain/policies/pedido/cotacaoEntregaPolicy'
@@ -76,6 +77,42 @@ describe('mensagemBloqueioTaxaAutomatica', () => {
         pedidoComEntrega: true,
         taxaEntregaOverride: 'catalogo',
         enderecoEntregaCoberturaStatus: 'pendente',
+      })
+    ).toBeNull()
+  })
+
+  it('não trata fora da cobertura — isso é mensagemBloqueioForaDaCobertura', () => {
+    expect(
+      mensagemBloqueioTaxaAutomatica({
+        pedidoComEntrega: true,
+        taxaEntregaOverride: 'automatica',
+        enderecoEntregaCoberturaStatus: 'fora',
+      })
+    ).toBeNull()
+  })
+})
+
+describe('mensagemBloqueioForaDaCobertura', () => {
+  it('bloqueia entrega fora da cobertura mesmo com outra taxa', () => {
+    expect(
+      mensagemBloqueioForaDaCobertura({
+        pedidoComEntrega: true,
+        enderecoEntregaCoberturaStatus: 'fora',
+      })
+    ).toMatch(/fora da área de cobertura/i)
+  })
+
+  it('não bloqueia retirada nem endereço coberto', () => {
+    expect(
+      mensagemBloqueioForaDaCobertura({
+        pedidoComEntrega: false,
+        enderecoEntregaCoberturaStatus: 'fora',
+      })
+    ).toBeNull()
+    expect(
+      mensagemBloqueioForaDaCobertura({
+        pedidoComEntrega: true,
+        enderecoEntregaCoberturaStatus: 'ok',
       })
     ).toBeNull()
   })

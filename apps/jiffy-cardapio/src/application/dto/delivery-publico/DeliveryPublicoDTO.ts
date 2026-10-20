@@ -23,10 +23,30 @@ export type CatalogoPublicoGrupoComplementoDTO = {
   complementoIds: string[]
 }
 
+/** Lean efetivo do complemento neste produto (todas as páginas do catálogo). */
+export type CatalogoPublicoComplementoNoProdutoDTO = {
+  id: string
+  valor: number
+  ativo: boolean
+  ordem: number
+  tipoImpactoPreco: string
+}
+
+/** Lean do grupo neste produto: ordem efetiva + complementos com override. */
+export type CatalogoPublicoGrupoComplementoNoProdutoDTO = {
+  id: string
+  ordem: number
+  complementos: CatalogoPublicoComplementoNoProdutoDTO[]
+}
+
 export type CatalogoPublicoProdutoDTO = {
   id: string
   nome: string
   valor: number
+  valorPromocional?: number
+  /** Campo opcional do backend; o preço exibido usa valor + valorPromocional + promocaoAtiva. */
+  valorVigente?: number
+  promocaoAtiva?: boolean
   descricao: string | null
   imagemUrl: string | null
   ordem: number
@@ -34,6 +54,11 @@ export type CatalogoPublicoProdutoDTO = {
   favorito: boolean
   abreComplementos: boolean
   grupoComplementosIds: string[]
+  /**
+   * Overrides efetivos (valor/ativo/ordem/tipoImpactoPreco). Join com o dicionário
+   * da 1ª página para nome/imagem/regras do grupo.
+   */
+  gruposComplementos: CatalogoPublicoGrupoComplementoNoProdutoDTO[]
 }
 
 export type CatalogoPublicoGrupoProdutoDTO = {
@@ -64,6 +89,14 @@ export type CatalogoPublicoPaginaDTO = {
   paginacao: CatalogoPublicoPaginacaoDTO
 }
 
+export type CanalWhatsAppPublicoStatus = 'conectando' | 'conectado' | 'desconectado'
+
+export type CanalWhatsAppPublicoDTO = {
+  status: CanalWhatsAppPublicoStatus
+  conectado: boolean
+  telefone: string | null
+}
+
 export type EmpresaPublicaDTO = {
   id: string
   nomeFantasia: string
@@ -72,6 +105,11 @@ export type EmpresaPublicaDTO = {
   segmento: string | null
   logoUrl: string | null
   bannerUrl: string | null
+  /**
+   * Quando true, o checkout exige CPF do cliente para finalizar o pedido.
+   * Vem na raiz da empresa pública (não em parametroDelivery).
+   */
+  exigeCpfVenda?: boolean
   endereco: {
     rua: string
     numero: string
@@ -80,10 +118,14 @@ export type EmpresaPublicaDTO = {
     estado: string | null
     cep: string | null
   } | null
+  /** GeoJSON Point da loja (contrato backend). Null se ainda não geocodificada. */
+  localizacao?: GeoJsonPoint | null
 }
 
 export type GetCatalogoPublicoResponseDTO = {
   empresa: EmpresaPublicaDTO
+  /** Presente quando a empresa tem canal WhatsApp cadastrado. */
+  canalWhatsApp?: CanalWhatsAppPublicoDTO | null
   funcionamento: FuncionamentoPublicoDTO
   catalogo: CatalogoPublicoPaginaDTO
 }

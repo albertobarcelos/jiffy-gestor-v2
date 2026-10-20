@@ -19,13 +19,22 @@ export async function POST(
       return NextResponse.json({ error: 'ID do pedido é obrigatório' }, { status: 400 })
     }
 
-    const body = (await request.json()) as { modelo?: number }
+    const body = (await request.json()) as {
+      modelo?: number
+      informacoesAdicionais?: string
+    }
     const modelo = Number(body.modelo)
     if (![55, 65].includes(modelo)) {
       return NextResponse.json(
         { error: 'Modelo deve ser 55 (NF-e) ou 65 (NFC-e)' },
         { status: 400 }
       )
+    }
+
+    const payload: Record<string, unknown> = { modelo }
+    const informacoesAdicionais = body.informacoesAdicionais?.trim()
+    if (informacoesAdicionais) {
+      payload.informacoesAdicionais = informacoesAdicionais
     }
 
     const apiClient = new ApiClient()
@@ -38,7 +47,7 @@ export async function POST(
           'Content-Type': 'application/json',
           Accept: 'application/json',
         },
-        body: JSON.stringify({ modelo }),
+        body: JSON.stringify(payload),
       }
     )
 

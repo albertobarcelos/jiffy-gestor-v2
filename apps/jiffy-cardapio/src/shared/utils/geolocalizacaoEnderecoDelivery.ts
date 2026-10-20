@@ -6,7 +6,6 @@ export type {
 export {
   coordsPointsDiferem,
   enderecoGeocodeMinimo,
-  enderecoTemGeolocalizacao,
   geocodificarEnderecoViaGoogle,
   mesclarEnderecoComReverseGeocode,
   montarEnderecoLocalizacaoInput,
@@ -17,3 +16,4 @@ export {
   resolverEnderecoPorCoordenadas,
   resolverPreferenciaEntrega,
 } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
+export { enderecoEntregaTemGeolocalizacao as enderecoTemGeolocalizacao } from '@/src/domain/policies/EnderecoEntregaRequerGeolocalizacao'

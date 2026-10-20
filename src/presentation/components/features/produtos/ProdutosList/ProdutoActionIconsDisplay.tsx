@@ -17,7 +17,7 @@ export function ProdutoActionIconsDisplay({ produto }: { produto: Produto }) {
       className="flex flex-nowrap items-center gap-1"
       aria-label="Indicadores do produto"
     >
-      {menuQuickActionIconsConfig.map(({ key, ariaLabel, Icon, field }) => {
+      {menuQuickActionIconsConfig.map(({ key, ariaLabel, Icon, field, hideOnMobile }) => {
         const ativo = toggleStates[field]
         return (
           <span
@@ -29,7 +29,7 @@ export function ProdutoActionIconsDisplay({ produto }: { produto: Produto }) {
               ativo
                 ? 'border border-secondary bg-secondary text-white'
                 : 'border border-secondary/60 bg-white text-secondary'
-            }`}
+            } ${hideOnMobile ? 'hidden md:inline-flex' : ''}`}
           >
             <Icon />
           </span>

@@ -1,4 +1,8 @@
-import { formatarTipoPagamentoDetalhe } from '@/src/application/mappers/PedidoDisplayMapper'
+import {
+  formatarTipoPagamentoDetalhe,
+  montarLinhasResumoPagamentoPedido,
+  totalCobrarNaEntregaPagamentos,
+} from '@/src/application/mappers/PedidoDisplayMapper'
 import {
   calcularTotalDosItensResumoEntrega,
   mapDetalhesEntregaFromVendaApi,
@@ -11,21 +15,21 @@ import { mapearPagamentoDetalheVenda } from '@/src/application/mappers/VendaDeta
 import type { VendaGestorApiResponse } from '@/src/application/dto/api/vendaGestorApi'
 import { pickProdutosLancados } from '@/src/application/mappers/VendaApiNormalizer'
 import type { IVendaDetalheReadRepository } from '@/src/domain/repositories/IVendaDetalheReadRepository'
-import { pagamentoEstaCancelado } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
+import { transformarParaReal } from '@/src/shared/utils/formatters'
 import type {
   DetalhesEntregaPedido,
   FluxoPagamentoEntrega,
   TabelaOrigemVenda,
 } from '@/src/domain/types/vendaDetalhe'
 import { deveUsarModuloDeliveryParaDetalhe } from '@/src/application/mappers/PedidoDeliveryDetalheAdapter'
-import { vendaDetalheReadRepository } from '@/src/infrastructure/api/repositories/VendaDetalheReadRepository'
 import {
   textoFromObservacoesApi,
   textoObservacaoProdutoApi,
 } from '@/src/shared/helpers/observacaoPedido'
 
 export interface ProdutoKanbanQuickView {
+  produtoId: string
   nome: string
   quantidade: number
   observacao?: string
@@ -47,14 +51,12 @@ export interface PedidoKanbanQuickViewData {
   troco: number
   fluxoPagamentoEntrega: FluxoPagamentoEntrega
   tipoPagamento: string
+  linhasPagamento: string[]
   observacaoPedido: string | null
 }
 
 function calcularTotalAReceberPagamentos(pagamentos: PagamentoSelecionado[]): number {
-  const total = pagamentos
-    .filter(p => !pagamentoEstaCancelado(p))
-    .reduce((sum, p) => sum + (Number(p.valor) || 0), 0)
-  return total > 0 ? Math.round(total * 100) / 100 : 0
+  return totalCobrarNaEntregaPagamentos(pagamentos)
 }
 
 function resolverFluxoPagamentoEntrega(
@@ -106,8 +108,9 @@ function mapearProdutosKanbanQuickView(
         })
 
       const observacao = textoObservacaoProdutoApi(prod) || undefined
+      const produtoId = String(prod.produtoId ?? prod.id ?? '').trim()
 
-      return { nome, quantidade, observacao, complementos }
+      return { produtoId, nome, quantidade, observacao, complementos }
     })
 }
 
@@ -171,14 +174,14 @@ async function resolverNomesMeiosPagamentoQuickView(args: {
 
 export class CarregarPedidoKanbanQuickViewUseCase {
   constructor(
-    private readonly repo: IVendaDetalheReadRepository = vendaDetalheReadRepository
+    private readonly repo: IVendaDetalheReadRepository
   ) {}
 
   async execute(params: {
     vendaId: string
     tabelaOrigem: TabelaOrigemVenda
     token: string
-    tipoVenda?: 'entrega' | 'retirada' | null
+    tipoVenda?: string | null
     /** Texto já conhecido no card do Kanban (GET unificado) — fallback se o GET detalhe vier vazio. */
     observacaoPedidoHint?: string | null
   }): Promise<PedidoKanbanQuickViewData> {
@@ -221,8 +224,13 @@ export class CarregarPedidoKanbanQuickViewUseCase {
       fetchClienteDelivery: telefone =>
         this.repo.fetchClienteDeliveryByTelefone(telefone, token),
     })
-    if (enderecoResolvido !== undefined) {
-      detalhesEntrega = { ...detalhesEntrega, enderecoEntrega: enderecoResolvido }
+    detalhesEntrega = {
+      ...detalhesEntrega,
+      enderecoEntrega: enderecoResolvido.enderecoEntrega,
+      clienteCpfCnpj:
+        detalhesEntrega.clienteCpfCnpj?.trim() ||
+        enderecoResolvido.documentoClienteDelivery ||
+        null,
     }
 
     let nomeEntregador = detalhesEntrega.entregadorNome?.trim() || ''
@@ -295,15 +303,26 @@ export class CarregarPedidoKanbanQuickViewUseCase {
       pagamentoEntregaApi
     )
 
-    const troco = resolverTrocoLevarPedidoEntrega(vendaData, pagamentos)
-    const totalAReceber = calcularTotalAReceberPagamentos(pagamentos)
     const nomesMeiosPagamento = await resolverNomesMeiosPagamentoQuickView({
       pagamentosApi,
       meiosCobrancaApi,
       repo: this.repo,
       token,
     })
+    const troco = resolverTrocoLevarPedidoEntrega(vendaData, pagamentos, nomesMeiosPagamento)
+    if (troco > 0) {
+      detalhesEntrega = { ...detalhesEntrega, trocoApi: troco }
+    } else if (detalhesEntrega.trocoApi) {
+      detalhesEntrega = { ...detalhesEntrega, trocoApi: null }
+    }
+    const totalAReceber = calcularTotalAReceberPagamentos(pagamentos)
     const tipoPagamento = formatarTipoPagamentoDetalhe(pagamentos, [], nomesMeiosPagamento)
+    const linhasPagamento = montarLinhasResumoPagamentoPedido(
+      pagamentos,
+      [],
+      nomesMeiosPagamento,
+      transformarParaReal
+    ).map(linha => linha.texto)
 
     const observacaoPedidoResolvida = (() => {
       const fromApi = resolverObservacaoPedidoQuickView(vendaData, detalhesEntrega)
@@ -327,9 +346,8 @@ export class CarregarPedidoKanbanQuickViewUseCase {
       troco: troco > 0 ? troco : 0,
       fluxoPagamentoEntrega,
       tipoPagamento,
+      linhasPagamento,
       observacaoPedido: observacaoPedidoResolvida,
     }
   }
 }
-
-export const carregarPedidoKanbanQuickViewUseCase = new CarregarPedidoKanbanQuickViewUseCase()

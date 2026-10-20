@@ -10,7 +10,8 @@ import { VendasList } from '@/src/presentation/components/features/vendas/Vendas
  * Componente principal de Relatórios
  * Replica o design e funcionalidades do Flutter
  */
-export function RelatoriosView() {  const searchParams = useSearchParams() // Obter search params da URL
+export function RelatoriosView() {
+  const searchParams = useSearchParams() // Obter search params da URL
   const initialPeriodo = searchParams.get('periodo') || 'Todos' // Período vindo da URL
   const initialStatus = searchParams.get('status') || null // Status vindo da URL
 
@@ -50,7 +51,7 @@ export function RelatoriosView() {  const searchParams = useSearchParams() // O
                   : 'text-secondary-text hover:text-primary'
               }`}
             >
-              Todas as Vendas do PDV
+              Relatório de Vendas Detalhado
             </button>
             {/*<button
               onClick={() => setActiveTab('faturamento')}

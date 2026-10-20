@@ -1,3 +1,52 @@
+import {
+  modoFichaDerivado,
+  parseModoImpressaoImpressora,
+  resolverModoImpressaoDaEstacao,
+  type ModoImpressaoImpressora,
+} from '@/src/domain/types/modoImpressaoImpressora'
+
+export type ImpressoraTerminalConfig = {
+  terminalId?: string
+  ativo?: boolean
+  modoFicha?: boolean
+  modoImpressao?: ModoImpressaoImpressora
+  imprimirSenha?: boolean
+  modelo?: string
+  ip?: string
+  porta?: string
+  tipoConexao?: string
+}
+
+function flagLigada(valor: unknown): boolean {
+  return valor === true || valor === 'true' || valor === 1 || valor === '1'
+}
+
+function asRecord(v: unknown): Record<string, unknown> | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null
+  return v as Record<string, unknown>
+}
+
+function mapTerminalConfig(raw: unknown): ImpressoraTerminalConfig {
+  const r = asRecord(raw) ?? {}
+  const modoImpressao = parseModoImpressaoImpressora(
+    r.modoImpressao ?? r.modo_impressao,
+    r.modoFicha === true || r.modoFicha === 'true' || r.modo_ficha === true || r.modo_ficha === 'true'
+  )
+  const ativo = r.ativo === true || r.ativo === 'true' || r.ativo === undefined
+  const terminalIdRaw = r.terminalId ?? r.estacaoId ?? r.estacaoImpressaoId
+  return {
+    terminalId: terminalIdRaw != null ? String(terminalIdRaw) : undefined,
+    ativo,
+    modoImpressao,
+    modoFicha: modoFichaDerivado(modoImpressao),
+    imprimirSenha: flagLigada(r.imprimirSenha ?? r.imprimir_senha),
+    modelo: r.modelo != null ? String(r.modelo) : undefined,
+    ip: r.ip != null ? String(r.ip) : undefined,
+    porta: r.porta != null ? String(r.porta) : undefined,
+    tipoConexao: r.tipoConexao != null ? String(r.tipoConexao) : undefined,
+  }
+}
+
 /**
  * Entidade de domínio representando uma Impressora
  */
@@ -12,7 +61,7 @@ export class Impressora {
     private readonly porta?: string,
     private readonly dataAtualizacao?: string,
     private readonly dataCriacao?: string,
-    private readonly terminais?: any[]
+    private readonly terminais?: ImpressoraTerminalConfig[]
   ) {}
 
   static create(
@@ -25,7 +74,7 @@ export class Impressora {
     porta?: string,
     dataAtualizacao?: string,
     dataCriacao?: string,
-    terminais?: any[]
+    terminais?: ImpressoraTerminalConfig[]
   ): Impressora {
     if (!id || !nome) {
       throw new Error('ID e nome são obrigatórios')
@@ -46,6 +95,9 @@ export class Impressora {
   }
 
   static fromJSON(data: any): Impressora {
+    const terminaisRaw = data.terminaisConfig || data.terminais
+    const terminais = Array.isArray(terminaisRaw) ? terminaisRaw.map(mapTerminalConfig) : undefined
+
     return Impressora.create(
       data.id?.toString() || '',
       data.nome?.toString() || '',
@@ -56,7 +108,7 @@ export class Impressora {
       data.porta?.toString(),
       data.dataAtualizacao?.toString(),
       data.dataCriacao?.toString(),
-      data.terminaisConfig || data.terminais // Aceita ambos os formatos
+      terminais
     )
   }
 
@@ -96,8 +148,12 @@ export class Impressora {
     return this.dataCriacao
   }
 
-  getTerminais(): any[] | undefined {
+  getTerminais(): ImpressoraTerminalConfig[] | undefined {
     return this.terminais
+  }
+
+  getModoImpressaoDaEstacao(estacaoId?: string | null): ModoImpressaoImpressora {
+    return resolverModoImpressaoDaEstacao(this.terminais, estacaoId)
   }
 
   toJSON() {
@@ -115,4 +171,3 @@ export class Impressora {
     }
   }
 }
-

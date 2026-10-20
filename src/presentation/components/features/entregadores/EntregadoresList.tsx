@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { MdDelete, MdSearch } from 'react-icons/md'
 import { Tooltip as MuiTooltip } from '@mui/material'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { invalidarQueriesEntregadores } from '@/src/presentation/components/features/pedidos/hooks/data/useEntregadoresQuery'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -79,6 +82,8 @@ function telefoneListaExibicao(valor?: string | null): string {
 
 export function EntregadoresList() {
   const { isAuthenticated } = useAuthStore()
+  const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
   const [entregadores, setEntregadores] = useState<EntregadorDeliveryResumo[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searchText, setSearchText] = useState('')
@@ -194,6 +199,7 @@ export function EntregadoresList() {
 
   const handleSalvo = () => {
     fecharModal()
+    invalidarQueriesEntregadores(queryClient, empresaId)
     void loadEntregadores()
   }
 
@@ -224,6 +230,7 @@ export function EntregadoresList() {
       setConfirmDeleteOpen(false)
       setDeletingId(null)
       setDeletingNome(null)
+      invalidarQueriesEntregadores(queryClient, empresaId)
       void loadEntregadores()
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Erro ao remover entregador')

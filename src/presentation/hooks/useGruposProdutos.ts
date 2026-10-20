@@ -1,8 +1,15 @@
 'use client'
 
+import { useCallback } from 'react'
 import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
+import { useTenantQueryKey } from '@/src/presentation/hooks/useTenantQueryKey'
+import {
+  usePrefetchRemainingCatalogPages,
+  useStableFetchPage,
+} from '@/src/presentation/hooks/menus/usePrefetchRemainingCatalogPages'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
@@ -109,17 +116,25 @@ export function useGruposProdutos(params: GruposProdutosQueryParams = {}) {
 }
 
 /**
- * Hook para buscar grupos de produtos com paginação infinita (scroll infinito)
+ * Hook para buscar grupos de produtos com paginação infinita (scroll infinito).
+ * Com `prefetchRemaining: true`, carrega o restante em paralelo após a 1ª página.
  */
-export function useGruposProdutosInfinite(params: Omit<GruposProdutosQueryParams, 'offset'> = {}) {
-  return useSecureTenantInfiniteQuery(
-    ['grupos-produtos', 'infinite', params],
-    async ({ token }, pageParam) => {
-      const limit = Math.min(params.limit || 10, GRUPOS_PRODUTOS_API_MAX_LIMIT)
+export function useGruposProdutosInfinite(
+  params: Omit<GruposProdutosQueryParams, 'offset'> & { prefetchRemaining?: boolean } = {}
+) {
+  const { prefetchRemaining = false, ...queryParams } = params
+  const limit = Math.min(queryParams.limit || 10, GRUPOS_PRODUTOS_API_MAX_LIMIT)
+  const enabled = queryParams.enabled ?? true
+  const baseKey = ['grupos-produtos', 'infinite', queryParams] as const
+  const queryKey = useTenantQueryKey(baseKey)
+  const tenantAuth = useAuthStore(s => s.tenantAuth)
+
+  const buildPage = useCallback(
+    async (token: string, pageParam: number) => {
       const searchParams = new URLSearchParams()
-      if (params.name) searchParams.append('q', params.name)
-      if (params.ativo !== undefined && params.ativo !== null) {
-        searchParams.append('ativo', params.ativo.toString())
+      if (queryParams.name) searchParams.append('q', queryParams.name)
+      if (queryParams.ativo !== undefined && queryParams.ativo !== null) {
+        searchParams.append('ativo', queryParams.ativo.toString())
       }
       searchParams.append('limit', limit.toString())
       searchParams.append('offset', String(pageParam))
@@ -133,7 +148,9 @@ export function useGruposProdutosInfinite(params: Omit<GruposProdutosQueryParams
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        const errorMessage = errorData.message || `Erro ${response.status}: ${response.statusText}`
+        const errorMessage =
+          (errorData as { message?: string }).message ||
+          `Erro ${response.status}: ${response.statusText}`
         throw new Error(errorMessage)
       }
 
@@ -153,8 +170,14 @@ export function useGruposProdutosInfinite(params: Omit<GruposProdutosQueryParams
         nextOffset,
       }
     },
+    [limit, queryParams.ativo, queryParams.name]
+  )
+
+  const query = useSecureTenantInfiniteQuery(
+    baseKey,
+    async ({ token }, pageParam) => buildPage(token, pageParam as number),
     {
-      enabled: params.enabled ?? true,
+      enabled,
       initialPageParam: 0,
       getNextPageParam: lastPage => lastPage.nextOffset,
       staleTime: 1000 * 60 * 5,
@@ -164,4 +187,26 @@ export function useGruposProdutosInfinite(params: Omit<GruposProdutosQueryParams
       placeholderData: previousData => previousData,
     }
   )
+
+  const fetchPage = useStableFetchPage(
+    useCallback(
+      async (offset: number) => {
+        const token = tenantAuth?.getAccessToken()
+        if (!token) throw new Error('Sessão de empresa não encontrada')
+        return buildPage(token, offset)
+      },
+      [buildPage, tenantAuth]
+    )
+  )
+
+  usePrefetchRemainingCatalogPages({
+    queryKey,
+    data: query.data,
+    isFetching: query.isFetching,
+    pageSize: limit,
+    enabled: prefetchRemaining && enabled,
+    fetchPage,
+  })
+
+  return query
 }

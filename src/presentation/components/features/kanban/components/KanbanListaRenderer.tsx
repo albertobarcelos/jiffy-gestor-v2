@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { FormControl, MenuItem, Select } from '@mui/material'
 import { MdExpandLess, MdExpandMore } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
@@ -11,10 +12,12 @@ import {
   rotuloTipoAtendimentoKanban,
   tipoAtendimentoKanban,
 } from '../utils/kanbanPedidoIdentidade'
-import { relogioPedidoKanban } from '../utils/kanbanPedidoTempo'
+import { deveExibirCronometroPreparoKanban, relogioPedidoKanban } from '../utils/kanbanPedidoTempo'
 import { useAgoraKanban } from '../hooks/useAgoraKanban'
+import { useTempoPreparoKanbanMinutos } from '../hooks/useTempoPreparoKanban'
 import { classeBordaEsquerdaColunaKanban } from '../rules/vendasKanban.rules'
-import type { ColunaKanbanId, KanbanColumn, Venda } from '../types'
+import type { ColunaKanbanId, FiltroStatusEntreguesKanban, KanbanColumn, Venda } from '../types'
+import { OPCOES_FILTRO_STATUS_ENTREGUES } from '../utils/kanbanDeliveryColumnConfig'
 import type { KanbanBoardRendererProps } from './KanbanBoardRenderer'
 import { KanbanAvancarEtapaCompacto } from './KanbanAvancarEtapaCompacto'
 
@@ -48,8 +51,12 @@ export function KanbanListaRenderer(props: KanbanBoardRendererProps) {
     isModoDeliveryKanban,
     deliveryKanban,
     balcaoKanban,
+    filtroStatusFiscalComNf,
+    onFiltroStatusFiscalComNfChange,
+    timestampsEtapaEntregaLocal,
   } = props
-  const agoraMs = useAgoraKanban()
+  const agoraMs = useAgoraKanban(1000)
+  const slaPreparoMinutos = useTempoPreparoKanbanMinutos()
   const [abertos, setAbertos] = useState<Record<string, boolean>>(() =>
     blocoInicialmenteAberto(columns, vendasPorColuna)
   )
@@ -93,14 +100,18 @@ export function KanbanListaRenderer(props: KanbanBoardRendererProps) {
         return (
           <section
             key={column.id}
-            className={`overflow-hidden rounded-2xl border border-gray-200 border-l-4 bg-white shadow-sm ${classeBordaEsquerdaColunaKanban(colId)}`}
+            className={`overflow-hidden rounded-2xl border border-gray-200 border-l-4 bg-white shadow-sm ${classeBordaEsquerdaColunaKanban(
+              colId,
+              isModoDeliveryKanban ? 'delivery' : 'balcao'
+            )}`}
           >
+            <div className="flex items-center">
             <button
               type="button"
               onClick={() =>
                 setAbertos(atual => ({ ...atual, [column.id]: !aberto }))
               }
-              className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50"
+              className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50"
               aria-expanded={aberto}
             >
               <span className="text-base font-bold text-gray-900">{column.title}</span>
@@ -111,6 +122,32 @@ export function KanbanListaRenderer(props: KanbanBoardRendererProps) {
                 {aberto ? <MdExpandLess className="h-6 w-6" /> : <MdExpandMore className="h-6 w-6" />}
               </span>
             </button>
+            {isModoDeliveryKanban &&
+            colId === 'FINALIZADAS' &&
+            filtroStatusFiscalComNf &&
+            onFiltroStatusFiscalComNfChange ? (
+              <div className="pr-3">
+                <FormControl size="small" sx={{ minWidth: 118 }}>
+                  <Select
+                    value={filtroStatusFiscalComNf}
+                    onChange={e =>
+                      onFiltroStatusFiscalComNfChange(
+                        colId,
+                        e.target.value as FiltroStatusEntreguesKanban
+                      )
+                    }
+                    sx={{ height: 28, fontSize: 12, borderRadius: '8px' }}
+                  >
+                    {OPCOES_FILTRO_STATUS_ENTREGUES.map(opcao => (
+                      <MenuItem key={opcao.value} value={opcao.value}>
+                        {opcao.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </div>
+            ) : null}
+            </div>
 
             {aberto ? (
               <div
@@ -134,8 +171,12 @@ export function KanbanListaRenderer(props: KanbanBoardRendererProps) {
                     </thead>
                     <tbody>
                       {vendas.map((venda: Venda) => {
-                        const relogio = relogioPedidoKanban(venda, agoraMs)
-                        const tipo = tipoAtendimentoKanban(venda.tipoVenda)
+                        const relogio = relogioPedidoKanban(venda, agoraMs, {
+                          colunaId: colId,
+                          slaPreparoMinutos,
+                          ancoraPreparoIso: timestampsEtapaEntregaLocal[venda.id],
+                        })
+                        const tipo = tipoAtendimentoKanban(venda.tipoAtendimento())
                         const cancelada = venda.isCancelada()
                         return (
                           <tr
@@ -165,8 +206,12 @@ export function KanbanListaRenderer(props: KanbanBoardRendererProps) {
                                 {rotuloTipoAtendimentoKanban(tipo)}
                               </span>
                             </td>
-                            <td className={`px-3 py-3 text-sm ${classeTomTempo(relogio.tom)}`}>
-                              {relogio.rotuloAtraso ?? relogio.rotuloHa ?? '—'}
+                            <td
+                              className={`px-3 py-3 text-sm ${classeTomTempo(
+                                deveExibirCronometroPreparoKanban(colId, venda) ? relogio.tom : 'ok'
+                              )}`}
+                            >
+                              {relogio.rotuloHa ?? '—'}
                             </td>
                             <td className="px-3 py-3">
                               <span
@@ -193,6 +238,16 @@ export function KanbanListaRenderer(props: KanbanBoardRendererProps) {
                                   colunaAtual={colId}
                                   avancando={Boolean(avancandoEtapaIds[venda.id])}
                                   onAvancar={onAvancarEtapa}
+                                  cronometroRotulo={
+                                    deveExibirCronometroPreparoKanban(colId, venda)
+                                      ? relogio.rotuloDecorrido
+                                      : null
+                                  }
+                                  cronometroTom={
+                                    deveExibirCronometroPreparoKanban(colId, venda)
+                                      ? relogio.tom
+                                      : undefined
+                                  }
                                 />
                               )}
                             </td>

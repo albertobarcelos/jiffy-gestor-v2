@@ -5,19 +5,28 @@ import type { Produto } from '@/src/domain/entities/Produto'
 import type { ModalLancamentoProdutoPainelConfirmPayload, ModalLancamentoProdutoPainelModo } from '../../components/ModalLancamentoProdutoPainel'
 import type { ComplementoSelecionado, ProdutoSelecionado } from '../../types'
 import {
+  type ComplementoTabKey,
   type ComplementosTabsModalState,
 } from '@/src/presentation/components/features/complementos/ComplementosTabsModal'
 import {
   aplicarProdutoAtualizadoNasLinhasCarrinho,
   obterUnidadeMedidaProdutoLinha,
   produtoPermiteAlterarPreco,
+  produtoTemComplementosCarregados,
+  type CarregarProdutoCatalogoOptions,
 } from '@/src/domain/policies/pedido/CarrinhoCatalogoPolicy'
 import {
   aplicarQuantidadeComplementoNaLinha,
   aplicarQuantidadeProdutoNaLinha,
   normalizarComplementosLinha,
 } from '@/src/domain/policies/pedido/ComplementoQuantidadeLinhaPolicy'
+import {
+  alteracaoComplementoRespeitaLimitesGrupo,
+  alteracaoComplementoRespeitaMinimoGrupo,
+  quantidadeSelecionadaNoGrupoCarrinho,
+} from '@/src/domain/policies/pedido/GrupoComplementoLimitesPolicy'
 import { showToast } from '@/src/shared/utils/toast'
+import { obterLimitesGrupoComplementoCarrinho } from '../../utils/obterLimitesGrupoComplementoCarrinho'
 
 export interface UseNovoPedidoProdutosParams {
   produtos: ProdutoSelecionado[]
@@ -27,7 +36,7 @@ export interface UseNovoPedidoProdutosParams {
   produtosList: Produto[]
   carregarProdutoNoCatalogoSeNecessario: (
     produtoId: string,
-    options?: { forceRefresh?: boolean }
+    options?: CarregarProdutoCatalogoOptions
   ) => Promise<Produto | null>
 }
 
@@ -61,21 +70,22 @@ export function useNovoPedidoProdutos({
   const longPressComplementoIndexRef = useRef<number | null>(null)
   const produtoIdContextoEdicaoComplementoRef = useRef<string | undefined>(undefined)
 
-  const produtoTemComplementos = useCallback((produto: Produto): boolean => {
-    const gruposComplementos = produto.getGruposComplementos()
-    if (!gruposComplementos || gruposComplementos.length === 0) return false
-    return gruposComplementos.some(grupo => grupo.complementos && grupo.complementos.length > 0)
-  }, [])
+  const produtoTemComplementos = useCallback(
+    (produto: Produto): boolean => produtoTemComplementosCarregados(produto),
+    []
+  )
 
   const garantirComplementosProdutoNoPainel = useCallback(
     (produtoId: string, produtoBase: Produto) => {
-      if (!produtoBase.abreComplementosAtivo() || produtoTemComplementos(produtoBase)) {
+      if (produtoTemComplementosCarregados(produtoBase)) {
         setCarregandoComplementosPainel(false)
         return
       }
 
       setCarregandoComplementosPainel(true)
-      void carregarProdutoNoCatalogoSeNecessario(produtoId)
+      void carregarProdutoNoCatalogoSeNecessario(produtoId, {
+        requireComplementos: true,
+      })
         .then(produtoAtualizado => {
           if (!produtoAtualizado) return
           setProdutoParaLancamentoPainel(prev =>
@@ -86,7 +96,7 @@ export function useNovoPedidoProdutos({
           setCarregandoComplementosPainel(false)
         })
     },
-    [carregarProdutoNoCatalogoSeNecessario, produtoTemComplementos]
+    [carregarProdutoNoCatalogoSeNecessario]
   )
 
   const abrirEdicaoComplementoNoPainel = useCallback(
@@ -112,7 +122,7 @@ export function useNovoPedidoProdutos({
     }))
   }, [])
 
-  const handleTabChangeComplementoTabsModalPainel = useCallback((tab: 'complemento') => {
+  const handleTabChangeComplementoTabsModalPainel = useCallback((tab: ComplementoTabKey) => {
     setComplementoTabsModalPainelState(prev => ({ ...prev, tab }))
   }, [])
 
@@ -441,6 +451,27 @@ export function useNovoPedidoProdutos({
             if (resultado.mensagem) showToast.error(resultado.mensagem)
             return prev
           }
+
+          const alvo = linhaAtual.complementos[complementoIndex]
+          if (alvo) {
+            const grupo = obterLimitesGrupoComplementoCarrinho(
+              catalogoProdutosPorId[linhaAtual.produtoId],
+              alvo.grupoId
+            )
+            const quantidadeNoGrupoApos = quantidadeSelecionadaNoGrupoCarrinho(
+              resultado.produto.complementos,
+              alvo.grupoId
+            )
+            const limites = alteracaoComplementoRespeitaLimitesGrupo(
+              grupo,
+              quantidadeNoGrupoApos
+            )
+            if (!limites.permitido) {
+              if (limites.mensagem) showToast.error(limites.mensagem)
+              return prev
+            }
+          }
+
           novosProdutos[produtoIndex] = resultado.produto
           return novosProdutos
         }
@@ -457,24 +488,47 @@ export function useNovoPedidoProdutos({
         return novosProdutos
       })
     },
-    [setProdutos]
+    [catalogoProdutosPorId, setProdutos]
   )
 
   const removerComplemento = useCallback(
     (produtoIndex: number, complementoIndex: number) => {
       setProdutos(prev => {
-        const novosProdutos = [...prev]
-        const novosComplementos = novosProdutos[produtoIndex].complementos.filter(
+        const linhaAtual = prev[produtoIndex]
+        if (!linhaAtual) return prev
+
+        const alvo = linhaAtual.complementos[complementoIndex]
+        if (!alvo) return prev
+
+        const novosComplementos = linhaAtual.complementos.filter(
           (_, i) => i !== complementoIndex
         )
+        const grupo = obterLimitesGrupoComplementoCarrinho(
+          catalogoProdutosPorId[linhaAtual.produtoId],
+          alvo.grupoId
+        )
+        const quantidadeNoGrupoApos = quantidadeSelecionadaNoGrupoCarrinho(
+          novosComplementos,
+          alvo.grupoId
+        )
+        const minimo = alteracaoComplementoRespeitaMinimoGrupo(
+          grupo,
+          quantidadeNoGrupoApos
+        )
+        if (!minimo.permitido) {
+          if (minimo.mensagem) showToast.error(minimo.mensagem)
+          return prev
+        }
+
+        const novosProdutos = [...prev]
         novosProdutos[produtoIndex] = {
-          ...novosProdutos[produtoIndex],
+          ...linhaAtual,
           complementos: novosComplementos,
         }
         return novosProdutos
       })
     },
-    [setProdutos]
+    [catalogoProdutosPorId, setProdutos]
   )
 
   const limparLongPressTimeouts = useCallback(() => {

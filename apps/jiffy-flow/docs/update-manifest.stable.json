@@ -2,10 +2,10 @@
     "schemaVersion":  1,
     "channel":  "stable",
     "latest":  {
-                   "version":  "0.1.5",
+                   "version":  "0.1.6",
                    "minAgentVersion":  "0.1.0",
-                   "url":  "https://pub-143026e1401641a5ad59a389410eed2a.r2.dev/releases/0.1.5/Fredy.exe",
-                   "sha256":  "800b0936aa1109ecb1519c7b5589c70567800450d9ad325689d98a1bb9485d66",
-                   "notes":  "Fredy 0.1.5 - gestor de pedidos (app.jiffy.run)"
+                   "url":  "https://pub-143026e1401641a5ad59a389410eed2a.r2.dev/releases/0.1.6/Fredy.exe",
+                   "sha256":  "26b81466d5581a89a119c0596a54b3321c1113a488f130ee3622cd6e8570d40c",
+                   "notes":  "Fredy 0.1.6 - som nativo de pedido novo (toca com a janela oculta) e alarme de 1s em Novos"
                }
 }

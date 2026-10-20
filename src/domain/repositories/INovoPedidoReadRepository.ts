@@ -36,6 +36,9 @@ export interface INovoPedidoReadRepository {
     menuId?: string | null
   ): Promise<Produto | null>
 
+  /** Completa itens/limites dos grupos já listados no produto do menu, sem GET cadastro+snapshot. */
+  hidratarGruposComplementosDoProduto(produto: Produto, token: string): Promise<Produto>
+
   buscarProdutosPorNome(nome: string, token: string, menuId: string | null): Promise<Produto[]>
 
   buscarClienteJson(clienteId: string, token: string): Promise<Record<string, unknown> | null>
@@ -64,6 +67,12 @@ export interface INovoPedidoReadRepository {
     pedidoId: string,
     token: string,
     modelo: 55 | 65
+  ): Promise<Record<string, unknown>>
+
+  reemitirNotaPedidoDelivery(
+    pedidoId: string,
+    token: string,
+    numero?: number
   ): Promise<Record<string, unknown>>
 
   buscarAuthMe(token: string): Promise<Record<string, unknown> | null>

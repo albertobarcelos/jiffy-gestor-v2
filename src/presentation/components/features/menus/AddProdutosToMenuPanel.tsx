@@ -57,17 +57,7 @@ export function AddProdutosToMenuPanel({
     data,
     isLoading,
     isFetching,
-    isFetchingNextPage,
-    hasNextPage,
-    fetchNextPage,
-  } = useProdutosInfinite(queryParams)
-
-  useEffect(() => {
-    if (!open) return
-    if (hasNextPage && !isFetchingNextPage && !isFetching && data) {
-      void fetchNextPage()
-    }
-  }, [open, hasNextPage, isFetchingNextPage, isFetching, fetchNextPage, data])
+  } = useProdutosInfinite(queryParams, { enabled: open, prefetchRemaining: open })
 
   const produtos = useMemo(() => {
     if (!data?.pages) return []
@@ -246,7 +236,7 @@ export function AddProdutosToMenuPanel({
               </label>
             )
           })}
-          {isFetchingNextPage && (
+          {isFetching && !isLoading && (
             <div className="flex justify-center py-4">
               <JiffyLoading />
             </div>

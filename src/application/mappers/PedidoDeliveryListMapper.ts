@@ -3,18 +3,24 @@ import type {
   PedidosDeliveryListResponse,
 } from '@/src/application/dto/api/pedidoDeliveryListApi'
 import { derivarFluxoPagamentoEntregaDeliverySummary } from '@/src/application/mappers/DeliveryFluxoPagamentoMapper'
+import { resolverTrocoLevarPedidoEntrega } from '@/src/application/mappers/resolverTrocoLevarPedidoEntrega'
 import {
   mapItemJsonParaVendaUnificadaDTO,
   type VendaUnificadaDTO,
-} from '@/features/kanban/hooks/useVendasUnificadas'
+} from '@/src/application/dto/VendaUnificadaDTO'
+import { canonicalizarAliasOrigemApi } from '@/src/application/mappers/canonicalizarAliasOrigemApi'
 
 /** Origem comercial no card Kanban (`VendaUnificadaDTO.origem`). */
 export function mapOrigemApiDeliveryParaVendaUnificada(
   origem: string | null | undefined
 ): VendaUnificadaDTO['origem'] {
-  const o = String(origem ?? '').trim().toUpperCase()
-  if (o === 'GESTOR' || o === 'JIFFY_DELIVERY') return 'GESTOR'
-  return 'GESTOR'
+  const o = canonicalizarAliasOrigemApi(origem)
+  if (o === 'GESTOR') return 'GESTOR'
+  if (o === 'JIFFY_DELIVERY') return 'JIFFY_DELIVERY'
+  if (o === 'AIQFOME') return 'AIQFOME'
+  if (o === 'IFOOD') return 'IFOOD'
+  if (o === 'PDV') return 'PDV'
+  return null
 }
 
 /** Deriva status financeiro a partir do summary delivery (Kanban / badge pagamento). */
@@ -42,7 +48,7 @@ function resolverTipoDocFiscal(modelo: number | null | undefined): 'NFE' | 'NFCE
 
 /**
  * Monta record compatível com `mapItemJsonParaVendaUnificadaDTO` (GET unificado).
- * `tipoEntrega` vira `tipoVenda`; ignora `tipoVenda: "delivery"` do backend.
+ * Mantém `tipoVenda` e `tipoEntrega` como o backend envia.
  */
 export function pedidoDeliverySummaryParaUnifiedRecord(
   summary: PedidoDeliverySummaryApi
@@ -53,7 +59,8 @@ export function pedidoDeliverySummaryParaUnifiedRecord(
     id: summary.id,
     numeroVenda: summary.numeroVenda,
     codigoVenda: summary.codigoVenda,
-    tipoVenda: summary.tipoEntrega,
+    tipoVenda: summary.tipoVenda,
+    tipoEntrega: summary.tipoEntrega,
     origem: mapOrigemApiDeliveryParaVendaUnificada(summary.origem),
     tabelaOrigem: 'venda_gestor',
     valorFinal: summary.valorFinal,
@@ -73,7 +80,7 @@ export function pedidoDeliverySummaryParaUnifiedRecord(
         }
       : null,
     solicitarEmissaoFiscal: summary.solicitarEmissaoFiscal,
-    statusFiscal: resumoFiscal?.status ?? null,
+    statusFiscal: resumoFiscal?.status ?? (summary as { statusFiscal?: string }).statusFiscal ?? null,
     resumoFiscal,
     documentoFiscalId: resumoFiscal?.documentoFiscalId ?? null,
     abertoPor: { id: '', nome: '—' },
@@ -95,6 +102,8 @@ export function pedidoDeliverySummaryParaUnifiedRecord(
     ),
     previsaoEntregaEm: summary.previsaoEntregaEm,
     tempoTotalEstimadoSegundos: summary.tempoTotalEstimadoSegundos,
+    dataInicioPreparo: summary.dataInicioPreparo,
+    dataFinalizacaoPreparo: summary.dataFinalizacaoPreparo,
     fluxoPagamentoEntrega: derivarFluxoPagamentoEntregaDeliverySummary(
       summary.totalFaltaPagar,
       summary.cobrancas
@@ -227,7 +236,11 @@ export function normalizarPedidoDeliverySummaryJson(raw: unknown): PedidoDeliver
     origem: String(o.origem ?? 'GESTOR'),
     statusDelivery,
     valorFinal: parseNumero(o.valorFinal, 0),
-    troco: parseNumero(o.troco, 0),
+    troco: resolverTrocoLevarPedidoEntrega({
+      valorFinal: parseNumero(o.valorFinal, 0),
+      troco: o.troco,
+      cobrancas,
+    }),
     totalPago: parseNumero(o.totalPago, 0),
     totalFaltaPagar: parseNumero(o.totalFaltaPagar, 0),
     totalCobrancasCriadas: parseNumero(o.totalCobrancasCriadas, 0),

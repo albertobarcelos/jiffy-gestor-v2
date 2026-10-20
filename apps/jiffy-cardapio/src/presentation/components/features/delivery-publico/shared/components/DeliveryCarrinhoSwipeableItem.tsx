@@ -8,7 +8,8 @@ import { Trash2 } from 'lucide-react'
 const ACTION_WIDTH_RATIO = 0.25
 /** Soltar a partir desta fração do swipe completo remove o item. */
 const DELETE_THRESHOLD_RATIO = 0.85
-const DIRECTION_LOCK_PX = 8
+/** Só trava o eixo depois de um deslocamento claro — no iOS 8px rouba o scroll vertical. */
+const DIRECTION_LOCK_PX = 16
 const EXIT_TRANSITION = { duration: 0.35, ease: [0.22, 1, 0.36, 1] as const }
 
 type DeliveryCarrinhoSwipeableItemProps = {
@@ -79,12 +80,6 @@ export function DeliveryCarrinhoSwipeableItem({
     startRef.current = { x: event.clientX, y: event.clientY }
     axisLockRef.current = null
     offsetRef.current = openRef.current ? -actionWidthRef.current : 0
-
-    try {
-      event.currentTarget.setPointerCapture(event.pointerId)
-    } catch {
-      // ignore
-    }
   }
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
@@ -96,13 +91,19 @@ export function DeliveryCarrinhoSwipeableItem({
 
     if (!axisLockRef.current) {
       if (Math.abs(dx) < DIRECTION_LOCK_PX && Math.abs(dy) < DIRECTION_LOCK_PX) return
-      axisLockRef.current = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y'
+      const horizontal = Math.abs(dx) > Math.abs(dy) * 1.25
+      axisLockRef.current = horizontal ? 'x' : 'y'
       if (axisLockRef.current === 'y') {
         resetPointer()
         return
       }
       draggingRef.current = true
       setDragging(true)
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId)
+      } catch {
+        // ignore
+      }
     }
 
     if (axisLockRef.current !== 'x') return

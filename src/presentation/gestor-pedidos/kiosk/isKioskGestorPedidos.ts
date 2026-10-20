@@ -112,7 +112,8 @@ export function chromeErpCasco(input: {
 }): { layoutKiosk: boolean; mostrarTopNav: boolean } {
   const noFredy = input.superficie === 'fredy'
   return {
-    layoutKiosk: noFredy,
+    // Até hidratar, assume kiosk em /pedidos* (SSR não vê UA Tauri) — evita mismatch no <main>.
+    layoutKiosk: input.clientePronto ? noFredy : input.rotaPedidos,
     mostrarTopNav: !noFredy && (input.clientePronto || !input.rotaPedidos),
   }
 }

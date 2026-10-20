@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { PedidoProdutosStep } from './PedidoProdutosStep'
 import { PedidoProdutosStepLayout } from './PedidoProdutosStepLayout'
@@ -8,16 +8,18 @@ import { useNovoPedidoDetalheContext } from '../context/NovoPedidoContext'
 import { useNovoPedidoUIContext } from '../context/NovoPedidoContext'
 
 export function PedidoWizardStepsView() {
-  const { modoVisualizacao, tipoInicioPedido } = useNovoPedidoDetalheContext()
+  const { modoVisualizacao, tipoInicioPedido, modoEdicaoProdutos } = useNovoPedidoDetalheContext()
   const { currentStep } = useNovoPedidoUIContext()
+  const mostrarCatalogoProdutos =
+    currentStep === 1 && (!modoVisualizacao || modoEdicaoProdutos)
 
   return (
     <>
-      {!modoVisualizacao && tipoInicioPedido === 'entrega' && currentStep === 2 && (
+      {!modoVisualizacao && tipoInicioPedido === 'delivery' && currentStep === 2 && (
         <PedidoInformacoesStepView />
       )}
 
-      {!modoVisualizacao && currentStep === 1 && (
+      {mostrarCatalogoProdutos && (
         <PedidoProdutosStep>
           <PedidoProdutosStepLayout />
         </PedidoProdutosStep>

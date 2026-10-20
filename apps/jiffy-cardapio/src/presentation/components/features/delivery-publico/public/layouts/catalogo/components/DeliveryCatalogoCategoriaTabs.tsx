@@ -22,7 +22,7 @@ export function DeliveryCatalogoCategoriaTabs({
 
   return (
     <div
-      className="sticky top-0 z-20 mt-3 border-b"
+      className="z-20 border-b"
       style={{
         borderColor: 'var(--delivery-card-border)',
         backgroundColor: 'var(--delivery-bg, var(--delivery-surface))',

@@ -1,6 +1,277 @@
 import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { Produto } from '@/src/domain/entities/Produto'
-import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
+import { parseQuantidadeLimiteGrupo } from '@/src/domain/policies/pedido/GrupoComplementoLimitesPolicy'
+import type {
+  MenuGrupoProduto,
+  MenuProduto,
+  MenuProdutoComplementoItemResumo,
+  MenuProdutoComplementoResumo,
+} from '@/src/shared/types/menus'
+
+export type ProdutoGrupoComplementoCatalogo = {
+  id: string
+  nome: string
+  qtdMinima: number
+  qtdMaxima: number
+  limitesDoCadastro?: boolean
+  complementos: MenuProdutoComplementoItemResumo[]
+}
+
+function asPlainRecord(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>
+  }
+  return {}
+}
+
+function quantidadeLimiteInformadaNoJson(raw: unknown): boolean {
+  if (raw == null || raw === '') return false
+  if (typeof raw === 'number') return Number.isFinite(raw)
+  if (typeof raw === 'string') return raw.trim() !== '' && Number.isFinite(Number(raw))
+  return false
+}
+
+/** JSON cru infere pelos campos; flag explícita ganha (inclusive `false` do snapshot slim). */
+export function grupoTemLimitesDeCadastro(grupo: {
+  qtdMinima?: unknown
+  qtdMaxima?: unknown
+  limitesDoCadastro?: unknown
+}): boolean {
+  if (grupo.limitesDoCadastro === true) return true
+  if (grupo.limitesDoCadastro === false) return false
+  return (
+    quantidadeLimiteInformadaNoJson(grupo.qtdMinima) ||
+    quantidadeLimiteInformadaNoJson(grupo.qtdMaxima)
+  )
+}
+
+function parseAtivoComplementoResumo(value: unknown): boolean {
+  if (value === false || value === 'false' || value === 0 || value === '0') return false
+  return true
+}
+
+function parseOrdemComplementoResumo(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim() !== '') {
+    const n = parseInt(value, 10)
+    return Number.isFinite(n) ? n : undefined
+  }
+  return undefined
+}
+
+function mapComplementoResumo(raw: unknown): MenuProdutoComplementoItemResumo | null {
+  const rec = asPlainRecord(raw)
+  const id = rec.id != null ? String(rec.id).trim() : ''
+  const nome = rec.nome != null ? String(rec.nome).trim() : ''
+  if (!id) return null
+  const valor =
+    typeof rec.valor === 'number' ? rec.valor : rec.valor != null ? Number(rec.valor) || 0 : 0
+  const tipo = rec.tipoImpactoPreco
+  const ordem = parseOrdemComplementoResumo(rec.ordem)
+  return {
+    id,
+    nome: nome || 'Complemento',
+    valor,
+    tipoImpactoPreco:
+      tipo === 'aumenta' || tipo === 'diminui' || tipo === 'nenhum' ? tipo : 'nenhum',
+    ativo: parseAtivoComplementoResumo(rec.ativo),
+    ...(ordem != null ? { ordem } : {}),
+  }
+}
+
+/** Ordem efetiva do cardápio; sem ordem, cai no nome. */
+export function ordenarComplementosResumoCatalogo(
+  itens: readonly MenuProdutoComplementoItemResumo[]
+): MenuProdutoComplementoItemResumo[] {
+  return [...itens].sort((a, b) => {
+    const oa = a.ordem
+    const ob = b.ordem
+    if (oa != null && ob != null && oa !== ob) return oa - ob
+    if (oa != null && ob == null) return -1
+    if (oa == null && ob != null) return 1
+    return a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' })
+  })
+}
+
+export function mapMenuGruposComplementosToProduto(
+  grupos: MenuProdutoComplementoResumo[] | undefined
+): ProdutoGrupoComplementoCatalogo[] {
+  if (!Array.isArray(grupos)) return []
+  return grupos.flatMap(grupo => {
+    const id = grupo?.id != null ? String(grupo.id).trim() : ''
+    if (!id) return []
+    return [
+      {
+        id,
+        nome: grupo.nome?.trim() || 'Grupo',
+        qtdMinima: parseQuantidadeLimiteGrupo(grupo.qtdMinima),
+        qtdMaxima: parseQuantidadeLimiteGrupo(grupo.qtdMaxima),
+        limitesDoCadastro: grupoTemLimitesDeCadastro(grupo),
+        complementos: Array.isArray(grupo.complementos)
+          ? ordenarComplementosResumoCatalogo(
+              grupo.complementos
+                .map(mapComplementoResumo)
+                .filter((item): item is MenuProdutoComplementoItemResumo => item != null)
+            )
+          : [],
+      },
+    ]
+  })
+}
+
+export function gruposComplementosPrecisamHidratacao(
+  grupos: Array<{ complementos?: readonly unknown[]; limitesDoCadastro?: boolean }>
+): boolean {
+  return grupos.some(
+    grupo => (grupo.complementos?.length ?? 0) === 0 || grupo.limitesDoCadastro !== true
+  )
+}
+
+export function mapGrupoComplementoJsonToProdutoGrupo(
+  raw: unknown
+): ProdutoGrupoComplementoCatalogo | null {
+  const root = asPlainRecord(raw)
+  const nested = asPlainRecord(root.data)
+  const rec = nested.id != null || nested.nome != null ? nested : root
+  const id = rec.id != null ? String(rec.id).trim() : ''
+  if (!id) return null
+  return {
+    id,
+    nome: rec.nome != null ? String(rec.nome).trim() || 'Grupo' : 'Grupo',
+    qtdMinima: parseQuantidadeLimiteGrupo(rec.qtdMinima),
+    qtdMaxima: parseQuantidadeLimiteGrupo(rec.qtdMaxima),
+    limitesDoCadastro: true,
+    complementos: Array.isArray(rec.complementos)
+      ? ordenarComplementosResumoCatalogo(
+          rec.complementos
+            .map(mapComplementoResumo)
+            .filter((item): item is MenuProdutoComplementoItemResumo => item != null)
+        )
+      : [],
+  }
+}
+
+/**
+ * Completa limites (e itens só se o menu veio slim).
+ * Itens já presentes no snapshot do menu — valor/ativo/ordem efetivos — nunca
+ * são trocados pelo cadastro do grupo.
+ */
+export function mesclarGrupoComplementoMenuComCadastro(
+  grupoMenu: ProdutoGrupoComplementoCatalogo,
+  grupoCadastro: ProdutoGrupoComplementoCatalogo | undefined
+): ProdutoGrupoComplementoCatalogo {
+  if (!gruposComplementosPrecisamHidratacao([grupoMenu])) return grupoMenu
+  if (!grupoCadastro) return grupoMenu
+
+  const temItensNoMenu = grupoMenu.complementos.length > 0
+  const limitesDoCadastro =
+    grupoMenu.limitesDoCadastro === true || grupoCadastro.limitesDoCadastro === true
+
+  return {
+    id: grupoMenu.id,
+    nome: grupoMenu.nome || grupoCadastro.nome,
+    qtdMinima: grupoMenu.limitesDoCadastro === true ? grupoMenu.qtdMinima : grupoCadastro.qtdMinima,
+    qtdMaxima: grupoMenu.limitesDoCadastro === true ? grupoMenu.qtdMaxima : grupoCadastro.qtdMaxima,
+    limitesDoCadastro,
+    complementos: temItensNoMenu ? grupoMenu.complementos : grupoCadastro.complementos,
+  }
+}
+
+export function gruposProdutoParaCatalogo(
+  produto: Pick<Produto, 'getGruposComplementos'>
+): ProdutoGrupoComplementoCatalogo[] {
+  return produto.getGruposComplementos().map(grupo => ({
+    id: grupo.id,
+    nome: grupo.nome,
+    qtdMinima: grupo.qtdMinima ?? 0,
+    qtdMaxima: grupo.qtdMaxima ?? 0,
+    limitesDoCadastro: grupo.limitesDoCadastro === true,
+    complementos: [...(grupo.complementos ?? [])],
+  }))
+}
+
+export function substituirGruposComplementosDoProduto(
+  produto: Produto,
+  grupos: ProdutoGrupoComplementoCatalogo[]
+): Produto {
+  return Produto.fromJSON({
+    ...produto.toJSON(),
+    gruposComplementos: grupos,
+  })
+}
+
+export type FontesHidratacaoGrupoComplemento = {
+  cadastroPorId?: Map<string, ProdutoGrupoComplementoCatalogo>
+  cachePorId?: Map<string, ProdutoGrupoComplementoCatalogo>
+}
+
+/**
+ * Completa itens e limites dos grupos do menu: cadastro → cache → GET opcional.
+ * Não troca a lista de grupos do cardápio.
+ */
+export async function hidratarGruposComplementosComFontes(
+  produto: Produto,
+  fontes: FontesHidratacaoGrupoComplemento,
+  buscarGrupo?: (id: string) => Promise<ProdutoGrupoComplementoCatalogo | null>
+): Promise<{ produto: Produto; gruposCompletos: ProdutoGrupoComplementoCatalogo[] }> {
+  const grupos = gruposProdutoParaCatalogo(produto)
+  if (grupos.length === 0) {
+    return { produto, gruposCompletos: [] }
+  }
+
+  if (!gruposComplementosPrecisamHidratacao(grupos)) {
+    return { produto, gruposCompletos: grupos }
+  }
+
+  const gruposCompletos: ProdutoGrupoComplementoCatalogo[] = []
+
+  const hidratados = await Promise.all(
+    grupos.map(async grupo => {
+      let atual = mesclarGrupoComplementoMenuComCadastro(
+        grupo,
+        fontes.cadastroPorId?.get(grupo.id)
+      )
+      if (!gruposComplementosPrecisamHidratacao([atual])) {
+        gruposCompletos.push(atual)
+        return atual
+      }
+
+      atual = mesclarGrupoComplementoMenuComCadastro(atual, fontes.cachePorId?.get(grupo.id))
+      if (!gruposComplementosPrecisamHidratacao([atual])) {
+        gruposCompletos.push(atual)
+        return atual
+      }
+
+      if (!buscarGrupo) return atual
+      const fetched = await buscarGrupo(grupo.id)
+      if (!fetched) return atual
+
+      const mescladoFetch: ProdutoGrupoComplementoCatalogo = {
+        ...fetched,
+        nome: atual.nome || fetched.nome,
+        complementos:
+          atual.complementos.length > 0 ? atual.complementos : fetched.complementos,
+      }
+      if (!gruposComplementosPrecisamHidratacao([mescladoFetch])) {
+        gruposCompletos.push(mescladoFetch)
+      }
+      return mescladoFetch
+    })
+  )
+
+  return {
+    produto: substituirGruposComplementosDoProduto(produto, hidratados),
+    gruposCompletos,
+  }
+}
+
+function abreComplementosDoSnapshot(
+  snapshot: MenuProduto,
+  gruposMenu: ProdutoGrupoComplementoCatalogo[]
+): boolean {
+  if (typeof snapshot.abreComplementos === 'boolean') return snapshot.abreComplementos
+  return gruposMenu.length > 0
+}
 
 export function menuGrupoProdutoToGrupoProduto(item: MenuGrupoProduto): GrupoProduto {
   const base = item.grupoBase
@@ -17,17 +288,19 @@ export function menuGrupoProdutoToGrupoProduto(item: MenuGrupoProduto): GrupoPro
   })
 }
 
-/** Snapshot leve para grade do catálogo (complementos completos vêm do cadastro base no lazy load). */
+/**
+ * Snapshot do produto neste cardápio.
+ * Complementos vêm só dos grupos vinculados ao produto do menu — nunca do cadastro base.
+ */
 export function menuProdutoToProduto(snapshot: MenuProduto, base?: Produto | null): Produto {
-  const produtoId = snapshot.produtoId?.trim() || snapshot.id
-  const grupoId = snapshot.grupoProduto?.id?.trim()
-  const grupoNome = snapshot.grupoProduto?.nome?.trim()
-
   if (base) {
     return mergeProdutoComSnapshotMenu(base, snapshot)
   }
 
-  const temComplementosResumo = (snapshot.gruposComplementos?.length ?? 0) > 0
+  const produtoId = snapshot.produtoId?.trim() || snapshot.id
+  const grupoId = snapshot.grupoProduto?.id?.trim()
+  const grupoNome = snapshot.grupoProduto?.nome?.trim()
+  const gruposMenu = mapMenuGruposComplementosToProduto(snapshot.gruposComplementos)
 
   return Produto.create(
     produtoId,
@@ -40,9 +313,7 @@ export function menuProdutoToProduto(snapshot: MenuProduto, base?: Produto | nul
     grupoId,
     undefined,
     snapshot.favorito === true,
-    typeof snapshot.abreComplementos === 'boolean'
-      ? snapshot.abreComplementos
-      : temComplementosResumo,
+    abreComplementosDoSnapshot(snapshot, gruposMenu),
     snapshot.permiteAcrescimo === true,
     snapshot.permiteDesconto === true,
     snapshot.permiteAlterarPreco === true,
@@ -50,7 +321,7 @@ export function menuProdutoToProduto(snapshot: MenuProduto, base?: Produto | nul
     true,
     true,
     typeof snapshot.ordem === 'number' ? snapshot.ordem : undefined,
-    [],
+    gruposMenu,
     [],
     undefined,
     undefined,
@@ -66,6 +337,7 @@ export function menuProdutoToProduto(snapshot: MenuProduto, base?: Produto | nul
 export function mergeProdutoComSnapshotMenu(base: Produto, snapshot: MenuProduto): Produto {
   const grupoId = snapshot.grupoProduto?.id?.trim() || base.getGrupoId()
   const grupoNome = snapshot.grupoProduto?.nome?.trim() || base.getNomeGrupo()
+  const gruposMenu = mapMenuGruposComplementosToProduto(snapshot.gruposComplementos)
 
   return Produto.create(
     base.getId(),
@@ -78,7 +350,7 @@ export function mergeProdutoComSnapshotMenu(base: Produto, snapshot: MenuProduto
     grupoId,
     base.getEstoque(),
     snapshot.favorito ?? base.isFavorito(),
-    snapshot.abreComplementos ?? base.abreComplementosAtivo(),
+    abreComplementosDoSnapshot(snapshot, gruposMenu),
     snapshot.permiteAcrescimo ?? base.permiteAcrescimoAtivo(),
     snapshot.permiteDesconto ?? base.permiteDescontoAtivo(),
     snapshot.permiteAlterarPreco ?? base.permiteAlterarPrecoAtivo(),
@@ -86,7 +358,7 @@ export function mergeProdutoComSnapshotMenu(base: Produto, snapshot: MenuProduto
     base.isAtivoDelivery(),
     base.isAtivoLocal(),
     typeof snapshot.ordem === 'number' ? snapshot.ordem : base.getOrdem(),
-    base.getGruposComplementos(),
+    gruposMenu,
     base.getImpressoras(),
     base.getNcm(),
     base.getCest(),
@@ -99,6 +371,20 @@ export function mergeProdutoComSnapshotMenu(base: Produto, snapshot: MenuProduto
   )
 }
 
+export function normalizeMenuProduto(item: MenuProduto): MenuProduto {
+  const valorPromocionalRaw = (item as MenuProduto & { valorPromocional?: unknown })
+    .valorPromocional
+  const valorPromocional =
+    typeof valorPromocionalRaw === 'number' && Number.isFinite(valorPromocionalRaw)
+      ? Math.max(0, valorPromocionalRaw)
+      : 0
+  return {
+    ...item,
+    valorPromocional,
+    promocaoAtiva: item.promocaoAtiva === true,
+  }
+}
+
 export function unwrapMenuProdutoPayload(raw: unknown): MenuProduto | null {
   if (!raw || typeof raw !== 'object') return null
   const obj = raw as Record<string, unknown>
@@ -106,5 +392,5 @@ export function unwrapMenuProdutoPayload(raw: unknown): MenuProduto | null {
   if (!data || typeof data !== 'object') return null
   const item = data as MenuProduto
   if (!item.produtoId && !item.id) return null
-  return item
+  return normalizeMenuProduto(item)
 }

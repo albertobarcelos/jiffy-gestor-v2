@@ -308,7 +308,7 @@ export function JiffyCustomerPanel({ onPedirLimparSessao }: Props) {
 
       <NovoPedidoModal
         open={novoPedidoAberto}
-        tipoInicioPedido="entrega"
+        tipoInicioPedido="delivery"
         clienteInicial={cliente}
         telefoneInicial={telefoneCampoPedido || telefoneExibido}
         preservarRascunhoAoFechar

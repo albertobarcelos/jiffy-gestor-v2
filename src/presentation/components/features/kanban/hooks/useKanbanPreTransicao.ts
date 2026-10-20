@@ -5,9 +5,10 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { useImpressaoDelivery } from '../../delivery/hooks/useImpressaoDelivery'
-import { confirmarCobrancaPendentePedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/ConfirmarCobrancaPendentePedidoDeliveryUseCase'
+import { confirmarCobrancaPendentePedidoDeliveryUseCase } from '@/src/infrastructure/composition/pedidoUseCases'
 import { invalidarPedidoKanbanQuickViewCache } from '../../delivery/kanban-panels/carregarPedidoKanbanQuickView'
 import { validarImpressaoAntesTransicaoKanban } from '@/src/application/delivery/validarImpressaoAntesTransicaoKanban'
+import { carregarPayloadTicketsImpressaoDelivery } from '@/src/infrastructure/printing/criarCarregarPayloadTicketsImpressaoDelivery'
 import {
   extrairPatchKanbanDeRespostaTransicao,
   extrairVendaUnificadaDeRespostaDeliverySummary,
@@ -23,6 +24,7 @@ import {
   resolverEntregadorIdVendaKanban,
 } from '../../delivery/kanban-panels/entregadorKanbanStore'
 import { vendaExigeEntregadorParaDespachar } from '../rules/vendasKanban.rules'
+import { sincronizarAlarmeSomComPedidoDelivery } from '@/src/presentation/gestor-pedidos/som/alarmeSomPedidoNovo'
 import { showToast } from '@/src/shared/utils/toast'
 import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
 import type { EmpresaMeResumo } from '@/src/presentation/hooks/useEmpresaMe'
@@ -49,7 +51,8 @@ export function useKanbanPreTransicao({
   preferenciasImpressaoDelivery,
   empresa,
   onAbrirConfigImpressoraExpedicao,
-}: UseKanbanPreTransicaoParams) {  const queryClient = useQueryClient()
+}: UseKanbanPreTransicaoParams) {
+  const queryClient = useQueryClient()
 
   const { processarAposTransicoes, reimprimirCupomEntrega } = useImpressaoDelivery({
     onImpressoraExpedicaoNecessaria: onAbrirConfigImpressoraExpedicao,
@@ -70,6 +73,12 @@ export function useKanbanPreTransicao({
         if (ok) {
           const cardAtualizado =
             extrairVendaUnificadaDeRespostaDeliverySummary(respostaTransicao)
+          sincronizarAlarmeSomComPedidoDelivery({
+            vendaId,
+            etapaKanban:
+              cardAtualizado?.getEtapaKanban() ?? colunaDestino ?? null,
+            statusOperacional: cardAtualizado?.statusEtapaOperacional,
+          })
           if (cardAtualizado?.entregador?.id) {
             definirEntregadorKanbanCache(vendaId, cardAtualizado.entregador.id)
             onPatchEntregadorPorVendaId(vendaId, cardAtualizado.entregador.id)
@@ -182,6 +191,7 @@ export function useKanbanPreTransicao({
         prefs: preferenciasImpressaoDelivery,
         empresa,
         acoes,
+        carregarPayload: carregarPayloadTicketsImpressaoDelivery,
       })
 
       for (const info of resultado.toastsInfo ?? []) {

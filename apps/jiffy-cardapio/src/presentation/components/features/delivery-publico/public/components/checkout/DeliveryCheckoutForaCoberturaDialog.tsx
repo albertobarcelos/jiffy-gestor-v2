@@ -20,7 +20,10 @@ export function DeliveryCheckoutForaCoberturaDialog({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[100] flex overscroll-none items-center justify-center px-4 py-6">
+    <div
+      className="delivery-vv-overlay z-[100] flex items-center justify-center overscroll-none px-4 py-6"
+      style={{ zIndex: 100 }}
+    >
       <button
         type="button"
         className="absolute inset-0"

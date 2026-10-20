@@ -1,3 +1,5 @@
+import { parseImagemUrlProdutoIndex } from '@/src/shared/utils/catalogoProdutoIndex'
+
 /**
  * Entidade de domínio representando um Grupo de Complementos
  */
@@ -83,7 +85,11 @@ export class GrupoComplemento {
             : [])
         : undefined,
       data.complementos,
-      typeof data.imagemUrl === 'string' ? data.imagemUrl : data.imagemUrl ?? null
+      parseImagemUrlProdutoIndex(
+        data && typeof data === 'object' && !Array.isArray(data)
+          ? (data as Record<string, unknown>)
+          : {}
+      )
     )
   }
 
@@ -121,6 +127,24 @@ export class GrupoComplemento {
 
   getImagemUrl(): string | null | undefined {
     return this.imagemUrl
+  }
+
+  /** Cópia imutável com a URL persistida da foto — mesma identidade de negócio. */
+  withImagemUrl(imagemUrl: string | null): GrupoComplemento {
+    const next = imagemUrl?.trim() || null
+    const current = this.imagemUrl?.trim() || null
+    if (next === current) return this
+    return new GrupoComplemento(
+      this.id,
+      this.nome,
+      this.qtdMinima,
+      this.qtdMaxima,
+      this.ativo,
+      this.ordem,
+      this.complementosIds,
+      this.complementos,
+      next
+    )
   }
 
   toJSON() {

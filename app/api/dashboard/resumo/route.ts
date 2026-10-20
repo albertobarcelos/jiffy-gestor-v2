@@ -5,6 +5,11 @@ import {
   calcularPeriodoNoFusoEmpresa,
   calcularPeriodoAnteriorParaComparacaoNoFusoEmpresa,
 } from '@/src/shared/utils/periodoNoFusoEmpresa'
+import { buscarPedidosDeliveryPeriodoDashboard } from '@/src/infrastructure/dashboard/buscarPedidosDeliveryPeriodoDashboard'
+import {
+  agregarMetricasDeliveryDashboard,
+  overlayMetricasPdvComDelivery,
+} from '@/src/infrastructure/dashboard/agregarMetricasDeliveryDashboard'
 
 type VendasMetricas = {
   totalFaturado?: number
@@ -215,7 +220,18 @@ export async function GET(request: NextRequest) {
         promises.push(countMesasAbertas({ apiClient, headers }))
       }
 
-      const results = await Promise.all(promises)
+      const [results, deliveryPedidos] = await Promise.all([
+        Promise.all(promises),
+        buscarPedidosDeliveryPeriodoDashboard({
+          apiClient,
+          headers,
+          inicioIso: inicio.toISOString(),
+          fimIso: fim.toISOString(),
+        }).catch(err => {
+          console.warn('Dashboard: não foi possível somar delivery no resumo', err)
+          return []
+        }),
+      ])
       const totalResp = results[0]
       const finalizadasResp = results[1]
       const canceladasResp = results[2]
@@ -258,7 +274,7 @@ export async function GET(request: NextRequest) {
         totalCancelado = 0
       }
 
-      return {
+      const metricasPdv = {
         total: {
           totalFaturado: totalMetricas.totalFaturado ?? 0,
           countVendasEfetivadas: totalMetricas.countVendasEfetivadas ?? 0,
@@ -280,6 +296,11 @@ export async function GET(request: NextRequest) {
         mesasAbertas: mesasAbertasCount ?? 0,
         totalCancelado,
       }
+
+      return overlayMetricasPdvComDelivery(
+        metricasPdv,
+        agregarMetricasDeliveryDashboard(deliveryPedidos)
+      )
     }
 
     const [dadosAtual, dadosAnterior] = await Promise.all([

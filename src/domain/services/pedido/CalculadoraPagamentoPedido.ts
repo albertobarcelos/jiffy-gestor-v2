@@ -1,6 +1,7 @@
 import {
   pagamentoContaComoEfetivo,
   pagamentoEstaCancelado,
+  pedidoTemCobrancaPendenteNaEntrega,
 } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
 
@@ -35,6 +36,39 @@ export function calcularValorAPagar(totalProdutos: number, totalPagamentos: numb
   return Math.max(0, totalProdutos - totalPagamentos)
 }
 
+export type ResultadoLancamentoPagamento =
+  | { ok: true; valor: number }
+  | { ok: false; message: string }
+
+/**
+ * Próximo lançamento: o saldo ignora a aba atual e desconta tudo que já foi lançado
+ * (já pago + cobrança na entrega).
+ */
+export function resolverLancamentoPagamento(args: {
+  totalPedido: number
+  pagamentosJaLancados: PagamentoSelecionado[]
+  valorDigitado: number | null
+  isDinheiro: boolean
+}): ResultadoLancamentoPagamento {
+  const saldo = calcularValorAPagar(
+    args.totalPedido,
+    totalPagamentosLancados(args.pagamentosJaLancados)
+  )
+  const valor =
+    args.valorDigitado != null && args.valorDigitado > 0 ? args.valorDigitado : saldo
+
+  if (valor <= 0) {
+    return { ok: false, message: 'Valor inválido' }
+  }
+  if (valor > saldo && (!args.isDinheiro || saldo <= 0)) {
+    return {
+      ok: false,
+      message: 'Este meio de pagamento não pode ultrapassar o valor a pagar.',
+    }
+  }
+  return { ok: true, valor }
+}
+
 export function resolverStatusPagamentoPedido(
   totalPagamentos: number,
   valorAPagar: number
@@ -50,6 +84,25 @@ export function rotuloStatusPagamento(status: StatusPagamentoPedido): string {
   return 'Pendente'
 }
 
+/** Status da tela: não marca Pago se ainda existe cobrança na entrega. */
+export function resolverStatusPagamentoExibicaoPedido(
+  pagamentos: PagamentoSelecionado[],
+  totalEfetivo: number,
+  valorAPagarEfetivo: number
+): StatusPagamentoPedido {
+  if (pedidoTemCobrancaPendenteNaEntrega(pagamentos)) {
+    return totalEfetivo > 0 ? 'parcial' : 'pendente'
+  }
+  return resolverStatusPagamentoPedido(totalEfetivo, valorAPagarEfetivo)
+}
+
+export function usarTrocoLancamentoPedido(
+  pagamentos: PagamentoSelecionado[],
+  entregaComCobrancaPeloEntregador: boolean
+): boolean {
+  return entregaComCobrancaPeloEntregador || pedidoTemCobrancaPendenteNaEntrega(pagamentos)
+}
+
 export function pagamentosCobremTotalPedido(
   totalProdutos: number,
   totalPagamentos: number,
@@ -63,6 +116,22 @@ export function pagamentosCobremTotalPedido(
 export function meioNomeEhDinheiro(nome: string): boolean {
   const lower = nome.toLowerCase()
   return lower.includes('dinheiro') || lower.includes('cash')
+}
+
+/**
+ * Só dinheiro gera troco.
+ * Sem catálogo/nome: cobrança na entrega é o único lançamento que pode carregar cédula
+ * (cardápio / entregador). Meio nomeado que não é dinheiro nunca gera troco.
+ */
+export function lancamentoEhDinheiroParaTroco(
+  pagamento: PagamentoSelecionado,
+  meiosPagamento: MeioPagamentoNomeLike[] = [],
+  nomesMeiosPagamentoPorId: Record<string, string> = {}
+): boolean {
+  const meio = meiosPagamento.find(m => m.getId() === pagamento.meioPagamentoId)
+  const nome = (meio?.getNome() || nomesMeiosPagamentoPorId[pagamento.meioPagamentoId] || '').trim()
+  if (nome) return meioNomeEhDinheiro(nome)
+  return Boolean(pagamento.cobrarNaEntrega || pagamento.naoEfetivo)
 }
 
 export type LancamentoTroco = {
@@ -86,9 +155,10 @@ export function calcularTrocoSobreLancamentos(args: {
 
     const totalAntes = lancamentos.slice(0, i).reduce((acc, x) => acc + x.valor, 0)
     const valorFaltavaPagar = total - totalAntes
+    if (valorFaltavaPagar <= 0) continue
 
     if (p.valor > valorFaltavaPagar) {
-      return p.valor - Math.max(0, valorFaltavaPagar)
+      return p.valor - valorFaltavaPagar
     }
     return 0
   }
@@ -99,10 +169,17 @@ export function calcularTrocoSobreLancamentos(args: {
 export function calcularTrocoPedido(args: {
   pagamentos: PagamentoSelecionado[]
   totalProdutos: number
-  meiosPagamento: MeioPagamentoNomeLike[]
+  meiosPagamento?: MeioPagamentoNomeLike[]
+  nomesMeiosPagamentoPorId?: Record<string, string>
   considerarApenasNaoCancelados?: boolean
 }): number {
-  const { pagamentos, totalProdutos, meiosPagamento, considerarApenasNaoCancelados } = args
+  const {
+    pagamentos,
+    totalProdutos,
+    meiosPagamento = [],
+    nomesMeiosPagamentoPorId = {},
+    considerarApenasNaoCancelados,
+  } = args
 
   const lancamentos: LancamentoTroco[] = []
   for (const p of pagamentos) {
@@ -112,10 +189,9 @@ export function calcularTrocoPedido(args: {
       continue
     }
 
-    const meio = meiosPagamento.find(m => m.getId() === p.meioPagamentoId)
     lancamentos.push({
       valor: p.valor,
-      isDinheiro: Boolean(meio && meioNomeEhDinheiro(meio.getNome())),
+      isDinheiro: lancamentoEhDinheiroParaTroco(p, meiosPagamento, nomesMeiosPagamentoPorId),
     })
   }
 

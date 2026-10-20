@@ -1,4 +1,4 @@
-import type { InfiniteData, QueryClient } from '@tanstack/react-query'
+import { notifyManager, type InfiniteData, type QueryClient } from '@tanstack/react-query'
 import type { ColunaKanbanId } from '../types'
 import type { PedidosDeliveryInfinitePage } from '../hooks/usePedidosDeliveryInfinite'
 import type { VendaUnificadaDTO } from '../hooks/useVendasUnificadas'
@@ -8,10 +8,13 @@ import {
   extrairColumnIdDePedidosDeliveryKanbanQueryKey,
   vendaPertenceColunaDeliveryKanban,
 } from './kanbanDeliveryColumnConfig'
+import { isoTimestampPreparoValido } from '@/src/application/kanban/timestampPreparoKanban'
 import {
   cloneVendaUnificadaDTO,
-  extrairPatchKanbanDeRespostaTransicao,
+  extrairPatchOperacionalKanbanDeStatusDelivery,
   extrairVendaUnificadaDeRespostaDeliverySummary,
+  mesclarTimestampsPreparoNoCard,
+  pedidoDeliverySummaryTemCamposComerciais,
 } from './kanbanVendaCacheUpdate'
 import type { KanbanVendaCachePatch } from '@/src/application/dto/TransicaoKanbanDTO'
 
@@ -21,12 +24,41 @@ function removerVendaDasPaginas(
 ): InfiniteData<PedidosDeliveryInfinitePage> | undefined {
   if (!data?.pages?.length) return data
 
+  let removeu = false
+  const pages = data.pages.map(page => {
+    const items = page.items.filter(item => item.id !== vendaId)
+    if (items.length === page.items.length) return page
+    removeu = true
+    return { ...page, items }
+  })
+
+  return removeu ? { ...data, pages } : data
+}
+
+function substituirVendaNasPaginas(
+  data: InfiniteData<PedidosDeliveryInfinitePage> | undefined,
+  venda: VendaUnificadaDTO
+): InfiniteData<PedidosDeliveryInfinitePage> | undefined {
+  if (!data?.pages?.length) return data
+
+  let encontrou = false
   const pages = data.pages.map(page => ({
     ...page,
-    items: page.items.filter(item => item.id !== vendaId),
+    items: page.items.map(item => {
+      if (item.id !== venda.id) return item
+      encontrou = true
+      return venda
+    }),
   }))
 
-  return { ...data, pages }
+  return encontrou ? { ...data, pages } : data
+}
+
+function vendaEstaNasPaginas(
+  data: InfiniteData<PedidosDeliveryInfinitePage> | undefined,
+  vendaId: string
+): boolean {
+  return Boolean(data?.pages?.some(page => page.items.some(item => item.id === vendaId)))
 }
 
 function inserirVendaNaPrimeiraPagina(
@@ -74,13 +106,120 @@ function etapaKanbanDeliveryCache(v: VendaUnificadaDTO): string {
 
 /**
  * `true` se o card mapeia para alguma coluna conhecida do Kanban delivery.
- * Quando `false` (etapa ambígua/`'ABERTA'`), o card não pertence a nenhuma coluna e
- * um upsert o removeria de todos os caches, fazendo-o "sumir" da tela até o reload.
+ * Quando `false` (etapa operacional ausente ou terminal), o card não fica nas colunas em curso.
  */
 export function vendaPertenceAlgumaColunaDeliveryKanban(venda: VendaUnificadaDTO): boolean {
   return DELIVERY_KANBAN_COLUMN_IDS.some(columnId =>
     vendaPertenceColunaDeliveryKanban(venda, columnId, etapaKanbanDeliveryCache)
   )
+}
+
+/**
+ * Nivel A/C realtime: aplica PEDIDO_DELIVERY_CRIADO so na coluna do status (sem varredura).
+ * @returns true se o summary virou card em coluna conhecida; false = caller deve invalidar.
+ */
+export function aplicarPedidoDeliveryCriadoNoKanbanCache(
+  queryClient: QueryClient,
+  payload: unknown
+): boolean {
+  const card = extrairVendaUnificadaDeRespostaDeliverySummary(payload)
+  if (!card) return false
+
+  const colunaAlvo = DELIVERY_KANBAN_COLUMN_IDS.find(columnId =>
+    vendaPertenceColunaDeliveryKanban(card, columnId, etapaKanbanDeliveryCache)
+  )
+  if (!colunaAlvo) return false
+
+  const queries = queryClient.getQueriesData<InfiniteData<PedidosDeliveryInfinitePage>>(
+    kanbanPedidosDeliveryInfiniteQueryFilter()
+  )
+
+  for (const [queryKey, data] of queries) {
+    const columnId = extrairColumnIdDePedidosDeliveryKanbanQueryKey(queryKey)
+    if (columnId !== colunaAlvo) continue
+    queryClient.setQueryData(queryKey, inserirVendaNaPrimeiraPagina(data, card))
+  }
+  // Summary valido: sucesso mesmo sem query da coluna montada (evita invalidate cego).
+  return true
+}
+
+/**
+ * Remove o card de todas as colunas delivery (ex.: CANCELADO).
+ * @returns true se removeu de pelo menos uma query.
+ */
+export function removerVendaDeliveryKanbanColumnCaches(
+  queryClient: QueryClient,
+  vendaId: string
+): boolean {
+  const id = vendaId.trim()
+  if (!id) return false
+
+  const queries = queryClient.getQueriesData<InfiniteData<PedidosDeliveryInfinitePage>>(
+    kanbanPedidosDeliveryInfiniteQueryFilter()
+  )
+
+  let removeu = false
+  for (const [queryKey, data] of queries) {
+    const columnId = extrairColumnIdDePedidosDeliveryKanbanQueryKey(queryKey)
+    if (!columnId) continue
+    const semVenda = removerVendaDasPaginas(data, id)
+    if (semVenda !== data) {
+      queryClient.setQueryData(queryKey, semVenda)
+      removeu = true
+    }
+  }
+  return removeu
+}
+
+/**
+ * Nivel D realtime: aplica PEDIDO_DELIVERY_STATUS_ALTERADO (move ou remove).
+ * Payload fino (só id/status) não substitui o card já no cache — preserva cliente, valor e tipo.
+ * @returns true se aplicou no cache; false = caller deve invalidar.
+ */
+export function aplicarPedidoDeliveryStatusAlteradoNoKanbanCache(
+  queryClient: QueryClient,
+  payload: unknown
+): boolean {
+  const card = extrairVendaUnificadaDeRespostaDeliverySummary(payload)
+  if (!card) return false
+
+  const statusOp = String(card.statusEtapaOperacional ?? '')
+    .trim()
+    .toUpperCase()
+  // CANCELADO nao tem coluna operacional; remove do board em vez de projetar fiscal.
+  if (statusOp === 'CANCELADO' || statusOp === 'CANCELADA') {
+    removerVendaDeliveryKanbanColumnCaches(queryClient, card.id)
+    return true
+  }
+
+  const existente = encontrarVendaNasColunasDeliveryKanban(queryClient, card.id)
+  const summaryCompleto = pedidoDeliverySummaryTemCamposComerciais(payload)
+
+  if (existente && !summaryCompleto) {
+    const merged = cloneVendaUnificadaDTO(
+      existente,
+      extrairPatchOperacionalKanbanDeStatusDelivery(payload)
+    )
+    if (!vendaPertenceAlgumaColunaDeliveryKanban(merged)) {
+      removerVendaDeliveryKanbanColumnCaches(queryClient, card.id)
+      return true
+    }
+    upsertVendaDeliveryKanbanColumnCaches(queryClient, merged)
+    return true
+  }
+
+  if (!summaryCompleto) return false
+
+  if (!vendaPertenceAlgumaColunaDeliveryKanban(card)) {
+    removerVendaDeliveryKanbanColumnCaches(queryClient, card.id)
+    return true
+  }
+
+  upsertVendaDeliveryKanbanColumnCaches(
+    queryClient,
+    mesclarTimestampsPreparoNoCard(card, existente)
+  )
+  return true
 }
 
 /** Substitui ou move o card entre caches de colunas após transição de status. */
@@ -95,26 +234,33 @@ export function upsertVendaDeliveryKanbanColumnCaches(
     kanbanPedidosDeliveryInfiniteQueryFilter()
   )
 
-  for (const [queryKey, data] of queries) {
-    const columnId = extrairColumnIdDePedidosDeliveryKanbanQueryKey(queryKey)
-    if (!columnId) continue
+  notifyManager.batch(() => {
+    for (const [queryKey, data] of queries) {
+      const columnId = extrairColumnIdDePedidosDeliveryKanbanQueryKey(queryKey)
+      if (!columnId) continue
 
-    const pertence = vendaPertenceColunaDeliveryKanban(venda, columnId, etapaKanbanDeliveryCache)
+      const pertence = vendaPertenceColunaDeliveryKanban(
+        venda,
+        columnId,
+        etapaKanbanDeliveryCache
+      )
 
-    if (!pertence) {
-      const semVenda = removerVendaDasPaginas(data, venda.id)
-      if (semVenda !== data) {
-        queryClient.setQueryData(queryKey, semVenda)
+      if (!pertence) {
+        const semVenda = removerVendaDasPaginas(data, venda.id)
+        if (semVenda !== data) {
+          queryClient.setQueryData(queryKey, semVenda)
+        }
+        continue
       }
-      continue
-    }
 
-    const comVenda = inserirVendaNaPrimeiraPagina(
-      removerVendaDasPaginas(data, venda.id),
-      venda
-    )
-    queryClient.setQueryData(queryKey, comVenda)
-  }
+      if (vendaEstaNasPaginas(data, venda.id)) {
+        queryClient.setQueryData(queryKey, substituirVendaNasPaginas(data, venda))
+        continue
+      }
+
+      queryClient.setQueryData(queryKey, inserirVendaNaPrimeiraPagina(data, venda))
+    }
+  })
 }
 
 /** Aplica patch em todas as colunas; remove o card se a etapa mudou de coluna. */
@@ -184,35 +330,58 @@ const STATUS_OPERACIONAL_POR_COLUNA_DESTINO: Partial<Record<ColunaKanbanId, stri
 
 /**
  * Garante que o patch carregue a etapa operacional do destino quando a resposta da transição
- * não devolve `statusDelivery`. Sem isso, o card perde a etapa, `getEtapaKanban()` cai em `'ABERTA'`
- * e o card é filtrado de todas as colunas (some até recarregar).
+ * não devolve `statusDelivery`. Sem a etapa, o card sai da coluna operacional.
  */
+function completarTimestampsPreparoNoPatch(
+  patch: KanbanVendaCachePatch,
+  colunaDestino?: ColunaKanbanId | null,
+  existente?: Pick<VendaUnificadaDTO, 'dataInicioPreparo' | 'dataFinalizacaoPreparo'> | null
+): KanbanVendaCachePatch {
+  if (
+    colunaDestino === 'EM_PREPARO' &&
+    !isoTimestampPreparoValido(patch.dataInicioPreparo) &&
+    !isoTimestampPreparoValido(existente?.dataInicioPreparo)
+  ) {
+    return { ...patch, dataInicioPreparo: new Date().toISOString() }
+  }
+  if (
+    colunaDestino === 'PRONTO_ENTREGA' &&
+    !isoTimestampPreparoValido(patch.dataFinalizacaoPreparo) &&
+    !isoTimestampPreparoValido(existente?.dataFinalizacaoPreparo)
+  ) {
+    return { ...patch, dataFinalizacaoPreparo: new Date().toISOString() }
+  }
+  return patch
+}
+
 function aplicarStatusDestinoNoPatch(
   patch: KanbanVendaCachePatch,
-  colunaDestino?: ColunaKanbanId | null
+  colunaDestino?: ColunaKanbanId | null,
+  existente?: Pick<VendaUnificadaDTO, 'dataInicioPreparo' | 'dataFinalizacaoPreparo'> | null
 ): KanbanVendaCachePatch {
-  if (!colunaDestino) return patch
-  if (String(patch.statusEtapaOperacional ?? '').trim()) return patch
+  const comPreparo = completarTimestampsPreparoNoPatch(patch, colunaDestino, existente)
+  if (!colunaDestino) return comPreparo
+  if (String(comPreparo.statusEtapaOperacional ?? '').trim()) return comPreparo
 
   const statusDestino = STATUS_OPERACIONAL_POR_COLUNA_DESTINO[colunaDestino]
-  if (!statusDestino) return patch
+  if (!statusDestino) return comPreparo
 
   const ehFinalizado = statusDestino === 'FINALIZADO'
   return {
-    ...patch,
+    ...comPreparo,
     statusEtapaOperacional: statusDestino,
     dataFinalizacao: ehFinalizado
-      ? (patch.dataFinalizacao ?? new Date().toISOString())
-      : patch.dataFinalizacao,
+      ? (comPreparo.dataFinalizacao ?? new Date().toISOString())
+      : comPreparo.dataFinalizacao,
   }
 }
 
 /**
  * Sincroniza caches de coluna após transição delivery.
- * 1) summary completo → upsert; 2) patch no card existente; 3) merge fallback + patch + upsert.
+ * Summary completo → upsert; payload fino → patch operacional no card já visível
+ * (não pisa cliente/valor/cobrança com default do mapper). Sem card no cache: patch.
  *
- * `colunaDestino` (quando conhecida) força a etapa operacional caso a resposta não a traga,
- * evitando que o card caia em `'ABERTA'` e suma da tela.
+ * `colunaDestino` (quando conhecida) força a etapa operacional caso a resposta não a traga.
  */
 export function sincronizarVendaDeliveryKanbanColumnCaches(
   queryClient: QueryClient,
@@ -222,20 +391,27 @@ export function sincronizarVendaDeliveryKanbanColumnCaches(
   colunaDestino?: ColunaKanbanId | null
 ): boolean {
   const cardAtualizado = extrairVendaUnificadaDeRespostaDeliverySummary(respostaTransicao)
+  const summaryCompleto = pedidoDeliverySummaryTemCamposComerciais(respostaTransicao)
   const cardSummaryUtilizavel =
-    cardAtualizado != null && vendaPertenceAlgumaColunaDeliveryKanban(cardAtualizado)
+    cardAtualizado != null &&
+    vendaPertenceAlgumaColunaDeliveryKanban(cardAtualizado) &&
+    summaryCompleto
+
+  const base = fallbackVenda ?? encontrarVendaNasColunasDeliveryKanban(queryClient, vendaId)
 
   if (cardAtualizado && cardSummaryUtilizavel) {
-    upsertVendaDeliveryKanbanColumnCaches(queryClient, cardAtualizado)
+    upsertVendaDeliveryKanbanColumnCaches(
+      queryClient,
+      mesclarTimestampsPreparoNoCard(cardAtualizado, base)
+    )
     return true
   }
 
   const patch = aplicarStatusDestinoNoPatch(
-    extrairPatchKanbanDeRespostaTransicao(respostaTransicao),
-    colunaDestino
+    extrairPatchOperacionalKanbanDeStatusDelivery(respostaTransicao),
+    colunaDestino,
+    base
   )
-
-  const base = fallbackVenda ?? encontrarVendaNasColunasDeliveryKanban(queryClient, vendaId)
   if (base) {
     const merged = cloneVendaUnificadaDTO(base, patch)
     if (vendaPertenceAlgumaColunaDeliveryKanban(merged)) {
@@ -244,6 +420,5 @@ export function sincronizarVendaDeliveryKanbanColumnCaches(
     }
   }
 
-  // Último recurso: patch direto no cache (mantém comportamento anterior se nada acima resolveu).
   return patchVendaDeliveryKanbanColumnCaches(queryClient, vendaId, patch)
 }

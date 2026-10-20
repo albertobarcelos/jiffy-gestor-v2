@@ -184,5 +184,12 @@ export class ProdutoRepository implements IProdutoRepository {
       throw error
     }
   }
+
+  async excluirProduto(id: string): Promise<void> {
+    await this.apiClient.request(`/api/v1/cardapio/produtos/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
+    })
+  }
 }
 

@@ -31,11 +31,18 @@ export interface MenuGrupoProduto {
   id: string
   nome: string
   ordem: number
+  /** Status do snapshot neste menu. Independente de `grupoBase.ativo`. */
+  ativo?: boolean
   menuId: string
   grupoBase: MenuGrupoBase
   image?: MenuProdutoImage | null
   dataCriacao: string
   dataAtualizacao: string
+}
+
+export interface UpdateMenuGrupoInput {
+  nome?: string
+  ativo?: boolean
 }
 
 export interface MenuProdutoGrupoResumo {
@@ -49,9 +56,26 @@ export interface MenuProdutoImage {
   imageUrl: string | null
 }
 
+export interface MenuProdutoComplementoItemResumo {
+  id: string
+  nome: string
+  valor?: number
+  tipoImpactoPreco?: 'aumenta' | 'diminui' | 'nenhum'
+  /** Efetivo no produto deste cardápio (`ComplementoMenuConfig`). Ausente = ativo. */
+  ativo?: boolean
+  /** Ordem efetiva neste produto/grupo do cardápio. */
+  ordem?: number
+}
+
 export interface MenuProdutoComplementoResumo {
   id: string
   nome: string
+  /** Cadastro do grupo. Ausente no snapshot slim (só id/nome). */
+  qtdMinima?: number
+  /** Cadastro do grupo. 0 = sem teto. Ausente no snapshot slim. */
+  qtdMaxima?: number
+  /** Presente só em alguns GETs; a listagem do menu costuma mandar só id/nome. */
+  complementos?: MenuProdutoComplementoItemResumo[]
 }
 
 export interface MenuProduto {
@@ -59,6 +83,10 @@ export interface MenuProduto {
   nome: string
   descricao: string | null
   valor: number
+  /** Preço promocional neste cardápio (≥ 0). */
+  valorPromocional: number
+  /** Quando true e valorPromocional > 0, o preço vigente é o promocional. */
+  promocaoAtiva: boolean
   ordem: number
   favorito: boolean
   ativo: boolean
@@ -69,6 +97,13 @@ export interface MenuProduto {
   gruposComplementos: MenuProdutoComplementoResumo[]
   dataCriacao: string
   dataAtualizacao: string
+  /**
+   * Código do cadastro base quando o snapshot do menu já incluir.
+   * Preferido sobre o índice `/catalogo-index` na lista do cardápio.
+   */
+  codigoProduto?: string
+  /** Alias legado se a API mandar `codigo` em vez de `codigoProduto`. */
+  codigo?: string
   /** Futuro: permissões do PDV neste menu. Se ausente, o front usa o cadastro. */
   permiteAcrescimo?: boolean
   permiteDesconto?: boolean
@@ -105,6 +140,8 @@ export interface UpdateMenuProdutoInput {
   nome?: string
   descricao?: string | null
   valor?: number
+  valorPromocional?: number
+  promocaoAtiva?: boolean
   ordem?: number
   favorito?: boolean
   ativo?: boolean

@@ -6,6 +6,7 @@ import { AtualizarUsuarioUseCase } from '@/src/application/use-cases/usuarios/At
 import { DeletarUsuarioUseCase } from '@/src/application/use-cases/usuarios/DeletarUsuarioUseCase'
 import { AtualizarUsuarioSchema } from '@/src/application/dto/AtualizarUsuarioDTO'
 import { ApiClient } from '@/src/infrastructure/api/apiClient'
+import { idUsuarioParaConsulta } from '@/src/application/mappers/atorPedidoDelivery'
 
 /**
  * GET /api/usuarios/[id]
@@ -22,7 +23,8 @@ export async function GET(
     }
     const { tokenInfo } = validation
 
-    const { id } = await params
+    const { id: idBruto } = await params
+    const id = idUsuarioParaConsulta(idBruto) || idBruto
     if (!id) {
       return NextResponse.json({ error: 'ID do usuário é obrigatório' }, { status: 400 })
     }

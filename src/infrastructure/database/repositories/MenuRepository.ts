@@ -235,14 +235,14 @@ export class MenuRepository implements IMenuRepository {
   async atualizarGrupo(
     menuId: string,
     grupoProdutoId: string,
-    nome: string
+    input: { nome?: string; ativo?: boolean }
   ): Promise<MenuGrupoProduto> {
     const { data } = await this.apiClient.request<MenuGrupoProduto>(
       `${BASE}/${menuId}/grupos-produtos/${grupoProdutoId}`,
       {
         method: 'PATCH',
         headers: this.authHeaders(true),
-        body: JSON.stringify({ nome }),
+        body: JSON.stringify(input),
       }
     )
     return data

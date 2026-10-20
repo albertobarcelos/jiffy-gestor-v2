@@ -1,7 +1,7 @@
 import type { DeliveryCupomTemplateConfig } from '@/src/shared/types/deliveryCupomTemplate'
 import { DEFAULT_DELIVERY_CUPOM_TEMPLATE } from '@/src/shared/types/deliveryCupomTemplate'
 import type { TicketTipoCupomApi } from '@/src/shared/types/vendaGestorTickets'
-import type { PrintSize } from '@/src/infrastructure/printing/agent/printJobTypes'
+import type { PrintSize } from '@/src/application/ports/printDocument'
 
 export function mergeCupomTemplate(
   template?: DeliveryCupomTemplateConfig
@@ -20,6 +20,23 @@ export function printSizeFromFontePx(px: number): PrintSize {
   if (px >= 16) return 'double'
   if (px <= 10) return 'small'
   return 'normal'
+}
+
+/** CSS px de Font A 2/2 (48 dots de altura) na escala do cupom gráfico. */
+export function fonteProdutoEscPosA22Px(larguraMm: 58 | 80): number {
+  const dotsLargura = larguraMm === 58 ? 384 : 576
+  const cssLargura = larguraMm === 58 ? 220 : 300
+  return Math.max(16, Math.round((48 * cssLargura) / dotsLargura))
+}
+
+/** CSS px de Font A 1/1 (24 dots) — nome da empresa no header. */
+export function fonteEmpresaEscPosA11Px(larguraMm: 58 | 80): number {
+  return Math.max(12, Math.round(fonteProdutoEscPosA22Px(larguraMm) / 2))
+}
+
+/** Escala HTML → dots da térmica no cupom gráfico (58 mm / 80 mm). */
+export function graphicRasterScale(larguraMm: 58 | 80): number {
+  return larguraMm === 58 ? 384 / 220 : 576 / 300
 }
 
 export function sectionFeedLines(densidade: DeliveryCupomTemplateConfig['densidade']): number {

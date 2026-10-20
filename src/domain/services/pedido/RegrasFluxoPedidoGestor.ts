@@ -3,6 +3,7 @@ import {
   statusFiscalPermiteCancelarNota,
 } from '@/src/domain/services/pedido/RegrasFiscaisVenda'
 import type { OrigemVenda, TabelaOrigemVenda } from '@/src/domain/types/vendaDetalhe'
+import { EtapaOperacionalDelivery } from '@/src/domain/value-objects/EtapaOperacionalDelivery'
 
 export function resolverStatusFiscalExibicao(
   statusFiscalUnificado: string | null | undefined,
@@ -38,13 +39,12 @@ export function podeExibirAbaNotaFiscalDetalhe(params: {
 
 export function podeExibirAbaDadosEntregaDetalhe(params: {
   modoVisualizacao: boolean | undefined
-  tipoVenda: string | null | undefined
+  tipoEntrega: string | null | undefined
 }): boolean {
   if (!params.modoVisualizacao) return false
-  const tipo = String(params.tipoVenda ?? '')
+  return String(params.tipoEntrega ?? '')
     .trim()
-    .toLowerCase()
-  return tipo === 'entrega'
+    .toLowerCase() === 'entrega'
 }
 
 export function podeExibirCancelarNotaFiscalDetalhe(params: {
@@ -58,21 +58,13 @@ export function podeExibirCancelarNotaFiscalDetalhe(params: {
   return statusFiscalPermiteCancelarNota(resumoFiscalStatus, statusFiscal, null)
 }
 
-/** Status operacionais terminais — pedido não pode mais ser cancelado. */
-const STATUS_ETAPA_PEDIDO_DELIVERY_ENCERRADO = new Set([
-  'FINALIZADO',
-  'FINALIZADA',
-  'CANCELADO',
-  'CANCELADA',
-])
-
 /** Pedido delivery pode ser cancelado em qualquer etapa operacional, exceto finalizado ou já cancelado. */
 export function statusEtapaPermiteCancelarPedidoDelivery(
   statusEtapaOperacional: string | null | undefined
 ): boolean {
-  const status = String(statusEtapaOperacional ?? '').trim().toUpperCase()
-  if (!status) return true
-  return !STATUS_ETAPA_PEDIDO_DELIVERY_ENCERRADO.has(status)
+  const etapa = EtapaOperacionalDelivery.tryParse(statusEtapaOperacional)
+  if (!etapa) return true
+  return etapa.permiteCancelarPedido()
 }
 
 export function podeExibirCancelarPedidoDeliveryOperacional(params: {
@@ -94,7 +86,46 @@ export function podeExibirCancelarPedidoDeliveryOperacional(params: {
   const tipo = String(params.tipoVenda ?? '')
     .trim()
     .toLowerCase()
-  if (tipo !== 'entrega' && tipo !== 'retirada') return false
+  if (tipo !== 'delivery') return false
 
   return statusEtapaPermiteCancelarPedidoDelivery(params.statusEtapaOperacional)
+}
+
+const ORIGENS_JIFFY_PERMITEM_EDITAR_ITENS = new Set(['GESTOR', 'JIFFY_DELIVERY'])
+
+export function statusEtapaPermiteEditarItensPedidoDelivery(
+  statusEtapaOperacional: string | null | undefined
+): boolean {
+  return EtapaOperacionalDelivery.tryParse(statusEtapaOperacional)?.permiteEditarItens() ?? false
+}
+
+/**
+ * Pedido delivery do Gestor/cardápio Jiffy ainda em PENDENTE, EM_PREPARO ou PRONTO:
+ * o detalhe pode abrir a edição completa dos itens (`PATCH produtos.add/remove`).
+ */
+export function podeEditarItensPedidoDeliveryDetalhe(params: {
+  modoVisualizacao: boolean | undefined
+  tabelaOrigemVenda: TabelaOrigemVenda
+  tipoVenda: string | null | undefined
+  origem: OrigemVenda | string | null | undefined
+  vendaId: string | undefined
+  vendaGestorJaCancelada: boolean
+  statusEtapaOperacional: string | null | undefined
+}): boolean {
+  if (!params.modoVisualizacao) return false
+  if (params.tabelaOrigemVenda !== 'venda_gestor') return false
+  if (!params.vendaId) return false
+  if (params.vendaGestorJaCancelada) return false
+
+  const tipo = String(params.tipoVenda ?? '')
+    .trim()
+    .toLowerCase()
+  if (tipo !== 'delivery') return false
+
+  const origem = String(params.origem ?? '')
+    .trim()
+    .toUpperCase()
+  if (origem && !ORIGENS_JIFFY_PERMITEM_EDITAR_ITENS.has(origem)) return false
+
+  return statusEtapaPermiteEditarItensPedidoDelivery(params.statusEtapaOperacional)
 }

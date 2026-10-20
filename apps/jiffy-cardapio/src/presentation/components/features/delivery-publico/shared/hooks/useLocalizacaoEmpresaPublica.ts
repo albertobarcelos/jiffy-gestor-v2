@@ -73,14 +73,21 @@ export function publicDeliveryLocalizacaoEmpresaQueryKey(slug: string, enderecoK
 }
 
 /**
- * Geocodifica o endereço textual da loja (já exposto no catálogo público)
- * e cacheia em React Query + sessionStorage — 1 request por sessão/endereço.
+ * Localização da loja para distância no checkout.
+ * Preferência: `localizacao` do catálogo público (P3). Fallback: geocode FE
+ * do endereço textual (1 request/sessão + sessionStorage).
  */
 export function useLocalizacaoEmpresaPublica(
   slug: string,
   endereco: EnderecoEmpresaPublicoInput,
-  enabled = true
+  enabled = true,
+  localizacaoApi?: GeoJsonPoint | null
 ) {
+  const localizacaoDaApi = useMemo(
+    () => parseGeoJsonPoint(localizacaoApi),
+    [localizacaoApi]
+  )
+
   const input = useMemo(
     () => toGeocodeInput(endereco),
     [
@@ -95,6 +102,10 @@ export function useLocalizacaoEmpresaPublica(
   const podeGeocode = Boolean(input && enderecoEmpresaGeocodeMinimo(input))
   const enderecoKey = input && podeGeocode ? chaveEnderecoEmpresa(input) : ''
 
+  const precisaGeocode = Boolean(
+    slug && enabled && !localizacaoDaApi && podeGeocode && enderecoKey
+  )
+
   const query = useQuery({
     queryKey: publicDeliveryLocalizacaoEmpresaQueryKey(slug, enderecoKey),
     queryFn: async ({ signal }) => {
@@ -105,7 +116,7 @@ export function useLocalizacaoEmpresaPublica(
       salvarCacheSession(slug, enderecoKey, result.enderecoLocalizacao)
       return result.enderecoLocalizacao
     },
-    enabled: Boolean(slug && enabled && podeGeocode && enderecoKey),
+    enabled: precisaGeocode,
     staleTime: Infinity,
     gcTime: 1000 * 60 * 60,
     retry: 1,
@@ -114,8 +125,9 @@ export function useLocalizacaoEmpresaPublica(
   })
 
   return {
-    localizacaoEmpresa: query.data ?? null,
-    isLoading: query.isLoading,
-    isError: query.isError,
+    localizacaoEmpresa: localizacaoDaApi ?? query.data ?? null,
+    isLoading: Boolean(precisaGeocode && query.isLoading),
+    isError: Boolean(precisaGeocode && query.isError),
+    fromApi: Boolean(localizacaoDaApi),
   }
 }

@@ -6,6 +6,7 @@ const EPS_PRECO = 0.0001
 /**
  * Indica se o create/PATCH deve enviar `valorUnitario` (preço alterado).
  * Só quando o produto permite alterar preço e o valor da linha difere do catálogo.
+ * Preço do cardápio (sem override) é responsabilidade do backend.
  */
 export function deveEnviarValorUnitarioAlterado(p: ProdutoSelecionado): boolean {
   if (!p.permiteAlterarPreco) return false

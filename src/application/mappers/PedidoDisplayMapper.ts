@@ -2,7 +2,10 @@ import {
   normalizeOrigemApi,
   rotuloOrigemParaExibicao as rotuloOrigemNormalizado,
 } from '@/src/application/mappers/VendaApiNormalizer'
-import { pagamentoEstaCancelado } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
+import {
+  pagamentoEstaCancelado,
+  pagamentoPendenteNaEntrega,
+} from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
 import type {
   EnderecoEntregaDetalhe,
@@ -11,6 +14,8 @@ import type {
   TaxaEntregaDetalhe,
 } from '@/src/domain/types/vendaDetalhe'
 import { formatarTelefoneBr } from '@/src/shared/utils/telefoneBr'
+import { idUsuarioGestorConsultavel } from '@/src/application/mappers/atorPedidoDelivery'
+import { temSeloCanalMarketplace } from '@/src/domain/policies/pedido/origemCanalMarketplace'
 
 export {
   formatarDataDetalhePedido,
@@ -49,7 +54,58 @@ export function formatarUsuarioPorId(
 ): string {
   const id = String(usuarioId || '').trim()
   if (!id) return '—'
-  return nomesUsuariosPedido[id] || 'Usuário não identificado'
+  const nome = nomesUsuariosPedido[id]
+  if (nome) return nome
+  if (!idUsuarioGestorConsultavel(id)) return 'Cliente'
+  return 'Usuário não identificado'
+}
+
+export function rotuloUsuarioPagamentoPedido(params: {
+  realizadoPorId?: string | null
+  realizadoPorNome?: string | null
+  pagamentoId?: string | null
+  abertoPorId?: string | null
+  clienteId?: string | null
+  nomesUsuariosPedido: Record<string, string>
+  clienteNome?: string | null
+  nomeUsuarioGestor?: string | null
+  usuarioGestorId?: string | null
+  origem?: string | null
+}): string {
+  const realizadoPorId = String(params.realizadoPorId ?? '').trim()
+  const gestorId = String(params.usuarioGestorId ?? '').trim()
+  const nomeGestor = String(params.nomeUsuarioGestor ?? '').trim()
+  const cliente = String(params.clienteNome ?? '').trim()
+  const abertoPorId = String(params.abertoPorId ?? '').trim()
+  const clienteId = String(params.clienteId ?? '').trim()
+  const persistido = Boolean(String(params.pagamentoId ?? '').trim())
+  const nomePersistido = String(params.realizadoPorNome ?? '').trim()
+
+  const ehAtorCliente = (id: string) =>
+    Boolean(id) && ((abertoPorId && id === abertoPorId) || (clienteId && id === clienteId))
+
+  if (realizadoPorId) {
+    if (gestorId && realizadoPorId === gestorId && nomeGestor) return nomeGestor
+    if (nomePersistido) return nomePersistido
+    const rotulo = formatarUsuarioPorId(realizadoPorId, params.nomesUsuariosPedido)
+    if (rotulo !== 'Usuário não identificado' && rotulo !== '—') return rotulo
+    if (ehAtorCliente(realizadoPorId)) return cliente || 'Cliente'
+    return rotulo
+  }
+
+  if (!persistido && nomeGestor) return nomeGestor
+  if (nomePersistido) return nomePersistido
+
+  if (cliente) return cliente
+  const origem = String(params.origem ?? '').trim().toUpperCase()
+  if (
+    origem === 'DELIVERY' ||
+    origem === 'JIFFY_DELIVERY' ||
+    temSeloCanalMarketplace(origem)
+  ) {
+    return 'Cliente'
+  }
+  return formatarUsuarioPorId(abertoPorId, params.nomesUsuariosPedido)
 }
 
 export function rotuloModeloNfe(modelo: number | null | undefined): string {
@@ -99,6 +155,71 @@ export function formatarTipoPagamentoDetalhe(
   }
 
   return nomesUnicos.length > 0 ? nomesUnicos.join(', ') : '—'
+}
+
+export type LinhaResumoPagamentoPedido = {
+  kind: 'ja_pago' | 'cobrar'
+  texto: string
+}
+
+function nomeMeioPagamentoPedido(
+  pagamento: PagamentoSelecionado,
+  meiosPagamento: MeioPagamentoLookup[],
+  nomesMeiosPorId: Record<string, string>
+): string {
+  const meioId = String(pagamento.meioPagamentoId ?? '').trim()
+  const meioLista = meiosPagamento.find(m => m.getId() === meioId)
+  return meioLista?.getNome()?.trim() || nomesMeiosPorId[meioId]?.trim() || 'Pagamento'
+}
+
+function juntarMeiosComValor(
+  pagamentos: PagamentoSelecionado[],
+  meiosPagamento: MeioPagamentoLookup[],
+  nomesMeiosPorId: Record<string, string>,
+  formatarValor: (valor: number) => string
+): string {
+  return pagamentos
+    .map(
+      pag =>
+        `${nomeMeioPagamentoPedido(pag, meiosPagamento, nomesMeiosPorId)} ${formatarValor(pag.valor)}`
+    )
+    .join(', ')
+}
+
+/** Já pago e a cobrar separados — o fluxo único esconde pagamento misto. */
+export function montarLinhasResumoPagamentoPedido(
+  pagamentos: PagamentoSelecionado[],
+  meiosPagamento: MeioPagamentoLookup[],
+  nomesMeiosPorId: Record<string, string>,
+  formatarValor: (valor: number) => string
+): LinhaResumoPagamentoPedido[] {
+  const ativos = pagamentos.filter(
+    p => !pagamentoEstaCancelado(p) && String(p.meioPagamentoId ?? '').trim()
+  )
+  const jaPagos = ativos.filter(p => !pagamentoPendenteNaEntrega(p))
+  const aCobrar = ativos.filter(p => pagamentoPendenteNaEntrega(p))
+  const linhas: LinhaResumoPagamentoPedido[] = []
+
+  if (jaPagos.length > 0) {
+    linhas.push({
+      kind: 'ja_pago',
+      texto: `Já pago: ${juntarMeiosComValor(jaPagos, meiosPagamento, nomesMeiosPorId, formatarValor)}`,
+    })
+  }
+  if (aCobrar.length > 0) {
+    linhas.push({
+      kind: 'cobrar',
+      texto: `Cobrar na entrega: ${juntarMeiosComValor(aCobrar, meiosPagamento, nomesMeiosPorId, formatarValor)}`,
+    })
+  }
+  return linhas
+}
+
+export function totalCobrarNaEntregaPagamentos(pagamentos: PagamentoSelecionado[]): number {
+  const total = pagamentos
+    .filter(p => !pagamentoEstaCancelado(p) && pagamentoPendenteNaEntrega(p))
+    .reduce((sum, p) => sum + (Number(p.valor) || 0), 0)
+  return total > 0 ? Math.round(total * 100) / 100 : 0
 }
 
 export function formatarCpfCnpjExibicao(valor: string | null | undefined): string {

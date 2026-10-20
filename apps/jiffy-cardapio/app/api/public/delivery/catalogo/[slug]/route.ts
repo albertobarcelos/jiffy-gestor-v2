@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server'
+import { normalizarSlugPublico } from '@/src/application/delivery-publico/normalizarSlugPublico'
 import { proxyPublicDeliveryGet } from '@/src/infrastructure/bff/proxyPublicDeliveryRoute'
+import { catalogoPublicoCacheControl } from '@/src/infrastructure/cache/catalogoPublicoCache'
 
 /**
  * GET /api/public/delivery/catalogo/[slug]
@@ -11,8 +13,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
-  const { slug } = await params
-  if (!slug?.trim()) {
+  const { slug: rawSlug } = await params
+  const slug = normalizarSlugPublico(rawSlug ?? '')
+  if (!slug) {
     return Response.json({ error: 'Slug é obrigatório' }, { status: 400 })
   }
 
@@ -24,8 +27,8 @@ export async function GET(
   if (limit != null) allowed.set('limit', limit)
 
   return proxyPublicDeliveryGet(
-    `/api/v1/delivery/catalogo/${encodeURIComponent(slug.trim())}`,
+    `/api/v1/delivery/catalogo/${encodeURIComponent(slug)}`,
     allowed,
-    { cacheControl: 'public, s-maxage=30, stale-while-revalidate=60' }
+    { cacheControl: catalogoPublicoCacheControl(), incoming: request }
   )
 }

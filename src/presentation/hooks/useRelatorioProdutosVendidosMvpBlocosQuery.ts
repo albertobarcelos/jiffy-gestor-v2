@@ -5,9 +5,11 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import type {
+  RelatorioProdutosVendidosMvpComplementosDTO,
   RelatorioProdutosVendidosMvpParticipacaoAbcDTO,
   RelatorioProdutosVendidosMvpParticipacaoDTO,
   RelatorioProdutosVendidosMvpSerieDTO,
+  RelatorioComplementoImpacto,
 } from '@/src/shared/types/relatoriosProdutosVendidosMvpApi'
 import {
   buildRelatorioMvpQueryKeyPrefix,
@@ -17,12 +19,17 @@ import {
 export type RelatorioMvpBlocoQueryParams = RelatorioProdutosVendidosMvpInfiniteParams & {
   dadosBaseProntos: boolean
   enabled?: boolean
+  /** Filtro do bloco de complementos (`impactoComplemento`). */
+  impactoComplemento?: RelatorioComplementoImpacto | 'todos'
+  /** Filtro do bloco de complementos por grupo de complemento (não grupo de produto). */
+  grupoComplementoIds?: string[]
 }
 
 function appendFiltrosBloco(
   search: URLSearchParams,
   params: RelatorioMvpBlocoQueryParams,
-  timezone: string
+  timezone: string,
+  opts?: { omitGrupoProduto?: boolean }
 ) {
   search.append('timezone', timezone)
   search.append('periodo', params.periodo)
@@ -35,7 +42,7 @@ function appendFiltrosBloco(
     search.append('dataFinalizacaoInicial', params.periodoInicial.toISOString())
     search.append('dataFinalizacaoFinal', params.periodoFinal.toISOString())
   }
-  if (params.grupoIds.length > 0) {
+  if (!opts?.omitGrupoProduto && params.grupoIds.length > 0) {
     search.append('grupoIds', params.grupoIds.join(','))
   }
   const vmin = params.valorMin.trim()
@@ -48,12 +55,19 @@ function appendFiltrosBloco(
   if (qmax) search.append('qtdMax', qmax)
   const q = params.buscaNome.trim()
   if (q) search.append('q', q)
+  if (params.impactoComplemento && params.impactoComplemento !== 'todos') {
+    search.append('impactoComplemento', params.impactoComplemento)
+  }
+  if (params.grupoComplementoIds && params.grupoComplementoIds.length > 0) {
+    search.append('grupoComplementoIds', params.grupoComplementoIds.join(','))
+  }
 }
 
 function filtrosKeyParams(params: RelatorioMvpBlocoQueryParams, timezone: string) {
   const inicioKey = params.periodoInicial ? params.periodoInicial.toISOString() : null
   const fimKey = params.periodoFinal ? params.periodoFinal.toISOString() : null
   const grupoKey = params.grupoIds.slice().sort().join('|')
+  const grupoComplementoKey = (params.grupoComplementoIds ?? []).slice().sort().join('|')
   return {
     periodo: params.periodo,
     inicioKey,
@@ -61,11 +75,13 @@ function filtrosKeyParams(params: RelatorioMvpBlocoQueryParams, timezone: string
     timezone,
     sort: params.sort,
     grupoKey,
+    grupoComplementoKey,
     valorMin: params.valorMin,
     valorMax: params.valorMax,
     qtdMin: params.qtdMin,
     qtdMax: params.qtdMax,
     buscaNome: params.buscaNome,
+    impactoComplemento: params.impactoComplemento ?? 'todos',
   }
 }
 
@@ -200,6 +216,60 @@ export function useRelatorioProdutosVendidosMvpSerieQuery(params: RelatorioMvpBl
     ],
     queryFn: () =>
       fetchBlocoSerie({
+        ...params,
+        token: token!,
+        timezone: resolvedTimezone,
+      }),
+    enabled:
+      enabled &&
+      isRehydrated &&
+      isAuthenticated &&
+      !!token &&
+      !!empresaId &&
+      !(tenantAuth?.isExpired() ?? true) &&
+      params.dadosBaseProntos,
+    staleTime: 30_000,
+  })
+}
+
+async function fetchBlocoComplementos(
+  params: RelatorioMvpBlocoQueryParams & { token: string; timezone: string }
+): Promise<RelatorioProdutosVendidosMvpComplementosDTO> {
+  const search = new URLSearchParams()
+  appendFiltrosBloco(search, params, params.timezone, { omitGrupoProduto: true })
+  search.append('somenteComplementos', '1')
+
+  const response = await fetchGestorApi(`/api/relatorios/produtos-vendidos/mvp?${search.toString()}`, {
+    headers: { Authorization: `Bearer ${params.token}` },
+  })
+  const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
+  if (!response.ok) {
+    const msg =
+      typeof data.error === 'string' ? data.error : 'Erro ao carregar complementos vendidos.'
+    throw new Error(msg)
+  }
+  return data as unknown as RelatorioProdutosVendidosMvpComplementosDTO
+}
+
+/** SPA: tabela de complementos — só quando o modo Complementos está ativo. */
+export function useRelatorioProdutosVendidosMvpComplementosQuery(
+  params: RelatorioMvpBlocoQueryParams
+) {
+  const { isAuthenticated, isRehydrated, tenantAuth } = useAuthStore()
+  const token = tenantAuth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
+  const resolvedTimezone = params.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
+  const enabled = params.enabled !== false
+
+  return useQuery({
+    queryKey: [
+      ...buildRelatorioMvpQueryKeyPrefix(empresaId, filtrosKeyParams(params, resolvedTimezone)),
+      'bloco-complementos',
+      params.impactoComplemento ?? 'todos',
+      (params.grupoComplementoIds ?? []).slice().sort().join('|'),
+    ],
+    queryFn: () =>
+      fetchBlocoComplementos({
         ...params,
         token: token!,
         timezone: resolvedTimezone,

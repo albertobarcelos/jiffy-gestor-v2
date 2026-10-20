@@ -1,5 +1,6 @@
 import type {
   AtualizarMoradaTelefoneDTO,
+  ClienteDeliveryIdentificacao,
   CriarMoradaTelefoneDTO,
   MoradaTelefone,
 } from '@/src/domain/types/moradaEntrega'
@@ -11,6 +12,11 @@ export interface IMoradaEntregaRepository {
     token: string,
     usarModuloDelivery: boolean
   ): Promise<MoradaTelefone[]>
+
+  identificarClienteDeliveryPorTelefone(
+    telefone: string,
+    token: string
+  ): Promise<ClienteDeliveryIdentificacao | null>
 
   criar(
     dto: CriarMoradaTelefoneDTO,

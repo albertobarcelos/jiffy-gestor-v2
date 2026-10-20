@@ -5,12 +5,14 @@ import { DeliverySecaoSugestoes } from '../../../../shared/components/DeliverySe
 import { DeliveryCatalogoProdutoCard } from './DeliveryCatalogoProdutoCard'
 import type { DeliveryPublicoDesignConfig } from '../../../../shared/types/deliveryPublicoDesignConfig'
 import type { DeliveryPublicoGrupoViewModel } from '../../../../shared/types/deliveryPublicoViewModel'
+import { devePriorizarImagemProduto } from '../../../../shared/media/deliveryPublicoImageHosts'
 
 type DeliveryCatalogoSecaoGrupoProps = {
   config: DeliveryPublicoDesignConfig
   grupo: DeliveryPublicoGrupoViewModel
   interactive?: boolean
   denseTop?: boolean
+  primeirasImagensPriority?: boolean
   onProdutoClick?: (produtoId: string) => void
 }
 
@@ -19,6 +21,7 @@ export function DeliveryCatalogoSecaoGrupo({
   grupo,
   interactive = false,
   denseTop = false,
+  primeirasImagensPriority = false,
   onProdutoClick,
 }: DeliveryCatalogoSecaoGrupoProps) {
   if (grupo.produtos.length === 0) return null
@@ -29,6 +32,7 @@ export function DeliveryCatalogoSecaoGrupo({
         config={config}
         grupo={grupo}
         interactive={interactive}
+        primeirasImagensPriority={primeirasImagensPriority}
         onProdutoClick={onProdutoClick}
       />
     )
@@ -47,7 +51,7 @@ export function DeliveryCatalogoSecaoGrupo({
       </h2>
 
       <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-pl-4 scroll-pr-4 px-4 pb-1 scrollbar-hide [scroll-padding-inline:1rem]">
-        {grupo.produtos.map(produto => (
+        {grupo.produtos.map((produto, index) => (
           <div
             key={produto.id}
             className="w-[min(68%,14.5rem)] shrink-0 snap-start @sm:w-[min(62%,15.5rem)]"
@@ -55,6 +59,7 @@ export function DeliveryCatalogoSecaoGrupo({
             <DeliveryCatalogoProdutoCard
               produto={produto}
               interactive={interactive}
+              priority={devePriorizarImagemProduto(primeirasImagensPriority, index)}
               onClick={onProdutoClick}
             />
           </div>

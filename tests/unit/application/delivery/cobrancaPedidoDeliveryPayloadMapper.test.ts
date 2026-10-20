@@ -41,7 +41,7 @@ describe('CobrancaPedidoDeliveryPayloadMapper', () => {
         id: 'cob-1',
         meioPagamentoId: 'mp-1',
         valor: 24,
-        cobrarNaEntrega: true,
+        cobrarNaEntrega: false,
       },
     ]
 
@@ -76,6 +76,34 @@ describe('CobrancaPedidoDeliveryPayloadMapper', () => {
     })
 
     expect(cobrancasPatchTemOperacao(patch)).toBe(false)
+  })
+
+  it('lança cobranças mistas no mesmo PATCH', () => {
+    const pagamentos: PagamentoSelecionado[] = [
+      { meioPagamentoId: 'mp-pix', valor: 30 },
+      { meioPagamentoId: 'mp-dinheiro', valor: 46, cobrarNaEntrega: true, naoEfetivo: true },
+    ]
+
+    const patch = buildAtualizarCobrancasPedidoDeliveryPatch({
+      cobrancaIdsAtivas: [],
+      cobrancaIdsPendentes: [],
+      pagamentos,
+      fluxoPagamentoEntrega: 'cobrar_entregador',
+    })
+
+    expect(patch.cobrancas?.add).toEqual([
+      {
+        meioPagamentoId: 'mp-pix',
+        valor: 30,
+        momentoCobranca: 'antecipado',
+        pagamentoEfetivado: { confirmar: true },
+      },
+      {
+        meioPagamentoId: 'mp-dinheiro',
+        valor: 46,
+        momentoCobranca: 'na_entrega',
+      },
+    ])
   })
 
   it('monta cancel + add ao trocar forma de pagamento (nova sem id)', () => {

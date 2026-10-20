@@ -20,4 +20,4 @@ export function mapCotacaoDtoToCheckoutState(
   }
 }
 
-export { isTokenCotacaoExpirado } from '@/src/domain/policies/ValidadeTokenCotacao'
+export { isTokenCotacaoExpirado, tokenCotacaoPertoDeVencer, MARGEM_RENOVACAO_TOKEN_COTACAO_MS } from '@/src/domain/policies/ValidadeTokenCotacao'

@@ -25,6 +25,10 @@ interface PropagarAlteracaoProdutoDialogProps {
   /** Menus em que o produto/imagem já foi salvo (exibição na pergunta de criação). */
   menusJaSalvos?: MenuAlvoPropagacao[]
   incluirCadastroBase: boolean
+  labelCadastroBase?: string
+  /** TEMP_SYNC_CADASTRO_MENU_PRINCIPAL: cadastro e principal são o mesmo universo. */
+  espelhoCadastroPrincipal?: boolean
+  origemEhMenuPrincipal?: boolean
   /** Lista de menus na alteração a partir do cadastro base (sem passo perguntar). */
   fluxoListaCadastroBase?: boolean
   /** Confirmação simples: ativo/inativo vale em todos os menus vinculados. */
@@ -67,6 +71,9 @@ export function PropagarAlteracaoProdutoDialog({
   novoAtivo,
   menusJaSalvos = [],
   incluirCadastroBase,
+  labelCadastroBase = 'Cadastro base',
+  espelhoCadastroPrincipal = false,
+  origemEhMenuPrincipal = false,
   fluxoListaCadastroBase = false,
   confirmacaoStatusGlobal = false,
   exigePeloMenosUmMenu = false,
@@ -114,9 +121,11 @@ export function PropagarAlteracaoProdutoDialog({
               : 'Onde aplicar esta alteração?'
 
   const descricao = fluxoListaCadastroBase
-      ? exigePeloMenosUmMenu
-        ? 'A alteração será salva no cadastro base e nos menus marcados. Menus desmarcados permanecem vinculados, mas não recebem esta alteração. É obrigatório marcar pelo menos um menu.'
-        : 'A alteração será salva no cadastro base. Marque os menus para vincular o produto e aplicar a alteração neles, ou confirme sem seleção para salvar só no cadastro.'
+      ? espelhoCadastroPrincipal
+        ? 'A alteração será salva no cadastro e no menu principal. Marque outros cardápios para replicar. Os desmarcados permanecem vinculados, mas não recebem esta alteração.'
+        : exigePeloMenosUmMenu
+          ? 'A alteração será salva no cadastro base e nos menus marcados. Menus desmarcados permanecem vinculados, mas não recebem esta alteração. É obrigatório marcar pelo menos um menu.'
+          : 'A alteração será salva no cadastro base. Marque os menus para vincular o produto e aplicar a alteração neles, ou confirme sem seleção para salvar só no cadastro.'
       : passo === 'perguntar'
         ? isVinculo
           ? nomesJaSalvos
@@ -133,8 +142,14 @@ export function PropagarAlteracaoProdutoDialog({
                 ? 'O produto ficará indisponível neste cardápio. Deseja aplicar a mesma desativação no cadastro base ou em outros menus?'
                 : 'O produto ficará disponível neste cardápio. Deseja aplicar a mesma ativação no cadastro base ou em outros menus?'
               : origem === 'cadastroBase'
-                ? 'A alteração será salva no cadastro do produto. Deseja copiar também para algum cardápio?'
-                : 'A alteração será salva neste cardápio. Deseja copiar também para o cadastro base ou para outros menus?'
+                ? espelhoCadastroPrincipal
+                  ? 'A alteração será salva no cadastro e no menu principal. Deseja copiar também para outros cardápios?'
+                  : 'A alteração será salva no cadastro do produto. Deseja copiar também para algum cardápio?'
+                : espelhoCadastroPrincipal && origemEhMenuPrincipal
+                  ? 'A alteração será salva neste cardápio e no cadastro do produto. Deseja copiar também para outros menus?'
+                  : espelhoCadastroPrincipal
+                    ? 'A alteração será salva neste cardápio. Deseja copiar também para o cadastro (menu principal) ou para outros menus?'
+                    : 'A alteração será salva neste cardápio. Deseja copiar também para o cadastro base ou para outros menus?'
         : isVinculo
           ? 'Marque os cardápios adicionais. Os já salvos permanecem vinculados.'
           : isImagem
@@ -262,8 +277,12 @@ export function PropagarAlteracaoProdutoDialog({
               {incluirCadastroBase ? (
                 <li className="flex items-center justify-between gap-2 bg-gray-50 px-3 py-2">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-primary-text">Cadastro base</p>
-                    <p className="text-xs text-secondary-text">Produto no cadastro da empresa</p>
+                    <p className="text-sm font-medium text-primary-text">{labelCadastroBase}</p>
+                    <p className="text-xs text-secondary-text">
+                      {labelCadastroBase === 'Cadastro e menu principal'
+                        ? 'Cadastro da empresa e cardápio principal (máquinas ainda leem o cadastro)'
+                        : 'Produto no cadastro da empresa'}
+                    </p>
                   </div>
                   <JiffyIconSwitch
                     checked={cadastroBaseMarcado}

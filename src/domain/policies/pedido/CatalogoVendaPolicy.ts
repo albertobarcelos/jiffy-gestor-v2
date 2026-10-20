@@ -1,5 +1,6 @@
 import type { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import type { Produto } from '@/src/domain/entities/Produto'
+import type { CanalVendaCatalogo } from '@/src/domain/repositories/INovoPedidoReadRepository'
 
 export const MIN_CARACTERES_BUSCA_CATALOGO_VENDA = 2
 /** Máximo aceito pelo BFF de menus (`limit` ≤ 100). */
@@ -12,6 +13,15 @@ type ProdutoCatalogo = Pick<Produto, 'getNome' | 'isAtivo'>
 
 export function buscaCatalogoVendaAtiva(textoBusca: string): boolean {
   return textoBusca.trim().length >= MIN_CARACTERES_BUSCA_CATALOGO_VENDA
+}
+
+/** Delivery manual e delivery público usam `menuDeliveryId`; balcão usa `menuVendaGestorId`. */
+export function resolverMenuCatalogoNovoPedido(
+  canal: CanalVendaCatalogo,
+  menuDeliveryId: string | null,
+  menuVendaGestorId: string | null
+): string | null {
+  return canal === 'entrega' ? menuDeliveryId : menuVendaGestorId
 }
 
 export function ordenarGruposCatalogoVenda<T extends GrupoCatalogo>(grupos: T[]): T[] {
@@ -73,13 +83,31 @@ export function montarProdutosCatalogoVenda<T extends ProdutoCatalogo>(input: {
   return fonte.filter(produto => produto.isAtivo())
 }
 
-export function mesclarProdutosNoCatalogo<T extends { getId: () => string }>(
-  atual: Record<string, T>,
-  produtos: T[]
-): Record<string, T> {
+function produtoCatalogoTemComplementosCarregados(produto: {
+  getGruposComplementos?: () => Array<{ complementos?: readonly unknown[] }>
+}): boolean {
+  const grupos = produto.getGruposComplementos?.() ?? []
+  return grupos.some(grupo => (grupo.complementos?.length ?? 0) > 0)
+}
+
+export function mesclarProdutosNoCatalogo<
+  T extends {
+    getId: () => string
+    getGruposComplementos?: () => Array<{ complementos?: readonly unknown[] }>
+  },
+>(atual: Record<string, T>, produtos: T[]): Record<string, T> {
   const next = { ...atual }
   for (const produto of produtos) {
-    next[produto.getId()] = produto
+    const id = produto.getId()
+    const existente = next[id]
+    if (
+      existente &&
+      produtoCatalogoTemComplementosCarregados(existente) &&
+      !produtoCatalogoTemComplementosCarregados(produto)
+    ) {
+      continue
+    }
+    next[id] = produto
   }
   return next
 }

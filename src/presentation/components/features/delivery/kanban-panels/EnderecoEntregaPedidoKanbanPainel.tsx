@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { MdLocationOn } from 'react-icons/md'
-import { atualizarEnderecoEntregaPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/AtualizarEnderecoEntregaPedidoDeliveryUseCase'
-import { alterarTipoEntregaPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/AlterarTipoEntregaPedidoDeliveryUseCase'
+import {
+  atualizarEnderecoEntregaPedidoDeliveryUseCase,
+  alterarTipoEntregaPedidoDeliveryUseCase,
+} from '@/src/infrastructure/composition/pedidoUseCases'
 import type { TipoEntregaDeliveryApi } from '@/src/application/dto/api/pedidoDeliveryApi'
 import { formatarEnderecoEntregaMultilinha } from '@/src/application/mappers/PedidoDisplayMapper'
 import {
@@ -144,8 +146,10 @@ export function EnderecoEntregaPedidoKanbanPainel({
     abaEntregaInicializadaRef.current = false
 
     const tipoDoCard = normalizarTipoEntregaVendaKanban(venda)
-    setTipoAtual(tipoDoCard)
-    setTipoSelecionado(tipoDoCard)
+    if (tipoDoCard) {
+      setTipoAtual(tipoDoCard)
+      setTipoSelecionado(tipoDoCard)
+    }
 
     const contextoDoCard = extrairContextoEnderecoDeVendaKanban(venda)
     if (contextoDoCard) {
@@ -186,8 +190,10 @@ export function EnderecoEntregaPedidoKanbanPainel({
 
       const data = await response.json()
       const tipoPedido = extrairTipoEntregaPedidoDeliveryApi(data)
-      setTipoAtual(tipoPedido)
-      setTipoSelecionado(tipoPedido)
+      if (tipoPedido) {
+        setTipoAtual(tipoPedido)
+        setTipoSelecionado(tipoPedido)
+      }
       salvarPedidoDeliveryDetalheCache(venda.id, data)
 
       const contexto = extrairContextoEnderecoPedidoDeliveryApi(data)

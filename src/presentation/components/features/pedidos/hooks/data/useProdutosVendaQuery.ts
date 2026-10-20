@@ -8,6 +8,11 @@ import {
   buscaCatalogoVendaAtiva,
   montarProdutosCatalogoVenda,
 } from '@/src/domain/policies/pedido/CatalogoVendaPolicy'
+import {
+  CATALOGO_VENDA_PRODUTOS_BUSCA_KEY,
+  CATALOGO_VENDA_PRODUTOS_POR_GRUPO_KEY,
+  refetchCatalogoVendaSeInvalidado,
+} from '@/src/presentation/cache/catalogoVendaQueryCache'
 import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
 import { fetchProdutosCatalogoPagina } from '../../novoPedidoProdutosApi'
 
@@ -39,7 +44,7 @@ export function useProdutosVendaQuery({
   const emBusca = buscaCatalogoVendaAtiva(buscaProdutoFiltrada)
 
   const buscaQuery = useSecureTenantInfiniteQuery<ProdutosCatalogoPagina, number>(
-    ['produtos-busca', menuId, buscaProdutoFiltrada, TAMANHO_PAGINA_CATALOGO_BUSCA],
+    [CATALOGO_VENDA_PRODUTOS_BUSCA_KEY, menuId, buscaProdutoFiltrada, TAMANHO_PAGINA_CATALOGO_BUSCA],
     async ({ token: tenantToken }, offset) => {
       if (!menuId) {
         return { produtos: [], count: 0, nextOffset: null }
@@ -60,11 +65,12 @@ export function useProdutosVendaQuery({
       initialPageParam: 0,
       getNextPageParam: lastPage => lastPage.nextOffset,
       staleTime: 1000 * 60 * 5,
+      refetchOnMount: refetchCatalogoVendaSeInvalidado,
     }
   )
 
   const grupoQuery = useSecureTenantInfiniteQuery<ProdutosCatalogoPagina, number>(
-    ['produtos-por-grupo', menuId, grupoSelecionadoId, TAMANHO_PAGINA_CATALOGO_GRUPO],
+    [CATALOGO_VENDA_PRODUTOS_POR_GRUPO_KEY, menuId, grupoSelecionadoId, TAMANHO_PAGINA_CATALOGO_GRUPO],
     async ({ token: tenantToken }, offset) => {
       if (!grupoSelecionadoId || !menuId) {
         return { produtos: [], count: 0, nextOffset: null }
@@ -87,6 +93,7 @@ export function useProdutosVendaQuery({
       staleTime: 1000 * 60 * 5,
       gcTime: 1000 * 60 * 15,
       retry: 1,
+      refetchOnMount: refetchCatalogoVendaSeInvalidado,
     }
   )
 

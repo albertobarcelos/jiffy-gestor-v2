@@ -10,14 +10,16 @@ type RouteContext = { params: Promise<{ telefone: string }> }
  * GET /api/public/delivery/clientes/[telefone]
  * Proxy público → GET /api/v1/delivery/clientes/{telefone}
  */
-export async function GET(_request: NextRequest, { params }: RouteContext) {
+export async function GET(request: NextRequest, { params }: RouteContext) {
   const { telefone } = await params
   if (!telefone?.trim()) {
     return NextResponse.json({ error: 'Telefone é obrigatório' }, { status: 400 })
   }
 
   return proxyPublicDeliveryGet(
-    `/api/v1/delivery/clientes/${encodeURIComponent(telefone.trim())}`
+    `/api/v1/delivery/clientes/${encodeURIComponent(telefone.trim())}`,
+    undefined,
+    { incoming: request }
   )
 }
 
@@ -35,7 +37,8 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     const body = await request.json()
     return proxyPublicDeliveryPatch(
       `/api/v1/delivery/clientes/${encodeURIComponent(telefone.trim())}`,
-      body
+      body,
+      request
     )
   } catch {
     return NextResponse.json({ error: 'Corpo da requisição inválido' }, { status: 400 })

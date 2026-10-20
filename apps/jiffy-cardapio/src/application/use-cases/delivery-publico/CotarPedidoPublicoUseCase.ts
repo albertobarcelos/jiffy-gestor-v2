@@ -13,6 +13,7 @@ import {
 } from '@/src/application/errors/publicDeliveryErrors'
 import { montarCotacaoPublico } from '@/src/application/mappers/MontarPedidoPublicoMapper'
 import type { ICotacaoPedidoPublicoPort } from '@/src/application/ports/delivery-publico'
+import { GarantirClienteDeliveryPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirClienteDeliveryPublicoUseCase'
 import {
   GarantirEnderecoEntregaPublicoUseCase,
   resolverEnderecoIdEntregaSeJaGarantido,
@@ -28,16 +29,18 @@ export type CotarPedidoPublicoInput = {
 }
 
 export type CotarPedidoPublicoResult =
-  | { ok: true; cotacao: CotacaoPedidoPublicoDTO }
+  | { ok: true; cotacao: CotacaoPedidoPublicoDTO; cliente: ClienteDeliveryPublicoDTO | null }
   | { ok: false; error: string; httpStatus?: number }
 
 /**
- * Garante endereço (se entrega) → monta payload de cotação → POST cotação.
+ * Garante cadastro do cliente (retirada) ou endereço (entrega) → POST cotação.
+ * Cotação e pedido não criam cliente no backend.
  */
 export class CotarPedidoPublicoUseCase {
   constructor(
     private readonly cotacaoPort: ICotacaoPedidoPublicoPort,
-    private readonly garantirEndereco: GarantirEnderecoEntregaPublicoUseCase
+    private readonly garantirEndereco: GarantirEnderecoEntregaPublicoUseCase,
+    private readonly garantirCliente: GarantirClienteDeliveryPublicoUseCase
   ) {}
 
   async execute(input: CotarPedidoPublicoInput): Promise<CotarPedidoPublicoResult> {
@@ -50,9 +53,25 @@ export class CotarPedidoPublicoUseCase {
     }
 
     let enderecoIdEntrega: string | null = null
+    let clienteGarantido: ClienteDeliveryPublicoDTO | null = input.clienteLookup
     const formComNome: CheckoutFormData = {
       ...input.form,
       nome: input.nomeEfetivo ?? input.form.nome,
+    }
+
+    if (formComNome.tipoEntrega === 'retirada') {
+      try {
+        clienteGarantido = await this.garantirCliente.execute({
+          telefone: tel,
+          nome: input.nomeEfetivo,
+          clienteLookup: input.clienteLookup,
+        })
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : 'Erro ao cadastrar cliente',
+        }
+      }
     }
 
     if (formComNome.tipoEntrega === 'entrega') {
@@ -84,6 +103,7 @@ export class CotarPedidoPublicoUseCase {
             },
           })
           enderecoIdEntrega = garantido.enderecoId
+          clienteGarantido = garantido.cliente ?? clienteGarantido
         }
       } catch (error) {
         return {
@@ -112,7 +132,7 @@ export class CotarPedidoPublicoUseCase {
 
     try {
       const cotacao = await this.cotacaoPort.cotar(parsed.data)
-      return { ok: true, cotacao }
+      return { ok: true, cotacao, cliente: clienteGarantido }
     } catch (error) {
       if (error instanceof PublicDeliveryApiError) {
         return {

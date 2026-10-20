@@ -82,8 +82,7 @@ export function buildVendasUnificadasParamsForKanbanColumn(
 }
 
 /**
- * Filtra itens da listagem balcão para a coluna visual (etapa Kanban).
- * Prefere `etapaKanbanBalcao` do backend quando disponível via getEtapaKanban.
+ * Filtra itens da listagem balcão para a coluna visual (máquina fiscal).
  */
 export function vendaPertenceColunaBalcaoKanban(
   venda: VendaUnificadaDTO,
@@ -91,18 +90,6 @@ export function vendaPertenceColunaBalcaoKanban(
   getEtapaKanban: (v: VendaUnificadaDTO) => string
 ): boolean {
   const etapa = getEtapaKanban(venda)
-
-  if (columnId === 'FINALIZADAS') {
-    if (
-      etapa === 'COM_FISCAL' ||
-      etapa === 'PENDENTE_EMISSAO' ||
-      etapa === 'REJEITADAS'
-    ) {
-      return false
-    }
-    return etapa === 'FINALIZADAS' || !isColunaKanbanBalcao(etapa as ColunaKanbanId)
-  }
-
   return etapa === columnId
 }
 

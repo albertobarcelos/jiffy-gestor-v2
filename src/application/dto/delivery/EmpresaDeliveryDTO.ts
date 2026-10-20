@@ -4,6 +4,8 @@ export interface ParametroDeliveryDTO {
   imprimirAoReceber: boolean
   imprimirAoFicarPronto: boolean
   autoIniciarPreparoNovosPedidos: boolean
+  /** Quando true, o checkout público exige CPF para finalizar. */
+  exigeCpfVenda: boolean
   impressoraExpedicaoId: string | null
   menuDeliveryId?: string | null
 }

@@ -2,11 +2,11 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Fredy",
   "mainBinaryName": "Fredy",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "identifier": "br.com.nexsyn.jiffy-flow",
   "build": {
-    "frontendDist": "http://127.0.0.1:5000/pedidos/empresas?gestor",
-    "devUrl": "http://127.0.0.1:5000/pedidos/empresas?gestor"
+    "frontendDist": "http://127.0.0.1:5552/pedidos/empresas?gestor",
+    "devUrl": "http://127.0.0.1:5552/pedidos/empresas?gestor"
   },
   "app": {
     "withGlobalTauri": true,

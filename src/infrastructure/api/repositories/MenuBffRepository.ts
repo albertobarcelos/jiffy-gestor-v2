@@ -14,6 +14,7 @@ import type {
   UpdateMenuProdutosBatchInput,
 } from '@/src/shared/types/menus'
 import type { MenuProdutoCatalogTipoFiltro } from '@/src/infrastructure/api/repositories/menuCatalogFetch'
+import { normalizeMenuProduto } from '@/src/application/mappers/MenuProdutoCatalogMapper'
 
 type ListarMenusParams = {
   q?: string
@@ -139,7 +140,7 @@ export class MenuBffRepository {
       token
     )
     return {
-      items: (data.items ?? []) as MenuProduto[],
+      items: (data.items ?? []).map(normalizeMenuProduto),
       count: data.count ?? 0,
     }
   }
@@ -229,21 +230,30 @@ export class MenuBffRepository {
     }
   }
 
-  async renomearGrupo(
+  async atualizarGrupo(
     token: string,
     menuId: string,
     grupoProdutoId: string,
-    nome: string
+    input: { nome?: string; ativo?: boolean }
   ): Promise<MenuGrupoProduto> {
     const data = await fetchBffJson<{ data: MenuGrupoProduto }>(
       `/api/menus/${encodeURIComponent(menuId)}/grupos-produtos/${encodeURIComponent(grupoProdutoId)}`,
       token,
       {
         method: 'PATCH',
-        body: JSON.stringify({ nome }),
+        body: JSON.stringify(input),
       }
     )
     return unwrapData(data)
+  }
+
+  async renomearGrupo(
+    token: string,
+    menuId: string,
+    grupoProdutoId: string,
+    nome: string
+  ): Promise<MenuGrupoProduto> {
+    return this.atualizarGrupo(token, menuId, grupoProdutoId, { nome })
   }
 
   async reordenarGrupo(

@@ -1,4 +1,4 @@
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { fetchGestorApi } from '@/src/infrastructure/api/fetchGestorApi'
 import type { ProdutoPatch } from '@/src/shared/types/produto'
 
 export interface UpdateProdutoPatchInput {

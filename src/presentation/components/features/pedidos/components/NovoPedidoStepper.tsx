@@ -5,7 +5,7 @@ import { MdCheckCircle } from 'react-icons/md'
 interface NovoPedidoStepperProps {
   currentStep: 1 | 2 | 3 | 4
   modoVisualizacao?: boolean
-  tipoInicioPedido: 'balcao' | 'entrega'
+  tipoInicioPedido: 'balcao' | 'delivery'
 }
 
 function StepCircle({
@@ -64,7 +64,7 @@ export function NovoPedidoStepper({
   if (modoVisualizacao && currentStep === 4) return null
 
   const steps =
-    tipoInicioPedido === 'entrega'
+    tipoInicioPedido === 'delivery'
       ? [
           { step: 1 as const, label: 'Produtos' },
           { step: 2 as const, label: 'Informações' },

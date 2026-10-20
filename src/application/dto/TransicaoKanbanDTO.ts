@@ -1,10 +1,10 @@
+import type { AcaoTransicaoOperacionalDelivery } from '@/src/domain/types/acaoTransicaoOperacionalDelivery'
+
 /** Ações operacionais do Kanban entrega (gestor legado e delivery). */
-export type AcaoTransicaoKanbanEntrega =
-  | 'iniciar_preparo'
-  | 'marcar_pronto'
-  | 'despachar'
-  | 'finalizar'
-  | 'cancelar'
+export type AcaoTransicaoKanbanEntrega = AcaoTransicaoOperacionalDelivery
+
+/** Alias usado na application/shared — não importar de hooks da presentation. */
+export type AcaoTransicaoGestor = AcaoTransicaoKanbanEntrega
 
 export type KanbanEntregadorCachePatch = {
   id: string
@@ -16,6 +16,8 @@ export type KanbanVendaCachePatch = {
   statusEtapaOperacional?: string | null
   dataUltimaModificacao?: string | null
   dataFinalizacao?: string | null
+  dataInicioPreparo?: string | null
+  dataFinalizacaoPreparo?: string | null
   statusFinanceiro?: string | null
   valorFinal?: number
   solicitarEmissaoFiscal?: boolean | null

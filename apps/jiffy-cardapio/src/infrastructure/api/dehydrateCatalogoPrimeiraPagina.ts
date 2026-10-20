@@ -7,8 +7,10 @@ import { fetchCatalogoPublicoUpstream } from '@/src/infrastructure/api/fetchCata
 import {
   CATALOGO_GRUPOS_PAGE_LIMIT,
   CATALOGO_QUERY_STALE_MS,
+  getCatalogoInfiniteNextPageParam,
   publicDeliveryCatalogInfiniteQueryKey,
 } from '@/src/presentation/hooks/publicDeliveryCatalogKeys'
+import { normalizarSlugPublico } from '@/src/application/delivery-publico/normalizarSlugPublico'
 
 /**
  * Prefetch best-effort da 1ª página do catálogo para hidratar o React Query no RSC.
@@ -16,7 +18,7 @@ import {
 export async function dehydrateCatalogoPrimeiraPagina(
   slug: string
 ): Promise<DehydratedState | undefined> {
-  const slugNormalizado = slug.trim()
+  const slugNormalizado = normalizarSlugPublico(slug)
   if (!slugNormalizado) return undefined
 
   const queryClient = new QueryClient({
@@ -36,6 +38,7 @@ export async function dehydrateCatalogoPrimeiraPagina(
           limit: CATALOGO_GRUPOS_PAGE_LIMIT,
         }),
       initialPageParam: 0,
+      getNextPageParam: getCatalogoInfiniteNextPageParam,
       pages: 1,
       staleTime: CATALOGO_QUERY_STALE_MS,
     })

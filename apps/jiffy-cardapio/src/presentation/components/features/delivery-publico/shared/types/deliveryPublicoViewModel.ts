@@ -2,7 +2,12 @@ export type DeliveryPublicoProdutoViewModel = {
   id: string
   nome: string
   descricao: string | null
+  /** Preço vigente (promocional quando a promo está ativa). */
   preco: number
+  /** Preço normal riscado quando há promoção vigente. */
+  precoRegular?: number | null
+  /** % de desconto exibido ao lado do preço riscado. */
+  descontoPercentual?: number | null
   imagemUrl: string | null
   grupoId: string
   /** Quando true, não exibe atalho "+" — deve abrir detalhes. */
@@ -28,7 +33,12 @@ export type DeliveryPublicoCarrinhoViewModel = {
 export type DeliveryPublicoViewModel = {
   grupos: DeliveryPublicoGrupoViewModel[]
   disponivel: boolean
+  /** Texto curto de horário (footer / agenda). */
   horarioTexto: string
+  /** Mensagem completa de status (topnav): aberto/fechado + próxima abertura. */
+  statusMensagem: string
+  /** Horário complementar (ex.: "até as 22:45"); null quando não aplica. */
+  statusDetalheHorario: string | null
   termoBusca: string
   carrinho: DeliveryPublicoCarrinhoViewModel
 }

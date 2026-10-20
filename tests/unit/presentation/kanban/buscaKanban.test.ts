@@ -4,6 +4,7 @@ import {
   isTermoBuscaValorKanban,
   normalizarTermoBuscaKanban,
   parseValorBuscaKanban,
+  qListagemDeliveryKanban,
   termoBuscaKanbanParaApi,
   vendaAtendeBuscaKanban,
 } from '@/src/presentation/components/features/kanban/rules/vendasKanban.rules'
@@ -74,6 +75,7 @@ describe('busca Kanban — número e código do card', () => {
     } as Partial<VendaUnificadaDTO>)
 
     expect(ehTermoBuscaTelefoneKanban('39')).toBe(false)
+    expect(ehTermoBuscaTelefoneKanban('4536')).toBe(false)
     expect(ehTermoBuscaTelefoneKanban('5565992934536')).toBe(true)
     expect(termoBuscaKanbanParaApi('5565992934536')).toBe('65992934536')
     expect(vendaAtendeBuscaKanban(venda, normalizarTermoBuscaKanban('5565992934536'), '5565992934536')).toBe(
@@ -85,6 +87,26 @@ describe('busca Kanban — número e código do card', () => {
     expect(vendaAtendeBuscaKanban(venda, normalizarTermoBuscaKanban('11999999999'), '11999999999')).toBe(
       false
     )
+  })
+
+  it('encontra por trecho do telefone enquanto digita', () => {
+    const venda = criarVendaBusca({
+      cliente: { id: 'c1', nome: 'Maria Silva', telefone: '65992934536' },
+    } as Partial<VendaUnificadaDTO>)
+
+    expect(vendaAtendeBuscaKanban(venda, normalizarTermoBuscaKanban('4536'), '4536')).toBe(true)
+    expect(vendaAtendeBuscaKanban(venda, normalizarTermoBuscaKanban('929345'), '929345')).toBe(true)
+    expect(vendaAtendeBuscaKanban(venda, normalizarTermoBuscaKanban('99293'), '99293')).toBe(true)
+    expect(vendaAtendeBuscaKanban(venda, normalizarTermoBuscaKanban('1111'), '1111')).toBe(false)
+  })
+
+  it('não envia telefone no q da listagem delivery', () => {
+    expect(qListagemDeliveryKanban('maria')).toBe('maria')
+    expect(qListagemDeliveryKanban('ULUGSBYD')).toBe('ULUGSBYD')
+    expect(qListagemDeliveryKanban('4536')).toBeUndefined()
+    expect(qListagemDeliveryKanban('929345')).toBeUndefined()
+    expect(qListagemDeliveryKanban('659992341536')).toBeUndefined()
+    expect(qListagemDeliveryKanban('5565992934536')).toBeUndefined()
   })
 
   it('encontra pelo telefone do destinatário na entrega', () => {

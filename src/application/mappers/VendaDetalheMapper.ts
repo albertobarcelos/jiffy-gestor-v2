@@ -1,6 +1,6 @@
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import { pagamentoEstaCancelado } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
+import { fetchGestorApi } from '@/src/infrastructure/api/fetchGestorApi'
 import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
+import { resolverTrocoLevarPedidoEntrega } from '@/src/application/mappers/resolverTrocoLevarPedidoEntrega'
 import {
   extrairContextoEntregaDeVendaData,
   extrairEnderecoEntregaSnapshotDeVendaData,
@@ -11,7 +11,6 @@ import {
   extrairTelefoneClienteDeliveryDeFontes,
   normalizarClienteDeliveryApi,
 } from '@/src/application/mappers/ClienteDeliveryMoradaMapper'
-import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
 import type {
   DetalhesEntregaPedido,
   EnderecoEntregaDetalhe,
@@ -39,6 +38,32 @@ function mapEnderecoEntrega(raw: unknown): EnderecoEntregaDetalhe | null {
   return hasAny ? mapped : null
 }
 
+function pickDocumentoTrim(raw: unknown): string | null {
+  if (raw == null) return null
+  const s = String(raw).trim()
+  return s !== '' ? s : null
+}
+
+/**
+ * Documento do destinatário no pedido delivery.
+ * Prioriza o documento da venda (checkout) e o snapshot do contexto;
+ * não usa CPF/CNPJ do cliente gestor vinculado.
+ */
+export function extrairDocumentoClienteEntregaDeVendaData(
+  vendaData: Record<string, unknown>
+): string | null {
+  const contextoEntrega = extrairContextoEntregaDeVendaData(vendaData)
+  const embeddedRaw = vendaData.clienteDelivery ?? vendaData.cliente_delivery
+  const embeddedCliente = normalizarClienteDeliveryApi(embeddedRaw)
+
+  return (
+    pickDocumentoTrim(vendaData.documentoCpfCnpj) ||
+    pickDocumentoTrim(contextoEntrega?.destinatarioCpf) ||
+    pickDocumentoTrim(embeddedCliente?.cpf) ||
+    null
+  )
+}
+
 /** Monta o snapshot de entrega a partir do GET de venda (gestor). */
 export function mapDetalhesEntregaFromVendaApi(vendaData: Record<string, unknown>): DetalhesEntregaPedido {
   const clienteNested =
@@ -48,11 +73,8 @@ export function mapDetalhesEntregaFromVendaApi(vendaData: Record<string, unknown
 
   const contextoEntrega = extrairContextoEntregaDeVendaData(vendaData)
 
-  const trocoRaw = vendaData.troco
-  const trocoApi =
-    trocoRaw !== undefined && trocoRaw !== null && !Number.isNaN(Number(trocoRaw))
-      ? Number(trocoRaw)
-      : null
+  const trocoResolvido = resolverTrocoLevarPedidoEntrega(vendaData)
+  const trocoApi = trocoResolvido > 0 ? trocoResolvido : null
 
   const enderecoSnapshot =
     extrairEnderecoEntregaSnapshotDeVendaData(vendaData) ??
@@ -83,9 +105,7 @@ export function mapDetalhesEntregaFromVendaApi(vendaData: Record<string, unknown
     clienteNome:
       contextoEntrega?.destinatarioNome?.trim() ||
       (clienteNested?.nome != null ? String(clienteNested.nome).trim() || null : null),
-    clienteCpfCnpj:
-      contextoEntrega?.destinatarioCpf?.trim() ||
-      (clienteNested?.cpfCnpj != null ? String(clienteNested.cpfCnpj).trim() || null : null),
+    clienteCpfCnpj: extrairDocumentoClienteEntregaDeVendaData(vendaData),
     clienteCelular:
       contextoEntrega?.destinatarioTelefone?.trim() ||
       (clienteNested?.telefone != null ? String(clienteNested.telefone).trim() || null : null) ||
@@ -112,6 +132,10 @@ export function mapDetalhesEntregaFromVendaApi(vendaData: Record<string, unknown
   }
 }
 
+/**
+ * Enriquece nome/telefone/endereço do cliente gestor.
+ * Não sobrescreve CPF/CNPJ: em delivery o documento vem do pedido / cliente delivery.
+ */
 export function mergeClienteDetalhesEntrega(
   base: DetalhesEntregaPedido | null,
   clienteApi: Record<string, unknown> | null | undefined
@@ -122,13 +146,6 @@ export function mergeClienteDetalhesEntrega(
   if (clienteApi) {
     const nome = String(clienteApi.nome ?? clienteApi.name ?? '').trim()
     if (nome) next.clienteNome = nome
-
-    const cpf = clienteApi.cpf != null ? String(clienteApi.cpf).trim() : ''
-    const cnpj = clienteApi.cnpj != null ? String(clienteApi.cnpj).trim() : ''
-    const cpfCnpjNested =
-      clienteApi.cpfCnpj != null ? String(clienteApi.cpfCnpj).trim() : ''
-    const doc = cpf || cnpj || cpfCnpjNested
-    if (doc) next.clienteCpfCnpj = doc
 
     const tel = String(clienteApi.telefone ?? clienteApi.celular ?? '').trim()
     if (tel) next.clienteCelular = tel
@@ -149,9 +166,16 @@ export type FetchClienteDeliveryPorTelefone = (
   telefone: string
 ) => Promise<Record<string, unknown> | null>
 
+export type ResolverEnderecoEntregaDetalheResult = {
+  enderecoEntrega: EnderecoEntregaDetalhe | null
+  /** CPF do cliente delivery (módulo delivery), se encontrado no fetch/embed. */
+  documentoClienteDelivery: string | null
+}
+
 /**
  * Resolve endereço de entrega para pedidos delivery (módulo `/api/delivery/clientes`).
  * Prioriza snapshot congelado no pedido (`contextoEntrega`); fallback: catálogo do cliente delivery.
+ * Também devolve CPF do cliente delivery para exibição (sem usar cliente gestor).
  */
 export async function resolverEnderecoEntregaDetalhePedido(args: {
   vendaData: Record<string, unknown>
@@ -160,15 +184,35 @@ export async function resolverEnderecoEntregaDetalhePedido(args: {
   /** Pedido carregado via GET `/delivery/pedidos/{id}` — prioriza snapshot do pedido. */
   preferirModuloDelivery?: boolean
   fetchClienteDelivery?: FetchClienteDeliveryPorTelefone
-}): Promise<EnderecoEntregaDetalhe | null | undefined> {
+}): Promise<ResolverEnderecoEntregaDetalheResult> {
   const { vendaData, detalhesEntrega, clienteApi, preferirModuloDelivery, fetchClienteDelivery } =
     args
 
-  const tipo = String(vendaData.tipoEntrega ?? vendaData.tipoVenda ?? '')
+  const embeddedRaw = vendaData.clienteDelivery ?? vendaData.cliente_delivery
+  const embeddedCliente = normalizarClienteDeliveryApi(embeddedRaw)
+  const documentoEmbedded = pickDocumentoTrim(embeddedCliente?.cpf)
+
+  const telefone = extrairTelefoneClienteDeliveryDeFontes(vendaData, clienteApi)
+  let clienteDeliveryFetch: ReturnType<typeof normalizarClienteDeliveryApi> = null
+  let enderecoDeliveryApi: EnderecoEntregaDetalhe | null = null
+
+  if (fetchClienteDelivery && telefone) {
+    const rawClienteDelivery = await fetchClienteDelivery(telefone)
+    clienteDeliveryFetch = normalizarClienteDeliveryApi(rawClienteDelivery)
+    enderecoDeliveryApi = extrairEnderecoEntregaDeClienteDeliveryApi(clienteDeliveryFetch)
+  }
+
+  const documentoClienteDelivery =
+    pickDocumentoTrim(clienteDeliveryFetch?.cpf) || documentoEmbedded || null
+
+  const tipo = String(vendaData.tipoEntrega ?? '')
     .trim()
     .toLowerCase()
   if (tipo === 'retirada') {
-    return detalhesEntrega.enderecoEntrega
+    return {
+      enderecoEntrega: detalhesEntrega.enderecoEntrega ?? null,
+      documentoClienteDelivery,
+    }
   }
 
   const snapshotPedido =
@@ -178,39 +222,32 @@ export async function resolverEnderecoEntregaDetalhePedido(args: {
       ? detalhesEntrega.enderecoEntrega
       : null)
 
-  const embeddedRaw = vendaData.clienteDelivery ?? vendaData.cliente_delivery
-  const embeddedCliente = normalizarClienteDeliveryApi(embeddedRaw)
   const enderecoEmbedded = extrairEnderecoEntregaDeClienteDeliveryApi(embeddedCliente)
-
-  const telefone = extrairTelefoneClienteDeliveryDeFontes(vendaData, clienteApi)
-  let enderecoDeliveryApi: EnderecoEntregaDetalhe | null = null
-
-  if (fetchClienteDelivery && telefone) {
-    const rawClienteDelivery = await fetchClienteDelivery(telefone)
-    const clienteDelivery = normalizarClienteDeliveryApi(rawClienteDelivery)
-    enderecoDeliveryApi = extrairEnderecoEntregaDeClienteDeliveryApi(clienteDelivery)
-  }
 
   const enderecoGestorCliente =
     clienteApi?.endereco != null ? mapEnderecoEntrega(clienteApi.endereco) : null
 
   if (preferirModuloDelivery) {
-    return (
-      snapshotPedido ??
-      enderecoEmbedded ??
-      enderecoGestorCliente ??
-      enderecoDeliveryApi ??
-      null
-    )
+    return {
+      enderecoEntrega:
+        snapshotPedido ??
+        enderecoEmbedded ??
+        enderecoGestorCliente ??
+        enderecoDeliveryApi ??
+        null,
+      documentoClienteDelivery,
+    }
   }
 
-  return (
-    snapshotPedido ??
-    enderecoDeliveryApi ??
-    enderecoEmbedded ??
-    enderecoGestorCliente ??
-    null
-  )
+  return {
+    enderecoEntrega:
+      snapshotPedido ??
+      enderecoDeliveryApi ??
+      enderecoEmbedded ??
+      enderecoGestorCliente ??
+      null,
+    documentoClienteDelivery,
+  }
 }
 
 function parseNumeroTaxa(raw: unknown): number | null {
@@ -665,39 +702,7 @@ export function formatarHoraPrevisaoEntrega(
   return formatarHoraDetalhePedido(str)
 }
 
-/**
- * Troco que o entregador deve levar ao cliente.
- * - Pedido já pago: `troco` na raiz (pagamento efetivo acima do total).
- * - Cobrar na entrega: `totalCobrarNaEntrega − valorFaltante` (mesma regra de `VendaGestor.trocoParaLevar`).
- */
-export function resolverTrocoLevarPedidoEntrega(
-  vendaData: Record<string, unknown>,
-  pagamentos: PagamentoSelecionado[] = []
-): number {
-  const trocoRaiz = Number(vendaData.troco)
-  if (Number.isFinite(trocoRaiz) && trocoRaiz > 0) {
-    return Math.round(trocoRaiz * 100) / 100
-  }
-
-  const valorFinal = Number(vendaData.valorFinal)
-  if (!Number.isFinite(valorFinal) || valorFinal <= 0) return 0
-
-  const pagamentosValidos = pagamentos.filter(p => !pagamentoEstaCancelado(p))
-  const totalPagoSemCobranca = pagamentosValidos
-    .filter(p => !p.cobrarNaEntrega && !p.naoEfetivo)
-    .reduce((sum, p) => sum + (Number(p.valor) || 0), 0)
-
-  const totalCobrarNaEntrega = pagamentosValidos
-    .filter(p => p.cobrarNaEntrega || p.naoEfetivo)
-    .reduce((sum, p) => sum + (Number(p.valor) || 0), 0)
-
-  if (totalCobrarNaEntrega <= 0) return 0
-
-  const valorFaltanteAntes = Math.max(0, valorFinal - totalPagoSemCobranca)
-  const troco = totalCobrarNaEntrega - valorFaltanteAntes
-
-  return troco > 0 ? Math.round(troco * 100) / 100 : 0
-}
+export { resolverTrocoLevarPedidoEntrega }
 
 export function formatarEnderecoEntregaMultilinha(
   endereco: EnderecoEntregaDetalhe | null | undefined

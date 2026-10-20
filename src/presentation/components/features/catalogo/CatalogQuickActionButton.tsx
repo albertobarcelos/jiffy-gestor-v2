@@ -38,7 +38,7 @@ export function CatalogQuickActionButton({
   const ligado = Boolean(active)
 
   return (
-    <div className="flex h-8 w-8 items-center justify-center">
+    <div className={cn('flex h-8 w-8 items-center justify-center', def.hideOnMobile && 'hidden md:flex')}>
       <Tooltip
         title={def.label}
         arrow

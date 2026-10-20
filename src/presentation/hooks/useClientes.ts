@@ -3,7 +3,9 @@ import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
+import type { IdentificacaoClienteEntregaDTO } from '@/src/application/dto/IdentificacaoClienteEntregaDTO'
 import { identificarClienteEntregaPorTelefoneUseCase } from '@/src/application/use-cases/clientes/IdentificarClienteEntregaPorTelefoneUseCase'
+import { identificarClienteEMoradasEntregaPorTelefoneUseCase } from '@/src/application/use-cases/clientes/IdentificarClienteEMoradasEntregaPorTelefoneUseCase'
 import { criarClienteEntregaRapidoUseCase } from '@/src/application/use-cases/clientes/CriarClienteEntregaRapidoUseCase'
 import { atualizarNomeClienteEntregaUseCase } from '@/src/application/use-cases/clientes/AtualizarNomeClienteEntregaUseCase'
 import { Cliente } from '@/src/domain/entities/Cliente'
@@ -146,6 +148,21 @@ export function useBuscarClientePorTelefone() {
   return useSecureTenantMutation(async ({ token }, q: string): Promise<Cliente | null> => {
     return identificarClienteEntregaPorTelefoneUseCase.execute(q, token)
   })
+}
+
+export function useIdentificarClienteEMoradasEntrega() {
+  return useSecureTenantMutation(
+    async (
+      { token },
+      input: { telefone: string; usarModuloDelivery: boolean }
+    ): Promise<IdentificacaoClienteEntregaDTO> => {
+      return identificarClienteEMoradasEntregaPorTelefoneUseCase.execute(
+        input.telefone,
+        token,
+        input.usarModuloDelivery
+      )
+    }
+  )
 }
 
 /**

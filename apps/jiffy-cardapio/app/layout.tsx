@@ -1,20 +1,34 @@
 import type { ReactNode } from 'react'
-import type { Viewport } from 'next'
+import type { Metadata, Viewport } from 'next'
+import { Analytics } from '@vercel/analytics/next'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import './globals.css'
 import '@/src/presentation/components/features/delivery-publico/shared/theme/delivery-publico-theme.css'
 import { DeliveryPublicoShell } from '@/src/presentation/components/features/delivery-publico/public/components/DeliveryPublicoShell'
 import { QueryProvider } from '@/src/presentation/providers/QueryProvider'
+import { cardapioPublicBaseUrl } from '@/src/infrastructure/seo/cardapioPublicBaseUrl'
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  interactiveWidget: 'resizes-content',
+  /**
+   * Sem `interactiveWidget`: o shell já sincroniza `visualViewport`.
+   * Os dois juntos redimensionam o layout duas vezes no Safari iOS.
+   */
 }
 
-export const metadata = {
-  title: 'Jiffy Cardápio',
-  description: 'Faça seu pedido online',
+export const metadata: Metadata = {
+  metadataBase: new URL(cardapioPublicBaseUrl()),
+  title: {
+    default: 'Cardápio digital',
+    template: '%s',
+  },
+  description: 'Peça online no cardápio da loja.',
+  icons: {
+    icon: [{ url: '/images/jiffy-favicon.png', type: 'image/png' }],
+    apple: '/images/jiffy-favicon.png',
+  },
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -25,6 +39,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <QueryProvider>
           <DeliveryPublicoShell>{children}</DeliveryPublicoShell>
         </QueryProvider>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )

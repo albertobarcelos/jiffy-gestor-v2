@@ -1,6 +1,6 @@
-import type { PedidoKanbanQuickViewData } from '@/src/presentation/components/features/delivery/kanban-panels/carregarPedidoKanbanQuickView'
-import type { ColunaKanbanId } from '@/src/presentation/components/features/kanban/types'
-import type { EnderecoEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import type { PedidoKanbanQuickViewData } from '@/src/application/use-cases/vendas/CarregarPedidoKanbanQuickViewUseCase'
+import type { EnderecoEmpresaMe } from '@/src/application/dto/EmpresaMeDTO'
+import type { ColunaKanbanId } from '@/src/domain/types/kanbanPedido'
 import {
   montarDetalhesPedidoClienteWhatsapp,
   resolverNomeClienteWhatsapp,
@@ -10,20 +10,20 @@ import { E } from './whatsappMensagemEmojis'
 export function montarMensagemWhatsappClienteKanban(args: {
   clienteNome: string
   colunaAtual: ColunaKanbanId
-  tipoVenda: 'entrega' | 'retirada'
+  tipoEntrega: 'entrega' | 'retirada'
   dados: PedidoKanbanQuickViewData
   enderecoEmpresa: EnderecoEmpresaMe | null | undefined
   numeroVenda?: number | null
   nomeEmpresa?: string
 }): string {
-  const { clienteNome, colunaAtual, tipoVenda, dados, enderecoEmpresa } = args
+  const { clienteNome, colunaAtual, tipoEntrega, dados, enderecoEmpresa } = args
   const nome = resolverNomeClienteWhatsapp(clienteNome)
 
   switch (colunaAtual) {
     case 'NOVOS_PEDIDOS':
       return montarDetalhesPedidoClienteWhatsapp({
         dados,
-        tipoVenda,
+        tipoEntrega,
         enderecoEmpresa,
       })
 
@@ -36,7 +36,7 @@ export function montarMensagemWhatsappClienteKanban(args: {
       ].join('\n')
 
     case 'EM_ROTA':
-      if (tipoVenda === 'retirada') {
+      if (tipoEntrega === 'retirada') {
         return `Seu pedido está pronto. Pode vir retirar! ${E.blush}${E.pin}`
       }
       return `Seu pedido saiu para entrega! ${E.scooter}${E.dash}`

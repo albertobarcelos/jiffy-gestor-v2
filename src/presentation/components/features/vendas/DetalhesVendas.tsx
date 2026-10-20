@@ -29,12 +29,20 @@ import { PainelPedidoBackdrop } from '@/src/presentation/components/ui/jiffy-sid
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { TipoVendaIcon } from './TipoVendaIcon'
+import { tipoVendaIconeRelatorio } from '@/src/presentation/utils/vendas/vendasListCalculos'
 import { useCancelarVendaGestor } from '@/src/presentation/hooks/useVendas'
 import { StatusFiscalBadge } from '@/src/presentation/components/features/fiscal'
 import {
   abrirDocumentoFiscalPdf,
   tipoDocFiscalFromModelo,
 } from '@/src/presentation/utils/abrirDocumentoFiscalPdf'
+import {
+  atorUsuarioId,
+  completarNomesAtoresPedidoDelivery,
+  idUsuarioGestorConsultavel,
+  idUsuarioParaConsulta,
+  rotuloAtorPedido,
+} from '@/src/application/mappers/atorPedidoDelivery'
 
 // Tipos
 interface VendaDetalhes {
@@ -43,7 +51,8 @@ interface VendaDetalhes {
   codigoVenda: string
   numeroMesa?: number
   valorFinal: number
-  tipoVenda: 'balcao' | 'mesa' | 'gestor'
+  tipoVenda: 'balcao' | 'mesa' | 'gestor' | 'delivery' | 'entrega' | 'retirada' | string
+  tipoEntrega?: 'entrega' | 'retirada' | null
   abertoPorId: string
   codigoTerminal: string
   terminalId: string
@@ -175,6 +184,34 @@ interface DetalhesVendasProps {
   /** Chamado após o painel terminar de deslizar para fora — use para limpar `vendaId` no pai sem cortar a animação. */
   onAfterClose?: () => void
   tabelaOrigem?: 'venda' | 'venda_gestor' // Indica de qual tabela buscar
+  /** Tipo da linha da lista — o ícone fica certo já na abertura, antes do GET. */
+  tipoVendaLista?: string
+  tipoEntregaLista?: 'entrega' | 'retirada' | null
+  numeroMesaLista?: number
+}
+
+function nomeExibicaoUsuario(
+  id: string | undefined,
+  nomes: Record<string, string>
+): string {
+  if (!id) return '—'
+  const nome = String(nomes[id] ?? '').trim()
+  return nome || '—'
+}
+
+function registrarNomeAtor(
+  map: Record<string, string>,
+  ator: unknown,
+  idPlano?: unknown
+): void {
+  const id = atorUsuarioId(ator) || String(idPlano ?? '').trim()
+  const rotulo = rotuloAtorPedido(ator)
+  if (id && rotulo) map[id] = rotulo
+}
+
+function idAtorOuPlano(ator: unknown, idPlano: unknown): string | undefined {
+  const id = atorUsuarioId(ator) || String(idPlano ?? '').trim()
+  return id || undefined
 }
 
 /** Mesmos tempos do `JiffySidePanelModal` — entrada/saída pela direita. */
@@ -205,6 +242,17 @@ function tipoAjusteVendaInformado(tipo: unknown): boolean {
 }
 
 /** Taxa/ajuste percentual no contrato (ex.: "percentual", "porcentagem"). */
+function extrairTipoEntregaDetalhe(raw: Record<string, unknown>): 'entrega' | 'retirada' | null {
+  const candidatos = [raw.tipoEntrega, raw.tipo_entrega, raw.tipoAtendimento, raw.tipo_atendimento]
+  for (const candidato of candidatos) {
+    const s = String(candidato ?? '')
+      .trim()
+      .toLowerCase()
+    if (s === 'entrega' || s === 'retirada') return s
+  }
+  return null
+}
+
 function tipoEhPercentual(tipo: unknown): boolean {
   const t = String(tipo ?? '')
     .trim()
@@ -485,7 +533,11 @@ export function DetalhesVendas({
   onClose,
   onAfterClose,
   tabelaOrigem = 'venda',
-}: DetalhesVendasProps) {  const [venda, setVenda] = useState<VendaDetalhes | null>(null)
+  tipoVendaLista,
+  tipoEntregaLista,
+  numeroMesaLista,
+}: DetalhesVendasProps) {
+  const [venda, setVenda] = useState<VendaDetalhes | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [nomesUsuarios, setNomesUsuarios] = useState<Record<string, string>>({})
   const [nomesMeiosPagamento, setNomesMeiosPagamento] = useState<
@@ -569,30 +621,33 @@ export function DetalhesVendas({
       const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return null
 
-      try {
-        // Usa endpoint diferente dependendo da origem da venda
-        const endpoint =
-          tabelaOrigem === 'venda_gestor'
-            ? `/api/pessoas/usuarios-gestor/${usuarioId}`
-            : `/api/usuarios/${usuarioId}`
+      const consultaId = idUsuarioParaConsulta(usuarioId)
+      if (!consultaId) return null
 
-        const response = await fetch(endpoint, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
+      const endpoints =
+        tabelaOrigem === 'venda_gestor'
+          ? [`/api/pessoas/usuarios-gestor/${consultaId}`, `/api/usuarios/${consultaId}`]
+          : [`/api/usuarios/${consultaId}`, `/api/pessoas/usuarios-gestor/${consultaId}`]
 
-        if (!response.ok) return null
-
-        const data = await response.json()
-        return data.nome || data.name || null
-      } catch (error) {
-        console.error('Erro ao buscar nome do usuário:', error)
-        return null
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(endpoint, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          })
+          if (!response.ok) continue
+          const data = await response.json()
+          const nome = data.nome || data.name
+          if (typeof nome === 'string' && nome.trim()) return nome.trim()
+        } catch {
+          // tenta o outro cadastro (PDV ↔ gestor)
+        }
       }
+      return null
     },
-    [ tabelaOrigem]
+    [tabelaOrigem]
   )
 
   /**
@@ -867,12 +922,37 @@ export function DetalhesVendas({
             quantidade: Number(t.quantidade) || 0,
             valorCalculado: Number(t.valorCalculado) || 0,
             lancadoAutomatico: Boolean(t.lancadoAutomatico),
-            lancadoPorId: t.lancadoPorId != null ? String(t.lancadoPorId) : undefined,
-            removidoPorId: t.removidoPorId != null ? String(t.removidoPorId) : undefined,
+            lancadoPorId: idAtorOuPlano(t.lancadoPor, t.lancadoPorId),
+            removidoPorId: idAtorOuPlano(t.removidoPor, t.removidoPorId),
             dataLancamento: t.dataLancamento != null ? String(t.dataLancamento) : undefined,
             dataRemocao: t.dataRemocao != null ? String(t.dataRemocao) : undefined,
           }))
         : []
+
+      const nomesEmbutidos: Record<string, string> = {}
+      registrarNomeAtor(nomesEmbutidos, dataRaw.abertoPor, dataRaw.abertoPorId)
+      registrarNomeAtor(nomesEmbutidos, dataRaw.ultimoResponsavel, dataRaw.ultimoResponsavelId)
+      registrarNomeAtor(nomesEmbutidos, dataRaw.canceladoPor, dataRaw.canceladoPorId)
+      for (const produto of produtosLancadosMapeados as Record<string, unknown>[]) {
+        registrarNomeAtor(nomesEmbutidos, produto.lancadoPor, produto.lancadoPorId)
+        registrarNomeAtor(nomesEmbutidos, produto.removidoPor, produto.removidoPorId)
+      }
+      if (Array.isArray(dataRaw.taxasLancadas)) {
+        for (const raw of dataRaw.taxasLancadas) {
+          if (!raw || typeof raw !== 'object') continue
+          const taxa = raw as Record<string, unknown>
+          registrarNomeAtor(nomesEmbutidos, taxa.lancadoPor, taxa.lancadoPorId)
+          registrarNomeAtor(nomesEmbutidos, taxa.removidoPor, taxa.removidoPorId)
+        }
+      }
+      if (Array.isArray(dataRaw.pagamentos)) {
+        for (const raw of dataRaw.pagamentos) {
+          if (!raw || typeof raw !== 'object') continue
+          const pag = raw as Record<string, unknown>
+          registrarNomeAtor(nomesEmbutidos, pag.realizadoPor, pag.realizadoPorId)
+          registrarNomeAtor(nomesEmbutidos, pag.canceladoPor, pag.canceladoPorId)
+        }
+      }
 
       const ajusteVendaApi = extrairAjustesTotaisVendaDaApi(dataRaw as Record<string, unknown>)
       const rawRecord = dataRaw as Record<string, unknown>
@@ -882,6 +962,7 @@ export function DetalhesVendas({
 
       const data: VendaDetalhes = {
         ...dataRaw,
+        tipoEntrega: extrairTipoEntregaDetalhe(dataRaw as Record<string, unknown>) ?? tipoEntregaLista ?? null,
         codigoTerminal: codigoTerminal,
         statusFiscal,
         documentoFiscalId,
@@ -970,14 +1051,24 @@ export function DetalhesVendas({
         ])
 
       // Constrói e atualiza o estado de nomes de usuários
-      const finalNomesUsuarios: Record<string, string> = {}
+      const finalNomesUsuarios: Record<string, string> = { ...nomesEmbutidos }
       Array.from(userIdsToFetch).forEach((id, index) => {
         const nome = userNamesResolved[index]
         if (nome) {
           finalNomesUsuarios[id] = nome
         }
       })
-      setNomesUsuarios(finalNomesUsuarios)
+      const idsCliente = Array.from(userIdsToFetch).filter(id => !idUsuarioGestorConsultavel(id))
+      const nomesComCliente = completarNomesAtoresPedidoDelivery(
+        finalNomesUsuarios,
+        idsCliente,
+        data.origem,
+        clienteNomeResult
+      )
+      for (const id of idsCliente) {
+        if (!nomesComCliente[id]) nomesComCliente[id] = 'Cliente'
+      }
+      setNomesUsuarios(nomesComCliente)
 
       // Constrói e atualiza o estado de meios de pagamento
       const finalNomesMeiosPagamento: Record<string, MeioPagamentoDetalhes> = {}
@@ -1013,6 +1104,7 @@ export function DetalhesVendas({
     fetchClienteNome,
     onClose,
     tabelaOrigem,
+    tipoEntregaLista,
   ])
 
   /**
@@ -1322,17 +1414,15 @@ export function DetalhesVendas({
         {/* AppBar */}
         <div className="flex w-full shrink-0 items-center gap-3 rounded-t-lg bg-primary py-3 md:px-4">
           <div className="flex flex-1 items-center justify-center gap-2">
-            {venda && (
+            {(venda || tipoVendaLista || tipoEntregaLista) && (
               <TipoVendaIcon
-                tipoVenda={
-                  tabelaOrigem === 'venda_gestor'
-                    ? (String(venda.tipoVenda ?? '').trim().toLowerCase() === 'entrega' ||
-                      String(venda.tipoVenda ?? '').trim().toLowerCase() === 'retirada')
-                      ? (String(venda.tipoVenda ?? '').trim().toLowerCase() as 'entrega' | 'retirada')
-                      : 'gestor'
-                    : (venda.tipoVenda as 'mesa' | 'balcao' | 'gestor' | 'entrega' | 'retirada')
-                }
-                numeroMesa={venda.numeroMesa}
+                tipoVenda={tipoVendaIconeRelatorio({
+                  tipoVenda: String(venda?.tipoVenda ?? tipoVendaLista ?? ''),
+                  tipoEntrega: venda?.tipoEntrega ?? tipoEntregaLista ?? null,
+                  tabelaOrigem,
+                  numeroMesa: venda?.numeroMesa ?? numeroMesaLista,
+                })}
+                numeroMesa={venda?.numeroMesa ?? numeroMesaLista}
                 containerScale={0.9}
                 className="flex-shrink-0"
                 corPrincipal="#FFFFFF"
@@ -1422,7 +1512,7 @@ export function DetalhesVendas({
                   {/* Aberto por */}
                   <div className="flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
                     <span>Aberto por:</span>
-                    <span>{nomesUsuarios[venda.abertoPorId] || venda.abertoPorId}</span>
+                    <span>{nomeExibicaoUsuario(venda.abertoPorId, nomesUsuarios)}</span>
                   </div>
 
                   {/* Última Alteração por - Só exibe quando statusMesa estiver aberta */}
@@ -1430,7 +1520,7 @@ export function DetalhesVendas({
                     <div className="flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
                       <span>Última Alteração por:</span>
                       <span>
-                        {nomesUsuarios[venda.ultimoResponsavelId] || venda.ultimoResponsavelId}
+                        {nomeExibicaoUsuario(venda.ultimoResponsavelId, nomesUsuarios)}
                       </span>
                     </div>
                   )}
@@ -1442,7 +1532,7 @@ export function DetalhesVendas({
                       <div className="flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
                         <span>Finalizado Por:</span>
                         <span>
-                          {nomesUsuarios[venda.ultimoResponsavelId] || venda.ultimoResponsavelId}
+                          {nomeExibicaoUsuario(venda.ultimoResponsavelId, nomesUsuarios)}
                         </span>
                       </div>
                     )}
@@ -1452,7 +1542,7 @@ export function DetalhesVendas({
                     <div className="flex justify-between rounded-lg bg-white px-1 text-xs text-error md:text-sm">
                       <span>Cancelado Por:</span>
                       <span className="font-semibold">
-                        {nomesUsuarios[venda.canceladoPorId] || venda.canceladoPorId}
+                        {nomeExibicaoUsuario(venda.canceladoPorId, nomesUsuarios)}
                       </span>
                     </div>
                   )}
@@ -1741,7 +1831,7 @@ export function DetalhesVendas({
                           <div className="mt-1 flex flex-col text-xs text-secondary-text md:ml-7 md:flex-row">
                             <span>Lançado: {formatDateTime(produto.dataLancamento)} |</span>{' '}
                             <span>
-                              Usuário: {nomesUsuarios[produto.lancadoPorId] || produto.lancadoPorId}
+                              Usuário: {nomeExibicaoUsuario(produto.lancadoPorId, nomesUsuarios)}
                             </span>
                           </div>
 
@@ -1749,7 +1839,7 @@ export function DetalhesVendas({
                           {isRemovido && produto.removidoPorId && (
                             <div className="ml-7 mt-1 text-xs text-error">
                               Removido por:{' '}
-                              {nomesUsuarios[produto.removidoPorId] || produto.removidoPorId}
+                              {nomeExibicaoUsuario(produto.removidoPorId, nomesUsuarios)}
                             </div>
                           )}
                           {isRemovido && produto.dataRemocao && (
@@ -1806,14 +1896,14 @@ export function DetalhesVendas({
                                 )}
                                 {taxa.lancadoPorId && (
                                   <span>
-                                    Usuário: {nomesUsuarios[taxa.lancadoPorId] || taxa.lancadoPorId}
+                                    Usuário: {nomeExibicaoUsuario(taxa.lancadoPorId, nomesUsuarios)}
                                   </span>
                                 )}
                               </div>
                               {isTaxaRemovida && taxa.removidoPorId && (
                                 <div className="ml-7 mt-1 text-xs text-error">
                                   Removido por:{' '}
-                                  {nomesUsuarios[taxa.removidoPorId] || taxa.removidoPorId}
+                                  {nomeExibicaoUsuario(taxa.removidoPorId, nomesUsuarios)}
                                 </div>
                               )}
                               {isTaxaRemovida && taxa.dataRemocao && (
@@ -1959,13 +2049,12 @@ export function DetalhesVendas({
                             </div>
                             <div className="text-xs text-secondary-text">
                               PDV Resp.:{' '}
-                              {nomesUsuarios[pagamento.realizadoPorId] || pagamento.realizadoPorId}
+                              {nomeExibicaoUsuario(pagamento.realizadoPorId, nomesUsuarios)}
                             </div>
                             {isCancelado && pagamento.canceladoPorId && (
                               <div className="mt-1 text-xs text-error">
                                 Cancelado por:{' '}
-                                {nomesUsuarios[pagamento.canceladoPorId] ||
-                                  pagamento.canceladoPorId}
+                                {nomeExibicaoUsuario(pagamento.canceladoPorId, nomesUsuarios)}
                               </div>
                             )}
                             {isCancelado && pagamento.dataCancelamento && (

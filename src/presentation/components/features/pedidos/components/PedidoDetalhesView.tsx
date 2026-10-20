@@ -1,28 +1,110 @@
 'use client'
 
+import { useMemo } from 'react'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Label } from '@/src/presentation/components/ui/label'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { estiloCardMeioPagamento } from '@/src/shared/utils/corFormaPagamentoFiscal'
 import { abrirDocumentoFiscalPdf, tipoDocFiscalFromModelo } from '@/src/presentation/utils/abrirDocumentoFiscalPdf'
 import { showToast } from '@/src/shared/utils/toast'
-import { MdCreditCard, MdDelete } from 'react-icons/md'
+import { MdCheck, MdCreditCard, MdDelete, MdTrendingDown, MdTrendingUp } from 'react-icons/md'
+import { cn } from '@/src/shared/utils/cn'
 // Mantido para uso futuro (pagamento efetivado e depois cancelado):
 // import { pagamentoComDestaqueCanceladoDetalhes } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import { statusFiscalEhEmitida } from '@/src/domain/services/pedido/RegrasFiscaisVenda'
 import { obterUnidadeMedidaProdutoLinha } from '@/src/domain/policies/pedido/CarrinhoCatalogoPolicy'
 import { formatarQuantidadeProdutoExibicao } from '@/src/shared/utils/quantidadeProdutoInput'
 import { formatarUnidadeMedidaProdutoExibicao } from '@/src/shared/types/unidadeMedidaProduto'
-import { taxaEntregaTemValor } from '@/src/application/mappers/PedidoDisplayMapper'
+import {
+  rotuloUsuarioPagamentoPedido,
+  taxaEntregaTemValor,
+} from '@/src/application/mappers/PedidoDisplayMapper'
+import {
+  classificarDivergenciaPagamentoVsTotal,
+  divergenciaPagamentoVsTotalPedido,
+  type DirecaoDivergenciaPagamento,
+} from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import { PedidoDetalhesNotaFiscal } from './PedidoDetalhesNotaFiscal'
 import { PedidoDetalhesPagamentos } from './PedidoDetalhesPagamentos'
 import { PedidoDetalhesProdutos } from './PedidoDetalhesProdutos'
 import { PedidoDetalhesEntrega } from './PedidoDetalhesEntrega'
 import { PedidoDetalhesObservacoesSection } from './PedidoDetalhesObservacoesSection'
 import { PedidoDetalhesVisaoUnica } from './PedidoDetalhesVisaoUnica'
+import { PedidoDetalhesResumoBalcao } from './PedidoDetalhesResumoBalcao'
 import { useNovoPedidoDetalheContext } from '../context/NovoPedidoDetalheContext'
 import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
 import { useNovoPedidoUIContext } from '../context/NovoPedidoUIContext'
+import { deveUsarVisaoUnicaDetalhePedido } from '../utils/detalheVisaoUnica'
+import {
+  COLUNA_CEST_DETALHE_CLASS,
+  COLUNA_NCM_DETALHE_CLASS,
+  PedidoDetalheColunaFiscal,
+  rotulosNcmCestFiscal,
+} from './PedidoNcmCestFiscalTexto'
+import {
+  ncmCestFiscalDoMapa,
+  useNcmCestFiscalPorProdutoIds,
+} from '@/src/presentation/hooks/pedidos/useNcmCestFiscalPorProdutoIds'
+
+function BannerAjustePagamentoAposEdicao({
+  direcao,
+  diferenca,
+}: {
+  direcao: DirecaoDivergenciaPagamento
+  diferenca: number
+}) {
+  const conferido = direcao === 'ok'
+  const valorAbs = transformarParaReal(Math.abs(diferenca))
+  const titulo =
+    direcao === 'faltando'
+      ? 'O total do pedido aumentou'
+      : direcao === 'excedente'
+        ? 'O total do pedido diminuiu'
+        : 'Valores conferem'
+  const detalhe =
+    direcao === 'faltando'
+      ? 'Inclua a diferença nas formas de pagamento e salve a cobrança.'
+      : direcao === 'excedente'
+        ? 'Reduza o valor lançado para o novo total e salve a cobrança.'
+        : 'Salve a cobrança para concluir o ajuste dos itens.'
+
+  return (
+    <div
+      role="status"
+      className={cn(
+        'mb-3 flex items-start gap-3 rounded-xl border p-3',
+        conferido ? 'border-emerald-200 bg-emerald-50/80' : 'border-primary/15 bg-primary/[0.04]'
+      )}
+    >
+      <div
+        className={cn(
+          'flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
+          conferido ? 'bg-emerald-100 text-emerald-700' : 'bg-primary/10 text-primary'
+        )}
+        aria-hidden
+      >
+        {direcao === 'faltando' ? (
+          <MdTrendingUp className="h-5 w-5" />
+        ) : direcao === 'excedente' ? (
+          <MdTrendingDown className="h-5 w-5" />
+        ) : (
+          <MdCheck className="h-5 w-5" />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-primary-text">{titulo}</p>
+          {!conferido ? (
+            <span className="shrink-0 rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-white">
+              {direcao === 'faltando' ? '+' : '−'} {valorAbs}
+            </span>
+          ) : null}
+        </div>
+        <p className="mt-0.5 text-xs leading-relaxed text-secondary-text">{detalhe}</p>
+      </div>
+    </div>
+  )
+}
 
 export function PedidoDetalhesView() {
   const {
@@ -30,12 +112,21 @@ export function PedidoDetalhesView() {
     handleAbrirEdicaoProdutoDetalhes,
     isLoadingVenda,
     podeAjustarPagamentoEntregaEmAberto,
+    ajustandoPagamentoAposEdicaoItens,
     podeExibirAbaNotaFiscal,
     resumoFinanceiroDetalhes,
     resumoFiscal,
     statusFiscalUnificado,
     detalhesEntregaPedido,
+    detalhesPedidoMeta,
+    tipoInicioPedido,
+    podeEditarItensPedidoDetalhe,
+    handleEditarPedidoNoDetalhe,
   } = useNovoPedidoDetalheContext()
+  const usarVisaoUnicaDelivery = deveUsarVisaoUnicaDetalhePedido({
+    tipoInicioPedido,
+    tipoVenda: detalhesPedidoMeta?.tipoVenda,
+  })
   const { currentStep } = useNovoPedidoUIContext()
   const {
     adicionarPagamentoPorCard,
@@ -57,7 +148,12 @@ export function PedidoDetalhesView() {
     produtos,
     produtosList,
     catalogoProdutosPorId,
+    clienteNome,
+    clienteEntregaVinculado,
+    nomeUsuario,
+    usuarioLogadoId,
     observacaoPedido,
+    origem,
     removerPagamento,
     rotuloModeloNfe,
     setValorRecebido,
@@ -68,6 +164,20 @@ export function PedidoDetalhesView() {
     valorAPagarLancamento,
     valorRecebido,
   } = useNovoPedidoFormContext()
+
+  const produtoIdsDetalhe = useMemo(
+    () => produtos.map(produto => String(produto.produtoId ?? '')),
+    [produtos]
+  )
+  const { data: ncmCestFiscalPorProdutoId, isPending: ncmCestFiscalCarregando } =
+    useNcmCestFiscalPorProdutoIds(produtoIdsDetalhe)
+
+  const divergenciaPagamentoAposEdicao = ajustandoPagamentoAposEdicaoItens
+    ? divergenciaPagamentoVsTotalPedido(totalProdutos, totalPagamentosLancados)
+    : null
+  const direcaoPagamentoAposEdicao = ajustandoPagamentoAposEdicaoItens
+    ? classificarDivergenciaPagamentoVsTotal(totalProdutos, totalPagamentosLancados)
+    : null
 
   return (
     <>            {/* STEP 4: Detalhes da Venda (visualização ou após criar pedido) */}
@@ -198,7 +308,12 @@ export function PedidoDetalhesView() {
                       />
                     )}
 
-                    {abaDetalhesPedido === 'infoPedido' && <PedidoDetalhesVisaoUnica />}
+                    {abaDetalhesPedido === 'infoPedido' &&
+                      (usarVisaoUnicaDelivery ? (
+                        <PedidoDetalhesVisaoUnica />
+                      ) : (
+                        <PedidoDetalhesResumoBalcao />
+                      ))}
 
                     {/* Lista de Produtos (Visualização) */}
                     {abaDetalhesPedido === 'listaProdutos' && (
@@ -207,7 +322,19 @@ export function PedidoDetalhesView() {
                         aria-labelledby="tab-detalhes-lista-produtos"
                       >
                         <div className="p-2">
-                          <h3 className="mb-2 text-lg font-semibold">Produtos do Pedido</h3>
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <h3 className="text-lg font-semibold">Produtos do Pedido</h3>
+                            {podeEditarItensPedidoDetalhe ? (
+                              <Button
+                                type="button"
+                                variant="outlined"
+                                className="shrink-0 !border-primary !text-primary hover:!bg-primary/5"
+                                onClick={handleEditarPedidoNoDetalhe}
+                              >
+                                Editar Pedido
+                              </Button>
+                            ) : null}
+                          </div>
                           {produtos.length > 0 ? (
                             <div className="space-y-1">
                               {/* Cabeçalho da tabela */}
@@ -217,9 +344,19 @@ export function PedidoDetalhesView() {
                                     Qtd
                                   </span>
                                 </div>
-                                <div className="min-w-0 flex-[4]">
+                                <div className="min-w-0 flex-[3]">
                                   <span className="text-xs font-semibold text-gray-700">
                                     Produto
+                                  </span>
+                                </div>
+                                <div className={COLUNA_NCM_DETALHE_CLASS}>
+                                  <span className="block text-center text-xs font-semibold text-gray-700">
+                                    NCM
+                                  </span>
+                                </div>
+                                <div className={COLUNA_CEST_DETALHE_CLASS}>
+                                  <span className="block text-center text-xs font-semibold text-gray-700">
+                                    CEST
                                   </span>
                                 </div>
                                 <div className="w-11 shrink-0">
@@ -256,6 +393,13 @@ export function PedidoDetalhesView() {
                                     produto.valorFinal !== null && produto.valorFinal !== undefined
                                       ? produto.valorFinal
                                       : calcularTotalProduto(produto)
+                                  const fiscal = rotulosNcmCestFiscal(
+                                    ncmCestFiscalDoMapa(
+                                      ncmCestFiscalPorProdutoId,
+                                      String(produto.produtoId ?? '')
+                                    ),
+                                    ncmCestFiscalCarregando
+                                  )
 
                                   return (
                                     <div key={index} className="space-y-0">
@@ -279,7 +423,7 @@ export function PedidoDetalhesView() {
                                           </span>
                                         </div>
                                         {/* Nome do Produto */}
-                                        <div className="min-w-0 flex-[4]">
+                                        <div className="min-w-0 flex-[3]">
                                           <span className="block truncate text-xs text-gray-900">
                                             {produto.nome}
                                           </span>
@@ -288,6 +432,20 @@ export function PedidoDetalhesView() {
                                               Obs: {produto.observacao.trim()}
                                             </span>
                                           ) : null}
+                                        </div>
+                                        <div className={COLUNA_NCM_DETALHE_CLASS}>
+                                          <PedidoDetalheColunaFiscal
+                                            texto={fiscal.ncm}
+                                            vazio={fiscal.ncmVazio}
+                                            indisponivel={fiscal.indisponivel}
+                                          />
+                                        </div>
+                                        <div className={COLUNA_CEST_DETALHE_CLASS}>
+                                          <PedidoDetalheColunaFiscal
+                                            texto={fiscal.cest}
+                                            vazio={fiscal.cestVazio}
+                                            indisponivel={fiscal.indisponivel}
+                                          />
                                         </div>
                                         {/* Unidade de medida */}
                                         <div className="w-11 shrink-0">
@@ -334,11 +492,13 @@ export function PedidoDetalhesView() {
                                               </span>
                                             </div>
                                             {/* Nome do Complemento com indentação */}
-                                            <div className="min-w-0 flex-[4] pl-4">
+                                            <div className="min-w-0 flex-[3] pl-4">
                                               <span className="block truncate text-xs leading-tight text-gray-600">
                                                 {complemento.nome}
                                               </span>
                                             </div>
+                                            <div className={COLUNA_NCM_DETALHE_CLASS} aria-hidden />
+                                            <div className={COLUNA_CEST_DETALHE_CLASS} aria-hidden />
                                             <div className="w-11 shrink-0" aria-hidden />
                                             {/* Espaço vazio para Desconto/Acréscimo (complementos não têm) */}
                                             <div className="flex-1"></div>
@@ -483,6 +643,15 @@ export function PedidoDetalhesView() {
                         aria-labelledby="tab-detalhes-pagamentos"
                       >
                         <h3 className="mb-2 text-lg font-semibold">Pagamentos</h3>
+
+                        {ajustandoPagamentoAposEdicaoItens &&
+                        divergenciaPagamentoAposEdicao &&
+                        direcaoPagamentoAposEdicao ? (
+                          <BannerAjustePagamentoAposEdicao
+                            direcao={direcaoPagamentoAposEdicao}
+                            diferenca={divergenciaPagamentoAposEdicao.diferenca}
+                          />
+                        ) : null}
 
                         {/* Total Pago e Troco */}
                         <div className="mb-2 border-t pt-2 text-sm">
@@ -656,7 +825,24 @@ export function PedidoDetalhesView() {
                               // cancelado abaixo está comentada e preservada para uso futuro:
                               // quando houver pagamento efetivado e depois cancelado.
                               // const emCancelado = pagamentoComDestaqueCanceladoDetalhes(pagamento)
-                              const usuarioPagamento = pagamento.realizadoPorId
+                              const rotuloPor = rotuloUsuarioPagamentoPedido({
+                                realizadoPorId: pagamento.realizadoPorId,
+                                realizadoPorNome: pagamento.realizadoPorNome,
+                                pagamentoId: pagamento.id,
+                                abertoPorId: detalhesPedidoMeta?.abertoPorId,
+                                clienteId: clienteEntregaVinculado?.id,
+                                nomesUsuariosPedido: pagamento.realizadoPorId
+                                  ? {
+                                      [pagamento.realizadoPorId]: formatarUsuarioPorId(
+                                        pagamento.realizadoPorId
+                                      ),
+                                    }
+                                  : {},
+                                clienteNome,
+                                nomeUsuarioGestor: nomeUsuario,
+                                usuarioGestorId: usuarioLogadoId,
+                                origem,
+                              })
                               const dataPagamento = pagamento.dataCriacao
 
                               return (
@@ -714,7 +900,7 @@ export function PedidoDetalhesView() {
                                   <span className="text-center text-[11px] text-gray-500">
                                     {/* className={`text-center text-[11px] ${emCancelado ? 'text-red-800/80' : 'text-gray-500'}`} */}
                                     {/* {emCancelado ? 'Cancelado por' : 'Por'}:{' '} */}
-                                    Por: {formatarUsuarioPorId(usuarioPagamento)}
+                                    Por: {rotuloPor}
                                   </span>
                                   {dataPagamento && (
                                     <span className="text-center text-[11px] text-gray-500">

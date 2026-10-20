@@ -11,7 +11,7 @@ import { urlLoginDaSessaoAtual } from '@/src/presentation/gestor-pedidos/sessao/
 import { useEmpresaUrlSync } from '@/src/presentation/hooks/useEmpresaUrlSync'
 import { EmpresaSwitcherTopNav } from './EmpresaSwitcherTopNav'
 import { useQueryClient } from '@tanstack/react-query'
-import { MdDashboard, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose, MdDeliveryDining, MdApps } from 'react-icons/md'
+import { MdDashboard, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose, MdDeliveryDining, MdApps, MdMoreHoriz } from 'react-icons/md'
 import { 
   MdInventory2, 
   MdShoppingBag, 
@@ -36,6 +36,10 @@ import { useDeliveryGestorConfigStatus } from '@/src/presentation/hooks/useDeliv
 import { EmpresaDeliveryPendenteGestorModal } from '@/src/presentation/components/features/delivery/EmpresaDeliveryPendenteGestorModal'
 import { matchesModulePath } from '@/src/shared/utils/gestaoRoutes'
 import { isConfiguracoesModulePath } from '@/src/shared/constants/configuracoesRoutes'
+import { useTopNavOverflow } from '@/src/presentation/hooks/useTopNavOverflow'
+
+const NAV_ITEM_CLASS =
+  'flex min-w-max shrink-0 items-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-2 text-xs font-medium transition-all duration-200 xl:px-2 xl:text-sm 2xl:gap-1.5 2xl:px-3'
 
 const MENU_ICON_PARENT =
   'inline-flex h-5 w-5 shrink-0 items-center justify-center [&>svg]:h-5 [&>svg]:w-5'
@@ -233,6 +237,7 @@ export function TopNav() {
           { name: 'Mesas Abertas', path: '/vendas/abertas', icon: MdTableBar },
           { name: 'Relatório de Vendas', path: '/relatorios-vendas', icon: MdAssessment },
           { name: 'Relatório de Produtos', path: '/relatorios-produtos-vendidos', icon: MdAnalytics },
+          { name: 'Relatório de Entregas', path: '/vendas/relatorio-entregas', icon: MdDeliveryDining },
           { name: 'Hist. Fechamentos', path: '/historico-fechamento', icon: MdHistory },
           { name: 'Comissões', path: '/vendas/comissoes', icon: MdPercent },
         ],
@@ -246,6 +251,15 @@ export function TopNav() {
     }
     return items
   }, [temAcessoFiscal])
+
+  const itensMenuDesktop = useMemo(
+    () => menuItems.filter(item => item.name !== 'Configurações'),
+    [menuItems]
+  )
+  const { containerRef, faixaMedicaoRef, maisMedicaoRef, visiveis, pronto } =
+    useTopNavOverflow(itensMenuDesktop.length)
+  const itensVisiveis = itensMenuDesktop.slice(0, visiveis)
+  const itensOverflow = itensMenuDesktop.slice(visiveis)
 
   const isMenuActive = (item: typeof menuItems[0]) => {
     if (item.path === '/configuracoes/empresa') {
@@ -267,6 +281,96 @@ export function TopNav() {
   }
 
   const isChildActive = (childPath: string) => matchesModulePath(pathname ?? '', childPath)
+
+  const classeItemDesktop = (ativo: boolean) =>
+    `${NAV_ITEM_CLASS} ${
+      ativo ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+    }`
+
+  const renderConteudoItem = (item: MenuItem, expandido = false) => (
+    <>
+      {renderNavIcon(item, MENU_ICON_PARENT)}
+      <span className="shrink-0 whitespace-nowrap">{item.name}</span>
+      {item.children ? (
+        <MdExpandMore
+          className={`h-4 w-4 shrink-0 transition-transform duration-200 ${
+            expandido ? 'rotate-180' : ''
+          }`}
+          aria-hidden
+        />
+      ) : null}
+    </>
+  )
+
+  const renderSubmenuDesktop = (item: MenuItem) => {
+    if (!item.children || !expandedMenus.has(item.name)) {
+      return null
+    }
+    return (
+      <div className="absolute top-full left-0 z-50 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-2 shadow-lg">
+        {item.children.map(child => {
+          const renderedChildIcon = renderNavIcon(child, MENU_ICON_CHILD)
+          const childIsActive = isChildActive(child.path)
+          return (
+            <Link
+              key={`${child.name}-${child.path}`}
+              href={toGestao(child.path)}
+              onMouseEnter={() => handleLinkHover(child.path)}
+              onClick={() => setExpandedMenus(new Set())}
+              prefetch={true}
+              className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                childIsActive
+                  ? 'bg-gray-50 text-gray-900 font-medium'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              {renderedChildIcon}
+              <span>{child.name}</span>
+              {childIsActive && (
+                <MdChevronRight className="ml-auto h-4 w-4 text-gray-400" />
+              )}
+            </Link>
+          )
+        })}
+      </div>
+    )
+  }
+
+  const renderItemDesktop = (item: MenuItem) => {
+    const isActive = isMenuActive(item)
+    const itemClass = classeItemDesktop(isActive)
+
+    if (item.children) {
+      return (
+        <div key={item.name} className="relative shrink-0">
+          <button
+            type="button"
+            onClick={() => toggleMenu(item.name)}
+            className={itemClass}
+            title={item.name}
+            aria-label={item.name}
+          >
+            {renderConteudoItem(item, expandedMenus.has(item.name))}
+          </button>
+          {renderSubmenuDesktop(item)}
+        </div>
+      )
+    }
+
+    return (
+      <Link
+        key={item.path}
+        href={toGestao(item.path)}
+        onMouseEnter={() => handleLinkHover(item.path)}
+        prefetch={true}
+        title={item.name}
+        aria-label={item.name}
+        className={itemClass}
+      >
+        {renderConteudoItem(item)}
+      </Link>
+    )
+  }
 
   const closeSubmenus = useCallback(() => setExpandedMenus(new Set()), [])
 
@@ -323,7 +427,7 @@ export function TopNav() {
   }, [pathname])
 
   const MobileMenuSection = (
-    <div className="fixed inset-0 z-50 sm:hidden">
+    <div className="fixed inset-0 z-50 lg:hidden">
       <div
         className="absolute inset-0 bg-black/40"
         onClick={closeMobileMenu}
@@ -438,7 +542,7 @@ export function TopNav() {
           >
             <MdApps className="w-6 h-6" />
           </button>
-          {/* Logout no mobile: ações do usuário ficam em `hidden sm:flex` na barra superior */}
+          {/* Logout no drawer: no desktop (`lg+`) as ações ficam na barra */}
           <button
             type="button"
             onClick={() => void handleLogout()}
@@ -454,16 +558,15 @@ export function TopNav() {
 
   return (
     <nav className="relative z-40 h-16 shrink-0 bg-white border-b border-gray-200 shadow-sm">
-      <div className="h-full flex items-center justify-between xl:px-4">
-        {/* Logo */}
-        <div className="flex items-center">
+      <div className="flex h-full min-w-0 w-full flex-nowrap items-center gap-2 px-3 sm:px-4">
+        <div className="shrink-0">
           <Link href={toGestao('/dashboard')} className="flex items-center">
-            <div className="relative ml-6 md:ml-0 w-12 h-12 sm:w-20 sm:h-16">
+            <div className="relative h-10 w-10 sm:h-12 sm:w-12 2xl:h-14 2xl:w-16">
               <Image
                 src="/images/jiffy-100x100.gif"
                 alt="Jiffy"
                 fill
-                sizes="(max-width: 640px) 176px, 208px"
+                sizes="(max-width: 640px) 40px, (max-width: 1536px) 48px, 64px"
                 className="object-contain"
                 priority
               />
@@ -471,210 +574,224 @@ export function TopNav() {
           </Link>
         </div>
 
-        {/* Menu Items */}
-        <div
-          ref={menuRef}
-          className="hidden sm:flex flex-1 items-center justify-start gap-1 pl-2"
-        >
-          {menuItems
-            .filter(item => item.name !== 'Configurações')
-            .map((item) => {
-            const isActive = isMenuActive(item)
-            const isExpanded = expandedMenus.has(item.name)
-            const renderedIcon = renderNavIcon(item, MENU_ICON_PARENT)
+        <div ref={menuRef} className="hidden min-w-0 flex-1 items-center lg:flex">
+          <div ref={containerRef} className="relative min-w-0 w-full">
+            <div
+              ref={faixaMedicaoRef}
+              className="pointer-events-none invisible absolute left-0 top-0 flex items-center gap-0.5 xl:gap-1"
+              aria-hidden
+            >
+              {itensMenuDesktop.map(item => (
+                <span key={`medicao-${item.name}`} className={NAV_ITEM_CLASS}>
+                  {renderConteudoItem(item)}
+                </span>
+              ))}
+            </div>
+            <span
+              ref={maisMedicaoRef}
+              className={`${NAV_ITEM_CLASS} pointer-events-none invisible absolute`}
+              aria-hidden
+            >
+              <MdMoreHoriz className="h-5 w-5 shrink-0" />
+              <span className="shrink-0 whitespace-nowrap">Mais</span>
+              <MdExpandMore className="h-4 w-4 shrink-0" />
+            </span>
 
-            if (item.children) {
-              return (
-                <div key={item.name} className="relative group">
+            <div className="flex items-center gap-0.5 xl:gap-1">
+              {pronto ? itensVisiveis.map(item => renderItemDesktop(item)) : null}
+              {pronto && itensOverflow.length > 0 ? (
+                <div className="relative shrink-0">
                   <button
-                    onClick={() => toggleMenu(item.name)}
-                    className={`flex items-center gap-1.5 xl:px-4 px-1 py-2 rounded-lg text-xs lg:text-sm font-medium transition-all duration-200 ${
-                      isActive
-                        ? 'bg-gray-100 text-gray-900'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    }`}
+                    type="button"
+                    onClick={() => toggleMenu('__mais')}
+                    className={classeItemDesktop(itensOverflow.some(item => isMenuActive(item)))}
+                    title="Mais"
+                    aria-label="Mais itens de menu"
+                    aria-expanded={expandedMenus.has('__mais')}
                   >
-                    {renderedIcon}
-                    <span>{item.name}</span>
-                    <MdExpandMore 
-                      className={`w-4 h-4 transition-transform duration-200 ${
-                        isExpanded ? 'rotate-180' : ''
-                      }`} 
+                    <MdMoreHoriz className="h-5 w-5 shrink-0" aria-hidden />
+                    <span className="shrink-0 whitespace-nowrap">Mais</span>
+                    <MdExpandMore
+                      className={`h-4 w-4 shrink-0 transition-transform duration-200 ${
+                        expandedMenus.has('__mais') ? 'rotate-180' : ''
+                      }`}
                     />
                   </button>
-
-                  {/* Dropdown Menu */}
-                  {isExpanded && (
-                    <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-                      {item.children.map((child) => {
-                        const renderedChildIcon = renderNavIcon(child, MENU_ICON_CHILD)
-                        const childIsActive = isChildActive(child.path)
+                  {expandedMenus.has('__mais') ? (
+                    <div className="absolute top-full right-0 z-50 mt-1 max-h-[min(24rem,70vh)] w-64 overflow-y-auto rounded-lg border border-gray-200 bg-white py-2 shadow-lg">
+                      {itensOverflow.map(item => {
+                        if (item.children) {
+                          return (
+                            <div key={item.name} className="py-1">
+                              <p className="px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                {item.name}
+                              </p>
+                              {item.children.map(child => {
+                                const childIsActive = isChildActive(child.path)
+                                return (
+                                  <Link
+                                    key={`${child.name}-${child.path}`}
+                                    href={toGestao(child.path)}
+                                    onMouseEnter={() => handleLinkHover(child.path)}
+                                    onClick={() => setExpandedMenus(new Set())}
+                                    prefetch={true}
+                                    className={`flex items-center gap-3 px-4 py-2 text-sm transition-colors ${
+                                      childIsActive
+                                        ? 'bg-gray-50 text-gray-900 font-medium'
+                                        : 'text-gray-700 hover:bg-gray-50'
+                                    }`}
+                                  >
+                                    {renderNavIcon(child, MENU_ICON_CHILD)}
+                                    <span>{child.name}</span>
+                                  </Link>
+                                )
+                              })}
+                            </div>
+                          )
+                        }
                         return (
                           <Link
-                            key={`${child.name}-${child.path}`}
-                            href={toGestao(child.path)}
-                            onMouseEnter={() => handleLinkHover(child.path)}
+                            key={item.path}
+                            href={toGestao(item.path)}
+                            onMouseEnter={() => handleLinkHover(item.path)}
                             onClick={() => setExpandedMenus(new Set())}
                             prefetch={true}
                             className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
-                              childIsActive
+                              isMenuActive(item)
                                 ? 'bg-gray-50 text-gray-900 font-medium'
                                 : 'text-gray-700 hover:bg-gray-50'
                             }`}
                           >
-                            {renderedChildIcon}
-                            <span>{child.name}</span>
-                            {childIsActive && (
-                              <MdChevronRight className="w-4 h-4 ml-auto text-gray-400" />
-                            )}
+                            {renderNavIcon(item, MENU_ICON_PARENT)}
+                            <span>{item.name}</span>
                           </Link>
                         )
                       })}
                     </div>
-                  )}
+                  ) : null}
                 </div>
-              )
-            }
-
-            return (
-              <Link
-                key={item.path}
-                href={toGestao(item.path)}
-                onMouseEnter={() => handleLinkHover(item.path)}
-                prefetch={true}
-                className={`flex items-center gap-1.5 xl:px-4 px-1 py-2 rounded-lg text-xs lg:text-sm font-medium transition-all duration-200 ${
-                  isActive
-                    ? 'bg-gray-100 text-gray-900'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }`}
-              >
-                {renderedIcon}
-                <span className="text-xs lg:text-sm">{item.name}</span>
-              </Link>
-            )
-          })}
-
-          <EmpresaSwitcherTopNav variant="desktop" />
+              ) : null}
+            </div>
+          </div>
         </div>
 
-        {/* Mobile toggler */}
-        <button
-          type="button"
-          className="sm:hidden p-2 rounded-lg hover:bg-gray-100 text-gray-600"
-          onClick={() => setIsMobileMenuOpen(true)}
-        >
-          <MdMenu className="w-6 h-6" />
-        </button>
+        <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-1.5">
+          <EmpresaSwitcherTopNav variant="desktop" />
 
-        {/* User Actions */}
-        <div className="hidden sm:flex items-center gap-2">
-          {/* Meu Jiffy */}
           <button
             type="button"
-            onClick={() => void handleVoltarPortal()}
-            className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
-            title="Meu Jiffy"
-            aria-label="Ir para Meu Jiffy"
+            className="rounded-lg p-2 text-gray-600 hover:bg-gray-100 lg:hidden"
+            onClick={() => setIsMobileMenuOpen(true)}
+            aria-label="Abrir menu"
           >
-            <MdApps className="h-5 w-5" aria-hidden />
+            <MdMenu className="h-6 w-6" />
           </button>
 
-          {/* Notifications */}
-          <div ref={notificationsRef} className="relative">
+          <div className="hidden shrink-0 items-center gap-0.5 lg:flex">
             <button
               type="button"
-              className="relative rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
-              aria-label="Notificações"
-              aria-expanded={notificationsOpen}
-              aria-haspopup="true"
-              onClick={() => setNotificationsOpen(open => !open)}
+              onClick={() => void handleVoltarPortal()}
+              className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
+              title="Meu Jiffy"
+              aria-label="Ir para Meu Jiffy"
             >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                />
-              </svg>
-              {deliveryGestorConfig.temPendencia ? (
-                <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary ring-2 ring-white" />
-              ) : null}
+              <MdApps className="h-5 w-5" aria-hidden />
             </button>
-            {notificationsOpen ? (
-              <div
-                role="menu"
-                className="absolute right-0 top-full z-50 mt-2 w-72 rounded-lg border border-gray-200 bg-white py-2 text-left shadow-lg"
+
+            <div ref={notificationsRef} className="relative">
+              <button
+                type="button"
+                className="relative rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
+                aria-label="Notificações"
+                aria-expanded={notificationsOpen}
+                aria-haspopup="true"
+                onClick={() => setNotificationsOpen(open => !open)}
               >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                  />
+                </svg>
                 {deliveryGestorConfig.temPendencia ? (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="flex w-full flex-col gap-1 px-3 py-2.5 text-left transition-colors hover:bg-gray-50"
-                    onClick={() => {
-                      setNotificationsOpen(false)
-                      setEmpresaDeliveryPendenteOpen(true)
-                    }}
-                  >
-                    <span className="text-sm font-semibold text-primary-text">
-                      Delivery ainda não ativado
-                    </span>
-                    <span className="text-xs leading-snug text-secondary-text">
-                      Defina o nome da loja e o cardápio para começar a vender por
-                      entrega no gestor.
-                    </span>
-                  </button>
-                ) : (
-                  <p className="px-3 py-2 text-center text-xs text-gray-600">
-                    Você não tem mensagens no momento.
-                  </p>
-                )}
-              </div>
-            ) : null}
+                  <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary ring-2 ring-white" />
+                ) : null}
+              </button>
+              {notificationsOpen ? (
+                <div
+                  role="menu"
+                  className="absolute right-0 top-full z-50 mt-2 w-72 rounded-lg border border-gray-200 bg-white py-2 text-left shadow-lg"
+                >
+                  {deliveryGestorConfig.temPendencia ? (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="flex w-full flex-col gap-1 px-3 py-2.5 text-left transition-colors hover:bg-gray-50"
+                      onClick={() => {
+                        setNotificationsOpen(false)
+                        setEmpresaDeliveryPendenteOpen(true)
+                      }}
+                    >
+                      <span className="text-sm font-semibold text-primary-text">
+                        Delivery ainda não ativado
+                      </span>
+                      <span className="text-xs leading-snug text-secondary-text">
+                        Defina o nome da loja e o cardápio para começar a vender por
+                        entrega no gestor.
+                      </span>
+                    </button>
+                  ) : (
+                    <p className="px-3 py-2 text-center text-xs text-gray-600">
+                      Você não tem mensagens no momento.
+                    </p>
+                  )}
+                </div>
+              ) : null}
+            </div>
+
+            <Link
+              href={toGestao('/configuracoes/empresa')}
+              onMouseEnter={() => handleLinkHover('/configuracoes/empresa')}
+              prefetch={true}
+              className={`rounded-lg p-2 transition-colors hover:bg-gray-100 ${
+                isConfiguracoesModulePath(pathname ?? '')
+                  ? 'bg-gray-100 text-gray-900'
+                  : 'text-gray-600'
+              }`}
+              title="Configurações"
+              aria-label="Configurações"
+            >
+              <MdSettings className="h-5 w-5" aria-hidden />
+            </Link>
+
+            <div
+              className="flex min-w-0 max-w-[14rem] flex-col items-end justify-center border-l border-gray-200 px-2 py-1.5 text-right"
+              title={
+                isHydrated
+                  ? `${user?.getName() || 'Usuário'}${user?.getEmail() ? ` • ${user.getEmail()}` : ''}`
+                  : 'Usuário'
+              }
+            >
+              <p className="truncate text-sm font-medium text-gray-900">
+                {isHydrated ? user?.getName() || user?.getEmail() || 'Usuário' : 'Usuário'}
+              </p>
+              <p className="truncate text-xs text-gray-500">
+                {isHydrated && user?.getEmail() ? user.getEmail() : 'Admin'}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => void handleLogout()}
+              className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
+              title="Logout"
+              aria-label="Sair da conta"
+            >
+              <MdLogout className="h-5 w-5" />
+            </button>
           </div>
-
-          <Link
-            href={toGestao('/configuracoes/empresa')}
-            onMouseEnter={() => handleLinkHover('/configuracoes/empresa')}
-            prefetch={true}
-            className={`rounded-lg p-2 transition-colors hover:bg-gray-100 ${
-              isConfiguracoesModulePath(pathname ?? '')
-                ? 'bg-gray-100 text-gray-900'
-                : 'text-gray-600'
-            }`}
-            title="Configurações"
-            aria-label="Configurações"
-          >
-            <MdSettings className="h-5 w-5" aria-hidden />
-          </Link>
-
-          {/* Dados do usuário (perfil será acessado noutro local) */}
-          <div
-            className="flex min-w-0 max-w-[min(100%,14rem)] flex-col items-end justify-center pl-3 text-right sm:max-w-[min(100%,18rem)] xl:max-w-[min(100%,22rem)] border-l border-gray-200 px-2 py-1.5"
-            title={
-              isHydrated
-                ? `${user?.getName() || 'Usuário'}${user?.getEmail() ? ` • ${user.getEmail()}` : ''}`
-                : 'Usuário'
-            }
-          >
-            <p className="truncate text-sm font-medium text-gray-900">
-              {isHydrated ? user?.getName() || user?.getEmail() || 'Usuário' : 'Usuário'}
-            </p>
-            <p className="truncate text-xs text-gray-500">
-              {isHydrated && user?.getEmail() ? user.getEmail() : 'Admin'}
-            </p>
-          </div>
-
-          {/* Logout */}
-          <button
-            type="button"
-            onClick={() => void handleLogout()}
-            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Logout"
-            aria-label="Sair da conta"
-          >
-            <MdLogout className="w-5 h-5" />
-          </button>
         </div>
       </div>
       {isMobileMenuOpen && MobileMenuSection}

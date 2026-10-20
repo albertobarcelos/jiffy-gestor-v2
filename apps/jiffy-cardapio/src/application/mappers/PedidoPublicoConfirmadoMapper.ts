@@ -7,6 +7,7 @@ import type { ItemCarrinhoDelivery } from '@/src/domain/types/carrinho'
 import type { DeliveryTipoEntrega } from '@/src/domain/types/entrega'
 
 export type PedidoPublicoConfirmadoSnapshot = {
+  pedidoId: string | null
   codigoVenda: string | null
   tipoEntrega: DeliveryTipoEntrega
   modoTempo: 'imediato' | 'agendado'
@@ -126,6 +127,7 @@ export function mapPedidoPublicoCriadoParaConfirmado(
     fallback.cpfNotaFiscal.replace(/\D/g, '')
 
   return {
+    pedidoId: pedido.id,
     codigoVenda: pedido.codigoVenda,
     tipoEntrega,
     modoTempo,

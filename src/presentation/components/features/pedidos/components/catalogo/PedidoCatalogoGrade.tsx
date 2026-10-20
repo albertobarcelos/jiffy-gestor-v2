@@ -34,6 +34,7 @@ export function PedidoCatalogoGrade({
   return (
     <div
       className={`scrollbar-thin ${PEDIDO_CATALOGO_GRADE_CLASS} overflow-y-auto`}
+      style={{ backgroundColor: `${corHex}15` }}
       onScroll={handleScroll}
     >
       {produtos.map(produto => (

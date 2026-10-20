@@ -1,8 +1,10 @@
 import {
   buscarProdutoCatalogoPorIdUseCase,
+  hidratarGruposComplementosCatalogoUseCase,
+  limparCacheGruposComplementosCatalogoUseCase,
   listarGruposCatalogoVendaUseCase,
   listarProdutosCatalogoVendaPaginaUseCase,
-} from '@/src/application/use-cases/vendas/ListarProdutosCatalogoUseCase'
+} from '@/src/infrastructure/composition/pedidoUseCases'
 import type { CanalVendaCatalogo } from '@/src/domain/repositories/INovoPedidoReadRepository'
 import { Produto } from '@/src/domain/entities/Produto'
 
@@ -31,6 +33,17 @@ export async function fetchProdutoCatalogoPorId(
   menuId?: string | null
 ) {
   return buscarProdutoCatalogoPorIdUseCase.execute(produtoId, token, menuId)
+}
+
+export async function fetchHidratacaoGruposComplementosCatalogo(
+  produto: Produto,
+  token: string
+) {
+  return hidratarGruposComplementosCatalogoUseCase.execute(produto, token)
+}
+
+export function limparCacheGruposComplementosCatalogoVenda() {
+  limparCacheGruposComplementosCatalogoUseCase.execute()
 }
 
 export type { Produto }

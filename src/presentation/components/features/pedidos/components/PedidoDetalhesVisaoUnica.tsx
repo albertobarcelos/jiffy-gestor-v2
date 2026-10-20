@@ -1,31 +1,42 @@
 'use client'
 
+import { useMemo } from 'react'
 import { MdAccessTime, MdLocationOn, MdSportsMotorsports } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
-import { transformarParaReal } from '@/src/shared/utils/formatters'
+import { temSeloCanalOrigem } from '@/src/domain/policies/pedido/origemCanalMarketplace'
+import { montarMensagemWhatsappClienteKanban } from '@/src/application/delivery/montarMensagemWhatsappClienteKanban'
+import { montarMensagemWhatsappEntregadorKanban } from '@/src/application/delivery/montarMensagemWhatsappEntregadorKanban'
 import {
   formatarCelularExibicao,
   formatarEnderecoEntregaMultilinha,
   formatarHoraDetalhePedido,
   formatarHoraPrevisaoEntrega,
   formatarTipoPagamentoDetalhe,
-  rotuloCobrancaEntrega,
+  montarLinhasResumoPagamentoPedido,
+  totalCobrarNaEntregaPagamentos,
   rotuloOrigemExibicao,
 } from '@/src/application/mappers/PedidoDisplayMapper'
-import { montarMensagemWhatsappClienteKanban } from '@/src/application/delivery/montarMensagemWhatsappClienteKanban'
-import { montarMensagemWhatsappEntregadorKanban } from '@/src/application/delivery/montarMensagemWhatsappEntregadorKanban'
 import { PedidoKanbanProgressoEntrega } from '@/src/presentation/components/features/delivery/kanban-panels/PedidoKanbanProgressoEntrega'
 import type { PedidoKanbanQuickViewData } from '@/src/presentation/components/features/delivery/kanban-panels/carregarPedidoKanbanQuickView'
-import { abrirWhatsapp, telefoneValidoParaWhatsapp } from '@/src/shared/utils/whatsappLink'
+import { OrigemCanalMark } from '@/src/presentation/components/features/origem/OrigemCanalMark'
+import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
+import { abrirWhatsapp, telefoneValidoParaWhatsapp } from '@/src/shared/utils/whatsappLink'
 import { useNovoPedidoDetalheContext } from '../context/NovoPedidoDetalheContext'
 import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
 import { useNovoPedidoUIContext } from '../context/NovoPedidoUIContext'
 import {
+  pedidoDetalheEhEntrega,
+  pedidoDetalheEhRetirada,
   resolverColunaDetalhePedido,
   rotuloEtapaDetalhePedido,
   rotuloTipoAtendimento,
 } from '../utils/detalheVisaoUnica'
+import { PedidoDetalheColunaFiscal, rotulosNcmCestFiscal } from './PedidoNcmCestFiscalTexto'
+import {
+  ncmCestFiscalDoMapa,
+  useNcmCestFiscalPorProdutoIds,
+} from '@/src/presentation/hooks/pedidos/useNcmCestFiscalPorProdutoIds'
 
 function Cartao({ children }: { children: React.ReactNode }) {
   return (
@@ -92,12 +103,14 @@ export function PedidoDetalhesVisaoUnica() {
 
   const numero = detalhesPedidoMeta?.numeroVenda
   const codigo = detalhesPedidoMeta?.codigoVenda?.trim()
-  const tipoVenda = detalhesPedidoMeta?.tipoVenda
+  const tipoEntrega = detalhesPedidoMeta?.tipoEntrega
+  const pedidoEntrega = pedidoDetalheEhEntrega(tipoEntrega)
+  const pedidoRetirada = pedidoDetalheEhRetirada(tipoEntrega)
   const coluna = resolverColunaDetalhePedido({
     statusEtapaOperacional: detalhesPedidoMeta?.statusEtapaOperacional,
     detalhesEntrega: detalhesEntregaPedido,
   })
-  const etapa = rotuloEtapaDetalhePedido(coluna, tipoVenda)
+  const etapa = rotuloEtapaDetalhePedido(coluna, tipoEntrega)
   const horaCriacao = formatarHoraDetalhePedido(detalhesPedidoMeta?.dataCriacao)
   const previsao = formatarHoraPrevisaoEntrega(
     detalhesEntregaPedido?.previsaoEntrega,
@@ -105,15 +118,28 @@ export function PedidoDetalhesVisaoUnica() {
   )
   const celularCliente = detalhesEntregaPedido?.clienteCelular
   const celularExibicao = formatarCelularExibicao(celularCliente)
-  const enderecoLinhas = formatarEnderecoEntregaMultilinha(
-    detalhesEntregaPedido?.enderecoEntrega
-  )
+  const enderecoLinhas = pedidoEntrega
+    ? formatarEnderecoEntregaMultilinha(detalhesEntregaPedido?.enderecoEntrega)
+    : []
   const produtosAtivos = produtos.filter(p => !p.removido)
+  const produtoIdsDetalhe = useMemo(
+    () => produtos.filter(p => !p.removido).map(produto => produto.produtoId),
+    [produtos]
+  )
+  const { data: ncmCestFiscalPorProdutoId, isPending: ncmCestFiscalCarregando } =
+    useNcmCestFiscalPorProdutoIds(produtoIdsDetalhe)
   const tipoPagamento = formatarTipoPagamentoDetalhe(
     pagamentos,
     meiosPagamento ?? [],
     nomesMeiosPagamentoPedido ?? {}
   )
+  const linhasPagamento = montarLinhasResumoPagamentoPedido(
+    pagamentos,
+    meiosPagamento ?? [],
+    nomesMeiosPagamentoPedido ?? {},
+    transformarParaReal
+  )
+  const valorCobrarNaEntrega = totalCobrarNaEntregaPagamentos(pagamentos)
   const total =
     valorFinalVenda != null && !Number.isNaN(Number(valorFinalVenda))
       ? Number(valorFinalVenda)
@@ -124,9 +150,8 @@ export function PedidoDetalhesVisaoUnica() {
     detalhesEntregaPedido?.observacaoPedido ||
     ''
   ).trim()
-  const tipoAtendimento = String(tipoVenda ?? '').trim().toLowerCase()
-  const pedidoEntrega = tipoAtendimento === 'entrega' || tipoAtendimento === 'delivery'
-  const tipoWhatsapp = tipoAtendimento === 'retirada' ? 'retirada' : 'entrega'
+  const tipoWhatsapp = pedidoRetirada ? 'retirada' : 'entrega'
+  const rotuloModalidade = rotuloTipoAtendimento(tipoEntrega)
 
   const entregadorDaLista = entregadores?.find(
     e => e.id === detalhesEntregaPedido?.entregadorId
@@ -155,6 +180,7 @@ export function PedidoDetalhesVisaoUnica() {
     nomeEntregador: nomeEntregador || '—',
     telefoneEntregador: telefoneEntregador || null,
     produtos: produtosAtivos.map(produto => ({
+      produtoId: produto.produtoId,
       nome: produto.nome,
       quantidade: produto.quantidade,
       observacao: produto.observacao?.trim() || undefined,
@@ -165,10 +191,11 @@ export function PedidoDetalhesVisaoUnica() {
     })),
     totalItens: totalProdutos,
     taxaEntrega: taxa ?? 0,
-    totalAReceber: fluxoPagamentoEntrega === 'ja_pago' ? 0 : total,
+    totalAReceber: valorCobrarNaEntrega,
     troco,
     fluxoPagamentoEntrega,
     tipoPagamento,
+    linhasPagamento: linhasPagamento.map(linha => linha.texto),
     observacaoPedido: observacao || null,
   }
 
@@ -176,7 +203,7 @@ export function PedidoDetalhesVisaoUnica() {
     const mensagem = montarMensagemWhatsappClienteKanban({
       clienteNome: dadosWhatsapp.clienteNome,
       colunaAtual: coluna,
-      tipoVenda: tipoWhatsapp,
+      tipoEntrega: tipoWhatsapp,
       dados: dadosWhatsapp,
       enderecoEmpresa: empresa?.endereco,
       nomeEmpresa: empresa?.nomeExibicao ?? '',
@@ -196,19 +223,28 @@ export function PedidoDetalhesVisaoUnica() {
     <div className="space-y-3 bg-gray-50 py-2" role="tabpanel" aria-labelledby="tab-detalhes-info-pedido">
       <Cartao>
         <div className="flex flex-wrap items-center justify-between gap-3 pr-5">
-          {pedidoEntrega ? null : (
-            <div className="rounded-lg border-2 border-gray-800 px-3 py-1 text-2xl font-bold tabular-nums text-gray-900">
-              {numero != null ? String(numero).padStart(4, '0') : '—'}
-            </div>
-          )}
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-lg font-bold leading-tight text-gray-900">
                 {clienteNome?.trim() || 'SEM CLIENTE'}
               </p>
-              {pedidoEntrega ? (
-                <span className="rounded-md border-2 border-gray-800 px-2 py-0.5 text-base font-bold tabular-nums leading-none text-gray-900">
-                  {numero != null ? String(numero).padStart(4, '0') : '—'}
+              <span className="rounded-md border-2 border-gray-800 px-2 py-0.5 text-base font-bold tabular-nums leading-none text-gray-900">
+                {numero != null ? String(numero).padStart(4, '0') : '—'}
+              </span>
+              {codigo ? (
+                <span className="rounded-md border-2 border-gray-800 px-2 py-0.5 text-base font-bold leading-none text-gray-900">
+                  #{codigo}
+                </span>
+              ) : null}
+              {pedidoRetirada || pedidoEntrega ? (
+                <span
+                  className={
+                    pedidoRetirada
+                      ? 'rounded-md border-2 border-amber-700 bg-amber-50 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-amber-900'
+                      : 'rounded-md border-2 border-sky-700 bg-sky-50 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-sky-900'
+                  }
+                >
+                  {rotuloModalidade}
                 </span>
               ) : null}
               {celularExibicao !== '—' ? (
@@ -219,14 +255,16 @@ export function PedidoDetalhesVisaoUnica() {
                 />
               ) : null}
             </div>
-            <p className="mt-1 text-sm text-gray-600">
-              Feito às {horaCriacao}
-              {codigo ? ` · #${codigo}` : ''}
-              {origem ? ` · ${rotuloOrigemExibicao(origem)}` : ''}
-              {' · '}
-              {rotuloTipoAtendimento(tipoVenda)}
+            <p className="mt-1 inline-flex flex-wrap items-center gap-x-1.5 text-sm text-gray-600">
+              <span>Feito às {horaCriacao}</span>
+              {codigo ? <span>· #{codigo}</span> : null}
+              {temSeloCanalOrigem(origem) ? (
+                <OrigemCanalMark origem={origem} size={24} />
+              ) : origem ? (
+                <span>· {rotuloOrigemExibicao(origem)}</span>
+              ) : null}
             </p>
-            {previsao !== '—' ? (
+            {pedidoEntrega && previsao !== '—' ? (
               <span className="mt-2 inline-flex items-center gap-1 text-sm text-gray-700">
                 <MdAccessTime className="h-4 w-4 text-primary" aria-hidden />
                 Entrega prevista: {previsao}
@@ -267,7 +305,7 @@ export function PedidoDetalhesVisaoUnica() {
         </div>
       </Cartao>
 
-      {enderecoLinhas.length > 0 && enderecoLinhas[0] !== '—' ? (
+      {pedidoEntrega && enderecoLinhas.length > 0 && enderecoLinhas[0] !== '—' ? (
         <Cartao>
           <div className="flex items-start gap-2">
             <MdLocationOn className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden />
@@ -291,7 +329,12 @@ export function PedidoDetalhesVisaoUnica() {
           <p className="text-sm text-gray-500">Nenhum produto</p>
         ) : (
           <ul className="space-y-2">
-            {produtosAtivos.map(produto => (
+            {produtosAtivos.map(produto => {
+              const fiscal = rotulosNcmCestFiscal(
+                ncmCestFiscalDoMapa(ncmCestFiscalPorProdutoId, produto.produtoId),
+                ncmCestFiscalCarregando
+              )
+              return (
               <li
                 key={produto.produtoLancadoId ?? `${produto.produtoId}-${produto.nome}`}
                 className="flex items-start justify-between gap-3 text-sm"
@@ -300,6 +343,26 @@ export function PedidoDetalhesVisaoUnica() {
                   <p className="text-gray-900">
                     <span className="font-semibold">{produto.quantidade}x</span> {produto.nome}
                   </p>
+                  <div className="mt-0.5 flex gap-3 text-xs">
+                    <span className="inline-flex min-w-[7.5rem] items-baseline gap-1">
+                      <span className="text-gray-500">NCM</span>
+                      <PedidoDetalheColunaFiscal
+                        texto={fiscal.ncm}
+                        vazio={fiscal.ncmVazio}
+                        indisponivel={fiscal.indisponivel}
+                        className="text-left"
+                      />
+                    </span>
+                    <span className="inline-flex min-w-[7.5rem] items-baseline gap-1">
+                      <span className="text-gray-500">CEST</span>
+                      <PedidoDetalheColunaFiscal
+                        texto={fiscal.cest}
+                        vazio={fiscal.cestVazio}
+                        indisponivel={fiscal.indisponivel}
+                        className="text-left"
+                      />
+                    </span>
+                  </div>
                   {produto.observacao?.trim() ? (
                     <p className="text-xs text-gray-500">Obs: {produto.observacao.trim()}</p>
                   ) : null}
@@ -313,7 +376,8 @@ export function PedidoDetalhesVisaoUnica() {
                   {transformarParaReal(produto.valorFinal ?? produto.valorUnitario)}
                 </span>
               </li>
-            ))}
+              )
+            })}
           </ul>
         )}
 
@@ -324,7 +388,7 @@ export function PedidoDetalhesVisaoUnica() {
         ) : null}
 
         <div className="mt-3 space-y-1 border-t border-gray-100 pt-2 text-sm">
-          {taxa != null && taxa > 0 ? (
+          {pedidoEntrega && taxa != null && taxa > 0 ? (
             <div className="flex justify-between text-gray-700">
               <span>Taxa de entrega</span>
               <span className="tabular-nums">{transformarParaReal(taxa)}</span>
@@ -334,10 +398,24 @@ export function PedidoDetalhesVisaoUnica() {
             <span>Total</span>
             <span className="tabular-nums">{transformarParaReal(total)}</span>
           </div>
-          <p className="pt-1 text-xs text-gray-600">
-            {rotuloCobrancaEntrega(fluxoPagamentoEntrega)}
-            {tipoPagamento !== '—' ? ` · ${tipoPagamento}` : ''}
-          </p>
+          {linhasPagamento.length > 0 ? (
+            <div className="space-y-0.5 pt-1">
+              {linhasPagamento.map(linha => (
+                <p
+                  key={linha.texto}
+                  className={
+                    linha.kind === 'cobrar'
+                      ? 'text-xs font-semibold text-amber-700'
+                      : 'text-xs font-semibold text-green-700'
+                  }
+                >
+                  {linha.texto}
+                </p>
+              ))}
+            </div>
+          ) : (
+            <p className="pt-1 text-xs text-gray-600">{tipoPagamento}</p>
+          )}
         </div>
       </Cartao>
     </div>

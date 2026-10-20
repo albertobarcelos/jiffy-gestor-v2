@@ -88,6 +88,8 @@ export interface CriarVendaGestorApiRequest {
   pagamentos?: unknown[]
   pagamento?: CriarVendaGestorPagamentoApi
   observacoes?: string[]
+  /** Estação deste PC (caixa / impressão). Enviar no create de balcão. */
+  estacaoId?: string
 }
 
 export interface MoradaEntregaSelecionadaApi {

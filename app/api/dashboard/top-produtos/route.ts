@@ -11,6 +11,12 @@ import {
   obterDetalhesVendasFinalizadasPeriodo,
 } from '@/src/infrastructure/dashboard/dashboardVendasPeriodoCache'
 import { montarParamsDashboardVendasPeriodo } from '@/src/infrastructure/dashboard/montarParamsDashboardPeriodo'
+import { buscarPedidosDeliveryPeriodoDashboard } from '@/src/infrastructure/dashboard/buscarPedidosDeliveryPeriodoDashboard'
+import {
+  buscarDetalhesPedidosDeliveryDashboard,
+  idsPedidosDeliveryFinalizados,
+  mesclarAgregacaoPorProdutoId,
+} from '@/src/infrastructure/dashboard/buscarDetalhesPedidosDeliveryDashboard'
 
 const TOP_PRODUTOS_CARD_LIMIT = 10
 
@@ -44,21 +50,47 @@ export async function GET(request: NextRequest) {
       paramsComIntervalo: params,
     })
 
-    const detalhes = await obterDetalhesVendasFinalizadasPeriodo({
-      apiClient,
-      headers,
-      paramsComIntervalo: params,
-      cacheKey,
-    })
+    const inicioIso = params.get('dataFinalizacaoInicial') ?? ''
+    const fimIso = params.get('dataFinalizacaoFinal') ?? ''
 
-    if (detalhes.length === 0) {
+    const [detalhes, deliveryDetalhes] = await Promise.all([
+      obterDetalhesVendasFinalizadasPeriodo({
+        apiClient,
+        headers,
+        paramsComIntervalo: params,
+        cacheKey,
+      }),
+      (async () => {
+        try {
+          const pedidos = await buscarPedidosDeliveryPeriodoDashboard({
+            apiClient,
+            headers,
+            inicioIso,
+            fimIso,
+          })
+          return buscarDetalhesPedidosDeliveryDashboard({
+            apiClient,
+            headers,
+            pedidoIds: idsPedidosDeliveryFinalizados(pedidos),
+          })
+        } catch (err) {
+          console.warn('Dashboard: não foi possível somar delivery no top produtos', err)
+          return []
+        }
+      })(),
+    ])
+
+    if (detalhes.length === 0 && deliveryDetalhes.length === 0) {
       return NextResponse.json({
         items: [] as Array<{ produto: string; quantidade: number; valorTotal: number }>,
         totaisPeriodo: { quantidadeTotal: 0, valorTotal: 0 },
       })
     }
 
-    const aggregationByProdutoId = agregarProdutosLancadosPorProdutoId(detalhes)
+    const aggregationByProdutoId = mesclarAgregacaoPorProdutoId(
+      agregarProdutosLancadosPorProdutoId(detalhes),
+      agregarProdutosLancadosPorProdutoId(deliveryDetalhes)
+    )
     const produtoIds = Array.from(aggregationByProdutoId.keys())
 
     const miniMap = await buscarCardapioMiniPorProdutoIds({
@@ -76,7 +108,8 @@ export async function GET(request: NextRequest) {
       }))
       .sort((a, b) => b.quantidade - a.quantidade)
 
-    const valorTotalPeriodoVendas = somarValorFinalDasVendas(detalhes)
+    const valorTotalPeriodoVendas =
+      somarValorFinalDasVendas(detalhes) + somarValorFinalDasVendas(deliveryDetalhes)
     let quantidadeTotalPeriodo = 0
     for (const row of todasOrdenadas) {
       quantidadeTotalPeriodo += row.quantidade

@@ -4,8 +4,11 @@ import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQu
 import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { Complemento } from '@/src/domain/entities/Complemento'
+import { hidratarComplemento } from '@/src/application/services/cadastroImagem'
+import { complementoImagemMedia } from '@/src/infrastructure/api/deliveryMediaApi'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { invalidarCatalogoVendaQueries } from '@/src/presentation/cache/catalogoVendaQueryCache'
 
 interface ComplementosQueryParams {
   q?: string
@@ -50,7 +53,9 @@ export function useComplementosInfinite(params: Omit<ComplementosQueryParams, 'o
 
       const data: ComplementosResponse = await response.json()
 
-      const complementos = (data.items || []).map((item: any) => Complemento.fromJSON(item))
+      const complementos = (data.items || []).map((item: any) =>
+        hidratarComplemento(complementoImagemMedia, Complemento.fromJSON(item))
+      )
       const hasMore = complementos.length === limit
       const nextOffset = hasMore ? pageParam + complementos.length : null
 
@@ -93,7 +98,9 @@ export function useComplementos(params: { ativo?: boolean; limit?: number } = {}
       }
 
       const data = await response.json()
-      return (data.items || []).map((item: any) => Complemento.fromJSON(item))
+      return (data.items || []).map((item: any) =>
+        hidratarComplemento(complementoImagemMedia, Complemento.fromJSON(item))
+      )
     },
     { staleTime: 1000 * 60 * 10 }
   )
@@ -117,7 +124,7 @@ export function useComplemento(id: string) {
       }
 
       const data = await response.json()
-      return Complemento.fromJSON(data)
+      return hidratarComplemento(complementoImagemMedia, Complemento.fromJSON(data))
     },
     { staleTime: 1000 * 60 * 5, enabled: !!id }
   )
@@ -155,6 +162,10 @@ export function useComplementoMutation() {
     {
       onSuccess: (_, variables) => {
         queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'complementos'] })
+        invalidarCatalogoVendaQueries(queryClient, empresaId, {
+          tipo: 'complemento',
+          complementoId: variables.complementoId,
+        })
         showToast.success(variables.isUpdate ? 'Complemento atualizado com sucesso!' : 'Complemento criado com sucesso!')
       },
     }

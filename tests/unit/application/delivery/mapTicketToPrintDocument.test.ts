@@ -43,15 +43,6 @@ const ticketExpedicao: VendaGestorTicket = {
   ],
 }
 
-const ticketProducao: VendaGestorTicket = {
-  ticketId: 't-prod-1',
-  tipoCupom: 'producao',
-  impressoraId: 'imp-cozinha',
-  impressoraNome: 'Cozinha',
-  copias: 1,
-  itens: [{ nomeProduto: 'X-Bacon', quantidade: 2, valorFinal: 40 }],
-}
-
 describe('buildPrintJobId', () => {
   it('gera id estável para o mesmo ticket', () => {
     const a = buildPrintJobId({
@@ -96,21 +87,106 @@ describe('mapTicketToPrintDocument', () => {
     expect(
       doc.content.some(
         b =>
-          (b.type === 'item' && b.name === 'X-Bacon' && b.quantity === 2) ||
-          (b.type === 'row' && (b.left ?? '').includes('X-Bacon'))
+          b.type === 'text' &&
+          (b.text ?? '').includes('Loja Teste') &&
+          b.bold === true &&
+          b.size === 'normal' &&
+          b.align === 'center'
       )
     ).toBe(true)
-    expect(doc.content.some(b => b.type === 'text' && b.text.includes('Ponto médio'))).toBe(true)
+    expect(
+      doc.content.some(
+        b =>
+          b.type === 'text' &&
+          b.text === 'ENTREGA#9842 #ABC123' &&
+          b.bold === true &&
+          b.size === 'double' &&
+          b.align === 'center'
+      )
+    ).toBe(true)
+    expect(doc.content.some(b => b.type === 'text' && (b.text ?? '').includes('Pedido #9842 Entrega'))).toBe(
+      false
+    )
+    expect(
+      doc.content.some(
+        b => b.type === 'row' && b.left === '2x X-BACON' && (b.right ?? '').includes('40,00') && b.size === 'normal'
+      )
+    ).toBe(true)
+    expect(
+      doc.content.some(
+        b =>
+          ((b.type === 'row' && (b.left ?? '').includes('BACON EXTRA')) ||
+            (b.type === 'text' && (b.text ?? '').includes('BACON EXTRA'))) &&
+          (b.size === 'small' || b.size === 'normal')
+      )
+    ).toBe(true)
+    expect(doc.content.some(b => b.type === 'text' && (b.text ?? '').includes('Obs: Ponto medio'))).toBe(
+      true
+    )
+    expect(doc.content.some(b => b.type === 'item')).toBe(false)
+    expect(doc.content.some(b => b.size === 'double' && b.type === 'row' && (b.left ?? '').includes('X-BACON'))).toBe(
+      false
+    )
     expect(doc.content.some(b => b.type === 'qrcode' && b.data.includes('wa.me'))).toBe(true)
+    expect(doc.content.some(b => b.type === 'text' && (b.text ?? '').startsWith('Data:'))).toBe(
+      true
+    )
+    expect(
+      doc.content.some(b => b.type === 'text' && (b.text ?? '').startsWith('Data Prevista:'))
+    ).toBe(true)
     expect(doc.content.at(-1)?.type).toBe('cut')
   })
 
-  it('cupom de produção omite valores, endereço e QR', () => {
-    const doc = mapTicketToPrintDocument(root, ticketProducao)
-    expect(doc.content.some(b => b.type === 'text' && b.text.includes('ENDERECO'))).toBe(false)
-    expect(doc.content.some(b => b.type === 'text' && b.text === 'RESUMO PEDIDO')).toBe(false)
+  it('retirada não imprime QR de WhatsApp', () => {
+    const doc = mapTicketToPrintDocument(
+      { ...root, tipoEntrega: 'retirada' },
+      ticketExpedicao
+    )
     expect(doc.content.some(b => b.type === 'qrcode')).toBe(false)
-    expect(doc.content.some(b => b.type === 'item' && b.name === 'X-Bacon')).toBe(true)
+    expect(doc.content.some(b => (b.text ?? '').includes('WhatsApp'))).toBe(false)
+    expect(
+      doc.content.some(
+        b => b.type === 'row' && b.left === '2x X-BACON' && b.bold === true && b.size === 'double'
+      )
+    ).toBe(true)
+  })
+
+  it('expedição imprime 0,00 no complemento gratuito e ordena * antes dos adicionais', () => {
+    const doc = mapTicketToPrintDocument(root, {
+      ...ticketExpedicao,
+      itens: [
+        {
+          nomeProduto: 'X-Bacon',
+          quantidade: 1,
+          valorFinal: 40,
+          complementos: [
+            { nome: 'Bacon extra', quantidade: 1, tipoImpactoPreco: 'aumenta', impressao: { valorFinal: 4 } },
+            { nome: 'Alface', quantidade: 1, tipoImpactoPreco: 'nenhum' },
+          ],
+        },
+      ],
+    })
+    const linhas = doc.content.filter(b => b.type === 'row' || b.type === 'text')
+    const idxAlface = linhas.findIndex(
+      b =>
+        (b.type === 'row' && (b.left ?? '').includes('ALFACE')) ||
+        (b.type === 'text' && (b.text ?? '').includes('ALFACE'))
+    )
+    const idxBacon = linhas.findIndex(
+      b =>
+        (b.type === 'row' && (b.left ?? '').includes('BACON EXTRA')) ||
+        (b.type === 'text' && (b.text ?? '').includes('BACON EXTRA'))
+    )
+    expect(idxAlface).toBeGreaterThanOrEqual(0)
+    expect(idxBacon).toBeGreaterThan(idxAlface)
+    expect(
+      doc.content.some(
+        b =>
+          b.type === 'row' &&
+          (b.left ?? '').includes('ALFACE') &&
+          (b.right ?? '').includes('0,00')
+      )
+    ).toBe(true)
   })
 
   it('58 mm reduz colunas', () => {

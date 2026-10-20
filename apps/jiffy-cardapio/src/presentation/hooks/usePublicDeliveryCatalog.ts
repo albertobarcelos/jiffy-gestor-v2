@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import {
   useInfiniteQuery,
   useQuery,
@@ -23,6 +23,7 @@ import { create } from 'zustand'
 import {
   CATALOGO_GRUPOS_PAGE_LIMIT,
   CATALOGO_QUERY_STALE_MS,
+  getCatalogoInfiniteNextPageParam,
   publicDeliveryCatalogInfiniteQueryKey,
   publicDeliveryCatalogQueryKey,
   publicDeliveryMeiosPagamentoQueryKey,
@@ -200,7 +201,7 @@ export function usePublicDeliveryCatalogInfinite(slug: string, enabled = true) {
       window.removeEventListener(EMPRESA_DELIVERY_UPDATED_EVENT, onDeliveryUpdated)
   }, [queryClient, slug])
 
-  return useInfiniteQuery<GetCatalogoPublicoResponseDTO, Error>({
+  const query = useInfiniteQuery<GetCatalogoPublicoResponseDTO, Error>({
     queryKey: publicDeliveryCatalogInfiniteQueryKey(slug),
     queryFn: async ({ pageParam }) => {
       const offset = pageParam as number
@@ -212,19 +213,39 @@ export function usePublicDeliveryCatalogInfinite(slug: string, enabled = true) {
       return data
     },
     initialPageParam: 0,
-    getNextPageParam: (lastPage, _pages, lastPageParam) => {
-      if (!lastPage.catalogo.paginacao.hasNext) return undefined
-      return (lastPageParam as number) + lastPage.catalogo.paginacao.limit
-    },
+    getNextPageParam: getCatalogoInfiniteNextPageParam,
     enabled: enabled && !!slug,
     staleTime: CATALOGO_QUERY_STALE_MS,
     retry: catalogoRetry,
   })
+
+  /**
+   * SSR/dehydrate entrega a 1ª página sem passar pelo queryFn do client.
+   * Sem este sync, o sessionStorage antigo sobrescreve os complementos frescos.
+   */
+  useEffect(() => {
+    if (!slug) return
+    const catalogo = query.data?.pages[0]?.catalogo
+    if (!catalogo) return
+    persistirComplementosPrimeiraPagina(slug, 0, catalogo, salvarComplementos)
+  }, [slug, query.data, salvarComplementos])
+
+  return query
+}
+
+function catalogoAutoFetchBatchSize(): number {
+  if (typeof window === 'undefined') return 3
+  const coarse =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: coarse)').matches
+  const narrow = window.innerWidth > 0 && window.innerWidth < 768
+  return coarse || narrow ? 1 : 3
 }
 
 /**
- * Carrega as páginas restantes do catálogo em lotes paralelos (até 3),
- * usando `totalPages` da 1ª página — evita waterfall estritamente sequencial.
+ * Carrega as páginas restantes do catálogo em lotes paralelos (até 3 no desktop,
+ * 1 no mobile), usando `totalPages` da 1ª página — evita waterfall estritamente
+ * sequencial. Em mobile aguarda idle antes do primeiro lote.
  */
 export function useAutoFetchCatalogoGrupos(
   slug: string,
@@ -245,8 +266,10 @@ export function useAutoFetchCatalogoGrupos(
     if (totalPages <= 1 || pagesCarregadas >= totalPages) return
 
     let cancelled = false
+    let idleHandle: number | null = null
+    let timeoutHandle: ReturnType<typeof setTimeout> | null = null
     const queryKey = publicDeliveryCatalogInfiniteQueryKey(slug)
-    const BATCH = 3
+    const BATCH = catalogoAutoFetchBatchSize()
 
     const run = async () => {
       const loaded = new Set(
@@ -304,9 +327,25 @@ export function useAutoFetchCatalogoGrupos(
       }
     }
 
-    void run()
+    const schedule = () => {
+      if (cancelled) return
+      void run()
+    }
+
+    if (BATCH === 1 && typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      idleHandle = window.requestIdleCallback(schedule, { timeout: 1500 })
+    } else if (BATCH === 1) {
+      timeoutHandle = setTimeout(schedule, 200)
+    } else {
+      schedule()
+    }
+
     return () => {
       cancelled = true
+      if (idleHandle != null && typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+        window.cancelIdleCallback(idleHandle)
+      }
+      if (timeoutHandle) clearTimeout(timeoutHandle)
     }
   }, [
     slug,
@@ -321,30 +360,57 @@ export function useAutoFetchCatalogoGrupos(
 }
 
 /**
- * Garante cache de complementos quando ausente (modal/carrinho).
+ * Garante cache de complementos quando ausente ou incompleto (modal/carrinho).
  * Reusa a infinite query do catálogo (mesma query key) — sem GET offset=0 paralelo.
+ * `forceRefetch`: limpa cache local e busca de novo (ex.: produto com grupos não resolvidos).
  */
-export function useEnsureComplementosCatalogo(slug: string, enabled = true) {
+export function useEnsureComplementosCatalogo(
+  slug: string,
+  enabled = true,
+  options?: { forceRefetch?: boolean }
+) {
+  const forceRefetch = options?.forceRefetch ?? false
   const cache = usePublicDeliveryComplementosStore(s => s.porSlug[slug] ?? null)
   const salvarComplementos = usePublicDeliveryComplementosStore(s => s.salvar)
   const hidratarDoStorage = usePublicDeliveryComplementosStore(s => s.hidratarDoStorage)
+  const queryClient = useQueryClient()
+  const forceRefetchFeitoRef = useRef(false)
+
+  useEffect(() => {
+    forceRefetchFeitoRef.current = false
+  }, [slug])
 
   useEffect(() => {
     if (slug) hidratarDoStorage(slug)
   }, [slug, hidratarDoStorage])
 
-  const precisaCatalogo = Boolean(enabled && slug && !cache)
+  useEffect(() => {
+    if (!forceRefetch || !slug || forceRefetchFeitoRef.current) return
+    forceRefetchFeitoRef.current = true
+    limparComplementosStorage(slug)
+    usePublicDeliveryComplementosStore.setState(state => {
+      if (!state.porSlug[slug]) return state
+      const next = { ...state.porSlug }
+      delete next[slug]
+      return { porSlug: next }
+    })
+    void queryClient.invalidateQueries({
+      queryKey: publicDeliveryCatalogInfiniteQueryKey(slug),
+    })
+  }, [forceRefetch, slug, queryClient])
+
+  const precisaCatalogo = Boolean(enabled && slug && (!cache || forceRefetch))
   const infinite = usePublicDeliveryCatalogInfinite(slug, precisaCatalogo)
 
   useEffect(() => {
-    if (!slug || cache) return
+    if (!slug) return
     const catalogo = infinite.data?.pages[0]?.catalogo
     if (!catalogo) return
     persistirComplementosPrimeiraPagina(slug, 0, catalogo, salvarComplementos)
-  }, [slug, cache, infinite.data, salvarComplementos])
+  }, [slug, infinite.data, salvarComplementos])
 
   return {
-    isLoading: Boolean(precisaCatalogo && !cache && infinite.isLoading),
+    isLoading: Boolean(precisaCatalogo && (!cache || forceRefetch) && infinite.isLoading),
     isFetching: infinite.isFetching,
     isError: infinite.isError,
     error: infinite.error,

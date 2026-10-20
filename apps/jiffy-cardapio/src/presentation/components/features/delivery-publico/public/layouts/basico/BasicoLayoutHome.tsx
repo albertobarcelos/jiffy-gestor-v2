@@ -2,7 +2,6 @@
 
 import { useRef } from 'react'
 import { DeliveryLojaHeader } from '../../../shared/components/DeliveryLojaHeader'
-import { DeliveryStatusHorario } from '../../../shared/components/DeliveryStatusHorario'
 import { DeliverySecaoGrupo } from '../../../shared/components/DeliverySecaoGrupo'
 import { DeliveryPedidoFooter } from '../../../shared/components/DeliveryPedidoFooter'
 import { DeliveryPublicoLojaFooter } from '../../../shared/components/DeliveryPublicoLojaFooter'
@@ -22,6 +21,8 @@ export function BasicoLayoutHome({
   onProdutoClick,
   onProdutoAddRapido,
   onPedidoClick,
+  onMeuPedidoClick,
+  onInformacoesClick,
   quantidadePorProduto,
   carrinhoThumbs,
   carrinhoThumbsBounceKey,
@@ -31,21 +32,21 @@ export function BasicoLayoutHome({
   const catalogRootRef = useRef<HTMLDivElement>(null)
 
   return (
-    <div ref={catalogRootRef} className="delivery-basico-catalog-root flex min-h-full flex-col pb-24">
+    <div ref={catalogRootRef} className="delivery-basico-catalog-root delivery-home-bottom-spacer flex min-h-full flex-col">
       <DeliveryBasicoTopNav
         config={config}
         carrinhoQuantidade={viewModel.carrinho.quantidadeItens}
+        disponivel={viewModel.disponivel}
+        statusMensagem={viewModel.statusMensagem}
+        statusDetalheHorario={viewModel.statusDetalheHorario}
         interactive={interactive}
         onPedidoClick={onPedidoClick}
+        onMeuPedidoClick={onMeuPedidoClick}
+        onInformacoesClick={onInformacoesClick}
       />
 
       <div className="delivery-basico-content-column flex min-h-0 w-full flex-1 flex-col">
         <DeliveryLojaHeader config={config} />
-        <DeliveryStatusHorario
-          disponivel={viewModel.disponivel}
-          horarioTexto={viewModel.horarioTexto}
-          interactive={interactive}
-        />
         <DeliveryBasicoCatalogToolbar
           config={config}
           grupos={filtered.grupos}
@@ -53,7 +54,6 @@ export function BasicoLayoutHome({
           interactive={interactive}
           catalogRootRef={catalogRootRef}
           onBuscaChange={onBuscaChange}
-          onGrupoClick={onGrupoClick}
         />
         <div className="flex-1">
           {filtered.grupos.map((grupo, index) => (

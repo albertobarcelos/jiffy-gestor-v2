@@ -7,5 +7,5 @@ interface PedidoPagamentoStepProps {
 }
 
 export function PedidoPagamentoStep({ children }: PedidoPagamentoStepProps) {
-  return <div className="space-y-2">{children}</div>
+  return <div className="space-y-4">{children}</div>
 }

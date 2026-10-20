@@ -12,7 +12,7 @@ export function usePedidoCatalogoColunaView(input: {
   isLoadingGruposVenda: boolean
   isLoadingBuscaProdutos: boolean
   isLoadingProdutos: boolean
-  tipoInicioPedido: 'balcao' | 'entrega'
+  tipoInicioPedido: 'balcao' | 'delivery'
 }) {
   const emBusca = input.buscaProdutoTexto.length >= MIN_CARACTERES_BUSCA_CATALOGO_VENDA
   const podeExibirProdutos = emBusca || !!input.grupoSelecionadoId
@@ -24,9 +24,9 @@ export function usePedidoCatalogoColunaView(input: {
   const isLoadingAtual = emBusca ? input.isLoadingBuscaProdutos : input.isLoadingProdutos
   const isLoadingCatalogo = input.isLoadingGruposVenda || (podeExibirProdutos && isLoadingAtual)
   const mensagemMenuIndisponivel =
-    input.tipoInicioPedido === 'entrega'
-      ? 'Configure o menu em Configurações → Delivery.'
-      : 'Configure o menu em Configurações → Empresa.'
+    input.tipoInicioPedido === 'delivery'
+      ? 'Escolha o cardápio na engrenagem do quadro Delivery.'
+      : 'Escolha o cardápio na engrenagem do quadro Balcão.'
 
   return {
     emBusca,

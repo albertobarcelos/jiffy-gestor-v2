@@ -6,9 +6,9 @@ import type {
 import type { CriarPedidoDeliveryApiRequest } from '@/src/application/dto/api/pedidoDeliveryApi'
 import { buildCriarPedidoDeliveryPayload } from '@/src/application/mappers/CriarPedidoDeliveryPayloadMapper'
 import { parsePedidoDeliveryApiResponse } from '@/src/application/mappers/PedidoDeliveryApiNormalizer'
-import { atualizarCobrancasPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/AtualizarCobrancasPedidoDeliveryUseCase'
+import type { AtualizarCobrancasPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/AtualizarCobrancasPedidoDeliveryUseCase'
 import type { INovoPedidoReadRepository } from '@/src/domain/repositories/INovoPedidoReadRepository'
-import { novoPedidoReadRepository } from '@/src/infrastructure/api/repositories/NovoPedidoReadRepository'
+import { pagamentoPendenteNaEntrega } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import type { FluxoPagamentoEntrega } from '@/src/domain/types/vendaDetalhe'
 
 export type CriarPedidoDeliveryMutateFn = (payload: CriarPedidoDeliveryPayload) => Promise<unknown>
@@ -33,8 +33,8 @@ function mensagemErro(error: unknown): string {
 
 export class CriarPedidoDeliveryUseCase {
   constructor(
-    private readonly cobrancasUseCase = atualizarCobrancasPedidoDeliveryUseCase,
-    private readonly repo: INovoPedidoReadRepository = novoPedidoReadRepository
+    private readonly cobrancasUseCase: Pick<AtualizarCobrancasPedidoDeliveryUseCase, 'execute'>,
+    private readonly repo: INovoPedidoReadRepository
   ) {}
 
   buildPayload(input: CriarPedidoDeliveryInputDTO): CriarPedidoDeliveryResultDTO {
@@ -48,8 +48,13 @@ export class CriarPedidoDeliveryUseCase {
     token?: string
   ): Promise<unknown> {
     const { payload } = this.buildPayload(input)
-    const jaPago = !input.entregaComCobrancaPeloEntregador
-    const omitirCobrancasNoPost = deveOmitirCobrancasNoPostCreate(payload, jaPago)
+    const temCobrancaAntecipada = input.pagamentos.some(
+      p => !pagamentoPendenteNaEntrega(p)
+    )
+    const omitirCobrancasNoPost = deveOmitirCobrancasNoPostCreate(
+      payload,
+      temCobrancaAntecipada
+    )
 
     const createPayload: CriarPedidoDeliveryApiRequest = omitirCobrancasNoPost
       ? { ...payload, cobrancas: undefined }

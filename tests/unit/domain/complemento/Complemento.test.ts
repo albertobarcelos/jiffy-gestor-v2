@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { Complemento } from '@/src/domain/entities/Complemento'
 
 describe('Complemento.parseAtivo', () => {
@@ -39,5 +39,52 @@ describe('Complemento.fromJSON', () => {
 
   it('ativo: "0" → inativo', () => {
     expect(Complemento.fromJSON({ ...base, ativo: '0' }).isAtivo()).toBe(false)
+  })
+
+  it('lê imagemUrl solto', () => {
+    expect(
+      Complemento.fromJSON({ ...base, imagemUrl: ' https://cdn/comp.jpg ' }).getImagemUrl()
+    ).toBe('https://cdn/comp.jpg')
+  })
+
+  it('lê image.imageUrl do backend de mídia', () => {
+    expect(
+      Complemento.fromJSON({
+        ...base,
+        image: { imageId: 'img-1', imageUrl: 'https://cdn/nested.jpg' },
+      }).getImagemUrl()
+    ).toBe('https://cdn/nested.jpg')
+  })
+
+  it('lê image.imageUrl dentro de data', () => {
+    expect(
+      Complemento.fromJSON({
+        data: {
+          ...base,
+          image: { imageUrl: 'https://cdn/wrap.jpg' },
+        },
+      }).getImagemUrl()
+    ).toBe('https://cdn/wrap.jpg')
+  })
+})
+
+describe('Complemento.withImagemUrl', () => {
+  const base = Complemento.create('1', 'Queijo')
+
+  it('grava URL persistida sem alterar os demais campos', () => {
+    const next = base.withImagemUrl(' https://cdn/q.jpg ')
+    expect(next).not.toBe(base)
+    expect(next.getId()).toBe('1')
+    expect(next.getNome()).toBe('Queijo')
+    expect(next.getImagemUrl()).toBe('https://cdn/q.jpg')
+  })
+
+  it('mesma URL → mesma instância', () => {
+    const withUrl = base.withImagemUrl('https://cdn/q.jpg')
+    expect(withUrl.withImagemUrl('https://cdn/q.jpg')).toBe(withUrl)
+  })
+
+  it('null remove a foto', () => {
+    expect(base.withImagemUrl('https://cdn/q.jpg').withImagemUrl(null).getImagemUrl()).toBeNull()
   })
 })

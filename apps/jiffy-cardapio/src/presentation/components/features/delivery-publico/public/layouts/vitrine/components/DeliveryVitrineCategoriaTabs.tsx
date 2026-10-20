@@ -22,7 +22,7 @@ export function DeliveryVitrineCategoriaTabs({
 
   return (
     <div
-      className="sticky top-0 z-20 border-b bg-white"
+      className="z-20 border-b bg-white"
       style={{ borderColor: 'var(--delivery-card-border)' }}
     >
       <div className="flex items-center gap-2 px-2 @sm:px-3">

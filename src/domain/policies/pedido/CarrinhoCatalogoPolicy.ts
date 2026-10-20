@@ -1,9 +1,89 @@
-import type { Produto } from '@/src/domain/entities/Produto'
+import { Produto } from '@/src/domain/entities/Produto'
 import type { ComplementoSelecionado, ProdutoSelecionado } from '@/src/domain/types/pedido'
 import {
   normalizarUnidadeMedidaProduto,
   type UnidadeMedidaProduto,
 } from '@/src/shared/types/unidadeMedidaProduto'
+import type { MenuProdutoPermissoes } from '@/src/shared/utils/menuProdutoPermissoes'
+
+export type CarregarProdutoCatalogoOptions = {
+  forceRefresh?: boolean
+  /** Não reutilizar snapshot slim da grade — precisa dos itens dos grupos do produto do menu. */
+  requireComplementos?: boolean
+}
+
+export function produtoTemComplementosCarregados(
+  produto: Pick<Produto, 'getGruposComplementos'>
+): boolean {
+  const grupos = produto.getGruposComplementos()
+  if (grupos.length === 0) return false
+  return grupos.every(
+    grupo => (grupo.complementos?.length ?? 0) > 0 && grupo.limitesDoCadastro === true
+  )
+}
+
+/** Grade slim já trouxe os ids dos grupos do menu — dá para hidratar só eles. */
+export function produtoTemIdsGruposComplementoParaHidratacao(
+  produto: Pick<Produto, 'getGruposComplementos'>
+): boolean {
+  return produto.getGruposComplementos().some(grupo => grupo.id.trim() !== '')
+}
+
+/**
+ * Snapshot da grade do menu traz só o resumo dos grupos (id/nome).
+ * Só reutiliza cache quando os itens já foram hidratados a partir do produto do menu.
+ */
+export function cacheProdutoCatalogoAtendePedido(
+  produto: Produto | undefined,
+  options?: CarregarProdutoCatalogoOptions
+): produto is Produto {
+  if (options?.forceRefresh) return false
+  if (!produto) return false
+  if (options?.requireComplementos && !produtoTemComplementosCarregados(produto)) {
+    return false
+  }
+  return true
+}
+
+/**
+ * @deprecated Não usar no lançamento.
+ * Hidratar só com GET do grupo ignora valor/ativo/ordem efetivos do cardápio
+ * (`ComplementoMenuConfig`). O pedido deve ir por `buscarProdutoPorId` (snapshot do menu).
+ * Mantido retornando sempre `false` para não reativar o atalho por engano.
+ */
+export function catalogoPermiteHidratacaoSomenteGrupos(
+  _produto: Produto | undefined,
+  _options?: CarregarProdutoCatalogoOptions
+): _produto is Produto {
+  return false
+}
+
+/**
+ * Aplica flags do cadastro (índice slim) no snapshot da grade.
+ * `abreComplementos` fica com o produto do menu — o vínculo de grupos no cadastro base vai deixar de existir.
+ */
+export function aplicarPermissoesCadastroNoProdutoCatalogo(
+  produto: Produto,
+  permissoes: MenuProdutoPermissoes | undefined
+): Produto {
+  if (!permissoes) return produto
+  if (produtoTemComplementosCarregados(produto)) return produto
+  if (
+    produto.permiteAcrescimoAtivo() === permissoes.permiteAcrescimo &&
+    produto.permiteDescontoAtivo() === permissoes.permiteDesconto &&
+    produto.permiteAlterarPrecoAtivo() === permissoes.permiteAlterarPreco &&
+    produto.incideTaxaAtivo() === permissoes.incideTaxa
+  ) {
+    return produto
+  }
+  return Produto.fromJSON({
+    ...produto.toJSON(),
+    permiteAcrescimo: permissoes.permiteAcrescimo,
+    permiteDesconto: permissoes.permiteDesconto,
+    permiteAlterarPreco: permissoes.permiteAlterarPreco,
+    incideTaxa: permissoes.incideTaxa,
+  })
+}
 
 export function obterProdutoDoCatalogo(
   produtoId: string,
@@ -87,13 +167,10 @@ export function aplicarProdutoAtualizadoNasLinhasCarrinho(
       }
     })
 
-    const ncmAtualizado = produtoAtualizado.getNcm()
-
     return {
       ...linha,
       nome: produtoAtualizado.getNome(),
       unidadeMedida: produtoAtualizado.getUnidadeMedida(),
-      ncm: ncmAtualizado || linha.ncm,
       valorCatalogo: novoValorCatalogo,
       permiteAlterarPreco,
       complementos,

@@ -69,11 +69,8 @@ export type DeliveryPublicoDesignConfig = {
      * Se false, oculta o texto do nome na barra (útil quando o banner já traz o nome).
      */
     mostrarNomeTitulo: boolean
-    /** Exibe o grupo fixo "Sugestões da Casa" no início do cardápio. */
-    mostrarSugestoesDaCasa: boolean
     /**
-     * Legado: banner em data URL no design. Preferir imagem do grupo real
-     * "Sugestões da Casa" (CDN). Mantido só para merge de storage antigo.
+     * Legado: banner em data URL no design. Mantido só para merge de storage antigo.
      */
     sugestoesDaCasaImagemUrl: string | null
   }

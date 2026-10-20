@@ -18,7 +18,7 @@ export type ValidacaoCriarVendaResult =
       ok: false
       message: string
       goToStep?: 1 | 2 | 3
-      code?: 'pagamentos_total'
+      code?: 'pagamentos_total' | 'cobertura'
     }
 
 export interface ValidarCriarVendaParams {
@@ -87,7 +87,10 @@ export function validarCriarVendaGestor(params: ValidarCriarVendaParams): Valida
     ok: false,
     message: primeiro?.message ?? 'Validação do pedido falhou.',
     goToStep: primeiro?.goToStep ?? resultado.goToStep,
-    code: primeiro?.code === 'pagamentos_total' ? 'pagamentos_total' : undefined,
+    code:
+      primeiro?.code === 'pagamentos_total' || primeiro?.code === 'cobertura'
+        ? primeiro.code
+        : undefined,
   }
 }
 

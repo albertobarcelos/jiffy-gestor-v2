@@ -19,6 +19,10 @@ import {
 } from '@/src/shared/constants/taxaEntregaPedido'
 import { useNovoPedidoFormContext } from '../../../context/NovoPedidoFormContext'
 import { useNovoPedidoUIContext } from '../../../context/NovoPedidoUIContext'
+import {
+  AlertaEnderecoForaDaCobertura,
+  useHrefCoberturaEntregaPedido,
+} from '../../../utils/coberturaEntregaPedidoUi'
 
 export function PedidoInformacoesStepView() {
   const {
@@ -49,8 +53,14 @@ export function PedidoInformacoesStepView() {
     cotacaoTaxaEntregaBuscando,
   } = useNovoPedidoFormContext()
 
-  const { empresa, setSeletorClienteOpen } = useNovoPedidoUIContext()
+  const { empresa, setSeletorClienteOpen, abrirCadastroRapidoEntregaPedido, setAbrirCadastroRapidoEntregaPedido } =
+    useNovoPedidoUIContext()
+  const hrefCoberturaEntrega = useHrefCoberturaEntregaPedido()
   const ultimaMoradaIdRef = useRef<string | null>(null)
+
+  const handleCadastroRapidoPedidoConsumido = useCallback(() => {
+    setAbrirCadastroRapidoEntregaPedido(0)
+  }, [setAbrirCadastroRapidoEntregaPedido])
 
   const resetOverrideSeMudouMorada = useCallback(
     (moradaId: string | undefined) => {
@@ -177,6 +187,8 @@ export function PedidoInformacoesStepView() {
           onClienteVinculado={setClienteEntregaVinculado}
           onAbrirCadastroCliente={handleAbrirEdicaoClienteEntrega}
           onAbrirSeletorCliente={() => setSeletorClienteOpen(true)}
+          abrirCadastroRapidoPedido={abrirCadastroRapidoEntregaPedido}
+          onCadastroRapidoPedidoConsumido={handleCadastroRapidoPedidoConsumido}
           telefoneExibicaoExterno={telefoneBuscaEntrega}
           onTelefoneExibicaoExternoChange={setTelefoneBuscaEntrega}
           digitosUltimaBuscaExterno={telefoneBuscadoEntrega}
@@ -192,6 +204,9 @@ export function PedidoInformacoesStepView() {
             pedidoDeliveryGestor && pedidoComEntrega ? handleCoberturaMoradaChange : undefined
           }
         />
+        {pedidoComEntrega && enderecoEntregaCoberturaStatus === 'fora' ? (
+          <AlertaEnderecoForaDaCobertura href={hrefCoberturaEntrega} />
+        ) : null}
         {pedidoComRetirada ? (
           <div className="mt-3 rounded-lg border border-primary/15 bg-white p-3 text-sm text-secondary-text">
             Pedido configurado para retirada no balcão. Entregador e taxa de entrega não são
@@ -199,7 +214,9 @@ export function PedidoInformacoesStepView() {
           </div>
         ) : null}
         {pedidoComEntrega && (
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <div
+            className={`mt-3 grid gap-3 ${temEnderecoParaCotar ? 'md:grid-cols-2' : 'md:grid-cols-1'}`}
+          >
             <div className="rounded-lg border border-primary/15 bg-white p-3">
               <div className="mb-2 flex items-center gap-2">
                 <MdAccessTime className="h-5 w-5 text-primary" />
@@ -222,52 +239,54 @@ export function PedidoInformacoesStepView() {
               </Select>
             </div>
 
-            <div className="rounded-lg border border-primary/15 bg-white p-3">
-              <div className="mb-2 flex items-center gap-2">
-                <MdAttachMoney className="h-5 w-5 text-primary" />
-                <Label className="text-sm font-semibold text-primary-text">Taxa de entrega</Label>
-                {mostrarBuscarTaxaDeNovo ? (
-                  <button
-                    type="button"
-                    onClick={recotarTaxaEntregaAutomatica}
-                    disabled={cotacaoTaxaEntregaBuscando}
-                    className="ml-auto inline-flex items-center gap-1 rounded-md border border-primary/30 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <MdRefresh
-                      className={`h-3.5 w-3.5 ${cotacaoTaxaEntregaBuscando ? 'animate-spin' : ''}`}
-                    />
-                    Buscar de novo
-                  </button>
+            {temEnderecoParaCotar ? (
+              <div className="rounded-lg border border-primary/15 bg-white p-3">
+                <div className="mb-2 flex items-center gap-2">
+                  <MdAttachMoney className="h-5 w-5 text-primary" />
+                  <Label className="text-sm font-semibold text-primary-text">Taxa de entrega</Label>
+                  {mostrarBuscarTaxaDeNovo ? (
+                    <button
+                      type="button"
+                      onClick={recotarTaxaEntregaAutomatica}
+                      disabled={cotacaoTaxaEntregaBuscando}
+                      className="ml-auto inline-flex items-center gap-1 rounded-md border border-primary/30 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <MdRefresh
+                        className={`h-3.5 w-3.5 ${cotacaoTaxaEntregaBuscando ? 'animate-spin' : ''}`}
+                      />
+                      Buscar de novo
+                    </button>
+                  ) : null}
+                </div>
+                <Select
+                  value={taxaEntregaIdParaSelect(taxaEntregaId)}
+                  onValueChange={value => setTaxaEntregaId(selectValueParaTaxaEntregaId(value))}
+                  onOpenChange={aberto => {
+                    if (aberto) void taxasEntregaQuery.refetch()
+                  }}
+                >
+                  <SelectTrigger className="border-primary/30 bg-white">
+                    <SelectValue placeholder="Taxa de entrega" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={TAXA_ENTREGA_SELECT_AUTOMATICA}>{labelAutomatica}</SelectItem>
+                    <SelectItem value={TAXA_ENTREGA_SEM_TAXA_ID}>Sem taxa</SelectItem>
+                    {taxasEntrega.map(taxa => (
+                      <SelectItem key={taxa.getId()} value={taxa.getId()}>
+                        {`${taxa.getNome()} — ${transformarParaReal(taxa.getValor())}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {enderecoEntregaCoberturaStatus === 'indisponivel' &&
+                !cotacaoTaxaEntregaBuscando &&
+                taxaAutomaticaSelecionada ? (
+                  <p className="mt-2 text-xs text-secondary-text">
+                    A cotação demorou ou falhou. Busque de novo ou escolha outra taxa.
+                  </p>
                 ) : null}
               </div>
-              <Select
-                value={taxaEntregaIdParaSelect(taxaEntregaId)}
-                onValueChange={value => setTaxaEntregaId(selectValueParaTaxaEntregaId(value))}
-                onOpenChange={aberto => {
-                  if (aberto) void taxasEntregaQuery.refetch()
-                }}
-              >
-                <SelectTrigger className="border-primary/30 bg-white">
-                  <SelectValue placeholder="Taxa de entrega" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={TAXA_ENTREGA_SELECT_AUTOMATICA}>{labelAutomatica}</SelectItem>
-                  <SelectItem value={TAXA_ENTREGA_SEM_TAXA_ID}>Sem taxa</SelectItem>
-                  {taxasEntrega.map(taxa => (
-                    <SelectItem key={taxa.getId()} value={taxa.getId()}>
-                      {`${taxa.getNome()} — ${transformarParaReal(taxa.getValor())}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {enderecoEntregaCoberturaStatus === 'indisponivel' &&
-              !cotacaoTaxaEntregaBuscando &&
-              taxaAutomaticaSelecionada ? (
-                <p className="mt-2 text-xs text-secondary-text">
-                  A cotação demorou ou falhou. Busque de novo ou escolha outra taxa.
-                </p>
-              ) : null}
-            </div>
+            ) : null}
           </div>
         )}
       </div>

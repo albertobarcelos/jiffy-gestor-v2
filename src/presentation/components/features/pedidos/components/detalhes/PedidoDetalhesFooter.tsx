@@ -9,7 +9,10 @@ import {
 } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { MdArrowBack, MdArrowForward, MdCancel } from 'react-icons/md'
 import { resolverModoTaxaEntregaOverride } from '@/src/shared/constants/taxaEntregaPedido'
-import { mensagemBloqueioTaxaAutomatica } from '@/src/domain/policies/pedido/cotacaoEntregaPolicy'
+import {
+  mensagemBloqueioForaDaCobertura,
+  mensagemBloqueioTaxaAutomatica,
+} from '@/src/domain/policies/pedido/cotacaoEntregaPolicy'
 import { enderecoTemGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 import { useNovoPedidoDetalheContext } from '../../context/NovoPedidoDetalheContext'
 import { useNovoPedidoFormContext } from '../../context/NovoPedidoFormContext'
@@ -51,6 +54,7 @@ export function PedidoDetalhesFooter({
     isLoadingVenda,
     abaDetalhesPedido,
     podeAjustarPagamentoEntregaEmAberto,
+    ajustandoPagamentoAposEdicaoItens,
     cancelarVendaGestor,
     cancelarNotaFiscalVendaPdv,
     cancelarNotaFiscalVendaGestor,
@@ -79,7 +83,9 @@ export function PedidoDetalhesFooter({
     }
     if (podeExibirCancelarNotaFiscal) chaves.push('cancelNota')
     if (podeAjustarPagamentoEntregaEmAberto && abaDetalhesPedido === 'pagamentos') {
-      chaves.push('fechar')
+      if (!ajustandoPagamentoAposEdicaoItens) chaves.push('fechar')
+      chaves.push('salvarCobranca')
+    } else if (ajustandoPagamentoAposEdicaoItens) {
       chaves.push('salvarCobranca')
     } else {
       chaves.push('fechar')
@@ -187,17 +193,22 @@ export function PedidoDetalhesFooter({
 
   const painelRaioEsqInf = '0.75rem'
   const showVoltar = currentStep > 1
+  const geoEnderecoSelecionado = Boolean(
+    moradaEntregaSelecionada?.endereco &&
+      enderecoTemGeolocalizacao(moradaEntregaSelecionada.endereco)
+  )
   const mensagemBloqueioTaxa =
     currentStep === 2
-      ? mensagemBloqueioTaxaAutomatica({
+      ? (mensagemBloqueioForaDaCobertura({
+          pedidoComEntrega,
+          enderecoEntregaCoberturaStatus,
+        }) ??
+        mensagemBloqueioTaxaAutomatica({
           pedidoComEntrega,
           taxaEntregaOverride: resolverModoTaxaEntregaOverride(taxaEntregaId),
           enderecoEntregaCoberturaStatus,
-          enderecoEntregaTemGeo: Boolean(
-            moradaEntregaSelecionada?.endereco &&
-              enderecoTemGeolocalizacao(moradaEntregaSelecionada.endereco)
-          ),
-        })
+          enderecoEntregaTemGeo: geoEnderecoSelecionado,
+        }))
       : null
 
   return (

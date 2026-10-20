@@ -114,3 +114,39 @@ export type RelatorioProdutosVendidosMvpSerieDTO = {
   serieTemporal: RelatorioProdutosVendidosMvpSerieDiaDTO[]
   mockFlags: Pick<RelatorioProdutosVendidosMvpMockFlags, 'serieSimplificada' | 'serieGranularidade'>
 }
+
+/** Impacto de preço do complemento no lançamento PDV. */
+export type RelatorioComplementoImpacto = 'aumenta' | 'diminui' | 'nenhum'
+
+export interface RelatorioComplementoVendidoLinhaDTO {
+  complementoId: string
+  nome: string
+  grupoComplementoId: string | null
+  grupoNome: string | null
+  quantidade: number
+  valorLiquido: number
+  valorAumenta: number
+  valorDiminui: number
+  qtdAumenta: number
+  qtdDiminui: number
+  qtdNenhum: number
+  impactoPredominante: RelatorioComplementoImpacto
+}
+
+export interface RelatorioComplementosVendidosKpisDTO {
+  skusDistintos: number
+  quantidadeTotal: number
+  valorAumenta: number
+  valorDiminui: number
+  valorLiquido: number
+  complementoLiderNome: string | null
+  complementoLiderQuantidade: number
+}
+
+/** Bloco SPA: complementos vendidos (`somenteComplementos=1`). */
+export type RelatorioProdutosVendidosMvpComplementosDTO = {
+  somenteComplementos: true
+  items: RelatorioComplementoVendidoLinhaDTO[]
+  kpis: RelatorioComplementosVendidosKpisDTO
+  totalFiltrado: number
+}

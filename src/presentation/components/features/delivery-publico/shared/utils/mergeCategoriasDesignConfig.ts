@@ -10,6 +10,7 @@ type CategoriasLegacyPartial = {
   corBarraTitulo?: string | null
   corTextoTitulo?: string | null
   mostrarNomeTitulo?: boolean
+  /** Legado: switch on/off do carrossel — ignorado (favoritos controlam a exibição). */
   mostrarSugestoesDaCasa?: boolean
   sugestoesDaCasaImagemUrl?: string | null
   /** Legado: chips on/off — ignorado (chips sempre visíveis). */
@@ -63,10 +64,6 @@ export function mergeCategoriasDesignConfig(
       typeof partial.mostrarNomeTitulo === 'boolean'
         ? partial.mostrarNomeTitulo
         : fallback.mostrarNomeTitulo,
-    mostrarSugestoesDaCasa:
-      typeof partial.mostrarSugestoesDaCasa === 'boolean'
-        ? partial.mostrarSugestoesDaCasa
-        : fallback.mostrarSugestoesDaCasa,
     sugestoesDaCasaImagemUrl:
       partial.sugestoesDaCasaImagemUrl !== undefined
         ? normalizeImagemUrl(partial.sugestoesDaCasaImagemUrl)

@@ -9,12 +9,14 @@ import { KanbanVendaCardHeader } from './KanbanVendaCardHeader'
 import { KanbanVendaCardActions } from './KanbanVendaCardActions'
 import {
   formatarFormaPagamentoKanbanCard,
-  formatarPrevisaoEntregaKanbanCard,
   rotuloFormaCobrancaKanbanCard,
 } from '../utils/kanbanDeliveryCardDisplay'
+import { deveExibirCronometroPreparoKanban, relogioPedidoKanban } from '../utils/kanbanPedidoTempo'
+import { OrigemCanalMark } from '@/src/presentation/components/features/origem/OrigemCanalMark'
+import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
 import {
   derivarTipoVendaCardKanban,
-  linhaIdentificacaoVendaKanban,
+  exibirSeloCanalMarketplace,
 } from '../utils/kanbanVendaCardViewModel'
 import { useKanbanVendaCardState } from '../hooks/useKanbanVendaCardState'
 import { PedidoEntregaQuickViewPopover } from '../../delivery/kanban-panels/PedidoEntregaQuickViewPopover'
@@ -45,6 +47,8 @@ export interface KanbanVendaCardProps {
   acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
   avancandoEtapaIds: Record<string, boolean>
   timestampsEtapaEntregaLocal: Record<string, string>
+  agoraMs: number
+  slaPreparoMinutos: number
   onViewDetails: (venda: Venda) => void
   /** Abre o pedido em modo edição de produtos (etapas anteriores a Em Rota). */
   onEditarProdutos?: (venda: Venda) => void
@@ -72,6 +76,8 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
     acaoFiscalEmAndamentoPorVenda,
     avancandoEtapaIds,
     timestampsEtapaEntregaLocal,
+    agoraMs,
+    slaPreparoMinutos,
     onViewDetails,
     onEditarProdutos,
     onAvancarEtapa,
@@ -86,6 +92,7 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
 
   const colunaAtual = column.id as ColunaKanbanId
   const tipoVendaView = derivarTipoVendaCardKanban(venda)
+  const seloCanal = exibirSeloCanalMarketplace(venda.origem)
   const etapaKanbanCard = venda.getEtapaKanban() as ColunaKanbanId
   const colunaIdParaEstiloCard = colunaParaEstiloCardKanban(
     colunaAtual,
@@ -95,7 +102,8 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
   const { borderClass: cardBorderClass, cardBgClass } = getCardBorderEFundoKanban(
     colunaIdParaEstiloCard,
     venda,
-    acaoFiscalEmAndamentoPorVenda
+    acaoFiscalEmAndamentoPorVenda,
+    modoKanbanVendas
   )
 
   const exibirAtribuirEntregador = exibirAtribuirEntregadorKanban(
@@ -120,8 +128,7 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
   const exibirQuickViewEntrega = venda.isPedidoEntregaGestor()
   const tabelaOrigemQuickView =
     venda.tabelaOrigem === 'venda_gestor' ? 'venda_gestor' : 'venda'
-  const tipoVendaQuickView =
-    (venda.tipoVenda ?? '').trim().toLowerCase() === 'retirada' ? 'retirada' : 'entrega'
+  const tipoEntregaQuickView = venda.tipoAtendimento()
 
   const exibirBotaoObservacaoPedido = deveExibirBotaoObservacaoPedidoKanban(
     colunaAtual,
@@ -143,11 +150,16 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
   )
   const exibirMetaDeliveryKanban =
     modoKanbanVendas === 'delivery' && venda.isPedidoEntregaGestor()
-  const previsaoEntregaKanban = exibirMetaDeliveryKanban
-    ? formatarPrevisaoEntregaKanbanCard(venda)
+  const relogioPreparo = exibirMetaDeliveryKanban
+    ? relogioPedidoKanban(venda, agoraMs, {
+        colunaId: colunaAtual,
+        slaPreparoMinutos,
+        ancoraPreparoIso: timestampsEtapaEntregaLocal[venda.id],
+      })
     : null
+  const exibirCronometroPreparo = deveExibirCronometroPreparoKanban(colunaAtual, venda)
   const formaCobrancaKanban = exibirMetaDeliveryKanban
-    ? rotuloFormaCobrancaKanbanCard(venda.tipoVenda, venda.fluxoPagamentoEntrega)
+    ? rotuloFormaCobrancaKanbanCard(venda.tipoAtendimento(), venda.fluxoPagamentoEntrega)
     : null
   const formaPagamentoKanban = exibirMetaDeliveryKanban
     ? formatarFormaPagamentoKanbanCard(venda.cobrancasDelivery, nomesMeiosPagamento)
@@ -170,11 +182,62 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
         onClick={() => onViewDetails(venda)}
         onDoubleClick={() => onViewDetails(venda)}
       >
-        <div className={`mb-2 ${exibirBotaoEditarProdutos ? 'pr-1' : ''}`}>
+        {seloCanal ? (
+          <div className="absolute top-0 right-0 z-10 flex flex-col items-end gap-1.5">
+            <OrigemCanalMark
+              origem={venda.origem}
+              size={28}
+              width={56}
+              className="rounded-none rounded-tr-lg rounded-bl-md border-gray-300"
+            />
+            {exibirMetaDeliveryKanban && tipoVendaView.exibirColunaTipoVenda ? (
+              <span
+                className={
+                  exibirAcaoAlterarTipoPedido ? 'cursor-pointer select-none pb-0.5' : 'pb-0.5'
+                }
+                role={exibirAcaoAlterarTipoPedido ? 'button' : undefined}
+                tabIndex={exibirAcaoAlterarTipoPedido ? 0 : undefined}
+                title={
+                  exibirAcaoAlterarTipoPedido
+                    ? 'Clique duas vezes para alterar o tipo do pedido (entrega/retirada)'
+                    : undefined
+                }
+                onClick={e => e.stopPropagation()}
+                onDoubleClick={e => {
+                  e.stopPropagation()
+                  if (exibirAcaoAlterarTipoPedido) cardState.setEnderecoEntregaOpen(true)
+                }}
+              >
+                <TipoVendaIcon
+                  tipoVenda={
+                    tipoVendaView.tipoVendaExibicao as
+                      | 'balcao'
+                      | 'mesa'
+                      | 'gestor'
+                      | 'entrega'
+                      | 'retirada'
+                      | 'delivery'
+                  }
+                  numeroMesa={
+                    tipoVendaView.tipoVendaExibicao === 'mesa' ? venda.numeroMesa : undefined
+                  }
+                  size={56}
+                  containerScale={0.9}
+                  corPrincipal="var(--color-primary)"
+                  corTexto="var(--color-info)"
+                  corBalcao="var(--color-primary)"
+                  corGestor="var(--color-primary)"
+                  corEntrega="var(--color-primary)"
+                  corBorda="var(--color-primary)"
+                />
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+        <div className={`mb-2 ${seloCanal ? 'pr-14' : exibirBotaoEditarProdutos ? 'pr-1' : ''}`}>
           <KanbanVendaCardHeader
             venda={venda}
             exibirMetaDeliveryKanban={exibirMetaDeliveryKanban}
-            linhaIdentificacaoVenda={linhaIdentificacaoVendaKanban(venda)}
             prefixoLinhaOrigemCard={tipoVendaView.prefixoLinhaOrigemCard}
             clienteNome={clienteNome}
             valorFormatado={valorFormatado}
@@ -183,11 +246,11 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
             formaCobrancaKanban={formaCobrancaKanban}
             formaPagamentoKanban={formaPagamentoKanban}
             observacaoPedidoTexto={observacaoPedidoTexto}
-            previsaoEntregaKanban={previsaoEntregaKanban}
             tipoVendaExibicao={tipoVendaView.tipoVendaExibicao}
             exibirColunaTipoVenda={tipoVendaView.exibirColunaTipoVenda}
             exibirAcaoAlterarTipoPedido={exibirAcaoAlterarTipoPedido}
             onAbrirAlterarTipoPedido={() => cardState.setEnderecoEntregaOpen(true)}
+            ocultarIconeTipoVenda={seloCanal}
           />
         </div>
 
@@ -219,6 +282,10 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
           onAbrirQuickView={anchor => cardState.setEntregaQuickViewAnchor(anchor)}
           onAbrirDocumentoVenda={cardState.abrirDocumentoVendaKanban}
           linhaEtapa={linhaTempo ? rotuloLinhaTempoCardCompacto(linhaTempo) : null}
+          cronometroRotulo={
+            exibirCronometroPreparo ? (relogioPreparo?.rotuloDecorrido ?? null) : null
+          }
+          cronometroTom={exibirCronometroPreparo ? relogioPreparo?.tom : undefined}
         />
       </div>
 
@@ -252,12 +319,13 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
         onClose={() => cardState.setEnderecoEntregaOpen(false)}
       />
 
-      {exibirQuickViewEntrega && (
+      {exibirQuickViewEntrega && tipoEntregaQuickView && (
         <PedidoEntregaQuickViewPopover
           vendaId={venda.id}
           tabelaOrigem={tabelaOrigemQuickView}
           colunaAtual={colunaAtual}
-          tipoVenda={tipoVendaQuickView}
+          tipoVenda={venda.tipoVenda}
+          tipoEntrega={tipoEntregaQuickView}
           observacaoPedidoHint={observacaoPedidoTexto || null}
           anchorEl={cardState.entregaQuickViewAnchor}
           open={Boolean(cardState.entregaQuickViewAnchor)}

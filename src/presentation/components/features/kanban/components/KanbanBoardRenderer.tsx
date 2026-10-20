@@ -11,7 +11,7 @@ import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
 import type {
   ColunaKanbanId,
   CriterioOrdenacaoKanban,
-  DirecaoOrdenacaoKanban,
+  FiltroStatusEntreguesKanban,
   KanbanColumn,
   Venda,
 } from '../types'
@@ -19,6 +19,8 @@ import type { usePedidosDeliveryKanbanColumns } from '../hooks/usePedidosDeliver
 import type { useVendasUnificadasKanbanColumns } from '../hooks/useVendasUnificadasKanbanColumns'
 import type { useReemissaoFiscalEmLote } from '../hooks/useReemissaoFiscalEmLote'
 import { classesKanbanQuadroFaixa, classesKanbanQuadroRow } from '../utils/kanbanQuadroLayout'
+import { useAgoraKanban } from '../hooks/useAgoraKanban'
+import { useTempoPreparoKanbanMinutos } from '../hooks/useTempoPreparoKanban'
 import type { SuperficieQuadroPedidos } from '@/src/presentation/gestor-pedidos/superficieQuadroPedidos'
 
 type DeliveryKanbanReturn = ReturnType<typeof usePedidosDeliveryKanbanColumns>
@@ -38,10 +40,12 @@ export interface KanbanBoardRendererProps {
   vendasPorColuna: Partial<Record<ColunaKanbanId, Venda[]>>
   getColumnTotalCount: (columnId: ColunaKanbanId) => number
   criterioOrdenacaoPorColuna: Record<ColunaKanbanId, CriterioOrdenacaoKanban>
-  direcaoOrdenacaoPorColuna: Record<ColunaKanbanId, DirecaoOrdenacaoKanban>
   onCriterioOrdenacaoChange: (columnId: ColunaKanbanId, criterio: CriterioOrdenacaoKanban) => void
-  onToggleDirecaoOrdenacao: (columnId: ColunaKanbanId) => void
-  onOcultarColuna?: (columnId: ColunaKanbanId) => void
+  filtroStatusFiscalComNf?: FiltroStatusEntreguesKanban
+  onFiltroStatusFiscalComNfChange?: (
+    columnId: ColunaKanbanId,
+    filtro: FiltroStatusEntreguesKanban
+  ) => void
   onColumnScroll: (columnId: ColunaKanbanId, event: React.UIEvent<HTMLDivElement>) => void
   deliveryKanban: DeliveryKanbanReturn
   balcaoKanban: BalcaoKanbanReturn
@@ -76,10 +80,9 @@ export function KanbanBoardRenderer({
   vendasPorColuna,
   getColumnTotalCount,
   criterioOrdenacaoPorColuna,
-  direcaoOrdenacaoPorColuna,
   onCriterioOrdenacaoChange,
-  onToggleDirecaoOrdenacao,
-  onOcultarColuna,
+  filtroStatusFiscalComNf,
+  onFiltroStatusFiscalComNfChange,
   onColumnScroll,
   deliveryKanban,
   balcaoKanban,
@@ -97,6 +100,8 @@ export function KanbanBoardRenderer({
   reemissaoEmLote,
   superficie,
 }: KanbanBoardRendererProps) {
+  const agoraMs = useAgoraKanban(1000)
+  const slaPreparoMinutos = useTempoPreparoKanbanMinutos()
   return (
     <div className={classesKanbanQuadroFaixa(superficie)}>
       {mostrarLoadingLista ? (
@@ -124,10 +129,17 @@ export function KanbanBoardRenderer({
                   superficie={superficie}
                   count={columnTotalCount}
                   criterioOrdenacao={criterioOrdenacaoPorColuna[colId] ?? 'data'}
-                  direcaoOrdenacao={direcaoOrdenacaoPorColuna[colId] ?? 'desc'}
                   onCriterioOrdenacaoChange={onCriterioOrdenacaoChange}
-                  onToggleDirecaoOrdenacao={onToggleDirecaoOrdenacao}
-                  onOcultarColuna={onOcultarColuna}
+                  filtroStatusFiscal={
+                    isModoDeliveryKanban && colId === 'FINALIZADAS'
+                      ? filtroStatusFiscalComNf
+                      : undefined
+                  }
+                  onFiltroStatusFiscalChange={
+                    isModoDeliveryKanban && colId === 'FINALIZADAS'
+                      ? onFiltroStatusFiscalComNfChange
+                      : undefined
+                  }
                   onColumnScroll={onColumnScroll}
                   columnRodape={
                     colId === 'REJEITADAS' &&
@@ -171,6 +183,8 @@ export function KanbanBoardRenderer({
                       acaoFiscalEmAndamentoPorVenda={acaoFiscalEmAndamentoPorVenda}
                       avancandoEtapaIds={avancandoEtapaIds}
                       timestampsEtapaEntregaLocal={timestampsEtapaEntregaLocal}
+                      agoraMs={agoraMs}
+                      slaPreparoMinutos={slaPreparoMinutos}
                       onViewDetails={onViewDetails}
                       onEditarProdutos={onEditarProdutos}
                       onAvancarEtapa={onAvancarEtapa}

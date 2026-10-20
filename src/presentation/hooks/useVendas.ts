@@ -14,8 +14,12 @@ import {
   mapAcaoTransicaoGestorToStatusDelivery,
   mapAcoesTransicaoGestorToStatusDelivery,
 } from '@/src/application/mappers/TransicaoPedidoDeliveryMapper'
-import { emitirNotaPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/EmitirNotaPedidoDeliveryUseCase'
-import { deveUsarModuloDeliveryParaDetalhe } from '@/src/application/mappers/PedidoDeliveryDetalheAdapter'
+import {
+  emitirNotaPedidoDeliveryUseCase,
+  reemitirNotaPedidoDeliveryUseCase,
+} from '@/src/infrastructure/composition/pedidoUseCases'
+import { ehPedidoModuloDelivery } from '@/src/domain/services/pedido/PedidoModuloDelivery'
+import { anexarInformacoesAdicionaisEmitirNota } from '@/src/shared/helpers/informacoesAdicionaisNota'
 
 /**
  * Extrai o motivo de rejeição (xMotivo) do XML de retorno da SEFAZ
@@ -839,13 +843,18 @@ export function useEmitirNfe() {
       const response = await fetchGestorApi(`/api/vendas/${id}/emitir-nota`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tipoDocumento: fiscalConfig.tipoDocumento,
-          modelo,
-          serie: fiscalConfig.serie,
-          ambiente: fiscalConfig.ambiente,
-          crt: fiscalConfig.crt,
-        }),
+        body: JSON.stringify(
+          anexarInformacoesAdicionaisEmitirNota(
+            {
+              tipoDocumento: fiscalConfig.tipoDocumento,
+              modelo,
+              serie: fiscalConfig.serie,
+              ambiente: fiscalConfig.ambiente,
+              crt: fiscalConfig.crt,
+            },
+            id
+          )
+        ),
       })
 
       if (!response.ok) {
@@ -930,13 +939,18 @@ export function useEmitirNfeGestor() {
       const response = await fetchGestorApi(`/api/vendas/gestor/${id}/emitir-nota`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tipoDocumento: fiscalConfig.tipoDocumento,
-          modelo,
-          serie: fiscalConfig.serie,
-          ambiente: fiscalConfig.ambiente,
-          crt: fiscalConfig.crt,
-        }),
+        body: JSON.stringify(
+          anexarInformacoesAdicionaisEmitirNota(
+            {
+              tipoDocumento: fiscalConfig.tipoDocumento,
+              modelo,
+              serie: fiscalConfig.serie,
+              ambiente: fiscalConfig.ambiente,
+              crt: fiscalConfig.crt,
+            },
+            id
+          )
+        ),
       })
 
       if (!response.ok) {
@@ -1027,12 +1041,56 @@ export function useEmitirNfeDelivery() {
   )
 }
 
-/** Indica se a emissão fiscal deve usar o módulo delivery (entrega/retirada gestor). */
+export type ReemitirNfeDeliveryVariables = {
+  id: string
+  numero?: number
+}
+
+/**
+ * Reemite NFC-e/NF-e de pedido delivery (`POST /delivery/pedidos/{id}/reemitir-nota`).
+ * Body homologação: `{ numero? }` — sem documentId.
+ */
+export function useReemitirNfeDelivery() {
+  const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
+
+  return useSecureTenantMutation(
+    async ({ token }, { id, numero }: ReemitirNfeDeliveryVariables) => {
+      return reemitirNotaPedidoDeliveryUseCase.execute(id, token, numero)
+    },
+    {
+      onSuccess: (data, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
+        invalidateKanbanVendasListagens(queryClient, { refetchType: 'none' })
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda-gestor', variables.id] })
+
+        const status = data?.status != null ? String(data.status) : ''
+        if (status === 'REJEITADA') {
+          const motivo =
+            (data.mensagemAmigavel != null ? String(data.mensagemAmigavel) : '') ||
+            'Reemissão rejeitada pela SEFAZ'
+          showToast.error(motivo)
+          return
+        }
+        if (status === 'EMITIDA') {
+          showToast.success('NFe reemitida com sucesso!')
+          return
+        }
+        showToast.success('Reemissão enviada. Aguardando retorno da SEFAZ...')
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Erro ao reemitir NFe')
+      },
+    }
+  )
+}
+
+/** Indica se a emissão fiscal deve usar o módulo delivery (`tipoVenda=delivery`). */
 export function deveUsarModuloDeliveryParaEmissaoFiscal(
   tabelaOrigem: 'venda' | 'venda_gestor',
   tipoVenda?: string | null
 ): boolean {
-  return deveUsarModuloDeliveryParaDetalhe(tabelaOrigem, tipoVenda)
+  return ehPedidoModuloDelivery(tabelaOrigem, tipoVenda)
 }
 
 /** Body alinhado ao contrato de reemitir-nota: `documentId` obrigatório; `numero` opcional. */

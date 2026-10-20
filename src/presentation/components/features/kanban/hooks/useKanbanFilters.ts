@@ -4,7 +4,7 @@ import type { DateRange } from 'react-day-picker'
 import { formatarHoraParaInputCalendar } from '@/src/presentation/components/features/dashboard/dashboardTextHelpers'
 import { primeiroMesQuadroDuploCalendario } from '@/src/shared/utils/calendarioIntervaloFaturamento'
 import { combinarIntervaloCalendarParaDatas } from '@/src/shared/utils/intervaloCalendarioComHoras'
-import type { OrigemFiltro, TipoEntregaFiltro, ColunaKanbanFiltroExtra } from '../types'
+import type { OrigemFiltro, TipoCanalFiltro, TipoEntregaFiltro, ColunaKanbanFiltroExtra } from '../types'
 import {
   type KanbanFiltroDataPreset,
   intervaloPresetKanbanFiltroData,
@@ -67,6 +67,9 @@ export function useKanbanFilters(
     filtrosIniciais.periodoPreset
   )
   const [origemFilter, setOrigemFilter] = useState<OrigemFiltro>(filtrosIniciais.origemFilter)
+  const [tipoCanalFilter, setTipoCanalFilter] = useState<TipoCanalFiltro>(
+    filtrosIniciais.tipoCanalFilter
+  )
   const [tipoEntregaFilter, setTipoEntregaFilter] = useState<TipoEntregaFiltro>(
     filtrosIniciais.tipoEntregaFilter
   )
@@ -103,6 +106,7 @@ export function useKanbanFilters(
     gravarFiltrosToolbarKanbanNoStorage({
       searchInput,
       origemFilter,
+      tipoCanalFilter,
       tipoEntregaFilter,
       periodoPreset,
       periodoDataModo,
@@ -112,6 +116,7 @@ export function useKanbanFilters(
   }, [
     searchInput,
     origemFilter,
+    tipoCanalFilter,
     tipoEntregaFilter,
     periodoPreset,
     periodoDataModo,
@@ -144,6 +149,7 @@ export function useKanbanFilters(
     return {
       q: qNormalizado || undefined,
       origem: origemFilter || undefined,
+      tipo: tipoCanalFilter || undefined,
       tipoEntrega: tipoEntregaFilter || undefined,
       // Filtro Pendente/Rejeitadas controla quais colunas montam query — não envia statusFiscal.
       dataCriacaoInicial: periodoInicioISO,
@@ -154,6 +160,7 @@ export function useKanbanFilters(
   }, [
     searchQuery,
     origemFilter,
+    tipoCanalFilter,
     tipoEntregaFilter,
     periodoInicioISO,
     periodoFimISO,
@@ -170,6 +177,7 @@ export function useKanbanFilters(
     setPeriodoInicio(null)
     setPeriodoFim(null)
     setOrigemFilter('')
+    setTipoCanalFilter('')
     setTipoEntregaFilter('')
     setColunaKanbanFiltro('TODAS')
     const hoje = periodoHoje.inicio
@@ -274,6 +282,8 @@ export function useKanbanFilters(
     periodoAtivoNaConsulta,
     origemFilter,
     setOrigemFilter,
+    tipoCanalFilter,
+    setTipoCanalFilter,
     tipoEntregaFilter,
     setTipoEntregaFilter,
     colunaKanbanFiltro,

@@ -24,6 +24,7 @@ import {
 } from '@/src/presentation/components/features/clientes/ClientesTabsModal'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { useRefetchCadastroAoAbrir } from '@/src/presentation/hooks/useRefetchCadastroAoAbrir'
 import { useCriarClienteRapido } from '@/src/presentation/hooks/useClientes'
 import { useCriarClienteDeliveryRapido } from '@/src/presentation/hooks/useMoradaTelefone'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -45,6 +46,11 @@ interface SeletorClienteModalProps {
   telefoneCadastro?: string
   /** Nome sugerido (título da conversa). */
   nomeSugerido?: string
+  /**
+   * Substitui o cadastro interno (mesmo fluxo do link “Cadastrar” na entrega).
+   * O pai deve fechar este seletor e abrir o painel correspondente.
+   */
+  onCadastrarCliente?: () => void
 }
 
 export function SeletorClienteModal({
@@ -56,6 +62,7 @@ export function SeletorClienteModal({
   cadastroRapido = false,
   telefoneCadastro = '',
   nomeSugerido = '',
+  onCadastrarCliente,
 }: SeletorClienteModalProps) {
   const invalidate = useInvalidateTenantQueries()
   const criarCliente = useCriarClienteRapido()
@@ -120,8 +127,9 @@ export function SeletorClienteModal({
   )
 
   // Hook com paginação infinita - limit 100 para carregar mais clientes por página
-  const { data, fetchNextPage, hasNextPage, isFetching, isFetchingNextPage, isLoading, error } =
+  const { data, fetchNextPage, hasNextPage, isFetching, isFetchingNextPage, isLoading, error, refetch } =
     useClientesInfinite(clientesQueryParams)
+  useRefetchCadastroAoAbrir(open, refetch)
 
   // Achata páginas, remove duplicatas por id (se a API repetir offset) e aplica filtro local no nome
   // quando há texto — defesa se o backend ignorar o parâmetro `q`.
@@ -199,6 +207,10 @@ export function SeletorClienteModal({
     : ''
 
   const handleOpenNovoCliente = useCallback(() => {
+    if (onCadastrarCliente) {
+      onCadastrarCliente()
+      return
+    }
     if (cadastroRapido) {
       const busca = searchText.trim()
       const buscaEhTelefone = termoBuscaClientePorTelefone(busca).length >= 8
@@ -212,7 +224,7 @@ export function SeletorClienteModal({
       mode: 'create',
       clienteId: undefined,
     })
-  }, [cadastroRapido, nomeSugerido, searchText])
+  }, [cadastroRapido, nomeSugerido, onCadastrarCliente, searchText])
 
   const handleSalvarClienteRapido = useCallback(async () => {
     const nome = nomeNovoCliente.trim()
@@ -378,7 +390,7 @@ export function SeletorClienteModal({
                   inputRef={searchInputRef}
                   value={searchText}
                   onChange={e => setSearchText(e.target.value)}
-                  placeholder="Pesquisar por nome..."
+                  placeholder="Pesquisar por nome ou telefone..."
                   className="w-full rounded-lg border border-gray-200 bg-info text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
                   sx={{
                     '& .MuiOutlinedInput-root': {
@@ -421,9 +433,12 @@ export function SeletorClienteModal({
           >
             {/* Barra de título */}
             {!isLoading && !error && (
-              <div className="mb-2 rounded-lg bg-primary/15 px-4 py-2">
-                <p className="text-sm font-semibold text-primary-text">
+              <div className="mb-2 flex items-center gap-3 rounded-lg bg-primary/15 px-4 py-2">
+                <p className="min-w-0 flex-[2] text-sm font-semibold text-primary-text">
                   Nome do Cliente
+                </p>
+                <p className="min-w-0 flex-1 text-sm font-semibold text-primary-text">
+                  Telefone
                 </p>
               </div>
             )}
@@ -450,7 +465,16 @@ export function SeletorClienteModal({
                       index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
                     } hover:bg-custom-2`}
                   >
-                    <div className="text-sm font-medium text-primary-text uppercase">{cliente.getNome()}</div>
+                    <div className="flex items-center gap-3">
+                      <div className="min-w-0 flex-[2] text-sm font-medium uppercase text-primary-text">
+                        {cliente.getNome()}
+                      </div>
+                      <div className="min-w-0 flex-1 text-sm text-secondary-text">
+                        {cliente.getTelefone()?.trim()
+                          ? formatarTelefoneBr(cliente.getTelefone()!)
+                          : '—'}
+                      </div>
+                    </div>
                   </button>
                 ))}
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { buscarClienteParaEntregaUseCase } from '@/src/application/use-cases/clientes/BuscarClienteParaEntregaUseCase'
+import { buscarClienteParaEntregaUseCase } from '@/src/infrastructure/composition/pedidoUseCases'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import type { MoradaTelefone } from '@/src/domain/types/moradaEntrega'
 import type { ClientesTabsModalState } from '@/src/presentation/components/features/clientes/ClientesTabsModal'
@@ -11,7 +11,7 @@ import type {
 } from '../../types'
 
 export interface UseNovoPedidoClienteParams {
-  tipoInicioPedido: 'balcao' | 'entrega'
+  tipoInicioPedido: 'balcao' | 'delivery'
   clienteEntregaVinculado: NovoPedidoClienteEntregaVinculado
   setClienteEntregaVinculado: React.Dispatch<
     React.SetStateAction<NovoPedidoClienteEntregaVinculado>
@@ -48,7 +48,7 @@ export function useNovoPedidoCliente({
 
   const handleSelectCliente = useCallback(
     (cliente: Cliente) => {
-      if (tipoInicioPedido === 'entrega') {
+      if (tipoInicioPedido === 'delivery') {
         const telefone = cliente.getTelefone()?.trim() ?? ''
         const telefoneDigitos = telefone.replace(/\D/g, '')
 

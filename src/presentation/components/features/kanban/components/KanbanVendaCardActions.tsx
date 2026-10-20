@@ -21,7 +21,9 @@ import {
   kanbanVendaUsaCupomPublicoNfce,
 } from '../rules/vendasKanban.rules'
 import { KanbanCardAcaoButton } from './KanbanCardAcaoButton'
+import { KanbanCronometroNoBotao } from './KanbanCronometroNoBotao'
 import type { ColunaKanbanId, KanbanColumn, Venda } from '../types'
+import type { TomTempoPedidoKanban } from '../utils/kanbanPedidoTempo'
 
 const KANBAN_BUTTON_COLOR = '#530CA3'
 
@@ -56,6 +58,8 @@ export interface KanbanVendaCardActionsProps {
   onAbrirQuickView: (anchor: HTMLElement) => void
   onAbrirDocumentoVenda: (venda: Venda) => void
   linhaEtapa?: { texto: string; titulo: string } | null
+  cronometroRotulo?: string | null
+  cronometroTom?: TomTempoPedidoKanban
 }
 
 export function KanbanVendaCardActions(props: KanbanVendaCardActionsProps) {
@@ -79,6 +83,8 @@ export function KanbanVendaCardActions(props: KanbanVendaCardActionsProps) {
     onAbrirQuickView,
     onAbrirDocumentoVenda,
     linhaEtapa = null,
+    cronometroRotulo = null,
+    cronometroTom,
   } = props
 
   const colunaAtual = column.id as ColunaKanbanId
@@ -97,10 +103,15 @@ export function KanbanVendaCardActions(props: KanbanVendaCardActionsProps) {
     venda,
     acaoFiscalEmAndamentoPorVenda
   )
+  const colunaArquivoFiscal =
+    colunaAtual === 'FINALIZADAS' ||
+    colunaAtual === 'COM_FISCAL' ||
+    colunaAtual === 'PENDENTE_EMISSAO' ||
+    colunaAtual === 'REJEITADAS'
   const mostrarInutilizada =
-    column.id === 'COM_FISCAL' && venda.statusFiscal === 'INUTILIZADA'
+    colunaArquivoFiscal && venda.statusFiscal === 'INUTILIZADA'
   const mostrarVerDocumento =
-    column.id === 'COM_FISCAL' &&
+    colunaArquivoFiscal &&
     !acaoFiscalEmAndamentoPorVenda[venda.id] &&
     Boolean(venda.documentoFiscalId) &&
     (venda.statusFiscal === 'EMITIDA' || venda.statusFiscal === 'CANCELADA')
@@ -115,7 +126,7 @@ export function KanbanVendaCardActions(props: KanbanVendaCardActionsProps) {
     mostrarEmitirNota ||
     mostrarInutilizada ||
     mostrarVerDocumento
-  const rotuloAvancar = rotuloBotaoAvancarEtapaKanban(colunaAtual, venda.tipoVenda)
+  const rotuloAvancar = rotuloBotaoAvancarEtapaKanban(colunaAtual, venda.tipoAtendimento())
   const [reimprimindo, setReimprimindo] = useState(false)
   const reimprimindoLockRef = useRef(false)
 
@@ -254,6 +265,12 @@ export function KanbanVendaCardActions(props: KanbanVendaCardActionsProps) {
               startIcon={!avancandoEtapaIds[venda.id] ? <MdArrowForward size={14} /> : undefined}
               onClick={() => onAvancarEtapa(venda, colunaAtual)}
               disabled={!!avancandoEtapaIds[venda.id]}
+              loading={!!avancandoEtapaIds[venda.id]}
+              endAdornment={
+                cronometroRotulo ? (
+                  <KanbanCronometroNoBotao rotulo={cronometroRotulo} tom={cronometroTom} />
+                ) : null
+              }
             >
               {avancandoEtapaIds[venda.id] ? rotuloAvancar.loading : rotuloAvancar.label}
             </KanbanCardAcaoButton>

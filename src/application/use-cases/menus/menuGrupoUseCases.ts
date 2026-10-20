@@ -3,7 +3,7 @@ import type {
   BuscarMenusPaginatedResponse,
   IMenuRepository,
 } from '@/src/domain/repositories/IMenuRepository'
-import type { MenuGrupoProduto } from '@/src/shared/types/menus'
+import type { MenuGrupoProduto, UpdateMenuGrupoInput } from '@/src/shared/types/menus'
 
 const MIME_PERMITIDOS = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const TAMANHO_MAXIMO_BYTES = 5_242_880
@@ -35,15 +35,25 @@ export class ListarMenuGruposUseCase {
 export class AtualizarMenuGrupoUseCase {
   constructor(private readonly menuRepository: IMenuRepository) {}
 
-  execute(menuId: string, grupoProdutoId: string, nome: string): Promise<MenuGrupoProduto> {
+  execute(
+    menuId: string,
+    grupoProdutoId: string,
+    input: UpdateMenuGrupoInput
+  ): Promise<MenuGrupoProduto> {
     if (!menuId?.trim() || !grupoProdutoId?.trim()) {
       throw new Error('Menu e categoria são obrigatórios')
     }
-    const nomeTrim = nome.trim()
-    if (!nomeTrim) {
-      throw new Error('Nome é obrigatório')
+    const patch: UpdateMenuGrupoInput = {}
+    if (typeof input.nome === 'string') {
+      const nomeTrim = input.nome.trim()
+      if (!nomeTrim) throw new Error('Nome é obrigatório')
+      patch.nome = nomeTrim
     }
-    return this.menuRepository.atualizarGrupo(menuId.trim(), grupoProdutoId.trim(), nomeTrim)
+    if (typeof input.ativo === 'boolean') patch.ativo = input.ativo
+    if (patch.nome === undefined && patch.ativo === undefined) {
+      throw new Error('Informe o nome ou o status da categoria neste cardápio')
+    }
+    return this.menuRepository.atualizarGrupo(menuId.trim(), grupoProdutoId.trim(), patch)
   }
 }
 

@@ -22,7 +22,10 @@ import type {
   ProdutosTabsTabKey,
 } from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
 import type { ClientesTabsModalState } from '@/src/presentation/components/features/clientes/ClientesTabsModal'
-import type { ComplementosTabsModalState } from '@/src/presentation/components/features/complementos/ComplementosTabsModal'
+import type {
+  ComplementoTabKey,
+  ComplementosTabsModalState,
+} from '@/src/presentation/components/features/complementos/ComplementosTabsModal'
 import type { ModalLancamentoProdutoPainelConfirmPayload, ModalLancamentoProdutoPainelModo } from '../components/ModalLancamentoProdutoPainel'
 import type {
   AbaDetalhesPedido,
@@ -61,6 +64,8 @@ export interface NovoPedidoFormSlice {
   setStatus: Dispatch<SetStateAction<StatusVenda>>
   statusDisponiveis: StatusOption[]
   clienteNome: string
+  nomeUsuario: string
+  usuarioLogadoId: string
   produtos: ProdutoSelecionado[]
   pagamentos: PagamentoSelecionado[]
   setPagamentos: Dispatch<SetStateAction<PagamentoSelecionado[]>>
@@ -78,6 +83,8 @@ export interface NovoPedidoFormSlice {
   dataVenda: string
   observacaoPedido: string
   setObservacaoPedido: Dispatch<SetStateAction<string>>
+  observacaoNota: string
+  setObservacaoNota: Dispatch<SetStateAction<string>>
 }
 
 /** Catálogo: grupos, produtos do grupo e busca. */
@@ -99,7 +106,7 @@ export interface NovoPedidoCatalogoSlice {
   isFetchingNextProdutosCatalogo: boolean
   carregarProximaPaginaProdutosCatalogo: () => void
   menuCatalogoIndisponivel: boolean
-  tipoInicioPedido: 'balcao' | 'entrega'
+  tipoInicioPedido: 'balcao' | 'delivery'
 }
 
 /** Edição/lançamento de linha de produto (painel e modal de edição). */
@@ -127,7 +134,7 @@ export interface NovoPedidoEdicaoLinhaSlice {
     options?: { produtoIdCarrinho?: string }
   ) => void
   fecharComplementoTabsModalNoPainel: () => void
-  handleTabChangeComplementoTabsModalPainel: (tab: 'complemento') => void
+  handleTabChangeComplementoTabsModalPainel: (tab: ComplementoTabKey) => void
   recarregarProdutoPainelAposEdicaoComplemento: () => Promise<void>
   recarregarProdutoCarrinhoAposEdicao: (produtoId?: string) => Promise<void>
   produtoParaLancamentoPainel: Produto | null
@@ -225,6 +232,8 @@ export interface NovoPedidoUISlice {
   empresa: EmpresaMe
   seletorClienteOpen: boolean
   setSeletorClienteOpen: Dispatch<SetStateAction<boolean>>
+  abrirCadastroRapidoEntregaPedido: number
+  setAbrirCadastroRapidoEntregaPedido: Dispatch<SetStateAction<number>>
   tooltipGrupoId: string | null
   setTooltipGrupoId: Dispatch<SetStateAction<string | null>>
   tooltipPosition: { x: number; y: number } | null
@@ -262,7 +271,7 @@ export interface NovoPedidoUISlice {
 export interface NovoPedidoDetalheSlice {
   modoVisualizacao?: boolean
   tabelaOrigemVenda: 'venda' | 'venda_gestor'
-  tipoInicioPedido: 'balcao' | 'entrega'
+  tipoInicioPedido: 'balcao' | 'delivery'
   statusFiscalUnificado: string | null
   isLoadingVenda: boolean
   abaDetalhesPedido: AbaDetalhesPedido
@@ -276,6 +285,16 @@ export interface NovoPedidoDetalheSlice {
   podeEditarPagamentoEntregaEmAberto: boolean
   podeAjustarPagamentoEntregaEmAberto: boolean
   pagamentoEntregaConfirmado: boolean
+  /**
+   * Após salvar itens no detalhe, a cobrança divergiu do novo total.
+   * O operador precisa ajustar e gravar o pagamento antes de sair.
+   */
+  ajustandoPagamentoAposEdicaoItens: boolean
+  /** Catálogo de produtos de um pedido já existente (lápis do Kanban ou Editar Pedido no detalhe). */
+  modoEdicaoProdutos: boolean
+  /** Pedido delivery em PENDENTE/EM_PREPARO/PRONTO: o detalhe pode abrir a edição completa dos itens. */
+  podeEditarItensPedidoDetalhe: boolean
+  handleEditarPedidoNoDetalhe: () => void
   produtoTabsModalState: ProdutosTabsModalState
   handleAbrirEdicaoProdutoDetalhes: (
     produtoId: string | null | undefined,

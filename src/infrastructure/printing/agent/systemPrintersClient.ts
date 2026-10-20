@@ -1,5 +1,18 @@
 import { mensagemJiffyPrintIndisponivel, printAgentBaseUrl } from './localAgentClient'
-import { isImpressoraVirtualPdf } from '@/src/infrastructure/printing/resolvePrinterDestinationForTicket'
+
+/** Impressoras virtuais do Windows que geram PDF/arquivo — não servem para cupom térmico. */
+export function isImpressoraVirtualPdf(nome: string): boolean {
+  const n = nome.trim().toLowerCase()
+  if (!n) return false
+  return (
+    n.includes('print to pdf') ||
+    n.includes('microsoft print to pdf') ||
+    n.includes('salvar como pdf') ||
+    n.includes('save as pdf') ||
+    n === 'pdf' ||
+    n.endsWith(' pdf')
+  )
+}
 
 export type AgentSystemPrinter = {
   name: string

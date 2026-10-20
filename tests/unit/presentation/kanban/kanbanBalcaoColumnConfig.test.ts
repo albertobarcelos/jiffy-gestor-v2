@@ -147,13 +147,13 @@ describe('vendaPertenceColunaBalcaoKanban', () => {
     ).toBe(true)
   })
 
-  it('em FINALIZADAS mantém etapa fora do balcão (não esvazia a coluna)', () => {
+  it('em FINALIZADAS não absorve etapa vazia nem coluna operacional', () => {
     expect(
       vendaPertenceColunaBalcaoKanban(venda, 'FINALIZADAS', () => 'NOVOS_PEDIDOS')
-    ).toBe(true)
+    ).toBe(false)
     expect(
-      vendaPertenceColunaBalcaoKanban(venda, 'FINALIZADAS', () => 'ABERTA')
-    ).toBe(true)
+      vendaPertenceColunaBalcaoKanban(venda, 'FINALIZADAS', () => '')
+    ).toBe(false)
   })
 
   it('nas demais colunas exige etapa exatamente igual', () => {

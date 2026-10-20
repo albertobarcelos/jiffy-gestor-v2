@@ -6,6 +6,7 @@ import {
   montarGruposCatalogoVenda,
   resolverGrupoCatalogoSelecionadoId,
 } from '@/src/domain/policies/pedido/CatalogoVendaPolicy'
+import { CATALOGO_VENDA_MENU_GRUPOS_KEY, refetchCatalogoVendaSeInvalidado } from '@/src/presentation/cache/catalogoVendaQueryCache'
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { fetchGruposCatalogoVenda } from '../../novoPedidoProdutosApi'
 
@@ -28,7 +29,7 @@ export function useGruposVendaQuery({
     data: gruposMenu = [],
     isLoading: isLoadingGruposMenu,
   } = useSecureTenantQuery(
-    ['novo-pedido-menu-grupos', menuId],
+    [CATALOGO_VENDA_MENU_GRUPOS_KEY, menuId],
     async ({ token: tenantToken }) => {
       if (!menuId) return [] as GrupoProduto[]
       return fetchGruposCatalogoVenda(menuId, tenantToken)
@@ -36,6 +37,7 @@ export function useGruposVendaQuery({
     {
       enabled: enabled && !!token && !!menuId,
       staleTime: 1000 * 60 * 5,
+      refetchOnMount: refetchCatalogoVendaSeInvalidado,
     }
   )
 

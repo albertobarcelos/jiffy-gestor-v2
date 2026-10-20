@@ -22,6 +22,7 @@ import { GrupoItem } from './GrupoItem'
 import { useGruposProdutosInfinite } from '@/src/presentation/hooks/useGruposProdutos'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { updateGrupoProdutoStatusUseCase } from '@/src/infrastructure/composition/categoriaStatusUseCases'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
@@ -255,25 +256,13 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       )
 
       try {
-        const response = await fetchGestorApi(`/api/grupos-produtos/${grupoId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ ativo: novoStatus }),
-        })
-
-        if (!response.ok) {
-          const error = await response.json().catch(() => ({}))
-          throw new Error(error.message || 'Erro ao atualizar categoria')
-        }
-
+        await updateGrupoProdutoStatusUseCase.execute({ grupoId, novoStatus, token })
+        await invalidate(['menu-grupos'])
         showToast.success(
-          novoStatus ? 'Categoria ativada com sucesso!' : 'Categoria desativada com sucesso!'
+          novoStatus
+            ? 'Categoria ativada no cadastro e em todos os cardápios'
+            : 'Categoria desativada no cadastro e em todos os cardápios'
         )
-        // Não invalidar cache imediatamente - a atualização otimista já atualizou a UI
-        // O cache será invalidado apenas quando necessário (ex: ao fechar modal, mudar filtros, etc)
       } catch (error) {
         console.error('Erro ao atualizar status do grupo:', error)
         // Reverter atualização otimista em caso de erro
@@ -281,7 +270,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
         showToast.error('Não foi possível atualizar o status da categoria.')
       }
     },
-    [ localGrupos]
+    [invalidate, localGrupos]
   )
 
   const openTabsModal = useCallback(

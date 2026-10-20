@@ -3,11 +3,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
+import { ComplementoGruposTab } from './ComplementoGruposTab'
+import { ComplementoOndeUsadoTab } from './ComplementoOndeUsadoTab'
 import { NovoComplemento, type NovoComplementoHandle } from './NovoComplemento'
 
 const COMPLEMENTO_TABS_FORM_ID = 'complemento-tabs-modal-form'
 
-type TabKey = 'complemento'
+export type ComplementoTabKey = 'complemento' | 'grupos' | 'onde-usado'
+
+type TabKey = ComplementoTabKey
 
 export interface ComplementosTabsModalState {
   open: boolean
@@ -20,7 +24,7 @@ interface ComplementosTabsModalProps {
   state: ComplementosTabsModalState
   onClose: () => void
   onTabChange: (tab: TabKey) => void
-  onReload?: () => void
+  onReload?: (savedId?: string, imagemUrl?: string | null) => void
   /** Chamado ao criar um novo complemento — passa o id para quem precisar auto-vincular. */
   onCreated?: (id: string) => void
   /** Empilhar acima de outros painéis (ex.: modal de lançamento de produto em z-index 1400). */
@@ -80,6 +84,9 @@ export function ComplementosTabsModal({
     return state.mode === 'create' ? 'Novo Complemento' : 'Editar Complemento'
   }, [state.mode])
 
+  const abasExtras = state.mode === 'edit' && Boolean(state.complementoId)
+  const abaCadastro = state.tab === 'complemento'
+
   const [embedFormState, setEmbedFormState] = useState({
     isSubmitting: false,
     canSubmit: false,
@@ -95,31 +102,50 @@ export function ComplementosTabsModal({
         scrollableBody={false}
         footerVariant="bar"
         panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,45vw)]"
-        footerActions={{
-          showSave: true,
-          saveLabel: 'Salvar',
-          saveFormId: COMPLEMENTO_TABS_FORM_ID,
-          saveLoading: embedFormState.isSubmitting,
-          saveDisabled: !embedFormState.canSubmit || embedFormState.isSubmitting,
-        }}
+        footerActions={
+          abaCadastro
+            ? {
+                showSave: true,
+                saveLabel: 'Salvar',
+                saveFormId: COMPLEMENTO_TABS_FORM_ID,
+                saveLoading: embedFormState.isSubmitting,
+                saveDisabled: !embedFormState.canSubmit || embedFormState.isSubmitting,
+              }
+            : {
+                showCancel: true,
+                cancelLabel: 'Fechar',
+                onCancel: handleRequestClose,
+              }
+        }
         tabsSlot={
           <div className="flex flex-wrap gap-1 px-2 pb-0">
-            <button
-              type="button"
-              onClick={() => onTabChange('complemento')}
-              className={`rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors ${
-                state.tab === 'complemento'
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
-              }`}
-            >
-              Complemento
-            </button>
+            {(
+              [
+                { key: 'complemento' as const, label: 'Complemento', visivel: true },
+                { key: 'grupos' as const, label: 'Grupos', visivel: abasExtras },
+                { key: 'onde-usado' as const, label: 'Onde é usado', visivel: abasExtras },
+              ] as const
+            )
+              .filter(tab => tab.visivel)
+              .map(tab => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => onTabChange(tab.key)}
+                  className={`rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                    state.tab === tab.key
+                      ? 'bg-primary text-white'
+                      : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
           </div>
         }
       >
         <div className="flex min-h-0 flex-1 flex-col">
-          {state.tab === 'complemento' ? (
+          <div className={abaCadastro ? 'flex min-h-0 flex-1 flex-col' : 'hidden'} aria-hidden={!abaCadastro}>
             <NovoComplemento
               ref={ncRef}
               key={`complemento-${state.complementoId ?? 'new'}-sess-${complementoFormSession}`}
@@ -129,15 +155,21 @@ export function ComplementosTabsModal({
               embeddedFormId={COMPLEMENTO_TABS_FORM_ID}
               hideEmbeddedFormActions
               onEmbedFormStateChange={setEmbedFormState}
-              onSaved={(savedId) => {
+              onSaved={async (savedId, imagemUrl) => {
                 if (state.mode === 'create' && savedId) {
                   onCreated?.(savedId)
                 }
-                onReload?.()
+                await Promise.resolve(onReload?.(savedId, imagemUrl))
                 onClose()
               }}
               onCancel={handleRequestClose}
             />
+          </div>
+          {state.tab === 'grupos' && state.complementoId ? (
+            <ComplementoGruposTab complementoId={state.complementoId} />
+          ) : null}
+          {state.tab === 'onde-usado' && state.complementoId ? (
+            <ComplementoOndeUsadoTab complementoId={state.complementoId} />
           ) : null}
         </div>
       </JiffySidePanelModal>

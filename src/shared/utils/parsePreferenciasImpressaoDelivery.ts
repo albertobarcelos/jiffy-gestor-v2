@@ -4,12 +4,6 @@ import type {
 } from '@/src/shared/types/deliveryImpressao'
 import { DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY } from '@/src/shared/types/deliveryImpressao'
 
-function str(v: unknown): string | null {
-  if (typeof v !== 'string') return null
-  const t = v.trim()
-  return t.length ? t : null
-}
-
 function bool(v: unknown, fallback: boolean): boolean {
   if (typeof v === 'boolean') return v
   if (v === 'true' || v === '1') return true
@@ -99,7 +93,6 @@ export function parsePreferenciasImpressaoDelivery(
     imprimirAoReceber: imprimirReceber,
     imprimirAoFicarPronto: imprimirPronto,
     impressoraExpedicaoId,
-    impressoraPadraoNome: null,
   }
 }
 

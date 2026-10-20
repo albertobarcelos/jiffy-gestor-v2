@@ -13,6 +13,7 @@ import {
   podeExibirAbaNotaFiscalDetalhe,
   podeExibirCancelarNotaFiscalDetalhe,
   podeExibirCancelarPedidoDeliveryOperacional as regraPodeExibirCancelarPedidoDeliveryOperacional,
+  podeEditarItensPedidoDeliveryDetalhe as regraPodeEditarItensPedidoDeliveryDetalhe,
   resolverStatusFiscalExibicao,
 } from '@/src/domain/services/pedido/RegrasFluxoPedidoGestor'
 import { Taxa } from '@/src/domain/entities/Taxa'
@@ -31,13 +32,15 @@ import { pagamentoEntregaConfirmadoNoPedido } from '@/src/domain/services/pedido
 
 export type UseNovoPedidoOrchestratorFlagsParams = {
   modoVisualizacao: boolean | undefined
+  /** No modo editar produtos, total/subtotal vêm do carrinho vivo — não do resumo da carga. */
+  modoEdicaoProdutos?: boolean
   tabelaOrigemVenda: 'venda' | 'venda_gestor'
   statusFiscalUnificado: string | null | undefined
   statusFiscalDetalhe: string | null
   resumoFiscal: ResumoFiscalVenda | null
   origem: OrigemVenda | null
   detalhesPedidoMeta: DetalhesPedidoMeta | null
-  tipoInicioPedido: 'balcao' | 'entrega'
+  tipoInicioPedido: 'balcao' | 'delivery'
   status: StatusVenda
   fluxoPagamentoEntrega: FluxoPagamentoEntrega
   currentStep: 1 | 2 | 3 | 4
@@ -55,10 +58,13 @@ export type UseNovoPedidoOrchestratorFlagsParams = {
   enderecoEntregaCoberturaValorTaxa?: number | null
   resumoFinanceiroDetalhes: ResumoFinanceiroDetalhes | null
   detalhesEntregaPedido: DetalhesEntregaPedido | null
+  /** Após editar itens, força o ajuste de cobrança mesmo se o pagamento anterior estava quitado. */
+  ajustandoPagamentoAposEdicaoItens?: boolean
 }
 
 export function useNovoPedidoOrchestratorFlags({
   modoVisualizacao,
+  modoEdicaoProdutos = false,
   tabelaOrigemVenda,
   statusFiscalUnificado,
   statusFiscalDetalhe,
@@ -82,7 +88,10 @@ export function useNovoPedidoOrchestratorFlags({
   enderecoEntregaCoberturaValorTaxa = null,
   resumoFinanceiroDetalhes,
   detalhesEntregaPedido,
+  ajustandoPagamentoAposEdicaoItens = false,
 }: UseNovoPedidoOrchestratorFlagsParams) {
+  const resumoParaTotais = modoEdicaoProdutos ? null : resumoFinanceiroDetalhes
+  const valorFinalParaTotais = modoEdicaoProdutos ? null : valorFinalVenda
   const statusFiscal = useMemo(
     () =>
       resolverStatusFiscalExibicao(
@@ -108,9 +117,9 @@ export function useNovoPedidoOrchestratorFlags({
     () =>
       podeExibirAbaDadosEntregaDetalhe({
         modoVisualizacao,
-        tipoVenda: detalhesPedidoMeta?.tipoVenda,
+        tipoEntrega: detalhesPedidoMeta?.tipoEntrega,
       }),
-    [modoVisualizacao, detalhesPedidoMeta?.tipoVenda]
+    [modoVisualizacao, detalhesPedidoMeta?.tipoEntrega]
   )
 
   const statusDisponiveis = [
@@ -120,7 +129,7 @@ export function useNovoPedidoOrchestratorFlags({
   ]
 
   const rotuloStatusResumoModal = useMemo(() => {
-    if (tipoInicioPedido === 'entrega' && status === 'ABERTA') {
+    if (tipoInicioPedido === 'delivery' && status === 'ABERTA') {
       return 'Pendente (novos pedidos)'
     }
     return statusDisponiveis.find(s => s.value === status)?.label ?? String(status)
@@ -129,9 +138,9 @@ export function useNovoPedidoOrchestratorFlags({
   const pedidoGestorComPagamentoNoPasso3 =
     status === 'FINALIZADA' ||
     status === 'PENDENTE_EMISSAO' ||
-    (tipoInicioPedido === 'entrega' && status === 'ABERTA')
+    (tipoInicioPedido === 'delivery' && status === 'ABERTA')
 
-  const pedidoEntregaAceitaPagamentoPendente = tipoInicioPedido === 'entrega' && status === 'ABERTA'
+  const pedidoEntregaAceitaPagamentoPendente = tipoInicioPedido === 'delivery' && status === 'ABERTA'
 
   const entregaComCobrancaPeloEntregador =
     pedidoEntregaAceitaPagamentoPendente && fluxoPagamentoEntrega === 'cobrar_entregador'
@@ -159,7 +168,7 @@ export function useNovoPedidoOrchestratorFlags({
       resolverValorTaxaEntregaPedido({
         pedidoComEntrega,
         taxaEntregaValor: detalhesEntregaPedido?.taxaEntrega?.valor,
-        resumoFinanceiroDetalhes,
+        resumoFinanceiroDetalhes: resumoParaTotais,
         taxaEntregaCoberturaValor: enderecoEntregaCoberturaValorTaxa,
         taxaEntregaCatalogoValor: taxaEntregaSelecionada?.getValor(),
         taxaEntregaOverride: resolverModoTaxaEntregaOverride(taxaEntregaId),
@@ -167,7 +176,7 @@ export function useNovoPedidoOrchestratorFlags({
     [
       pedidoComEntrega,
       detalhesEntregaPedido?.taxaEntrega?.valor,
-      resumoFinanceiroDetalhes,
+      resumoParaTotais,
       enderecoEntregaCoberturaValorTaxa,
       taxaEntregaSelecionada,
       taxaEntregaId,
@@ -175,8 +184,8 @@ export function useNovoPedidoOrchestratorFlags({
   )
 
   const subtotalProdutos = useMemo(
-    () => resolverSubtotalItensPedido(subtotalProdutosCalculado, resumoFinanceiroDetalhes),
-    [subtotalProdutosCalculado, resumoFinanceiroDetalhes]
+    () => resolverSubtotalItensPedido(subtotalProdutosCalculado, resumoParaTotais),
+    [subtotalProdutosCalculado, resumoParaTotais]
   )
 
   const totalProdutos = useMemo(
@@ -184,10 +193,10 @@ export function useNovoPedidoOrchestratorFlags({
       resolverTotalPedidoComTaxaEntrega({
         subtotalItens: subtotalProdutos,
         taxaEntrega: valorTaxaEntrega,
-        valorFinalApi: valorFinalVenda,
-        resumoFinanceiroDetalhes,
+        valorFinalApi: valorFinalParaTotais,
+        resumoFinanceiroDetalhes: resumoParaTotais,
       }),
-    [subtotalProdutos, valorTaxaEntrega, valorFinalVenda, resumoFinanceiroDetalhes]
+    [subtotalProdutos, valorTaxaEntrega, valorFinalParaTotais, resumoParaTotais]
   )
 
   const totalItensPedido = useMemo(
@@ -271,8 +280,36 @@ export function useNovoPedidoOrchestratorFlags({
   )
 
   const podeAjustarPagamentoEntregaEmAberto = useMemo(
-    () => podeEditarPagamentoEntregaEmAberto && !pagamentoEntregaConfirmado,
-    [podeEditarPagamentoEntregaEmAberto, pagamentoEntregaConfirmado]
+    () =>
+      podeEditarPagamentoEntregaEmAberto &&
+      (!pagamentoEntregaConfirmado || ajustandoPagamentoAposEdicaoItens),
+    [
+      podeEditarPagamentoEntregaEmAberto,
+      pagamentoEntregaConfirmado,
+      ajustandoPagamentoAposEdicaoItens,
+    ]
+  )
+
+  const podeEditarItensPedidoDetalhe = useMemo(
+    () =>
+      regraPodeEditarItensPedidoDeliveryDetalhe({
+        modoVisualizacao,
+        tabelaOrigemVenda,
+        tipoVenda: detalhesPedidoMeta?.tipoVenda,
+        origem,
+        vendaId,
+        vendaGestorJaCancelada,
+        statusEtapaOperacional: detalhesPedidoMeta?.statusEtapaOperacional,
+      }),
+    [
+      modoVisualizacao,
+      tabelaOrigemVenda,
+      detalhesPedidoMeta?.tipoVenda,
+      detalhesPedidoMeta?.statusEtapaOperacional,
+      origem,
+      vendaId,
+      vendaGestorJaCancelada,
+    ]
   )
 
   return {
@@ -297,5 +334,6 @@ export function useNovoPedidoOrchestratorFlags({
     podeEditarPagamentoEntregaEmAberto,
     podeAjustarPagamentoEntregaEmAberto,
     pagamentoEntregaConfirmado,
+    podeEditarItensPedidoDetalhe,
   }
 }

@@ -1,6 +1,7 @@
 import { menuBffRepository } from '@/src/infrastructure/api/repositories/MenuBffRepository'
 import type {
   CreateMenuInput,
+  UpdateMenuGrupoInput,
   UpdateMenuInput,
   UpdateMenuProdutoInput,
   UpdateMenuProdutosBatchInput,
@@ -134,6 +135,23 @@ export class ListarMenuGruposViaBffUseCase {
   }
 }
 
+export class AtualizarMenuGrupoViaBffUseCase {
+  execute(
+    input: TokenInput & {
+      menuId: string
+      grupoProdutoId: string
+      data: UpdateMenuGrupoInput
+    }
+  ) {
+    return menuBffRepository.atualizarGrupo(
+      input.token,
+      input.menuId,
+      input.grupoProdutoId,
+      input.data
+    )
+  }
+}
+
 export class RenomearMenuGrupoViaBffUseCase {
   execute(
     input: TokenInput & { menuId: string; grupoProdutoId: string; nome: string }
@@ -185,6 +203,7 @@ export const atualizarMenuProdutoViaBffUseCase = new AtualizarMenuProdutoViaBffU
 export const reordenarMenuProdutoViaBffUseCase = new ReordenarMenuProdutoViaBffUseCase()
 export const uploadImagemMenuProdutoViaBffUseCase = new UploadImagemMenuProdutoViaBffUseCase()
 export const listarMenuGruposViaBffUseCase = new ListarMenuGruposViaBffUseCase()
+export const atualizarMenuGrupoViaBffUseCase = new AtualizarMenuGrupoViaBffUseCase()
 export const renomearMenuGrupoViaBffUseCase = new RenomearMenuGrupoViaBffUseCase()
 export const reordenarMenuGrupoViaBffUseCase = new ReordenarMenuGrupoViaBffUseCase()
 export const uploadImagemMenuGrupoViaBffUseCase = new UploadImagemMenuGrupoViaBffUseCase()

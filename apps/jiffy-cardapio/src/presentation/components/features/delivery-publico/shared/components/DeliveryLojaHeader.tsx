@@ -1,6 +1,8 @@
 'use client'
 
 import type { DeliveryPublicoDesignConfig } from '../types/deliveryPublicoDesignConfig'
+import { DeliveryPublicoMidiaImagem } from '../media/DeliveryPublicoMidiaImagem'
+import { DELIVERY_IMAGEM_SIZES } from '../media/deliveryPublicoImageHosts'
 
 type DeliveryLojaHeaderProps = {
   config: DeliveryPublicoDesignConfig
@@ -12,17 +14,17 @@ export function DeliveryLojaHeader({ config }: DeliveryLojaHeaderProps) {
 
   return (
     <div
-      className="delivery-loja-capa relative mt-5 h-auto w-full overflow-hidden lg:rounded-2xl"
+      className="delivery-loja-capa relative mt-0 h-auto w-full overflow-hidden lg:mt-5 lg:rounded-2xl"
       style={{ backgroundColor: 'var(--delivery-hero-bg)' }}
       role="img"
       aria-label="Capa da loja"
     >
       {capaUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <DeliveryPublicoMidiaImagem
           src={capaUrl}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover object-center"
+          sizes={DELIVERY_IMAGEM_SIZES.capa}
+          priority
+          className="object-cover object-center"
         />
       ) : null}
     </div>

@@ -11,7 +11,7 @@ function criarDto(id: string): VendaUnificadaDTO {
     id,
     1,
     'V0001',
-    'entrega',
+    'delivery',
     'GESTOR',
     'venda_gestor',
     50,
@@ -48,18 +48,34 @@ describe('vendasUnificadasQueryParamsParaPedidosDelivery', () => {
     expect(
       vendasUnificadasQueryParamsParaPedidosDelivery({
         q: 'maria',
-        origem: 'DELIVERY',
+        origem: 'JIFFY_DELIVERY',
         dataCriacaoInicial: '2026-06-01T00:00:00.000Z',
         dataFinalizacaoInicio: '2026-06-02T00:00:00.000Z',
       })
     ).toEqual({
       q: 'maria',
-      origemFiltroKanban: 'DELIVERY',
+      origemFiltroKanban: 'JIFFY_DELIVERY',
+      tipoEntrega: undefined,
       dataCriacaoInicial: '2026-06-01T00:00:00.000Z',
       dataCriacaoFinal: undefined,
       dataFinalizacaoInicio: '2026-06-02T00:00:00.000Z',
       dataFinalizacaoFim: undefined,
     })
+  })
+
+  it('omite q quando o termo é telefone', () => {
+    expect(
+      vendasUnificadasQueryParamsParaPedidosDelivery({
+        q: '659992341536',
+        origem: 'GESTOR',
+      }).q
+    ).toBeUndefined()
+    expect(
+      vendasUnificadasQueryParamsParaPedidosDelivery({
+        q: '4536',
+        origem: 'GESTOR',
+      }).q
+    ).toBeUndefined()
   })
 })
 

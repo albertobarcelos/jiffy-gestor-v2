@@ -102,6 +102,8 @@ export function middleware(request: NextRequest) {
 
   // Rotas públicas - bypass rápido
   if (
+    pathname === '/ws' ||
+    pathname.startsWith('/ws/') ||
     pathname === '/login' ||
     pathname === '/registro' ||
     pathname.startsWith('/registro/') ||
@@ -254,7 +256,7 @@ export const config = {
      * - images (image files)
      * - public files
      */
-    '/((?!_next/static|_next/image|favicon.ico|videos|images|jiffy-flow-bolha\\.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|videos|images|ws(?:/|$)|jiffy-flow-bolha\\.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
 

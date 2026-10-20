@@ -1,9 +1,12 @@
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { fetchGestorApi } from '@/src/infrastructure/api/fetchGestorApi'
 import { MIN_CARACTERES_BUSCA_CATALOGO_VENDA } from '@/src/domain/policies/pedido/CatalogoVendaPolicy'
 import { Produto } from '@/src/domain/entities/Produto'
 import type { INovoPedidoReadRepository } from '@/src/domain/repositories/INovoPedidoReadRepository'
 import {
-  mergeProdutoComSnapshotMenu,
+  gruposComplementosPrecisamHidratacao,
+  gruposProdutoParaCatalogo,
+  hidratarGruposComplementosComFontes,
+  mapGrupoComplementoJsonToProdutoGrupo,
   menuGrupoProdutoToGrupoProduto,
   menuProdutoToProduto,
 } from '@/src/application/mappers/MenuProdutoCatalogMapper'
@@ -16,7 +19,14 @@ import {
   fetchMenuProdutoSnapshot,
   fetchMenuProdutosPagina,
 } from '@/src/infrastructure/api/repositories/menuCatalogFetch'
+import {
+  gravarGruposComplementosNoCache,
+  snapshotCacheGruposComplementosCatalogo,
+} from '@/src/infrastructure/api/repositories/grupoComplementoCatalogoCache'
 import { salvarPedidoDeliveryDetalheCache } from '@/src/infrastructure/api/pedidoDeliveryDetalheCache'
+import { anexarInformacoesAdicionaisEmitirNota } from '@/src/shared/helpers/informacoesAdicionaisNota'
+import { montarBodyReemitirNotaDelivery } from '@/src/domain/services/pedido/RegrasEmissaoFiscalDelivery'
+import { unwrapProdutoApiPayload } from '@/src/shared/utils/unwrapProdutoApiPayload'
 
 async function fetchJson<T>(url: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetchGestorApi(url, {
@@ -39,6 +49,56 @@ async function fetchJson<T>(url: string, token: string, init?: RequestInit): Pro
   }
 
   return (await response.json()) as T
+}
+
+async function fetchProdutoCadastroPorId(produtoId: string, token: string): Promise<Produto | null> {
+  try {
+    const data = await fetchJson<unknown>(
+      `/api/produtos/${encodeURIComponent(produtoId)}`,
+      token
+    )
+    return Produto.fromJSON(unwrapProdutoApiPayload(data))
+  } catch {
+    return null
+  }
+}
+
+async function hidratarComplementosDoProdutoMenu(
+  produto: Produto,
+  token: string,
+  cadastro?: Produto | null
+): Promise<Produto> {
+  const grupos = gruposProdutoParaCatalogo(produto)
+  if (grupos.length === 0 || !gruposComplementosPrecisamHidratacao(grupos)) {
+    gravarGruposComplementosNoCache(grupos)
+    return produto
+  }
+
+  const cadastroPorId = new Map(
+    (cadastro ? gruposProdutoParaCatalogo(cadastro) : []).map(grupo => [grupo.id, grupo])
+  )
+
+  const { produto: hidratado, gruposCompletos } = await hidratarGruposComplementosComFontes(
+    produto,
+    {
+      cadastroPorId,
+      cachePorId: snapshotCacheGruposComplementosCatalogo(),
+    },
+    async id => {
+      try {
+        const raw = await fetchJson<unknown>(
+          `/api/grupos-complementos/${encodeURIComponent(id)}`,
+          token
+        )
+        return mapGrupoComplementoJsonToProdutoGrupo(raw)
+      } catch {
+        return null
+      }
+    }
+  )
+
+  gravarGruposComplementosNoCache(gruposCompletos)
+  return hidratado
 }
 
 export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
@@ -175,23 +235,26 @@ export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
     token: string,
     menuId?: string | null
   ): Promise<Produto | null> {
-    let base: Produto | null = null
-    try {
-      const data = await fetchJson<unknown>(
-        `/api/produtos/${encodeURIComponent(produtoId)}`,
-        token
-      )
-      base = Produto.fromJSON(data)
-    } catch {
-      base = null
+    const [base, snapshot] = await Promise.all([
+      fetchProdutoCadastroPorId(produtoId, token),
+      menuId ? fetchMenuProdutoSnapshot(menuId, produtoId, token) : Promise.resolve(null),
+    ])
+
+    if (!snapshot) {
+      if (!menuId || !base) return base
+      return Produto.fromJSON({
+        ...base.toJSON(),
+        gruposComplementos: [],
+        abreComplementos: false,
+      })
     }
 
-    if (!menuId) return base
+    const produto = menuProdutoToProduto(snapshot, base)
+    return hidratarComplementosDoProdutoMenu(produto, token, base)
+  }
 
-    const snapshot = await fetchMenuProdutoSnapshot(menuId, produtoId, token)
-    if (snapshot && base) return mergeProdutoComSnapshotMenu(base, snapshot)
-    if (snapshot) return menuProdutoToProduto(snapshot, base)
-    return base
+  async hidratarGruposComplementosDoProduto(produto: Produto, token: string): Promise<Produto> {
+    return hidratarComplementosDoProdutoMenu(produto, token)
   }
 
   async buscarClienteJson(
@@ -263,7 +326,27 @@ export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
       token,
       {
         method: 'POST',
-        body: JSON.stringify({ modelo }),
+        body: JSON.stringify(anexarInformacoesAdicionaisEmitirNota({ modelo }, pedidoId)),
+      }
+    )
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      return raw as Record<string, unknown>
+    }
+    return {}
+  }
+
+  async reemitirNotaPedidoDelivery(
+    pedidoId: string,
+    token: string,
+    numero?: number
+  ): Promise<Record<string, unknown>> {
+    const body = montarBodyReemitirNotaDelivery({ numero })
+    const raw = await fetchJson<unknown>(
+      `/api/delivery/pedidos/${encodeURIComponent(pedidoId)}/reemitir-nota`,
+      token,
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
       }
     )
     if (raw && typeof raw === 'object' && !Array.isArray(raw)) {

@@ -5,6 +5,7 @@ import type {
   Menu,
   MenuGrupoProduto,
   MenuProduto,
+  UpdateMenuGrupoInput,
   UpdateMenuInput,
   UpdateMenuProdutoInput,
   UpdateMenuProdutosBatchInput,
@@ -99,7 +100,7 @@ export interface IMenuRepository {
   atualizarGrupo(
     menuId: string,
     grupoProdutoId: string,
-    nome: string
+    input: UpdateMenuGrupoInput
   ): Promise<MenuGrupoProduto>
   reordenarGrupo(
     menuId: string,

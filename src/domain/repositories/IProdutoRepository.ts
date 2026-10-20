@@ -43,5 +43,8 @@ export interface IProdutoRepository {
     id: string,
     input: { add?: string[]; remove?: string[] }
   ): Promise<Produto>
+
+  /** Exclui o produto do cadastro base. */
+  excluirProduto(id: string): Promise<void>
 }
 

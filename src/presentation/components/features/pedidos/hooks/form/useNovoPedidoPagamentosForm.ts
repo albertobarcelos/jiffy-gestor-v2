@@ -6,9 +6,36 @@ import { HiOutlineCreditCard } from 'react-icons/hi2'
 import { MdPix } from 'react-icons/md'
 import type { IconType } from 'react-icons'
 import type { MeioPagamento } from '@/src/domain/entities/MeioPagamento'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { formatarNumeroComMilhar } from '@/src/domain/services/pedido/CalculadoraPedido'
+import { resolverLancamentoPagamento } from '@/src/domain/services/pedido/CalculadoraPagamentoPedido'
 import type { PagamentoSelecionado } from '../../types'
+
+function valorDigitadoDoCampo(valorRecebido: string): number | null {
+  if (!valorRecebido.trim()) return null
+  const valorLimpo = valorRecebido.replace(/\./g, '').replace(',', '.')
+  const valor = parseFloat(valorLimpo)
+  if (!Number.isFinite(valor) || valor <= 0) return null
+  return valor
+}
+
+function idUsuarioGestorLogado(): string {
+  return useAuthStore.getState().tenantAuth?.getUser()?.getId()?.trim() ?? ''
+}
+
+function nomeUsuarioGestorLogado(): string {
+  return useAuthStore.getState().tenantAuth?.getUser()?.getName()?.trim() ?? ''
+}
+
+function carimboAtorGestorLogado(): { realizadoPorId?: string; realizadoPorNome?: string } {
+  const realizadoPorId = idUsuarioGestorLogado()
+  const realizadoPorNome = nomeUsuarioGestorLogado()
+  return {
+    ...(realizadoPorId ? { realizadoPorId } : {}),
+    ...(realizadoPorNome ? { realizadoPorNome } : {}),
+  }
+}
 
 export interface UseNovoPedidoPagamentosFormParams {
   pagamentos: PagamentoSelecionado[]
@@ -18,9 +45,6 @@ export interface UseNovoPedidoPagamentosFormParams {
   valorRecebido: string
   setValorRecebido: React.Dispatch<React.SetStateAction<string>>
   meiosPagamento: MeioPagamento[]
-  pagamentoModoCobranca: boolean
-  valorAPagar: number
-  valorAPagarLancamento: number
   totalProdutos: number
   totalPagamentos: number
   entregaComCobrancaPeloEntregador: boolean
@@ -34,9 +58,6 @@ export function useNovoPedidoPagamentosForm({
   valorRecebido,
   setValorRecebido,
   meiosPagamento,
-  pagamentoModoCobranca,
-  valorAPagar,
-  valorAPagarLancamento,
   totalProdutos,
   totalPagamentos,
   entregaComCobrancaPeloEntregador,
@@ -80,43 +101,43 @@ export function useNovoPedidoPagamentosForm({
 
   const adicionarPagamentoPorCard = useCallback(
     (meioPagamentoIdSelecionado: string) => {
-      const saldoParaLancar = pagamentoModoCobranca ? valorAPagarLancamento : valorAPagar
-      let valorParaUsar = 0
-
-      if (valorRecebido && valorRecebido.trim() !== '') {
-        const valorLimpo = valorRecebido.replace(/\./g, '').replace(',', '.')
-        valorParaUsar = parseFloat(valorLimpo) || 0
-      } else {
-        valorParaUsar = saldoParaLancar
-      }
-
-      if (valorParaUsar <= 0) {
-        showToast.error('Valor inválido')
-        return
-      }
-
       const isDinheiro = isMeioPagamentoDinheiro(meioPagamentoIdSelecionado)
-
-      if (!isDinheiro && valorParaUsar > saldoParaLancar) {
-        showToast.error(`Este meio de pagamento não pode ultrapassar o valor a pagar.`)
+      const valorDigitado = valorDigitadoDoCampo(valorRecebido)
+      const preview = resolverLancamentoPagamento({
+        totalPedido: totalProdutos,
+        pagamentosJaLancados: pagamentos,
+        valorDigitado,
+        isDinheiro,
+      })
+      if (!preview.ok) {
+        showToast.error(preview.message)
         return
       }
 
-      setPagamentos(prev => [
-        ...prev,
-        {
-          meioPagamentoId: meioPagamentoIdSelecionado,
-          valor: valorParaUsar,
-          cobrarNaEntrega: entregaComCobrancaPeloEntregador,
-          naoEfetivo: entregaComCobrancaPeloEntregador,
-        },
-      ])
+      setPagamentos(prev => {
+        const resultado = resolverLancamentoPagamento({
+          totalPedido: totalProdutos,
+          pagamentosJaLancados: prev,
+          valorDigitado,
+          isDinheiro,
+        })
+        if (!resultado.ok) return prev
+        return [
+          ...prev,
+          {
+            meioPagamentoId: meioPagamentoIdSelecionado,
+            valor: resultado.valor,
+            cobrarNaEntrega: entregaComCobrancaPeloEntregador,
+            naoEfetivo: entregaComCobrancaPeloEntregador,
+            ...carimboAtorGestorLogado(),
+          },
+        ]
+      })
       setValorRecebido('')
     },
     [
-      pagamentoModoCobranca,
-      valorAPagarLancamento,
-      valorAPagar,
+      pagamentos,
+      totalProdutos,
       valorRecebido,
       isMeioPagamentoDinheiro,
       entregaComCobrancaPeloEntregador,
@@ -142,6 +163,7 @@ export function useNovoPedidoPagamentosForm({
       {
         meioPagamentoId,
         valor: valorRestante,
+        ...carimboAtorGestorLogado(),
       },
     ])
     setMeioPagamentoId('')

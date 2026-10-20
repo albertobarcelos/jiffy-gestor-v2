@@ -1,4 +1,5 @@
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
+import { StatusFiscalVenda } from '@/src/domain/value-objects/StatusFiscalVenda'
 
 /** Trecho fiscal alinhado ao detalhe Gestor (`incluirFiscal` / NovoPedidoModal). */
 export type ResumoFiscalPublico = {
@@ -174,8 +175,6 @@ function unwrapPayload(raw: unknown): VendaContingenciaPublica {
   return raw as VendaContingenciaPublica
 }
 
-const STATUS_RODAPE_OK = new Set(['EMITIDA', 'AUTORIZADA'])
-
 /**
  * Exibe rodapé com PNG DANFE/NFC-e 80mm quando a nota está autorizada.
  * Chave fiscal preenchida implica documento válido para consulta/QR.
@@ -185,10 +184,9 @@ export function deveExibirRodapeDanfe80mm(data: VendaContingenciaPublica): boole
   const chave = data.resumoFiscal?.chaveFiscal?.trim()
   if (chave) return true
   const r = data.resumoFiscal?.status != null ? String(data.resumoFiscal.status).trim().toUpperCase() : ''
-  if (STATUS_RODAPE_OK.has(r)) return true
+  if (StatusFiscalVenda.tryParse(r)?.isEmitida()) return true
   if (r !== '') return false
-  const s = data.statusFiscal != null ? String(data.statusFiscal).trim().toUpperCase() : ''
-  return STATUS_RODAPE_OK.has(s)
+  return StatusFiscalVenda.tryParse(data.statusFiscal)?.isEmitida() ?? false
 }
 
 function dataFinalizacaoValida(dataFinalizacao: string | undefined): boolean {

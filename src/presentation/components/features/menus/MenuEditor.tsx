@@ -11,6 +11,7 @@ import {
 } from '@/src/presentation/hooks/menus/useMenuCatalog'
 import { useMenuProdutosFilters } from '@/src/presentation/hooks/menus/useMenuProdutosFilters'
 import { useMenuProdutoLista } from '@/src/presentation/hooks/menus/useMenuProdutoLista'
+import { useStatusCategoriaNesteCardapio } from '@/src/presentation/hooks/menus/useStatusCategoriaNesteCardapio'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
 import { useIsMobile } from '@/src/presentation/hooks/useIsMobile'
 import { AddProdutosToMenuPanel } from './AddProdutosToMenuPanel'
@@ -31,17 +32,15 @@ import {
   useEscolherTipoProdutoCadastro,
 } from '@/src/presentation/components/features/produtos/EscolherTipoProdutoModal'
 import { CatalogGroupedList } from '@/src/presentation/components/features/catalogo/CatalogGroupedList'
-import { CatalogProductRow } from '@/src/presentation/components/features/catalogo/CatalogProductRow'
 import type { CatalogGroup } from '@/src/presentation/components/features/catalogo/types'
-import { MenuProdutoRowQuickActions } from './MenuProdutoRowQuickActions'
+import { MenuProdutoCatalogRow } from './MenuProdutoCatalogRow'
+import { MenuCategoriaSnapshotPanel } from './MenuCategoriaSnapshotPanel'
 import { MENU_MODAL_CANCEL_VARIANT } from './menuPanelConstants'
 import { coletarGruposMenuPorSnapshot, ordemSnapshotCategoria } from './ordenarGruposMenuSnapshot'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyFriendlyAlertDialog } from '@/src/presentation/components/ui/JiffyFriendlyAlertDialog'
-import { showToast } from '@/src/shared/utils/toast'
-import { atualizarGrupoProdutoViaBffUseCase } from '@/src/application/use-cases/grupos-produtos/AtualizarGrupoProdutoViaBffUseCase'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { categoriaAtivaNoSnapshot } from '@/src/domain/policies/menu/categoriaStatusNoMenu'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { usePizzaCategorias } from '@/src/presentation/hooks/pizza/usePizza'
@@ -53,6 +52,9 @@ import {
   isPizzaGrupoProdutoId,
 } from '@/src/presentation/utils/pizza/pizzaMenuHelpers'
 import type { CategoriaPizza } from '@/src/shared/types/pizza'
+import { resolverCodigoMenuProduto } from '@/src/shared/utils/catalogoProdutoIndex'
+import { podeDesvincularProdutoDoMenu } from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
+import { showToast } from '@/src/shared/utils/toast'
 import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
 
 interface MenuEditorProps {
@@ -61,6 +63,7 @@ interface MenuEditorProps {
 
 export function MenuEditor({ menuId }: MenuEditorProps) {
   const { toGestao } = useGestaoPath()
+  const invalidate = useInvalidateTenantQueries()
   const isMobile = useIsMobile()
   const { state: filters, query, temFiltroAtivo, actions } = useMenuProdutosFilters()
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(false)
@@ -72,20 +75,12 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   const {
     data: gruposData,
     isLoading: loadingGrupos,
-    fetchNextPage: fetchNextGrupos,
-    hasNextPage: hasNextGrupos,
-    isFetching: isFetchingGrupos,
-    isFetchingNextPage: isFetchingNextGrupos,
   } = useMenuGruposProdutos({
     menuId,
   })
   const {
     data: produtosData,
     isLoading: loadingProdutos,
-    fetchNextPage: fetchNextProdutos,
-    hasNextPage: hasNextProdutos,
-    isFetching: isFetchingProdutos,
-    isFetchingNextPage: isFetchingNextProdutos,
   } = useMenuProdutos({
     menuId,
     q: query.q,
@@ -124,10 +119,6 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   )
   const {
     data: produtosTodosData,
-    fetchNextPage: fetchNextTodos,
-    hasNextPage: hasNextTodos,
-    isFetching: isFetchingTodos,
-    isFetchingNextPage: isFetchingNextTodos,
   } = useMenuProdutos({
     menuId,
     ativo: null,
@@ -135,39 +126,9 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     enabled: addOpen,
   })
   const { data: gruposComplementos = [], isLoading: isLoadingGruposComplementos } =
-    useGruposComplementos({ limit: 100, ativo: null })
-  const invalidate = useInvalidateTenantQueries()
-
-  useEffect(() => {
-    if (hasNextProdutos && !isFetchingNextProdutos && !isFetchingProdutos && produtosData) {
-      void fetchNextProdutos()
-    }
-  }, [
-    hasNextProdutos,
-    isFetchingNextProdutos,
-    isFetchingProdutos,
-    fetchNextProdutos,
-    produtosData,
-  ])
-
-  useEffect(() => {
-    if (hasNextGrupos && !isFetchingNextGrupos && !isFetchingGrupos && gruposData) {
-      void fetchNextGrupos()
-    }
-  }, [hasNextGrupos, isFetchingNextGrupos, isFetchingGrupos, fetchNextGrupos, gruposData])
-
-  useEffect(() => {
-    if (addOpen && hasNextTodos && !isFetchingNextTodos && !isFetchingTodos && produtosTodosData) {
-      void fetchNextTodos()
-    }
-  }, [
-    addOpen,
-    hasNextTodos,
-    isFetchingNextTodos,
-    isFetchingTodos,
-    fetchNextTodos,
-    produtosTodosData,
-  ])
+    useGruposComplementos({ limit: 100, ativo: true })
+  const { toggleStatus: toggleStatusCategoria, dialogReplicacao } =
+    useStatusCategoriaNesteCardapio({ menuId })
 
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
   const [tabsState, setTabsState] = useState<MenuProdutoTabsModalState>({
@@ -176,6 +137,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     produto: null,
     grupo: null,
   })
+  const [categoriaPanelGrupo, setCategoriaPanelGrupo] = useState<MenuGrupoProduto | null>(null)
 
   const openWizardCadastro = useCallback((categoriaId?: string) => {
     setWizardCategoriaId(categoriaId)
@@ -231,6 +193,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   const gruposDoMenu = useMemo(() => {
     const map = new Map<string, { id: string; nome: string }>()
     for (const grupo of grupos) {
+      if (grupo.grupoBase.ativo === false) continue
       const id = grupo.grupoBase.id
       if (!map.has(id)) {
         map.set(id, { id, nome: grupo.nome || grupo.grupoBase.nome })
@@ -266,7 +229,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         grupoId: baseId,
         grupoVisual:
           cor && icon ? { corHex: cor, iconName: icon } : undefined,
-        grupoAtivo: grupo.grupoBase.ativo ?? true,
+        grupoAtivo: categoriaAtivaNoSnapshot(grupo),
         ordem: ordemSnapshotCategoria(grupo),
         addProdutoLabel: pizzaCategoriaIds.has(baseId) ? 'Adicionar sabor' : undefined,
         items: produtosPorGrupo.get(baseId) ?? [],
@@ -386,6 +349,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   const {
     codigoPorId,
     permissoesPorId,
+    imagemPorId,
     savingDaLinha,
     handleNomeChange,
     handleValorChange,
@@ -402,6 +366,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     menuId,
     produtosDoMenu,
     onProdutoRemovido: handleProdutoRemovido,
+    tipoMenu: menu?.tipo,
   })
 
   const handleEditProduto = useCallback(
@@ -442,11 +407,15 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       const grupo = findGrupo(grupoId)
       if (!grupo) return
       const primeiro = produtosPorGrupo.get(grupoId)?.[0] ?? null
-      openTabs({
-        tab: 'grupo',
-        grupo,
-        produto: primeiro,
-      })
+      if (primeiro) {
+        openTabs({
+          tab: 'produto',
+          grupo,
+          produto: primeiro,
+        })
+        return
+      }
+      setCategoriaPanelGrupo(grupo)
     },
     [findGrupo, produtosPorGrupo, openTabs, pizzaCategoriaIds]
   )
@@ -475,33 +444,16 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   }, [])
 
   const handleToggleGrupoStatus = useCallback(
-    async (grupoId: string) => {
+    (grupoId: string) => {
       const grupo = findGrupo(grupoId)
       if (!grupo) return
-
-      const novoStatus = !(grupo.grupoBase.ativo ?? true)
-      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-      if (!token) return
-
-      try {
-        await atualizarGrupoProdutoViaBffUseCase.execute({
-          token,
-          grupoId,
-          patch: { ativo: novoStatus },
-        })
-
-        showToast.success(
-          novoStatus ? 'Categoria ativada com sucesso!' : 'Categoria desativada com sucesso!'
-        )
-        await invalidate(['menu-grupos', menuId])
-        await invalidate(['grupos-produtos'])
-      } catch (err) {
-        showToast.error(
-          err instanceof Error ? err.message : 'N├úo foi poss├¡vel atualizar o status da categoria.'
-        )
-      }
+      void toggleStatusCategoria({
+        grupoId,
+        nome: grupo.nome || grupo.grupoBase.nome,
+        ativoAtual: categoriaAtivaNoSnapshot(grupo),
+      })
     },
-    [findGrupo, invalidate, menuId]
+    [findGrupo, toggleStatusCategoria]
   )
 
   const renderItem = useCallback(
@@ -513,32 +465,23 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         : undefined
       const saving = savingDaLinha(produto.produtoId)
       return (
-        <CatalogProductRow
-          variant="menu"
-          id={produto.produtoId}
-          nome={produto.nome}
-          valor={isPizzaSabor ? 0 : Number(produto.valor)}
-          valorSomenteLeitura={isPizzaSabor}
+        <MenuProdutoCatalogRow
+          produto={produto}
+          codigo={resolverCodigoMenuProduto(
+            produto,
+            codigoPorId.get(produto.produtoId)
+          )}
+          imagemCadastro={imagemPorId.get(produto.produtoId)}
+          permissoesCadastro={permissoesPorId.get(produto.produtoId)}
+          saving={saving}
           valorExibicao={valorExibicao}
-          ativo={produto.ativo}
-          imagemUrl={produto.image?.imageUrl}
-          codigo={codigoPorId.get(produto.produtoId)}
-          isSavingValor={saving.valor}
-          isSavingStatus={saving.status}
-          isSavingNome={saving.nome}
-          onNomeChange={isPizzaSabor ? undefined : handleNomeChange}
-          onValorChange={isPizzaSabor ? undefined : handleValorChange}
+          valorSomenteLeitura={isPizzaSabor}
+          onNomeChange={handleNomeChange}
+          onValorChange={handleValorChange}
           onSwitchToggle={handleStatusToggle}
           onEdit={handleEditProduto}
-          actionsSlot={
-            <MenuProdutoRowQuickActions
-              produto={produto}
-              disabled={saving.acoes}
-              permissoesCadastro={permissoesPorId.get(produto.produtoId)}
-              onPatch={handleQuickPatch}
-              onTogglePermissao={handleTogglePermissao}
-            />
-          }
+          onPatch={handleQuickPatch}
+          onTogglePermissao={handleTogglePermissao}
         />
       )
     },
@@ -552,6 +495,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       handleStatusToggle,
       handleTogglePermissao,
       handleValorChange,
+      imagemPorId,
       permissoesPorId,
       savingDaLinha,
     ]
@@ -589,8 +533,8 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       nomeMenu={menu.nome}
       aba="produtos"
       toolbar={
-        <div className="flex h-8 shrink-0 items-center gap-2">
-          <div className="w-[min(220px,22vw)] shrink-0">
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="w-full min-w-0 sm:max-w-[220px] sm:flex-1 md:w-[min(220px,22vw)] md:flex-none">
             <TextField
               id="menu-produtos-search"
               size="small"
@@ -628,6 +572,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
               onAdicionar={handleAdicionarProdutosCabecalho}
               onReordenar={() => setReorderOpen(true)}
               loteHref={toGestao(`/menus/${menuId}/atualizar-lote`)}
+              className="w-full justify-start sm:w-auto sm:flex-none"
             />
           ) : null}
         </div>
@@ -653,8 +598,9 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         onClearFilters={actions.reset}
       />
 
-      <div className="mt-2 min-h-0 flex-1 overflow-y-auto px-1 scrollbar-hide">
+      <div className="mt-2 flex min-h-0 flex-1 flex-col px-1">
         <CatalogGroupedList
+          virtualize
           groups={catalogGroupsVisiveis}
           getItemKey={item => item.produtoId}
           renderItem={renderItem}
@@ -680,7 +626,17 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         state={tabsState}
         onClose={closeTabs}
         onTabChange={tab => setTabsState(prev => ({ ...prev, tab }))}
-        onRemoverDesteCardapio={handleRemove}
+        onGrupoChange={grupo => setTabsState(prev => ({ ...prev, grupo }))}
+        onRemoverDesteCardapio={
+          podeDesvincularProdutoDoMenu(menu?.tipo) ? handleRemove : undefined
+        }
+      />
+
+      <MenuCategoriaSnapshotPanel
+        open={Boolean(categoriaPanelGrupo)}
+        menuId={menuId}
+        grupo={categoriaPanelGrupo}
+        onClose={() => setCategoriaPanelGrupo(null)}
       />
 
       <AddProdutosToMenuPanel
@@ -739,6 +695,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         onClose={() => setReorderOpen(false)}
       />
       {dialogPropagacao}
+      {dialogReplicacao}
       <JiffyFriendlyAlertDialog
         open={Boolean(statusConfirm)}
         onClose={fecharStatusConfirm}

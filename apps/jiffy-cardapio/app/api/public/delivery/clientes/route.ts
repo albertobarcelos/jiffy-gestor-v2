@@ -8,7 +8,7 @@ import { proxyPublicDeliveryPost } from '@/src/infrastructure/bff/proxyPublicDel
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    return proxyPublicDeliveryPost('/api/v1/delivery/clientes', body)
+    return proxyPublicDeliveryPost('/api/v1/delivery/clientes', body, request)
   } catch {
     return Response.json({ error: 'Corpo da requisição inválido' }, { status: 400 })
   }

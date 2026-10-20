@@ -24,15 +24,16 @@ export function formatarPrevisaoEntregaKanbanCard(venda: VendaUnificadaDTO): str
 
 /** Forma de cobrança no card (antecipado vs na entrega/retirada). */
 export function rotuloFormaCobrancaKanbanCard(
-  tipoVenda: string | null | undefined,
+  tipoEntrega: string | null | undefined,
   fluxo: FluxoPagamentoEntrega | null | undefined
 ): string | null {
   if (!fluxo) return null
   if (fluxo === 'ja_pago') return 'Já foi pago'
 
-  const tipo = String(tipoVenda ?? '').trim().toLowerCase()
+  const tipo = String(tipoEntrega ?? '').trim().toLowerCase()
   if (tipo === 'retirada') return 'Cobrança na retirada'
-  return 'Cobrar na entrega'
+  if (tipo === 'entrega') return 'Cobrar na entrega'
+  return 'A cobrar'
 }
 
 /** Nomes dos meios de pagamento das cobranças ativas (ex.: Dinheiro, PIX). */

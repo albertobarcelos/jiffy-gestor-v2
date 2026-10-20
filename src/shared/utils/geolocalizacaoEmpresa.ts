@@ -120,6 +120,63 @@ export async function geocodificarEnderecoEmpresaViaGoogle(
   }
 }
 
+/** Chave estável dos campos que definem a coordenada da loja (ignora complemento). */
+export function assinaturaEnderecoEmpresaGeocode(input: EnderecoEmpresaGeocodeInput): string {
+  return [
+    (input.rua ?? '').trim().toLowerCase(),
+    (input.numero ?? '').trim().toLowerCase(),
+    (input.bairro ?? '').trim().toLowerCase(),
+    (input.cidade ?? '').trim().toLowerCase(),
+    (input.estado ?? '').trim().toUpperCase(),
+    normalizarCepEndereco(input.cep),
+  ].join('|')
+}
+
+export type ResolucaoPinEmpresa =
+  | { acao: 'manter'; point: GeoJsonPoint; providerEnderecoId: string | null }
+  | { acao: 'geocodificar' }
+  | { acao: 'pular' }
+
+/**
+ * A aba Empresa grava o endereço. O pin vive na cobertura.
+ * Aqui só tentamos geocodificar em segundo plano quando o endereço está completo.
+ * Places nesta sessão (pin alinhado) não precisa geocodificar de novo.
+ */
+export function resolverPinAoSalvarEmpresa(params: {
+  enderecoAtual: EnderecoEmpresaGeocodeInput
+  enderecoSalvo: EnderecoEmpresaGeocodeInput | null
+  pinAtual: GeoJsonPoint | null
+  providerEnderecoId: string | null
+  pinAlinhadoAoFormulario: boolean
+}): ResolucaoPinEmpresa {
+  const minimo = enderecoEmpresaGeocodeMinimo(params.enderecoAtual)
+  const enderecoMudou =
+    !params.enderecoSalvo ||
+    assinaturaEnderecoEmpresaGeocode(params.enderecoAtual) !==
+      assinaturaEnderecoEmpresaGeocode(params.enderecoSalvo)
+
+  if (!minimo) {
+    if (params.pinAtual && !enderecoMudou) {
+      return {
+        acao: 'manter',
+        point: params.pinAtual,
+        providerEnderecoId: params.providerEnderecoId,
+      }
+    }
+    return { acao: 'pular' }
+  }
+
+  if (params.pinAlinhadoAoFormulario && params.pinAtual && enderecoMudou) {
+    return {
+      acao: 'manter',
+      point: params.pinAtual,
+      providerEnderecoId: params.providerEnderecoId,
+    }
+  }
+
+  return { acao: 'geocodificar' }
+}
+
 export function montarPatchEnderecoGeolocalizacao(
   point: GeoJsonPoint | null,
   providerEnderecoId?: string | null

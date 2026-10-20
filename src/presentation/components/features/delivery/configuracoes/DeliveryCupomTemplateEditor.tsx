@@ -2,9 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MdPrint, MdReceiptLong, MdRestartAlt } from 'react-icons/md'
-import { mapTicketToGraphicPrintDocument } from '@/src/application/delivery/mapTicketToGraphicPrintDocument'
+import { mapTicketToGraphicPrintDocument } from '@/src/infrastructure/printing/mapTicketToGraphicPrintDocument'
 import { mapTicketToPrintDocument } from '@/src/application/delivery/mapTicketToPrintDocument'
+import { mapTicketToProducaoHibridoDocument } from '@/src/application/delivery/mapTicketToProducaoHibridoDocument'
 import { printDeliveryCupom } from '@/src/infrastructure/printing/printDeliveryCupom'
+import {
+  desenharMolduraIdentidadePng,
+  desenharPilulaProducaoPng,
+} from '@/src/infrastructure/printing/pilulaProducaoPng'
+import { desenharSeparadorTracejadoPng } from '@/src/shared/printing/receiptBitmaps'
 import { showToast } from '@/src/shared/utils/toast'
 import { DeliveryConfigCollapsibleSection } from './DeliveryConfigCollapsibleSection'
 import { larguraCupomDeliveryPx, renderDeliveryCupomHtml } from '@/src/application/delivery/renderDeliveryCupomHtml'
@@ -281,7 +287,8 @@ function sampleCupom(tipoCupom: VendaGestorTicket['tipoCupom']): {
       dataPedido: '2026-05-02T15:18:00-04:00',
       dataPrevista: '2026-05-02T16:10:00-04:00',
       entregador: { nome: 'Thauan Barcelos' },
-      cliente: { nome: 'Alberto Barcelos', telefone: '(65) 9 9293-4536' },
+      tiradoPor: { nome: 'Carlos' },
+      cliente: { nome: 'Joao', telefone: '(65) 9 9293-4536' },
       enderecoEntrega: {
         rua: 'Rua Teste',
         numero: '123',
@@ -328,15 +335,18 @@ function sampleCupom(tipoCupom: VendaGestorTicket['tipoCupom']): {
       itens: [
         {
           produtoId: '1',
-          nomeProduto: 'Coca Cola',
-          quantidade: 1,
+          nomeProduto: 'X-Burger',
+          quantidade: 2,
           valorFinal: 10,
-          observacao: 'Manda canudo',
-          complementos: [{ nome: 'Limão e gelo', quantidade: 1, impressao: { valorFinal: 2 } }],
+          observacao: 'sem cebola',
+          complementos: [
+            { nome: 'Queijo', quantidade: 1, tipoImpactoPreco: 'aumenta', impressao: { valorFinal: 2 } },
+            { nome: 'Bacon', quantidade: 1, tipoImpactoPreco: 'aumenta', impressao: { valorFinal: 2 } },
+          ],
         },
         {
           produtoId: '2',
-          nomeProduto: 'Hambúrguer do Beto',
+          nomeProduto: 'Coca Lata',
           quantidade: 1,
           valorFinal: 10,
         },
@@ -448,15 +458,24 @@ export function DeliveryCupomTemplateEditor({
     try {
       const sample = sampleCupom(modeloSelecionado === 'producao' ? 'producao' : 'expedicao')
       const document =
-        value.modoPapel === 'grafico'
-          ? await mapTicketToGraphicPrintDocument(sample.root, sample.ticket, {
-              nomeEmpresa: 'Espeto do Joaquim',
-              template: value,
+        modeloSelecionado === 'producao'
+          ? mapTicketToProducaoHibridoDocument(sample.root, sample.ticket, {
+              desenharPilula: desenharPilulaProducaoPng,
+              desenharMolduraIdentidade: desenharMolduraIdentidadePng,
+              desenharSeparador: desenharSeparadorTracejadoPng,
             })
-          : mapTicketToPrintDocument(sample.root, sample.ticket, {
-              nomeEmpresa: 'Espeto do Joaquim',
-              template: value,
-            })
+          : value.modoPapel === 'grafico'
+            ? await mapTicketToGraphicPrintDocument(sample.root, sample.ticket, {
+                nomeEmpresa: 'Espeto do Joaquim',
+                template: value,
+                desenharMolduraIdentidade: desenharMolduraIdentidadePng,
+              })
+            : mapTicketToPrintDocument(sample.root, sample.ticket, {
+                nomeEmpresa: 'Espeto do Joaquim',
+                template: value,
+                desenharPilula: desenharPilulaProducaoPng,
+                desenharMolduraIdentidade: desenharMolduraIdentidadePng,
+              })
       const result = await printDeliveryCupom({
         jobId: `teste-cupom-${modeloSelecionado}-${Date.now()}`,
         printerName,

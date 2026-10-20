@@ -13,6 +13,29 @@ export function pinDentroDoRaioPermitido(
 }
 
 /**
+ * Pin ausente ou a mais de 1 km do endereço geocodificado (ex.: empresa mudou de cidade).
+ * Nesse caso o pin tem de saltar para o novo endereço — o ajuste fino de 1 km não alcança.
+ */
+export function pinEmpresaDeveSeguirNovoEndereco(
+  centroEndereco: GeoJsonPoint,
+  pinSalvo: GeoJsonPoint | null
+): boolean {
+  if (!pinSalvo) return true
+  return !pinDentroDoRaioPermitido(centroEndereco, pinSalvo)
+}
+
+/** Geocode longe do pin salvo substitui o pin; perto (≤ 1 km) preserva ajuste fino / Places. */
+export function escolherPinAposGeocode(
+  pinAtual: GeoJsonPoint | null,
+  geocodePoint: GeoJsonPoint
+): 'usar-geocode' | 'manter-pin' {
+  if (!pinAtual) return 'usar-geocode'
+  return pinEmpresaDeveSeguirNovoEndereco(geocodePoint, pinAtual)
+    ? 'usar-geocode'
+    : 'manter-pin'
+}
+
+/**
  * Se o ponto passar do raio, projeta na borda (interpolação linear em lat/lng).
  * Em 1 km o erro vs geodésica é desprezível para o ajuste do pin.
  */

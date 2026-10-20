@@ -130,10 +130,13 @@ export class ApiClient {
     }
 
     try {
+      const next = (options as RequestInit & { next?: { revalidate?: number | false; tags?: string[] } })
+        .next
       const response = await fetch(url, {
         ...options,
-        // Multi-tenant BFF: nunca cachear por URL — o Authorization muda por empresa/aba.
-        cache: 'no-store',
+        // Default no-store: rotas autenticadas não podem compartilhar cache entre empresas.
+        // GET público (catálogo) passa `next.revalidate` — a URL já inclui o slug.
+        ...(next ? { next } : { cache: options.cache ?? 'no-store' }),
         headers: {
           ...defaultHeaders,
           ...options.headers,

@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { calcularPeriodoNoFusoEmpresa } from '@/src/shared/utils/periodoNoFusoEmpresa'
+import { ApiClient } from '@/src/infrastructure/api/apiClient'
+import { buscarPedidosDeliveryPeriodoDashboard } from '@/src/infrastructure/dashboard/buscarPedidosDeliveryPeriodoDashboard'
+import {
+  acrescentarCobrancasDeliveryAoAgregado,
+  idsMeiosCobrancasDelivery,
+} from '@/src/infrastructure/dashboard/agregarMetricasDeliveryDashboard'
 
 interface VendaListApiResponse {
   items: { id: string }[]
@@ -308,18 +314,31 @@ export async function GET(request: NextRequest) {
     const periodoInicialStr = inicioAtual.toISOString()
     const periodoFinalStr = fimAtual.toISOString()
 
+    const apiClient = new ApiClient()
+    const deliveryPromise = buscarPedidosDeliveryPeriodoDashboard({
+      apiClient,
+      headers,
+      inicioIso: periodoInicialStr,
+      fimIso: periodoFinalStr,
+    }).catch(err => {
+      console.warn('Dashboard: não foi possível somar delivery nas formas de pagamento', err)
+      return []
+    })
+
     const meiosPromise = fetchAllMeiosPagamentoMap(baseUrl, headers)
     const vendaIds = await fetchAllVendasFinalizadas(baseUrl, headers, periodoInicialStr, periodoFinalStr)
 
-    if (vendaIds.length === 0) {
-      void meiosPromise.catch(() => {})
+    const [paymentMethodCache, detalhesBrutos, deliveryPedidos] = await Promise.all([
+      meiosPromise,
+      vendaIds.length > 0
+        ? fetchDetalhesVendasEmLotes(baseUrl, headers, vendaIds)
+        : Promise.resolve([] as (VendaDetalhesApiResponse | null)[]),
+      deliveryPromise,
+    ])
+
+    if (vendaIds.length === 0 && deliveryPedidos.length === 0) {
       return NextResponse.json([])
     }
-
-    const [paymentMethodCache, detalhesBrutos] = await Promise.all([
-      meiosPromise,
-      fetchDetalhesVendasEmLotes(baseUrl, headers, vendaIds),
-    ])
     
     const allDetailedVendas = detalhesBrutos.filter(Boolean) as VendaDetalhesApiResponse[]
     const detailedVendas = allDetailedVendas.filter(venda => isVendaFinalizada(venda))
@@ -341,6 +360,10 @@ export async function GET(request: NextRequest) {
           idsMeiosUsados.add(p.meioPagamentoId)
         }
       }
+    }
+
+    for (const meioId of idsMeiosCobrancasDelivery(deliveryPedidos)) {
+      idsMeiosUsados.add(meioId)
     }
 
     await garantirMeiosFaltantesNoCache(baseUrl, headers, paymentMethodCache, idsMeiosUsados)
@@ -417,6 +440,12 @@ export async function GET(request: NextRequest) {
         }
       }
     }
+
+    totalSalesValue += acrescentarCobrancasDeliveryAoAgregado({
+      pedidos: deliveryPedidos,
+      cacheMeios: paymentMethodCache,
+      agregado: methodAggregation,
+    })
 
     const metodosPagamento = Array.from(methodAggregation.values())
       .map(item => ({

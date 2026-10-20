@@ -3,7 +3,7 @@
 import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
 import { MdClose, MdPointOfSale, MdDeliveryDining } from 'react-icons/md'
 
-export type TipoPedido = 'balcao' | 'entrega'
+export type TipoPedido = 'balcao' | 'delivery'
 
 interface EscolhaTipoPedidoModalProps {
   open: boolean
@@ -64,7 +64,7 @@ export function EscolhaTipoPedidoModal({ open, onClose, onSelect }: EscolhaTipoP
           {/* Entrega */}
           <button
             type="button"
-            onClick={() => onSelect('entrega')}
+            onClick={() => onSelect('delivery')}
             className="group flex min-h-[170px] flex-col items-center justify-center gap-3 rounded-xl border-2 border-gray-200 bg-white p-4 text-center shadow-sm transition-colors hover:border-primary hover:bg-primary/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           >
             <MdDeliveryDining className="h-12 w-12 text-primary" aria-hidden />

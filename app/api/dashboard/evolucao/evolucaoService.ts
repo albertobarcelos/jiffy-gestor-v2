@@ -1,5 +1,10 @@
 import { ApiClient } from '@/src/infrastructure/api/apiClient'
 import { resolverTimezoneAgregacaoEmpresa } from '@/src/shared/utils/timezoneAgregacaoEmpresa'
+import { buscarPedidosDeliveryPeriodoDashboard } from '@/src/infrastructure/dashboard/buscarPedidosDeliveryPeriodoDashboard'
+import {
+  pedidoDeliveryEhCancelado,
+  pedidoDeliveryEhFinalizado,
+} from '@/src/infrastructure/dashboard/agregarMetricasDeliveryDashboard'
 
 export type Status = 'FINALIZADA' | 'CANCELADA'
 
@@ -224,7 +229,7 @@ export async function fetchEvolucaoPoints(args: {
   
   const isCustomDates = Boolean(periodoInicial && periodoFinal)
 
-  const [finalizadas, canceladas] = await Promise.all([
+  const [finalizadas, canceladas, deliveryPedidos] = await Promise.all([
     selectedStatuses.includes('FINALIZADA')
       ? fetchAllVendasStatus({
           apiClient,
@@ -241,6 +246,17 @@ export async function fetchEvolucaoPoints(args: {
           dataFinalizacaoInicial: periodoInicial || undefined,
           dataFinalizacaoFinal: periodoFinal || undefined,
           status: 'CANCELADA',
+        })
+      : Promise.resolve([]),
+    periodoInicial && periodoFinal
+      ? buscarPedidosDeliveryPeriodoDashboard({
+          apiClient,
+          headers,
+          inicioIso: periodoInicial,
+          fimIso: periodoFinal,
+        }).catch(err => {
+          console.warn('Dashboard: não foi possível somar delivery na evolução', err)
+          return []
         })
       : Promise.resolve([]),
   ])
@@ -296,6 +312,30 @@ export async function fetchEvolucaoPoints(args: {
 
   finalizadas.forEach(v => addVenda(v, 'FINALIZADA'))
   canceladas.forEach(v => addVenda(v, 'CANCELADA'))
+
+  for (const pedido of deliveryPedidos) {
+    if (pedidoDeliveryEhCancelado(pedido)) {
+      if (!selectedStatuses.includes('CANCELADA')) continue
+      addVenda(
+        {
+          dataFinalizacao: pedido.dataFinalizacao ?? undefined,
+          dataCancelamento: pedido.dataCancelamento,
+          valorFinal: pedido.valorFinal,
+        },
+        'CANCELADA'
+      )
+      continue
+    }
+    if (!pedidoDeliveryEhFinalizado(pedido) || !selectedStatuses.includes('FINALIZADA')) continue
+    addVenda(
+      {
+        dataFinalizacao: pedido.dataFinalizacao ?? undefined,
+        dataCancelamento: null,
+        valorFinal: pedido.valorFinal,
+      },
+      'FINALIZADA'
+    )
+  }
 
   const keys = Array.from(new Set([...mapFinalizadas.keys(), ...mapCanceladas.keys()])).sort()
 

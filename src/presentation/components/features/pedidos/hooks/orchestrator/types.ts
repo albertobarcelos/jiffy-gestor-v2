@@ -12,14 +12,18 @@ export type NovoPedidoShellProps = {
   salvandoProdutos: boolean
   /** Salva as alterações de produtos (diff add/remove). */
   onSalvarProdutos: () => void | Promise<void>
+  /** Cancela a edição de produtos (restaura snapshot). */
+  onCancelarEdicaoProdutos: () => void
   nomeUsuario: string
   currentStep: 1 | 2 | 3 | 4
   isLoadingVenda: boolean
   abaDetalhesPedido: AbaDetalhesPedido
   setAbaDetalhesPedido: (aba: AbaDetalhesPedido) => void
+  /** Trava as abas no detalhe até gravar o pagamento após editar itens. */
+  bloquearAbasDetalhe?: boolean
   podeExibirAbaNotaFiscal: boolean
   podeExibirAbaDadosEntrega: boolean
-  tipoInicioPedido: 'balcao' | 'entrega'
+  tipoInicioPedido: 'balcao' | 'delivery'
   createPending: boolean
   canSubmit: () => boolean
   onSubmit: () => void | Promise<void>

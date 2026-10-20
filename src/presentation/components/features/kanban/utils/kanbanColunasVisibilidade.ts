@@ -13,10 +13,9 @@ export const COLUNAS_KANBAN_IDS: readonly ColunaKanbanId[] = [
   'REJEITADAS',
 ]
 
-/** Fredy (Flow): Novos + Com NF ficam de fora até o operador voltar a marcar. O Gestor web não usa isto. */
+/** Fredy (Flow): Novos fica de fora até o operador voltar a marcar. O Gestor web não usa isto. */
 export const COLUNAS_OCULTAS_PADRAO_DELIVERY: readonly ColunaKanbanId[] = [
   'NOVOS_PEDIDOS',
-  'COM_FISCAL',
 ]
 
 export function isColunaKanbanId(value: string): value is ColunaKanbanId {
@@ -41,7 +40,7 @@ export function colunasOcultasPadraoDoModo(modo: ModoKanbanVendas): ColunaKanban
 
 /**
  * Gestor: todas as etapas do modo.
- * Fredy: preferência do operador — por padrão esconde Novos + Com NF no delivery.
+ * Fredy: preferência do operador — por padrão esconde Novos no delivery.
  */
 export function resolverColunasOcultasKanban(
   superficie: SuperficieQuadroPedidos,

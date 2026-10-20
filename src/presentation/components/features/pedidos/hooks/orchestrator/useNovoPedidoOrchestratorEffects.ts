@@ -9,7 +9,9 @@ export type UseNovoPedidoOrchestratorEffectsParams = {
   open: boolean
   vendaId: string | undefined
   modoVisualizacao: boolean | undefined
-  tipoInicioPedido: 'balcao' | 'entrega'
+  editandoItensNoDetalhe?: boolean
+  ajustandoPagamentoAposEdicaoItens?: boolean
+  tipoInicioPedido: 'balcao' | 'delivery'
   abaDetalhesInicial?: AbaDetalhesPedido
   vendaDataUpdatedAt?: number
   currentStep: 1 | 2 | 3 | 4
@@ -30,6 +32,8 @@ export function useNovoPedidoOrchestratorEffects({
   open,
   vendaId,
   modoVisualizacao,
+  editandoItensNoDetalhe = false,
+  ajustandoPagamentoAposEdicaoItens = false,
   tipoInicioPedido,
   abaDetalhesInicial,
   vendaDataUpdatedAt,
@@ -61,8 +65,17 @@ export function useNovoPedidoOrchestratorEffects({
 
   useEffect(() => {
     if (!open || !vendaId || !modoVisualizacao || !abaDetalhesInicial) return
+    if (editandoItensNoDetalhe || ajustandoPagamentoAposEdicaoItens) return
     setAbaDetalhesPedido(abaDetalhesInicial)
-  }, [open, vendaId, modoVisualizacao, abaDetalhesInicial, setAbaDetalhesPedido])
+  }, [
+    open,
+    vendaId,
+    modoVisualizacao,
+    abaDetalhesInicial,
+    editandoItensNoDetalhe,
+    ajustandoPagamentoAposEdicaoItens,
+    setAbaDetalhesPedido,
+  ])
 
   /** Kanban abre pagamentos para quitar antes de finalizar — efetiva na API, não só “cobrar na entrega”. */
   useEffect(() => {
@@ -91,13 +104,20 @@ export function useNovoPedidoOrchestratorEffects({
 
   useEffect(() => {
     if (!open || !vendaId) return
+    if (editandoItensNoDetalhe) return
 
     if (modoVisualizacao) {
       setCurrentStep(4)
     } else {
       setCurrentStep(1)
     }
-  }, [open, vendaId, modoVisualizacao, setCurrentStep])
+  }, [open, vendaId, modoVisualizacao, editandoItensNoDetalhe, setCurrentStep])
+
+  useEffect(() => {
+    if (!open || !ajustandoPagamentoAposEdicaoItens) return
+    setCurrentStep(4)
+    setAbaDetalhesPedido('pagamentos')
+  }, [open, ajustandoPagamentoAposEdicaoItens, setCurrentStep, setAbaDetalhesPedido])
 
   useEffect(() => {
     if (!open) {

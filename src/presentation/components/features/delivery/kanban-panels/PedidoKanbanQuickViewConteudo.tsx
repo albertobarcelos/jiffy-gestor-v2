@@ -19,7 +19,7 @@ interface PedidoKanbanQuickViewConteudoProps {
   nomeEmpresa: string
   enderecoEmpresa: EnderecoEmpresaMe | null | undefined
   colunaAtual: ColunaKanbanId
-  tipoVenda: 'entrega' | 'retirada'
+  tipoEntrega: 'entrega' | 'retirada'
 }
 
 function Separador() {
@@ -92,7 +92,7 @@ export function PedidoKanbanQuickViewConteudo({
   nomeEmpresa,
   enderecoEmpresa,
   colunaAtual,
-  tipoVenda,
+  tipoEntrega,
 }: PedidoKanbanQuickViewConteudoProps) {
   const { ref: scrollRef, isDragging, dragScrollProps } = useDragScroll()
   const cpfCnpj = formatarCpfCnpjExibicao(dados.detalhesEntrega.clienteCpfCnpj)
@@ -141,16 +141,32 @@ export function PedidoKanbanQuickViewConteudo({
             value={formatarCelularExibicao(dados.telefoneEntregador)}
           />
         )}
-        <LinhaCompacta
-          label="Pagamento:"
-          value={rotuloPagamentoPedidoQuickView(dados.fluxoPagamentoEntrega)}
-          className="text-secondary pt-1"
-        />
-        <LinhaCompacta
-          label="Tipo Pagamento:"
-          value={dados.tipoPagamento ?? '—'}
-          className="text-secondary"
-        />
+        {dados.linhasPagamento?.length ? (
+          dados.linhasPagamento.map(linha => (
+            <LinhaCompacta
+              key={linha}
+              value={linha}
+              className={
+                linha.startsWith('Cobrar')
+                  ? 'pt-1 font-semibold text-amber-700'
+                  : 'pt-1 font-semibold text-green-700'
+              }
+            />
+          ))
+        ) : (
+          <>
+            <LinhaCompacta
+              label="Pagamento:"
+              value={rotuloPagamentoPedidoQuickView(dados.fluxoPagamentoEntrega)}
+              className="text-secondary pt-1"
+            />
+            <LinhaCompacta
+              label="Tipo Pagamento:"
+              value={dados.tipoPagamento ?? '—'}
+              className="text-secondary"
+            />
+          </>
+        )}
 
         <Separador />
 
@@ -227,7 +243,7 @@ export function PedidoKanbanQuickViewConteudo({
           nomeEmpresa={nomeEmpresa}
           enderecoEmpresa={enderecoEmpresa}
           colunaAtual={colunaAtual}
-          tipoVenda={tipoVenda}
+          tipoEntrega={tipoEntrega}
         />
       </div>
     </div>

@@ -88,6 +88,19 @@ describe('montarTicketsResponseFromInstrucoes', () => {
     expect(result.modoImpressaoDelivery).toBe('unificado')
     expect(result.cliente?.nome).toBe('Maria')
     expect(result.cliente?.telefone).toBe('65999998888')
+    expect(result.dataPedido).toBe('2026-06-15T10:00:00.000Z')
+    expect(result.dataInicioPreparo).toBeNull()
+  })
+
+  it('carrega dataInicioPreparo do pedido para o cupom de produção', () => {
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: { mapeamentos: [], warnings: [] },
+      pedido: { ...pedidoBase, dataInicioPreparo: '2026-06-15T10:22:00.000Z' },
+      prefs: DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      empresa: { id: 'emp-1', nomeExibicao: 'Loja Teste' },
+    })
+    expect(result.dataPedido).toBe('2026-06-15T10:00:00.000Z')
+    expect(result.dataInicioPreparo).toBe('2026-06-15T10:22:00.000Z')
   })
 
   it('modo separado gera tickets de produção e expedição com todos os itens', () => {
@@ -203,6 +216,104 @@ describe('montarTicketsResponseFromInstrucoes', () => {
     expect(result.pagamento?.valorCobrarNaEntrega).toBe(29)
   })
 
+  it('leva troco da cédula na cobrança quando o GET manda troco 0 (cardapio)', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      modo: 'separado' as const,
+      impressoraExpedicaoId: 'imp-exp',
+    }
+
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: { mapeamentos: [], warnings: [] },
+      pedido: {
+        ...pedidoBase,
+        valorFinal: 39.9,
+        totalPago: 0,
+        totalFaltaPagar: 39.9,
+        troco: 0,
+        cobrancas: [
+          {
+            id: 'cob-1',
+            meioPagamentoId: 'mp-dinheiro',
+            valor: 50,
+            momentoCobranca: 'na_entrega',
+            status: 'pendente',
+          },
+        ],
+      },
+      prefs,
+      nomesMeiosPagamentoPorId: { 'mp-dinheiro': 'Dinheiro' },
+    })
+
+    expect(result.pagamento?.trocoParaLevar).toBe(10.1)
+    expect(result.pagamento?.valorCobrarNaEntrega).toBe(39.9)
+    expect(result.pagamento?.meios).toEqual([
+      { nome: 'Dinheiro', valor: 39.9, naEntrega: true },
+    ])
+  })
+
+  it('COBRAR usa o valor do pedido, não a cédula, quando há troco', () => {
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: { mapeamentos: [], warnings: [] },
+      pedido: {
+        ...pedidoBase,
+        valorFinal: 45,
+        totalPago: 0,
+        totalFaltaPagar: 45,
+        troco: 0,
+        cobrancas: [
+          {
+            id: 'cob-1',
+            meioPagamentoId: 'mp-dinheiro',
+            valor: 145,
+            momentoCobranca: 'na_entrega',
+            status: 'pendente',
+          },
+        ],
+      },
+      prefs: DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      nomesMeiosPagamentoPorId: { 'mp-dinheiro': 'Dinheiro' },
+    })
+
+    expect(result.pagamento?.trocoParaLevar).toBe(100)
+    expect(result.pagamento?.valorCobrarNaEntrega).toBe(45)
+    expect(result.pagamento?.meios).toEqual([
+      { nome: 'Dinheiro', valor: 45, naEntrega: true },
+    ])
+  })
+
+  it('nao leva troco no cupom quando a cobranca na entrega e PIX', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      modo: 'separado' as const,
+      impressoraExpedicaoId: 'imp-exp',
+    }
+
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: { mapeamentos: [], warnings: [] },
+      pedido: {
+        ...pedidoBase,
+        valorFinal: 39.9,
+        totalPago: 0,
+        totalFaltaPagar: 39.9,
+        troco: 0,
+        cobrancas: [
+          {
+            id: 'cob-1',
+            meioPagamentoId: 'mp-pix',
+            valor: 50,
+            momentoCobranca: 'na_entrega',
+            status: 'pendente',
+          },
+        ],
+      },
+      prefs,
+      nomesMeiosPagamentoPorId: { 'mp-pix': 'PIX' },
+    })
+
+    expect(result.pagamento?.trocoParaLevar).toBeUndefined()
+  })
+
   it('nao soma taxa removida com a taxa ativa no cupom', () => {
     const prefs = {
       ...DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
@@ -255,7 +366,9 @@ describe('montarTicketsResponseFromInstrucoes', () => {
     expect(result.resumoPedido?.valorTotal).toBe(48)
     expect(result.valorFinal).toBe(48)
     expect(result.pagamento?.valorCobrarNaEntrega).toBe(48)
-    expect(result.pagamento?.meios).toEqual([{ nome: 'Dinheiro', valor: 48 }])
+    expect(result.pagamento?.meios).toEqual([
+      { nome: 'Dinheiro', valor: 48, naEntrega: true },
+    ])
   })
 
   it('usa a taxa ativa mesmo se resumoPedido do GET ainda tiver o valor antigo', () => {
@@ -275,5 +388,396 @@ describe('montarTicketsResponseFromInstrucoes', () => {
 
     expect(result.resumoPedido?.taxaEntrega).toBe(8)
     expect(result.resumoPedido?.valorTotal).toBe(48)
+  })
+
+  it('soma só o pendente na entrega e marca o que já foi pago', () => {
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: { mapeamentos: [], warnings: [] },
+      pedido: {
+        ...pedidoBase,
+        valorFinal: 76,
+        totalPago: 30,
+        totalFaltaPagar: 46,
+        cobrancas: [
+          {
+            id: 'cob-pix',
+            meioPagamentoId: 'mp-pix',
+            valor: 30,
+            momentoCobranca: 'antecipado',
+            status: 'paga',
+          },
+          {
+            id: 'cob-dinheiro',
+            meioPagamentoId: 'mp-dinheiro',
+            valor: 46,
+            momentoCobranca: 'na_entrega',
+            status: 'pendente',
+          },
+        ],
+      },
+      prefs: DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      nomesMeiosPagamentoPorId: { 'mp-pix': 'Pix', 'mp-dinheiro': 'Dinheiro' },
+    })
+
+    expect(result.pagamento?.cobrarCliente).toBe(true)
+    expect(result.pagamento?.valorCobrarNaEntrega).toBe(46)
+    expect(result.pagamento?.meioPagamento).toBe('Dinheiro')
+    expect(result.pagamento?.meios).toEqual([
+      { nome: 'Pix', valor: 30, naEntrega: false },
+      { nome: 'Dinheiro', valor: 46, naEntrega: true },
+    ])
+  })
+
+  it('cobra só o pendente mesmo se totalFaltaPagar vier igual ao total do pedido', () => {
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: { mapeamentos: [], warnings: [] },
+      pedido: {
+        ...pedidoBase,
+        valorFinal: 45,
+        totalPago: 30,
+        totalFaltaPagar: 45,
+        cobrancas: [
+          {
+            id: 'cob-dinheiro',
+            meioPagamentoId: 'mp-dinheiro',
+            valor: 30,
+            momentoCobranca: 'antecipado',
+            status: 'paga',
+          },
+          {
+            id: 'cob-credito',
+            meioPagamentoId: 'mp-credito',
+            valor: 15,
+            momentoCobranca: 'na_entrega',
+            status: 'pendente',
+          },
+        ],
+      },
+      prefs: DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      nomesMeiosPagamentoPorId: { 'mp-dinheiro': 'Dinheiro', 'mp-credito': 'Crédito' },
+    })
+
+    expect(result.pagamento?.valorCobrarNaEntrega).toBe(15)
+    expect(result.pagamento?.meios).toEqual([
+      { nome: 'Dinheiro', valor: 30, naEntrega: false },
+      { nome: 'Crédito', valor: 15, naEntrega: true },
+    ])
+  })
+
+  it('classifica pagamentos do cache adaptado quando não vêm cobrancas', () => {
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: { mapeamentos: [], warnings: [] },
+      pedido: {
+        ...pedidoBase,
+        valorFinal: 45,
+        totalPago: 30,
+        totalFaltaPagar: 45,
+        pagamentos: [
+          { meioPagamentoId: 'mp-dinheiro', valor: 30, cobrarNaEntrega: false },
+          { meioPagamentoId: 'mp-credito', valor: 15, cobrarNaEntrega: true, naoEfetivo: true },
+        ],
+      },
+      prefs: DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      nomesMeiosPagamentoPorId: { 'mp-dinheiro': 'Dinheiro', 'mp-credito': 'Crédito' },
+    })
+
+    expect(result.pagamento?.valorCobrarNaEntrega).toBe(15)
+    expect(result.pagamento?.meios).toEqual([
+      { nome: 'Dinheiro', valor: 30, naEntrega: false },
+      { nome: 'Crédito', valor: 15, naEntrega: true },
+    ])
+  })
+
+  it('modo agrupado soma itens equivalentes só no ticket de produção', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      modo: 'separado' as const,
+      impressoraExpedicaoId: 'imp-exp',
+    }
+    const pedido = {
+      ...pedidoBase,
+      produtosLancados: [
+        {
+          id: 'pl-1',
+          produtoId: 'h',
+          nomeProduto: 'Heineken',
+          quantidade: 1,
+          valorUnitario: 10,
+          valorFinal: 10,
+          removido: false,
+          complementos: [],
+          observacoes: [],
+        },
+        {
+          id: 'pl-2',
+          produtoId: 'h',
+          nomeProduto: 'Heineken',
+          quantidade: 1,
+          valorUnitario: 10,
+          valorFinal: 10,
+          removido: false,
+          complementos: [],
+          observacoes: [],
+        },
+      ],
+    }
+
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: {
+        mapeamentos: [
+          {
+            impressoraId: 'imp-cozinha',
+            impressoraNome: 'Cozinha',
+            nomeImpressoraWindows: 'EPSON_COZ',
+            produtosLancadosIds: ['pl-1', 'pl-2'],
+          },
+        ],
+        warnings: [],
+      },
+      pedido,
+      prefs,
+      modoPorImpressoraId: { 'imp-cozinha': 'agrupado' },
+    })
+
+    const producao = result.tickets.filter(t => t.tipoCupom === 'producao')
+    const expedicao = result.tickets.find(t => t.tipoCupom === 'expedicao')
+    expect(producao).toHaveLength(1)
+    expect(producao[0].itens).toHaveLength(1)
+    expect(producao[0].itens[0].quantidade).toBe(2)
+    expect(producao[0].viaProducao?.kind).toBe('single')
+    expect(expedicao?.itens).toHaveLength(2)
+  })
+
+  it('modo porUnidade gera vias unitárias e conferência na produção', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      modo: 'separado' as const,
+      impressoraExpedicaoId: 'imp-exp',
+    }
+
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: {
+        mapeamentos: [
+          {
+            impressoraId: 'imp-cozinha',
+            impressoraNome: 'Cozinha',
+            nomeImpressoraWindows: 'EPSON_COZ',
+            produtosLancadosIds: ['pl-1'],
+          },
+        ],
+        warnings: [],
+      },
+      pedido: pedidoBase,
+      prefs,
+      modoPorImpressoraId: { 'imp-cozinha': 'porUnidade' },
+    })
+
+    const producao = result.tickets.filter(t => t.tipoCupom === 'producao')
+    expect(producao).toHaveLength(3)
+    expect(producao.map(t => t.viaProducao?.kind)).toEqual(['unit', 'unit', 'conference'])
+    expect(producao[0].ticketId).toBe('imp-cozinha-producao-unit-1')
+    expect(producao[2].itens[0].quantidade).toBe(2)
+    expect(result.tickets.find(t => t.tipoCupom === 'expedicao')?.itens).toHaveLength(2)
+  })
+
+  it('modo ficha na impressora não expande o ticket de produção', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      modo: 'separado' as const,
+      impressoraExpedicaoId: 'imp-exp',
+    }
+
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: {
+        mapeamentos: [
+          {
+            impressoraId: 'imp-cozinha',
+            impressoraNome: 'Cozinha',
+            nomeImpressoraWindows: 'EPSON_COZ',
+            produtosLancadosIds: ['pl-1', 'pl-2'],
+          },
+        ],
+        warnings: [],
+      },
+      pedido: pedidoBase,
+      prefs,
+      modoPorImpressoraId: { 'imp-cozinha': 'ficha' },
+    })
+
+    const producao = result.tickets.filter(t => t.tipoCupom === 'producao')
+    expect(producao).toHaveLength(1)
+    expect(producao[0].itens).toHaveLength(2)
+    expect(producao[0].viaProducao?.kind).toBe('single')
+  })
+
+  it('unificado ignora o planner mesmo com modo porUnidade no mapa', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      modo: 'unificado' as const,
+      impressoraExpedicaoId: 'imp-exp',
+    }
+
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: {
+        mapeamentos: [
+          {
+            impressoraId: 'imp-exp',
+            impressoraNome: 'Expedição',
+            nomeImpressoraWindows: 'EPSON_EXP',
+            produtosLancadosIds: ['pl-1', 'pl-2'],
+          },
+        ],
+        warnings: [],
+      },
+      pedido: pedidoBase,
+      prefs,
+      modoPorImpressoraId: { 'imp-exp': 'porUnidade' },
+    })
+
+    expect(result.tickets).toHaveLength(1)
+    expect(result.tickets[0].tipoCupom).toBe('unificado')
+    expect(result.tickets[0].itens).toHaveLength(2)
+    expect(result.tickets[0].viaProducao).toBeUndefined()
+  })
+
+  it('usa modoImpressao vindo das instruções da estação quando o mapa extra está vazio', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      modo: 'separado' as const,
+      impressoraExpedicaoId: 'imp-exp',
+    }
+
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: {
+        mapeamentos: [
+          {
+            impressoraId: 'imp-cozinha',
+            impressoraNome: 'Cozinha',
+            nomeImpressoraWindows: 'EPSON_COZ',
+            produtosLancadosIds: ['pl-1', 'pl-2'],
+            modoImpressao: 'agrupado',
+          },
+        ],
+        warnings: [],
+      },
+      pedido: {
+        ...pedidoBase,
+        produtosLancados: [
+          {
+            id: 'pl-1',
+            produtoId: 'h',
+            nomeProduto: 'Heineken',
+            quantidade: 1,
+            valorUnitario: 10,
+            valorFinal: 10,
+            removido: false,
+            complementos: [],
+            observacoes: [],
+          },
+          {
+            id: 'pl-2',
+            produtoId: 'h',
+            nomeProduto: 'Heineken',
+            quantidade: 1,
+            valorUnitario: 10,
+            valorFinal: 10,
+            removido: false,
+            complementos: [],
+            observacoes: [],
+          },
+        ],
+      },
+      prefs,
+    })
+
+    const producao = result.tickets.filter(t => t.tipoCupom === 'producao')
+    expect(producao).toHaveLength(1)
+    expect(producao[0].itens).toHaveLength(1)
+    expect(producao[0].itens[0].quantidade).toBe(2)
+  })
+
+  it('tipo nenhum zera valor de impressão mesmo com valorUnitario de cadastro', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      modo: 'unificado' as const,
+      impressoraExpedicaoId: 'imp-exp',
+    }
+
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: {
+        mapeamentos: [
+          {
+            impressoraId: 'imp-exp',
+            impressoraNome: 'Expedição',
+            nomeImpressoraWindows: 'EPSON_EXP',
+            produtosLancadosIds: ['pl-1'],
+          },
+        ],
+        warnings: [],
+      },
+      pedido: {
+        ...pedidoBase,
+        valorFinal: 20,
+        produtosLancados: [
+          {
+            id: 'pl-1',
+            produtoId: 'p-1',
+            nomeProduto: 'Hambúrguer',
+            quantidade: 1,
+            valorUnitario: 20,
+            valorFinal: 20,
+            removido: false,
+            complementos: [
+              {
+                id: 'c-alface',
+                nomeComplemento: 'Alface',
+                quantidade: 2,
+                valorUnitario: 3.5,
+                valorFinal: 7,
+                tipoImpactoPreco: 'nenhum',
+              },
+              {
+                id: 'c-bacon',
+                nomeComplemento: 'Bacon',
+                quantidade: 1,
+                valorUnitario: 4,
+                valorFinal: 4,
+                tipoImpactoPreco: 'aumenta',
+              },
+              {
+                id: 'c-sem-cebola',
+                nomeComplemento: 'Sem cebola',
+                quantidade: 1,
+                valorUnitario: 1,
+                valorFinal: 1,
+                tipoImpactoPreco: 'diminui',
+              },
+            ],
+            observacoes: [],
+          },
+        ],
+      },
+      prefs,
+    })
+
+    const item = result.tickets[0].itens[0]
+    const alface = item.complementos.find(c => c.nome === 'Alface')
+    const bacon = item.complementos.find(c => c.nome === 'Bacon')
+    const semCebola = item.complementos.find(c => c.nome === 'Sem cebola')
+
+    expect(alface?.impressao).toEqual({
+      quantidade: 2,
+      valorUnitario: 0,
+      valorFinal: 0,
+      valorTotal: 0,
+    })
+    expect(bacon?.impressao).toEqual({
+      quantidade: 1,
+      valorUnitario: 4,
+      valorFinal: 4,
+      valorTotal: 4,
+    })
+    expect(semCebola?.impressao?.valorFinal).toBe(-1)
+    expect(result.resumoPedido?.valorAdicionais).toBe(3)
   })
 })

@@ -17,7 +17,13 @@ export function DeliveryAdicionadoCarrinhoDialog({
   useDeliveryBodyScrollLock()
 
   return (
-    <div className="fixed inset-0 z-[60] flex overscroll-none items-start justify-center px-4 pt-[12vh] sm:pt-[10vh]">
+    <div
+      className="delivery-vv-overlay z-[60] flex overscroll-none items-start justify-center px-4"
+      style={{
+        zIndex: 60,
+        paddingTop: 'calc(var(--delivery-vv-height, 100dvh) * 0.12)',
+      }}
+    >
       <div
         className="absolute inset-0"
         style={{ backgroundColor: 'var(--delivery-overlay, rgba(0, 0, 0, 0.55))' }}

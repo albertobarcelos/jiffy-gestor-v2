@@ -1,7 +1,7 @@
 'use client'
 
 import { Label } from '@/src/presentation/components/ui/label'
-import { Skeleton } from '@/src/presentation/components/ui/skeleton'
+import { ShimmerLine } from '@/src/presentation/components/ui/shimmer'
 import { MdClear, MdSearch } from 'react-icons/md'
 import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
 import { BUSCA_PRODUTO_INPUT_ID } from '../hooks/form/useNovoPedidoAtalhosTeclado'
@@ -80,7 +80,7 @@ export function PedidoProdutosCatalogoColuna() {
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-2 pb-3 pt-2">
             <Label className="mb-2 shrink-0 text-sm text-gray-600">
               {isLoadingGruposVenda && !emBusca && !grupoSelecionado ? (
-                <Skeleton animation="wave" variant="text" width={200} height={20} />
+                <ShimmerLine width={200} height={20} />
               ) : (
                 <>
                   {tituloGrade}

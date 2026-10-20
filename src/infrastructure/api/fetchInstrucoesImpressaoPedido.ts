@@ -1,6 +1,6 @@
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { fetchGestorApi } from '@/src/infrastructure/api/fetchGestorApi'
 import type { InstrucoesImpressaoResponse } from '@/src/shared/types/instrucoesImpressao'
-import { getEstacaoImpressaoId } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
+import { estacaoDestePcLocalStore } from '@/src/infrastructure/printing/EstacaoDestePcLocalStore'
 import {
   obterInstrucoesImpressaoCache,
   salvarInstrucoesImpressaoCache,
@@ -31,6 +31,8 @@ function normalizarInstrucoes(raw: Record<string, unknown>): InstrucoesImpressao
           nomeImpressoraWindows:
             o.nomeImpressoraWindows != null ? String(o.nomeImpressoraWindows) : null,
           produtosLancadosIds,
+          modoImpressao: o.modoImpressao ?? o.modo_impressao,
+          modoFicha: o.modoFicha ?? o.modo_ficha,
         }
       })
     : []
@@ -70,7 +72,7 @@ export async function fetchInstrucoesImpressaoPedido(
     return { ok: false, status: 401, error: 'Sem token' }
   }
 
-  const estacao = (estacaoImpressaoId ?? getEstacaoImpressaoId())?.trim()
+  const estacao = (estacaoImpressaoId ?? estacaoDestePcLocalStore.obterId())?.trim()
   if (!estacao) {
     warnImpressao('fetchInstrucoes.abort', { motivo: 'sem_estacao', vendaId })
     return {

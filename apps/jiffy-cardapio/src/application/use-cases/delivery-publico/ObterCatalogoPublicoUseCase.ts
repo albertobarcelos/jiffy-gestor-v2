@@ -1,5 +1,6 @@
 import type { GetCatalogoPublicoResponseDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { ICatalogoPublicoPort } from '@/src/application/ports/delivery-publico'
+import { normalizarCatalogoPublicoImagens } from '@/src/application/mappers/normalizarCatalogoPublicoImagens'
 
 export class ObterCatalogoPublicoUseCase {
   constructor(private readonly catalogoPort: ICatalogoPublicoPort) {}
@@ -12,6 +13,7 @@ export class ObterCatalogoPublicoUseCase {
     if (!slugNormalizado) {
       throw new Error('Slug é obrigatório')
     }
-    return this.catalogoPort.buscarPorSlug(slugNormalizado, params)
+    const data = await this.catalogoPort.buscarPorSlug(slugNormalizado, params)
+    return normalizarCatalogoPublicoImagens(data)
   }
 }

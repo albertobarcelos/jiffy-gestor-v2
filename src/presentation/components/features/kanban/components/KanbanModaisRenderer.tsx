@@ -4,6 +4,7 @@ import { EmitirNfeModal } from '../../fiscal/EmitirNfeModal'
 import { AlertaCbenefEmissaoDialog } from '../../fiscal/AlertaCbenefEmissaoDialog'
 import { NovoPedidoModal } from '../../pedidos/NovoPedidoModal'
 import { DeliveryConfiguracoesModal } from '../../delivery/configuracoes/DeliveryConfiguracoesModal'
+import { KanbanBalcaoConfiguracoesModal } from './KanbanBalcaoConfiguracoesModal'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { FaturamentoRangeCalendar } from '@/src/presentation/components/ui/FaturamentoRangeCalendar'
 import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
@@ -14,6 +15,7 @@ import type { Venda } from '../types'
 import type { DateRange } from 'react-day-picker'
 import { AtribuirEntregadorKanbanPainel } from '../../delivery/kanban-panels/AtribuirEntregadorKanbanPainel'
 import { EmpresaDeliveryPendenteGestorModal } from '../../delivery/EmpresaDeliveryPendenteGestorModal'
+import { MeuCaixaSidePanel } from '../../meu-caixa/MeuCaixaSidePanel'
 
 export interface KanbanModaisRendererProps {
   timezoneAgregacao: string
@@ -29,6 +31,10 @@ export interface KanbanModaisRendererProps {
   onAplicarPeriodoDatas: () => void
   deliveryConfiguracoesOpen: boolean
   onCloseDeliveryConfiguracoes: () => void
+  configuracaoEstacaoCaixa: boolean
+  onAbrirConfiguracaoEstacaoCaixa: () => void
+  caixaEstacaoOpen: boolean
+  onCloseCaixaEstacao: () => void
   vendaSelecionadaParaEmissao: VendaSelecionadaParaEmissao | null
   emitirNfeModalOpen: boolean
   onCloseEmitirNfe: () => void
@@ -90,6 +96,10 @@ export function KanbanModaisRenderer({
   onAplicarPeriodoDatas,
   deliveryConfiguracoesOpen,
   onCloseDeliveryConfiguracoes,
+  configuracaoEstacaoCaixa,
+  onAbrirConfiguracaoEstacaoCaixa,
+  caixaEstacaoOpen,
+  onCloseCaixaEstacao,
   vendaSelecionadaParaEmissao,
   emitirNfeModalOpen,
   onCloseEmitirNfe,
@@ -126,8 +136,18 @@ export function KanbanModaisRenderer({
   return (
     <>
       {deliveryConfiguracoesOpen ? (
-        <DeliveryConfiguracoesModal open onClose={onCloseDeliveryConfiguracoes} />
+        modoKanbanVendas === 'delivery' ? (
+          <DeliveryConfiguracoesModal open onClose={onCloseDeliveryConfiguracoes} />
+        ) : (
+          <KanbanBalcaoConfiguracoesModal open onClose={onCloseDeliveryConfiguracoes} />
+        )
       ) : null}
+
+      <MeuCaixaSidePanel
+        open={caixaEstacaoOpen}
+        onClose={onCloseCaixaEstacao}
+        onAbrirConfiguracaoEstacao={onAbrirConfiguracaoEstacaoCaixa}
+      />
 
       <JiffySidePanelModal
         open={modalPeriodoDatasAberto}
@@ -200,7 +220,7 @@ export function KanbanModaisRenderer({
           tabelaOrigemVenda={pedidoEdicaoProdutosContext.tabelaOrigem}
           statusFiscalUnificado={pedidoEdicaoProdutosContext.statusFiscal}
           tipoVendaGestor={pedidoEdicaoProdutosContext.tipoVenda}
-          tipoInicioPedido="entrega"
+          tipoInicioPedido="delivery"
           modoEdicaoProdutos={true}
         />
       )}
@@ -217,9 +237,8 @@ export function KanbanModaisRenderer({
           tipoVendaGestor={pedidoVisualizacaoContext.tipoVenda}
           tipoInicioPedido={
             modoKanbanVendas === 'delivery' ||
-            pedidoVisualizacaoContext.tipoVenda === 'entrega' ||
-            pedidoVisualizacaoContext.tipoVenda === 'retirada'
-              ? 'entrega'
+            pedidoVisualizacaoContext.tipoVenda === 'delivery'
+              ? 'delivery'
               : 'balcao'
           }
           abaDetalhesInicial={pedidoVisualizacaoContext.abaDetalhesInicial}

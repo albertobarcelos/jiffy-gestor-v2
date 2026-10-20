@@ -1,27 +1,17 @@
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { fetchGestorApi } from '@/src/infrastructure/api/fetchGestorApi'
 import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
 import {
-  getEstacaoImpressaoId,
-  limparEstacaoImpressaoId,
-  salvarEstacaoImpressaoId,
-} from '@/src/infrastructure/printing/estacaoImpressaoStorage'
-
-export interface EstacaoImpressaoResumo {
-  id: string
-  nome: string
-  ativo: boolean
-}
-
-export interface ImpressoraLogica {
-  id: string
-  nome: string
-}
-
-export interface EstacaoImpressaoMapeamento {
-  impressoraId: string
-  nomeImpressora: string
-  nomeImpressoraWindows: string
-}
+  normalizarEstacaoImpressaoResumo,
+  normalizarListaEstacoesImpressao,
+} from '@/src/infrastructure/api/normalizarEstacaoImpressaoResumo'
+import { normalizarListaMapeamentosEstacao } from '@/src/infrastructure/api/normalizarEstacaoImpressaoMapeamentos'
+import type {
+  AtualizarEstacaoImpressaoPatch,
+  EstacaoImpressaoMapeamento,
+  EstacaoImpressaoResumo,
+  ImpressoraLogica,
+  MapeamentoEstacaoParaSalvar,
+} from '@/src/domain/estacao-impressao/EstacaoImpressao'
 
 export class EstacaoImpressaoApiError extends Error {
   constructor(
@@ -70,25 +60,49 @@ export async function criarEstacaoImpressao(
   token: string,
   nome: string
 ): Promise<EstacaoImpressaoResumo> {
-  const data = await requestJson<EstacaoImpressaoResumo>('/api/gestor/estacoes-impressao', token, {
+  const data = await requestJson<unknown>('/api/gestor/estacoes-impressao', token, {
     method: 'POST',
     body: JSON.stringify({ nome }),
   })
-  const id = data?.id != null ? String(data.id).trim() : ''
-  if (!id) {
+  const normalized = normalizarEstacaoImpressaoResumo(data)
+  if (!normalized) {
     throw new Error(
       'Criação de estação retornou sem id. Verifique o BFF e o contrato da API gestor.'
     )
   }
-  return {
-    id,
-    nome: data?.nome != null ? String(data.nome) : '',
-    ativo: typeof data?.ativo === 'boolean' ? data.ativo : true,
-  }
+  return normalized
 }
 
 export function listarEstacoesImpressao(token: string): Promise<EstacaoImpressaoResumo[]> {
-  return requestJson<EstacaoImpressaoResumo[]>('/api/gestor/estacoes-impressao', token)
+  return requestJson<unknown>('/api/gestor/estacoes-impressao', token).then(data =>
+    normalizarListaEstacoesImpressao(data)
+  )
+}
+
+export async function atualizarEstacaoImpressao(
+  token: string,
+  estacaoId: string,
+  patch: AtualizarEstacaoImpressaoPatch
+): Promise<EstacaoImpressaoResumo> {
+  const id = estacaoId.trim()
+  if (!id) {
+    throw new Error('ID da estação é obrigatório.')
+  }
+  const data = await requestJson<unknown>(
+    `/api/gestor/estacoes-impressao/${encodeURIComponent(id)}`,
+    token,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }
+  )
+  const normalized = normalizarEstacaoImpressaoResumo(data)
+  if (!normalized) {
+    throw new Error(
+      'Atualização de estação retornou sem id. Verifique o BFF e o contrato da API gestor.'
+    )
+  }
+  return normalized
 }
 
 export async function buscarImpressorasLogicas(token: string): Promise<ImpressoraLogica[]> {
@@ -148,10 +162,11 @@ export async function buscarMapeamentosEstacao(
   const cached = id ? MAPEAMENTOS_ESTACAO_CACHE.get(id) : undefined
   if (cached) return cached
 
-  const data = await requestJson<EstacaoImpressaoMapeamento[]>(
+  const raw = await requestJson<unknown>(
     `/api/gestor/estacoes-impressao/${encodeURIComponent(estacaoId)}/impressoras`,
     token
   )
+  const data = normalizarListaMapeamentosEstacao(raw)
   if (id) MAPEAMENTOS_ESTACAO_CACHE.set(id, data)
   return data
 }
@@ -159,74 +174,19 @@ export async function buscarMapeamentosEstacao(
 export async function salvarMapeamentosEstacao(
   token: string,
   estacaoId: string,
-  mapeamentos: Array<{ impressoraId: string; nomeImpressoraWindows: string }>
+  mapeamentos: MapeamentoEstacaoParaSalvar[]
 ): Promise<EstacaoImpressaoMapeamento[]> {
-  const data = await requestJson<EstacaoImpressaoMapeamento[]>(
-    `/api/gestor/estacoes-impressao/${encodeURIComponent(estacaoId)}/impressoras`,
-    token,
-    {
-      method: 'PUT',
-      body: JSON.stringify({ mapeamentos }),
-    }
+  const data = normalizarListaMapeamentosEstacao(
+    await requestJson<unknown>(
+      `/api/gestor/estacoes-impressao/${encodeURIComponent(estacaoId)}/impressoras`,
+      token,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ mapeamentos }),
+      }
+    )
   )
   const id = estacaoId.trim()
   if (id) MAPEAMENTOS_ESTACAO_CACHE.set(id, data)
   return data
-}
-
-export interface EstacaoImpressaoConfigResolvida {
-  estacaoId: string
-  mapeamentos: EstacaoImpressaoMapeamento[]
-}
-
-/** Nome sugerido ao criar estação local (browser + data). */
-export function nomeEstacaoImpressaoPadrao(): string {
-  if (typeof window === 'undefined') return 'Estação Gestor'
-  const userAgent = window.navigator.userAgent
-  const browser =
-    userAgent.includes('Edg') ? 'Edge'
-    : userAgent.includes('Chrome') ? 'Chrome'
-    : userAgent.includes('Firefox') ? 'Firefox'
-    : 'Navegador'
-  return `Estação ${browser} - ${new Date().toLocaleDateString('pt-BR')}`
-}
-
-async function criarOuReaproveitarEstacaoImpressao(token: string): Promise<string> {
-  try {
-    const estacao = await criarEstacaoImpressao(token, nomeEstacaoImpressaoPadrao())
-    salvarEstacaoImpressaoId(estacao.id)
-    return estacao.id
-  } catch (createError) {
-    const estacoes = await listarEstacoesImpressao(token).catch(() => [])
-    const existente = estacoes.find(e => e.ativo) ?? estacoes[0]
-    if (existente) {
-      salvarEstacaoImpressaoId(existente.id)
-      return existente.id
-    }
-    throw createError
-  }
-}
-
-/**
- * Resolve o id da estação local (localStorage) e carrega mapeamentos.
- * Recria estação se o id salvo não existir mais (404).
- */
-export async function resolverEstacaoImpressaoConfig(
-  token: string
-): Promise<EstacaoImpressaoConfigResolvida> {
-  let estacaoId = getEstacaoImpressaoId()
-  if (!estacaoId) {
-    estacaoId = await criarOuReaproveitarEstacaoImpressao(token)
-  }
-
-  try {
-    const mapeamentos = await buscarMapeamentosEstacao(token, estacaoId)
-    return { estacaoId, mapeamentos }
-  } catch (error) {
-    if (!isEstacaoImpressaoNotFoundError(error)) throw error
-    limparEstacaoImpressaoId()
-    estacaoId = await criarOuReaproveitarEstacaoImpressao(token)
-    const mapeamentos = await buscarMapeamentosEstacao(token, estacaoId)
-    return { estacaoId, mapeamentos }
-  }
 }

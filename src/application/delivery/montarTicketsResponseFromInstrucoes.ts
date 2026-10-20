@@ -3,10 +3,11 @@ import {
   extrairEnderecoEntregaSnapshotDeVendaData,
 } from '@/src/application/mappers/ContextoEntregaDeliveryMapper'
 import { resolverTaxaEntregaValorSync } from '@/src/application/mappers/VendaDetalheMapper'
+import { resolverTrocoLevarPedidoEntrega } from '@/src/application/mappers/resolverTrocoLevarPedidoEntrega'
 import type { EnderecoEntregaDetalhe } from '@/src/domain/types/vendaDetalhe'
 import type { PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
-import type { EstacaoImpressaoMapeamento } from '@/src/infrastructure/api/estacoesImpressaoApi'
-import { isTcpPrinterRef } from '@/src/infrastructure/printing/tcpPrinterRef'
+import type { EstacaoImpressaoMapeamento } from '@/src/domain/estacao-impressao/EstacaoImpressao'
+import { isTcpPrinterRef } from '@/src/domain/estacao-impressao/tcpPrinterRef'
 import type { InstrucoesImpressaoResponse } from '@/src/shared/types/instrucoesImpressao'
 import type {
   VendaGestorTicket,
@@ -18,7 +19,22 @@ import type {
   VendaGestorTicketsPagamentoMeio,
   VendaGestorTicketsResponse,
 } from '@/src/shared/types/vendaGestorTickets'
-import type { EmpresaMeResumo } from '@/src/presentation/hooks/useEmpresaMe'
+import type { EmpresaMeResumo } from '@/src/application/dto/EmpresaMeDTO'
+import {
+  modoImpressaoDeMapeamentoOpcional,
+  type ModoImpressaoImpressora,
+} from '@/src/domain/types/modoImpressaoImpressora'
+import {
+  magnitudeValorComplementoLancamento,
+  valorAssinadoComplementoImpressao,
+} from '@/src/application/delivery/valorComplementoImpressao'
+import {
+  planejarTicketsProducaoImpressora,
+  ticketIdViaProducao,
+} from '@/src/application/delivery/planejarTicketsProducaoImpressora'
+import { normalizeTipoImpactoPreco } from '@/src/application/mappers/VendaApiNormalizer'
+import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
+import { meioNomeEhDinheiro } from '@/src/domain/services/pedido/CalculadoraPagamentoPedido'
 
 function asRecord(v: unknown): Record<string, unknown> | null {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return null
@@ -40,6 +56,10 @@ function isoOrEmpty(v: unknown): string {
 function numeroFinito(v: unknown): number {
   const n = Number(v)
   return Number.isFinite(n) ? n : 0
+}
+
+function roundCentavos(valor: number): number {
+  return Math.round(valor * 100) / 100
 }
 
 function numeroOpcional(v: unknown): number | null {
@@ -69,6 +89,26 @@ function cobrancaAtivaNoCupom(r: Record<string, unknown>): boolean {
   return true
 }
 
+function fontesPagamentoCupom(pedido: Record<string, unknown>): Record<string, unknown>[] {
+  const cobrancas = Array.isArray(pedido.cobrancas) ? pedido.cobrancas : []
+  if (cobrancas.length > 0) {
+    return cobrancas.map(asRecord).filter((r): r is Record<string, unknown> => r != null)
+  }
+  const pagamentos = Array.isArray(pedido.pagamentos) ? pedido.pagamentos : []
+  return pagamentos.map(asRecord).filter((r): r is Record<string, unknown> => r != null)
+}
+
+function cobrancaPendenteNaEntregaNoCupom(r: Record<string, unknown>): boolean {
+  if (!cobrancaAtivaNoCupom(r)) return false
+  const status = asStr(r.status).toLowerCase()
+  const momento = asStr(r.momentoCobranca || r.momento_cobranca).toLowerCase()
+  if (status === 'paga' || asRecord(r.pagamentoEfetivado)) return false
+  if (r.cobrarNaEntrega === true || r.naoEfetivo === true) return true
+  if (momento === 'antecipado') return false
+  if (momento === 'na_entrega') return true
+  return status === 'pendente'
+}
+
 function enderecoDetalheParaTicketsEndereco(
   endereco: EnderecoEntregaDetalhe | null | undefined
 ): VendaGestorTicketsEndereco | null {
@@ -93,15 +133,23 @@ function produtoLancadoAtivo(pl: Record<string, unknown>): boolean {
 
 function mapComplemento(c: Record<string, unknown>): VendaGestorTicketItemComplemento {
   const quantidade = numeroFinito(c.quantidade) || 1
-  const valorUnitario = numeroFinito(c.valorUnitario)
+  const tipoImpactoPreco = normalizeTipoImpactoPreco(c.tipoImpactoPreco)
+  const magnitude = magnitudeValorComplementoLancamento(c)
+  const { valorUnitario, valorFinal } = valorAssinadoComplementoImpressao(
+    tipoImpactoPreco,
+    magnitude,
+    quantidade
+  )
   return {
     nome: asStr(c.nomeComplemento) || asStr(c.nome),
     quantidade,
+    complementoId: asStr(c.complementoId) || asStr(c.id) || undefined,
+    tipoImpactoPreco,
     impressao: {
       quantidade,
       valorUnitario,
-      valorFinal: quantidade * valorUnitario,
-      valorTotal: quantidade * valorUnitario,
+      valorFinal,
+      valorTotal: valorFinal,
     },
   }
 }
@@ -149,7 +197,12 @@ function buildResumoPedido(
         const r = asRecord(c)
         if (!r) return ss
         const q = numeroFinito(r.quantidade) || 1
-        return ss + q * numeroFinito(r.valorUnitario)
+        const { valorFinal } = valorAssinadoComplementoImpressao(
+          r.tipoImpactoPreco,
+          magnitudeValorComplementoLancamento(r),
+          q
+        )
+        return ss + valorFinal
       }, 0)
     )
   }, 0)
@@ -191,51 +244,70 @@ function buildPagamento(
   const totalFaltaPagar = numeroFinito(pedido.totalFaltaPagar)
   const valorFinal = numeroFinito(pedido.valorFinal)
   const totalPago = numeroFinito(pedido.totalPago)
-  const troco = numeroFinito(pedido.troco)
+  const troco = resolverTrocoLevarPedidoEntrega(pedido, [], nomesMeiosPagamentoPorId)
 
-  const cobrancas = Array.isArray(pedido.cobrancas) ? pedido.cobrancas : []
-  let cobrancaNaEntrega: Record<string, unknown> | null = null
-  for (const c of cobrancas) {
-    const r = asRecord(c)
-    if (!r || !cobrancaAtivaNoCupom(r)) continue
-    const momento = asStr(r.momentoCobranca).toLowerCase()
-    const status = asStr(r.status).toLowerCase()
-    if (momento === 'na_entrega' && status !== 'paga') {
-      cobrancaNaEntrega = r
-      break
-    }
-  }
-
-  const valorCobrarNaEntrega = cobrancaNaEntrega
-    ? numeroFinito(cobrancaNaEntrega.valor)
+  const cobrancas = fontesPagamentoCupom(pedido)
+  const cobrancasAtivas = cobrancas.filter(cobrancaAtivaNoCupom)
+  const cobrancasNaEntregaPendentes = cobrancasAtivas.filter(cobrancaPendenteNaEntregaNoCupom)
+  const somaCedulaNaEntrega = cobrancasNaEntregaPendentes.reduce(
+    (soma, cobranca) => soma + numeroFinito(cobranca.valor),
+    0
+  )
+  const valorCobrarNaEntrega = cobrancasAtivas.length
+    ? Math.max(0, roundCentavos(somaCedulaNaEntrega - Math.max(0, troco)))
     : totalFaltaPagar
   const cobrarCliente = valorCobrarNaEntrega > 0
 
-  const meioIdCobranca = cobrancaNaEntrega ? asStr(cobrancaNaEntrega.meioPagamentoId) : ''
-  let meioPagamentoNome = extrairNomeMeioPagamentoDeRegistro(
-    cobrancaNaEntrega,
-    meioIdCobranca,
-    nomesMeiosPagamentoPorId
-  )
-  if (!meioPagamentoNome && cobrancaNaEntrega) {
-    const pagamentoEfetivado = asRecord(cobrancaNaEntrega.pagamentoEfetivado)
-    meioPagamentoNome = extrairNomeMeioPagamentoDeRegistro(
-      pagamentoEfetivado,
-      asStr(pagamentoEfetivado?.meioPagamentoId) || meioIdCobranca,
-      nomesMeiosPagamentoPorId
-    )
-  }
+  const indiceCedulaComTroco =
+    troco > 0
+      ? cobrancasNaEntregaPendentes.findIndex(cobranca => {
+          const meioId = asStr(cobranca.meioPagamentoId)
+          const nome =
+            extrairNomeMeioPagamentoDeRegistro(cobranca, meioId, nomesMeiosPagamentoPorId) || ''
+          return meioNomeEhDinheiro(nome)
+        })
+      : -1
+  const cobrancaCedulaComTroco =
+    indiceCedulaComTroco >= 0
+      ? cobrancasNaEntregaPendentes[indiceCedulaComTroco]
+      : troco > 0 && cobrancasNaEntregaPendentes.length === 1
+        ? cobrancasNaEntregaPendentes[0]
+        : null
+
+  const nomesNaEntrega = cobrancasNaEntregaPendentes
+    .map(cobranca => {
+      const meioId = asStr(cobranca.meioPagamentoId)
+      const nome = extrairNomeMeioPagamentoDeRegistro(
+        cobranca,
+        meioId,
+        nomesMeiosPagamentoPorId
+      )
+      if (nome) return nome
+      const pagamentoEfetivado = asRecord(cobranca.pagamentoEfetivado)
+      return extrairNomeMeioPagamentoDeRegistro(
+        pagamentoEfetivado,
+        asStr(pagamentoEfetivado?.meioPagamentoId) || meioId,
+        nomesMeiosPagamentoPorId
+      )
+    })
+    .filter((nome): nome is string => Boolean(nome))
+  const meioPagamentoNome = nomesNaEntrega.join(' + ') || null
 
   const meios: VendaGestorTicketsPagamentoMeio[] = []
-  for (const c of cobrancas) {
-    const r = asRecord(c)
-    if (!r || !cobrancaAtivaNoCupom(r)) continue
-    const meioId = asStr(r.meioPagamentoId)
-    const nome = extrairNomeMeioPagamentoDeRegistro(r, meioId, nomesMeiosPagamentoPorId)
-    if (!nome) continue
+  for (const r of cobrancasAtivas) {
+    const meioId = asStr(r.meioPagamentoId || r.meio_pagamento_id)
+    const nome =
+      extrairNomeMeioPagamentoDeRegistro(r, meioId, nomesMeiosPagamentoPorId) || 'PAGAMENTO'
+    const naEntrega = cobrancaPendenteNaEntregaNoCupom(r)
+    const valorCedula = numeroFinito(r.valor)
+    const valor =
+      naEntrega && cobrancaCedulaComTroco === r
+        ? Math.max(0, roundCentavos(valorCedula - troco))
+        : valorCedula
     meios.push({
       nome,
-      valor: numeroFinito(r.valor),
+      valor,
+      naEntrega,
     })
   }
 
@@ -254,14 +326,10 @@ function buildPagamento(
 }
 
 function buildObservacaoPedido(pedido: Record<string, unknown>): string | undefined {
-  const obs = Array.isArray(pedido.observacoes) ? pedido.observacoes : []
-  const texto = obs
-    .map(o => {
-      const r = asRecord(o)
-      return r ? asStr(r.observacao) : ''
-    })
-    .filter(Boolean)
-    .join('\n')
+  const texto =
+    textoFromObservacoesApi(pedido.observacoes) ||
+    asStr(pedido.observacaoPedido) ||
+    asStr(pedido.observacao)
   return texto || undefined
 }
 
@@ -374,6 +442,24 @@ function montarTicket(params: {
   }
 }
 
+function expandirTicketProducao(
+  ticket: VendaGestorTicket,
+  modo: ModoImpressaoImpressora
+): VendaGestorTicket[] {
+  const vias = planejarTicketsProducaoImpressora(ticket.itens, modo)
+  if (vias.length === 0) return []
+  return vias.map((via, index) => ({
+    ...ticket,
+    ticketId: ticketIdViaProducao(ticket.impressoraId, via.kind, index),
+    itens: via.items,
+    viaProducao: {
+      kind: via.kind,
+      unitIndex: via.unitIndex,
+      unitTotal: via.unitTotal,
+    },
+  }))
+}
+
 /**
  * Monta `VendaGestorTicketsResponse` compatível com o fluxo legado de tickets,
  * combinando instruções de roteamento + detalhe do pedido + prefs da empresa.
@@ -388,6 +474,8 @@ export function montarTicketsResponseFromInstrucoes(params: {
   mapeamentosEstacao?: EstacaoImpressaoMapeamento[]
   /** Nomes dos meios de pagamento (id → nome) para o rodapé do cupom. */
   nomesMeiosPagamentoPorId?: Record<string, string>
+  /** Modo da estação atual por impressora lógica (`normal` se ausente). Só tickets `producao`. */
+  modoPorImpressoraId?: Record<string, ModoImpressaoImpressora>
 }): VendaGestorTicketsResponse {
   const {
     instrucoes,
@@ -397,6 +485,7 @@ export function montarTicketsResponseFromInstrucoes(params: {
     estacaoImpressaoId,
     mapeamentosEstacao,
     nomesMeiosPagamentoPorId,
+    modoPorImpressoraId,
   } = params
   const modo = prefs.modo
   const impressoraExpedicaoId = prefs.impressoraExpedicaoId
@@ -473,7 +562,12 @@ export function montarTicketsResponseFromInstrucoes(params: {
         produtoPorId,
         origemImpressora: origemFallback ? 'fallback_expedicao' : 'produto',
       })
-      if (ticket) tickets.push(ticket)
+      if (!ticket) continue
+      const modoImpressora =
+        (mapping.impressoraId && modoPorImpressoraId?.[mapping.impressoraId]) ||
+        modoImpressaoDeMapeamentoOpcional(mapping) ||
+        'normal'
+      tickets.push(...expandirTicketProducao(ticket, modoImpressora))
     }
 
     const expedicaoMapping = instrucoes.mapeamentos.find(
@@ -506,7 +600,10 @@ export function montarTicketsResponseFromInstrucoes(params: {
   }))
 
   const vendaId = asStr(pedido.id)
-  const tipoEntrega = asStr(pedido.tipoEntrega ?? pedido.tipoVenda)
+  const tipoVenda = asStr(pedido.tipoVenda) || 'delivery'
+  const tipoEntregaRaw = asStr(pedido.tipoEntrega).toLowerCase()
+  const tipoEntrega =
+    tipoEntregaRaw === 'entrega' || tipoEntregaRaw === 'retirada' ? tipoEntregaRaw : null
 
   return {
     rastreamento: {
@@ -522,9 +619,25 @@ export function montarTicketsResponseFromInstrucoes(params: {
     estacaoImpressaoId: estacaoImpressaoId ?? undefined,
     codigoVenda: asStr(pedido.codigoVenda) || undefined,
     numeroVenda: numeroFinito(pedido.numeroVenda),
-    tipoVenda: tipoEntrega || null,
+    tipoVenda: tipoVenda || null,
+    tipoEntrega,
+    numeroMesa: pedido.numeroMesa as string | number | null | undefined,
+    identificacao: asStr(pedido.identificacao) || undefined,
+    senha: (pedido.senha ?? pedido.senhaNumero ?? pedido.numeroSenha) as string | number | null | undefined,
+    codigoTerminal: asStr(pedido.codigoTerminal) || undefined,
     dataPedido: isoOrEmpty(pedido.dataCriacao),
+    dataInicioPreparo: isoOrEmpty(pedido.dataInicioPreparo) || null,
     dataPrevista: isoOrEmpty(pedido.previsaoEntregaEm ?? pedido.previsaoEntrega),
+    tiradoPor: (() => {
+      const raw = asRecord(pedido.tiradoPor) || asRecord(pedido.abertoPor)
+      const nome = asStr(raw?.nome) || asStr(pedido.tiradoPorNome) || asStr(pedido.abertoPorNome)
+      if (!nome && !raw) return null
+      return {
+        id: asStr(raw?.id) || undefined,
+        usuarioId: asStr(raw?.usuarioId) || asStr(pedido.abertoPorId) || undefined,
+        nome: nome || undefined,
+      }
+    })(),
     entregador: entregadorRaw
       ? {
           id: asStr(entregadorRaw.id) || undefined,

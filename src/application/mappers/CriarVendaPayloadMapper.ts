@@ -88,14 +88,19 @@ export function buildCriarVendaGestorPayload(input: CriarVendaGestorInputDTO): C
   const produtosLancados = mapProdutosLancadosPayload(input.produtos)
 
   const vendaData: CriarVendaGestorApiRequest = {
-    tipoVenda: input.tipoInicioPedido === 'entrega' ? 'entrega' : 'balcao',
+    tipoVenda: input.tipoInicioPedido === 'delivery' ? 'delivery' : 'balcao',
     origem: input.origem,
     statusVenda: input.status,
     produtosLancados,
     produtos: produtosLancados,
   }
 
-  if (input.tipoInicioPedido === 'entrega') {
+  const estacaoId = input.estacaoId?.trim()
+  if (estacaoId && input.tipoInicioPedido !== 'delivery') {
+    vendaData.estacaoId = estacaoId
+  }
+
+  if (input.tipoInicioPedido === 'delivery') {
     vendaData.tipoAtendimento = input.tipoAtendimentoDelivery
     vendaData.modalidadeEntrega = input.tipoAtendimentoDelivery
     vendaData.tempoPrevistoMinutos = input.tempoPrevistoMinutos
@@ -114,7 +119,7 @@ export function buildCriarVendaGestorPayload(input: CriarVendaGestorInputDTO): C
   vendaData.solicitarEmissaoFiscal = input.status === 'PENDENTE_EMISSAO'
 
   const clienteIdParaVenda =
-    input.tipoInicioPedido === 'entrega'
+    input.tipoInicioPedido === 'delivery'
       ? input.clienteEntregaVinculado?.id
       : input.clienteId
   if (clienteIdParaVenda) {
@@ -133,7 +138,7 @@ export function buildCriarVendaGestorPayload(input: CriarVendaGestorInputDTO): C
   const pagamentosPayload = buildPagamentosPayloadComEfetivado(
     buildPagamentosPayload(
       input.pagamentos,
-      input.tipoInicioPedido === 'entrega' &&
+      input.tipoInicioPedido === 'delivery' &&
         input.status === 'ABERTA' &&
         input.entregaComCobrancaPeloEntregador
     ),
@@ -159,7 +164,7 @@ export function buildCriarVendaGestorPayload(input: CriarVendaGestorInputDTO): C
         valorFaltante: input.totalProdutos - input.totalPagamentos,
       }
     }
-  } else if (input.tipoInicioPedido === 'entrega' && input.status === 'ABERTA') {
+  } else if (input.tipoInicioPedido === 'delivery' && input.status === 'ABERTA') {
     const trocoPara =
       input.valorRecebido.trim() !== ''
         ? Number(input.valorRecebido.replace(/\./g, '').replace(',', '.')) || 0

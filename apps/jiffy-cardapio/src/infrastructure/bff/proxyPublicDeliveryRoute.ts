@@ -6,6 +6,7 @@
  */
 import { NextResponse } from 'next/server'
 import { ApiClient, ApiError, mensagemLegivelApiError } from '@/src/infrastructure/api/apiClient'
+import { headersEncaminharIpCliente } from '@/src/infrastructure/bff/clientIpFromRequest'
 
 /** CORS aberto: catálogo/checkout públicos + Design do Gestor em outro host. */
 const PUBLIC_CORS_HEADERS: HeadersInit = {
@@ -38,7 +39,7 @@ export function publicDeliveryOptionsResponse(): NextResponse {
 export async function proxyPublicDeliveryGet(
   upstreamPath: string,
   searchParams?: URLSearchParams,
-  options?: { cacheControl?: string }
+  options?: { cacheControl?: string; incoming?: Request }
 ): Promise<NextResponse> {
   try {
     const qs = searchParams?.toString()
@@ -46,7 +47,10 @@ export async function proxyPublicDeliveryGet(
     const apiClient = new ApiClient()
     const response = await apiClient.request<unknown>(endpoint, {
       method: 'GET',
-      headers: { Accept: 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        ...(options?.incoming ? headersEncaminharIpCliente(options.incoming) : {}),
+      },
     })
     return NextResponse.json(
       response.data ?? {},
@@ -72,7 +76,8 @@ export async function proxyPublicDeliveryGet(
 
 export async function proxyPublicDeliveryPost(
   upstreamPath: string,
-  body: unknown
+  body: unknown,
+  incoming?: Request
 ): Promise<NextResponse> {
   try {
     const apiClient = new ApiClient()
@@ -81,6 +86,7 @@ export async function proxyPublicDeliveryPost(
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
+        ...(incoming ? headersEncaminharIpCliente(incoming) : {}),
       },
       body: JSON.stringify(body),
     })
@@ -105,7 +111,8 @@ export async function proxyPublicDeliveryPost(
 
 export async function proxyPublicDeliveryPatch(
   upstreamPath: string,
-  body: unknown
+  body: unknown,
+  incoming?: Request
 ): Promise<NextResponse> {
   try {
     const apiClient = new ApiClient()
@@ -114,6 +121,7 @@ export async function proxyPublicDeliveryPatch(
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
+        ...(incoming ? headersEncaminharIpCliente(incoming) : {}),
       },
       body: JSON.stringify(body),
     })

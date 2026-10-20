@@ -1,3 +1,4 @@
+import { escolherTimestampPreparo, isoTimestampPreparoValido } from '@/src/application/kanban/timestampPreparoKanban'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import type { InfiniteData, QueryClient } from '@tanstack/react-query'
 import type { KanbanVendaCachePatch } from '@/src/application/dto/TransicaoKanbanDTO'
@@ -12,7 +13,9 @@ import {
 export type { KanbanVendaCachePatch } from '@/src/application/dto/TransicaoKanbanDTO'
 export {
   extrairPatchKanbanDeRespostaTransicao,
+  extrairPatchOperacionalKanbanDeStatusDelivery,
   extrairVendaUnificadaDeRespostaDeliverySummary,
+  pedidoDeliverySummaryTemCamposComerciais,
 } from '@/src/application/mappers/TransicaoPedidoDeliveryMapper'
 
 import {
@@ -42,7 +45,7 @@ function isoDeCampoApi(valor: unknown): string | null {
   return texto || null
 }
 
-/** Extrai campos operacionais da resposta de POST /vendas/gestor/:id/transicoes (legado). */
+/** Extrai campos operacionais da resposta de POST /vendas/gestor/:id/transicoes. */
 export function extrairPatchKanbanDeTransicaoGestor(data: unknown): KanbanVendaCachePatch {
   const registro =
     data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
@@ -60,6 +63,13 @@ export function extrairPatchKanbanDeTransicaoGestor(data: unknown): KanbanVendaC
       isoDeCampoApi(registro.data_ultima_modificacao),
     dataFinalizacao:
       isoDeCampoApi(registro.dataFinalizacao) ?? isoDeCampoApi(registro.data_finalizacao),
+    dataInicioPreparo:
+      isoDeCampoApi(registro.dataInicioPreparo) ?? isoDeCampoApi(registro.data_inicio_preparo),
+    dataFinalizacaoPreparo:
+      isoDeCampoApi(registro.dataFinalizacaoPreparo) ??
+      isoDeCampoApi(registro.data_finalizacao_preparo) ??
+      isoDeCampoApi(registro.dataPronto) ??
+      isoDeCampoApi(registro.data_pronto),
   }
 }
 
@@ -117,7 +127,9 @@ export function cloneVendaUnificadaDTO(
     venda.totalDesconto,
     venda.totalAcrescimo,
     venda.dataCriacao,
-    patch.dataFinalizacao !== undefined ? patch.dataFinalizacao : venda.dataFinalizacao,
+    patch.dataFinalizacao != null && String(patch.dataFinalizacao).trim()
+      ? patch.dataFinalizacao
+      : venda.dataFinalizacao,
     venda.dataCancelamento,
     venda.cliente,
     patch.solicitarEmissaoFiscal !== undefined
@@ -141,7 +153,7 @@ export function cloneVendaUnificadaDTO(
       ? normalizarModeloFiscalPatch(patch.modelo, venda.modelo)
       : venda.modelo,
     patch.retornoSefaz !== undefined ? patch.retornoSefaz : venda.retornoSefaz,
-    patch.statusEtapaOperacional !== undefined
+    patch.statusEtapaOperacional != null && String(patch.statusEtapaOperacional).trim()
       ? patch.statusEtapaOperacional
       : venda.statusEtapaOperacional,
     patch.dataUltimaModificacao !== undefined
@@ -159,8 +171,39 @@ export function cloneVendaUnificadaDTO(
       ? normalizarEntregadorKanbanPatch(patch.entregador)
       : venda.entregador,
     venda.contextoEntrega,
-    patch.etapaKanbanBalcao !== undefined ? patch.etapaKanbanBalcao : venda.etapaKanbanBalcao
+    patch.etapaKanbanBalcao !== undefined ? patch.etapaKanbanBalcao : venda.etapaKanbanBalcao,
+    venda.tipoEntrega,
+    escolherTimestampPreparo(
+      patch.dataInicioPreparo !== undefined ? patch.dataInicioPreparo : venda.dataInicioPreparo,
+      venda.dataInicioPreparo
+    ),
+    escolherTimestampPreparo(
+      patch.dataFinalizacaoPreparo !== undefined
+        ? patch.dataFinalizacaoPreparo
+        : venda.dataFinalizacaoPreparo,
+      venda.dataFinalizacaoPreparo
+    )
   )
+}
+
+/** Summary sem as datas não zera o par que o cache já tem. */
+export function mesclarTimestampsPreparoNoCard(
+  incoming: VendaUnificadaDTO,
+  existente?: VendaUnificadaDTO | null
+): VendaUnificadaDTO {
+  if (!existente) return incoming
+  const inicio = escolherTimestampPreparo(incoming.dataInicioPreparo, existente.dataInicioPreparo)
+  const fim = escolherTimestampPreparo(
+    incoming.dataFinalizacaoPreparo,
+    existente.dataFinalizacaoPreparo
+  )
+  if (inicio === (incoming.dataInicioPreparo ?? null) && fim === (incoming.dataFinalizacaoPreparo ?? null)) {
+    return incoming
+  }
+  return cloneVendaUnificadaDTO(incoming, {
+    dataInicioPreparo: inicio,
+    dataFinalizacaoPreparo: fim,
+  })
 }
 
 /** Substitui um item inteiro no cache infinito (resposta summary de transicao-status). */
@@ -458,15 +501,18 @@ export async function sincronizarPedidoDeliveryKanbanEmBackground(
 
 /**
  * A listagem GET /delivery/pedidos (summary) não inclui `observacoes`.
- * Ao refetch, preserva observações já presentes no cache do Kanban (patch local ou unificado).
+ * Ao refetch, preserva observações e datas de preparo já presentes no cache
+ * quando a API omite o campo (null não apaga o par início/fim).
  */
 export function preservarObservacoesKanbanCacheNosItems(
   queryClient: QueryClient,
   novosItems: VendaUnificadaDTO[]
 ): VendaUnificadaDTO[] {
   const observacoesPorId = new Map<string, string[]>()
+  const inicioPreparoPorId = new Map<string, string>()
+  const fimPreparoPorId = new Map<string, string>()
 
-  const coletarObservacoes = (
+  const coletarDoCache = (
     queries: [readonly unknown[], InfiniteData<VendasUnificadasResponse> | undefined][]
   ) => {
     for (const [, data] of queries) {
@@ -476,29 +522,58 @@ export function preservarObservacoesKanbanCacheNosItems(
           if (item.observacoes?.length) {
             observacoesPorId.set(item.id, item.observacoes)
           }
+          if (isoTimestampPreparoValido(item.dataInicioPreparo)) {
+            inicioPreparoPorId.set(item.id, item.dataInicioPreparo.trim())
+          }
+          if (isoTimestampPreparoValido(item.dataFinalizacaoPreparo)) {
+            fimPreparoPorId.set(item.id, item.dataFinalizacaoPreparo.trim())
+          }
         }
       }
     }
   }
 
-  coletarObservacoes(
+  coletarDoCache(
     queryClient.getQueriesData<InfiniteData<VendasUnificadasResponse>>(
       kanbanVendasUnificadasInfiniteQueryFilter()
     )
   )
-  coletarObservacoes(
+  coletarDoCache(
     queryClient.getQueriesData<InfiniteData<VendasUnificadasResponse>>(
       kanbanPedidosDeliveryInfiniteQueryFilter()
     )
   )
 
-  if (observacoesPorId.size === 0) return novosItems
+  if (
+    observacoesPorId.size === 0 &&
+    inicioPreparoPorId.size === 0 &&
+    fimPreparoPorId.size === 0
+  ) {
+    return novosItems
+  }
 
   return novosItems.map(item => {
-    if (item.observacoes?.length) return item
-    const cached = observacoesPorId.get(item.id)
-    if (!cached?.length) return item
-    return cloneVendaUnificadaDTO(item, { observacoes: cached })
+    const patch: KanbanVendaCachePatch = {}
+    if (!item.observacoes?.length) {
+      const cachedObs = observacoesPorId.get(item.id)
+      if (cachedObs?.length) patch.observacoes = cachedObs
+    }
+    if (!isoTimestampPreparoValido(item.dataInicioPreparo)) {
+      const cachedInicio = inicioPreparoPorId.get(item.id)
+      if (cachedInicio) patch.dataInicioPreparo = cachedInicio
+    }
+    if (!isoTimestampPreparoValido(item.dataFinalizacaoPreparo)) {
+      const cachedFim = fimPreparoPorId.get(item.id)
+      if (cachedFim) patch.dataFinalizacaoPreparo = cachedFim
+    }
+    if (
+      patch.observacoes === undefined &&
+      patch.dataInicioPreparo === undefined &&
+      patch.dataFinalizacaoPreparo === undefined
+    ) {
+      return item
+    }
+    return cloneVendaUnificadaDTO(item, patch)
   })
 }
 
@@ -551,11 +626,42 @@ export function extrairPatchFiscalKanban(data: unknown): KanbanVendaCachePatch {
       ? (root.resumoFiscal as Record<string, unknown>)
       : null
 
+  const statusOperacional = new Set([
+    'FINALIZADO',
+    'FINALIZADA',
+    'EM_PREPARO',
+    'PRONTO',
+    'EM_ROTA',
+    'PENDENTE',
+    'CANCELADO',
+    'ENTREGUE',
+    'CONCLUIDO',
+  ])
+  const statusFiscalUnico = new Set([
+    'EMITIDA',
+    'AUTORIZADA',
+    'AUTORIZADO',
+    'REJEITADA',
+    'DENEGADA',
+    'EMITINDO',
+    'PENDENTE_AUTORIZACAO',
+    'PENDENTE_EMISSAO',
+    'INUTILIZADA',
+    'CONTINGENCIA',
+    'CANCELADA',
+  ])
+  const statusRaizGenerico = isoOuNull(root.status)
+  const statusRaizFiscal =
+    statusRaizGenerico &&
+    statusFiscalUnico.has(statusRaizGenerico.toUpperCase()) &&
+    !statusOperacional.has(statusRaizGenerico.toUpperCase())
+      ? statusRaizGenerico
+      : null
   const statusRaw =
     isoOuNull(root.statusFiscal) ??
-    isoOuNull(root.status) ??
     isoOuNull(rf?.status) ??
-    isoOuNull(rf?.statusFiscal)
+    isoOuNull(rf?.statusFiscal) ??
+    statusRaizFiscal
 
   const modeloRaw = numeroOuNull(root.modelo) ?? numeroOuNull(rf?.modelo)
   const tipoDocRaw = isoOuNull(root.tipoDocFiscal) ?? isoOuNull(root.tipoDocumento)
@@ -646,16 +752,20 @@ export function aplicarPatchFiscalKanbanSemRefetch(
     atualizouListagem = patchKanbanVendasListagemCache(queryClient, vendaId, patch)
   } else {
     const atualizada = cloneVendaUnificadaDTO(venda, patch)
-    const etapa = atualizada.getEtapaKanban()
-    if ((COLUNAS_FISCAIS_BALCAO as string[]).includes(etapa)) {
-      atualizouListagem = moveVendaKanbanBalcaoEntreColunas(
-        queryClient,
-        vendaId,
-        etapa as EtapaKanbanBalcao,
-        patch
-      )
-    } else {
-      atualizouListagem = patchKanbanVendasListagemCache(queryClient, vendaId, patch)
+    const entregaKanban = atualizada.isPedidoEntregaGestor() || atualizada.isDelivery()
+    // Delivery: Entregues absorve COM_FISCAL. Não mover para coluna de balcão.
+    atualizouListagem = patchKanbanVendasListagemCache(queryClient, vendaId, patch)
+    if (!entregaKanban) {
+      const etapa = atualizada.getEtapaKanban()
+      if ((COLUNAS_FISCAIS_BALCAO as string[]).includes(etapa)) {
+        atualizouListagem =
+          moveVendaKanbanBalcaoEntreColunas(
+            queryClient,
+            vendaId,
+            etapa as EtapaKanbanBalcao,
+            patch
+          ) || atualizouListagem
+      }
     }
   }
 
@@ -675,7 +785,7 @@ export async function sincronizarStatusFiscalVendaKanban(
       .trim()
       .toLowerCase()
     const usarDelivery =
-      venda.tabelaOrigem === 'venda_gestor' && (tipo === 'entrega' || tipo === 'retirada')
+      venda.tabelaOrigem === 'venda_gestor' && tipo === 'delivery'
 
     const url = usarDelivery
       ? `/api/delivery/pedidos/${encodeURIComponent(venda.id)}`

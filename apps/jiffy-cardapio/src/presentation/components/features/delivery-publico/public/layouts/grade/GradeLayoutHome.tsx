@@ -19,6 +19,7 @@ export function GradeLayoutHome({
   onGrupoClick,
   onProdutoClick,
   onPedidoClick,
+  onInformacoesClick,
   carrinhoThumbs,
   carrinhoThumbsBounceKey,
   carrinhoThumbsTargetRef,
@@ -33,10 +34,15 @@ export function GradeLayoutHome({
 
   return (
     <div
-      className="flex min-h-full flex-col pb-24"
+      className="delivery-home-bottom-spacer flex min-h-full flex-col"
       style={{ backgroundColor: 'var(--delivery-primary-dark)' }}
     >
-      <DeliveryGradeHeader config={config} disponivel={viewModel.disponivel} />
+      <DeliveryGradeHeader
+        config={config}
+        disponivel={viewModel.disponivel}
+        interactive={interactive}
+        onInformacoesClick={onInformacoesClick}
+      />
 
       <div
         className="-mt-1 flex flex-1 flex-col rounded-t-[1.75rem] pb-2 pt-4"

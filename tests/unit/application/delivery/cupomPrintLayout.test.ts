@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   columnsFromCupomTemplate,
+  fonteEmpresaEscPosA11Px,
   printSizeFromFontePx,
   qrModuleSizeForWidth,
   sectionFeedLines,
@@ -12,6 +13,11 @@ describe('cupomPrintLayout', () => {
   it('mapeia 80 mm para 48 colunas e 58 mm para 32', () => {
     expect(columnsFromCupomTemplate(DEFAULT_DELIVERY_CUPOM_TEMPLATE)).toBe(48)
     expect(columnsFromCupomTemplate({ ...DEFAULT_DELIVERY_CUPOM_TEMPLATE, larguraMm: 58 })).toBe(32)
+  })
+
+  it('nome da empresa usa Font A 1/1 na escala do cupom', () => {
+    expect(fonteEmpresaEscPosA11Px(80)).toBe(13)
+    expect(fonteEmpresaEscPosA11Px(58)).toBeGreaterThanOrEqual(12)
   })
 
   it('converte fonte do preview em tamanho ESC/POS', () => {

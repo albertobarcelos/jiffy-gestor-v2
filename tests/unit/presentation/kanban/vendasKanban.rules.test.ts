@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   classeBordaEsquerdaColunaKanban,
+  getCardBorderEFundoKanban,
+  getLinhaTempoPedidoEntregaKanban,
   vendaElegivelParaReemissaoAutomaticaLote,
   fiscalKanbanPodeReemitirAposCooldown,
   rotuloBotaoAvancarEtapaKanban,
@@ -22,6 +24,10 @@ function makeVenda(
       | 'dataFinalizacao'
       | 'dataCriacao'
       | 'numeroFiscal'
+      | 'tabelaOrigem'
+      | 'tipoVenda'
+      | 'statusEtapaOperacional'
+      | 'dataInicioPreparo'
     >
   > = {}
 ): VendaUnificadaDTO {
@@ -97,6 +103,28 @@ describe('vendaElegivelParaReemissaoAutomaticaLote', () => {
     const acoes: Record<string, 'emitindo' | 'reemitindo'> = { 'venda-test-1': 'reemitindo' }
     expect(vendaElegivelParaReemissaoAutomaticaLote(venda, acoes)).toBe(false)
   })
+
+  it('retorna false para delivery ainda em etapa operacional', () => {
+    const venda = makeVenda({
+      statusFiscal: 'REJEITADA',
+      documentoFiscalId: 'doc-op',
+      tabelaOrigem: 'venda_gestor',
+      tipoVenda: 'delivery',
+      statusEtapaOperacional: 'EM_PREPARO',
+    })
+    expect(vendaElegivelParaReemissaoAutomaticaLote(venda, SEM_ACAO_EM_ANDAMENTO)).toBe(false)
+  })
+
+  it('retorna true para delivery finalizado rejeitado sem documentId', () => {
+    const venda = makeVenda({
+      statusFiscal: 'REJEITADA',
+      documentoFiscalId: null,
+      tabelaOrigem: 'venda_gestor',
+      tipoVenda: 'delivery',
+      statusEtapaOperacional: 'FINALIZADO',
+    })
+    expect(vendaElegivelParaReemissaoAutomaticaLote(venda, SEM_ACAO_EM_ANDAMENTO)).toBe(true)
+  })
 })
 
 describe('fiscalKanbanPodeReemitirAposCooldown', () => {
@@ -169,8 +197,55 @@ describe('rotuloBotaoAvancarEtapaKanban', () => {
 describe('classeBordaEsquerdaColunaKanban', () => {
   it('usa as mesmas cores da faixa dos cards do quadro', () => {
     expect(classeBordaEsquerdaColunaKanban('EM_PREPARO')).toBe('border-l-amber-500')
-    expect(classeBordaEsquerdaColunaKanban('PRONTO_ENTREGA')).toBe('border-l-teal-500')
+    expect(classeBordaEsquerdaColunaKanban('PRONTO_ENTREGA')).toBe('border-l-sky-500')
     expect(classeBordaEsquerdaColunaKanban('EM_ROTA')).toBe('border-l-indigo-500')
     expect(classeBordaEsquerdaColunaKanban('FINALIZADAS')).toBe('border-l-primary')
+    expect(classeBordaEsquerdaColunaKanban('FINALIZADAS', 'delivery')).toBe('border-l-primary')
+  })
+})
+
+describe('getCardBorderEFundoKanban', () => {
+  it('card entregue sem nota usa a faixa do Finalizadas do balcão', () => {
+    const venda = makeVenda({ statusFiscal: null })
+    expect(
+      getCardBorderEFundoKanban('FINALIZADAS', venda, SEM_ACAO_EM_ANDAMENTO, 'delivery')
+        .borderClass
+    ).toBe('border-l-primary')
+  })
+
+  it('card com NF emitida mantém a faixa verde fiscal', () => {
+    const venda = makeVenda({ statusFiscal: 'EMITIDA' })
+    expect(
+      getCardBorderEFundoKanban('COM_FISCAL', venda, SEM_ACAO_EM_ANDAMENTO, 'delivery')
+        .borderClass
+    ).toBe('border-l-green-500')
+  })
+})
+
+describe('getLinhaTempoPedidoEntregaKanban', () => {
+  it('em Em preparo usa dataInicioPreparo, não a última modificação', () => {
+    const venda = makeVenda({
+      tabelaOrigem: 'venda_gestor',
+      tipoVenda: 'delivery',
+      dataInicioPreparo: '2026-06-15T10:00:00.000Z',
+      dataUltimaModificacao: '2026-06-15T10:40:00.000Z',
+    })
+    expect(getLinhaTempoPedidoEntregaKanban('EM_PREPARO', venda)).toEqual({
+      prefixo: 'Desde:',
+      iso: '2026-06-15T10:00:00.000Z',
+    })
+  })
+
+  it('em Pronto continua usando a entrada na etapa (última modificação)', () => {
+    const venda = makeVenda({
+      tabelaOrigem: 'venda_gestor',
+      tipoVenda: 'delivery',
+      dataInicioPreparo: '2026-06-15T10:00:00.000Z',
+      dataUltimaModificacao: '2026-06-15T10:12:00.000Z',
+    })
+    expect(getLinhaTempoPedidoEntregaKanban('PRONTO_ENTREGA', venda)).toEqual({
+      prefixo: 'Desde:',
+      iso: '2026-06-15T10:12:00.000Z',
+    })
   })
 })

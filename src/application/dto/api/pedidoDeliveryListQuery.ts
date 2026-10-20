@@ -7,8 +7,10 @@
  * |-------------------|---------------------------|-------|
  * | '' (todas)        | omitido                   |       |
  * | GESTOR            | GESTOR                    | Pedidos criados no gestor web |
- * | DELIVERY          | JIFFY_DELIVERY            | App Jiffy Delivery |
- * | PDV               | omitido                   | Não se aplica à listagem delivery; modo Balcão usa `/vendas/unificado` |
+ * | JIFFY_DELIVERY    | JIFFY_DELIVERY            | App / rota pública Jiffy |
+ * | AIQFOME           | AIQFOME                   | Integração Aiqfome |
+ * | IFOOD             | IFOOD                     | Integração iFood |
+ * | PDV               | omitido                   | Não se aplica à listagem delivery |
  *
  * Datas: o Kanban hoje envia `dataFinalizacaoInicio/Fim` ao unificado; na API delivery
  * os nomes são `dataFinalizacaoInicial/Final` (mapeados em `montarPedidosDeliveryQueryParams`).
@@ -23,12 +25,16 @@ import type {
   TipoEntregaDeliveryApi,
 } from '@/src/application/dto/api/pedidoDeliveryApi'
 import { PEDIDOS_DELIVERY_KANBAN_PAGE_SIZE } from '@/src/application/dto/api/pedidoDeliveryListApi'
+import { canonicalizarAliasOrigemApi } from '@/src/application/mappers/canonicalizarAliasOrigemApi'
 
-/**
- * Espelho de `OrigemFiltro` (`kanban/types.ts`) — definido aqui para não acoplar
- * application → presentation.
- */
-export type OrigemFiltroKanbanListagem = '' | 'PDV' | 'GESTOR' | 'DELIVERY'
+/** Origem real da toolbar. Canal `DELIVERY` não entra aqui. */
+export type OrigemFiltroKanbanListagem =
+  | ''
+  | 'PDV'
+  | 'GESTOR'
+  | 'JIFFY_DELIVERY'
+  | 'AIQFOME'
+  | 'IFOOD'
 
 /** Filtros do hook `useKanbanFilters` adaptados para a listagem delivery. */
 export interface FiltrosKanbanParaPedidosDelivery {
@@ -45,22 +51,24 @@ export interface FiltrosKanbanParaPedidosDelivery {
   statusDelivery?: StatusDeliveryApi | StatusDeliveryApi[]
   /** Filtro por tipo de entrega (entrega/retirada) — modo delivery. */
   tipoEntrega?: TipoEntregaDeliveryApi | TipoEntregaDeliveryApi[]
-  /** Default operacional: excluir cancelados (`cancelado=false`). */
-  cancelado?: boolean
+  /** Default operacional: excluir cancelados (`cancelado=false`). `null` omite o param (Entregues mistura FINALIZADO+CANCELADO). */
+  cancelado?: boolean | null
   /** Filtro delta: retorna itens com `dataUltimaModificacao >= valor`. Usado no re-poll do Kanban. */
   dataUltimaModificacaoInicial?: string
 }
 
 /**
  * Converte filtro de origem da toolbar para valor da API delivery.
- * `PDV` não tem equivalente — retorna `undefined` (sem filtro de origem).
+ * `PDV` não se aplica à listagem delivery — omite.
  */
 export function mapOrigemFiltroKanbanParaApi(
   origem: OrigemFiltroKanbanListagem | undefined
 ): OrigemPedidoDeliveryApi | undefined {
   if (!origem || origem === 'PDV') return undefined
   if (origem === 'GESTOR') return 'GESTOR'
-  if (origem === 'DELIVERY') return 'JIFFY_DELIVERY'
+  if (origem === 'JIFFY_DELIVERY') return 'JIFFY_DELIVERY'
+  if (origem === 'AIQFOME') return 'AIQFOME'
+  if (origem === 'IFOOD') return 'IFOOD'
   return undefined
 }
 
@@ -68,9 +76,12 @@ export function mapOrigemFiltroKanbanParaApi(
 export function mapOrigemApiParaFiltroKanban(
   origem: string | null | undefined
 ): OrigemFiltroKanbanListagem | undefined {
-  const o = String(origem ?? '').trim().toUpperCase()
+  const o = canonicalizarAliasOrigemApi(origem)
   if (o === 'GESTOR') return 'GESTOR'
-  if (o === 'JIFFY_DELIVERY') return 'DELIVERY'
+  if (o === 'JIFFY_DELIVERY') return 'JIFFY_DELIVERY'
+  if (o === 'AIQFOME') return 'AIQFOME'
+  if (o === 'IFOOD') return 'IFOOD'
+  if (o === 'PDV') return 'PDV'
   return undefined
 }
 
@@ -146,7 +157,7 @@ export function montarPedidosDeliveryQueryParams(
     dataCriacaoFinal: filtros.dataCriacaoFinal,
     dataFinalizacaoInicial: filtros.dataFinalizacaoInicio,
     dataFinalizacaoFinal: filtros.dataFinalizacaoFim,
-    cancelado: filtros.cancelado ?? false,
+    cancelado: filtros.cancelado === null ? undefined : filtros.cancelado ?? false,
     dataUltimaModificacaoInicial: filtros.dataUltimaModificacaoInicial,
   }
 }
@@ -251,38 +262,3 @@ export function extrairPedidosDeliveryQueryParamsDeSearchParams(
   return params
 }
 
-const CHAVES_QUERY_JIFFY = [
-  'offset',
-  'limit',
-  'q',
-  'statusDelivery',
-  'tipoEntrega',
-  'origem',
-  'solicitarEmissaoFiscal',
-  'cancelado',
-  'dataCriacaoInicial',
-  'dataCriacaoFinal',
-  'dataFinalizacaoInicial',
-  'dataFinalizacaoFinal',
-  'dataFinalizacaoInicio',
-  'dataFinalizacaoFim',
-  'dataUltimaModificacaoInicial',
-] as const
-
-/** Indica se a requisição deve usar o módulo delivery Jiffy (vs integrador legado). */
-export function isRequisicaoListagemPedidosJiffy(searchParams: URLSearchParams): boolean {
-  if (CHAVES_QUERY_JIFFY.some(chave => searchParams.has(chave))) return true
-  return false
-}
-
-/** Integrador legado: `status`/`data_atualizacao` ou header `Bearer` customizado (não Authorization). */
-export function isRequisicaoListagemPedidosIntegradorLegada(
-  searchParams: URLSearchParams,
-  headers: { bearerHeaderCustom?: string | null; integradorToken?: string | null }
-): boolean {
-  if (isRequisicaoListagemPedidosJiffy(searchParams)) return false
-  if (searchParams.has('status') || searchParams.has('data_atualizacao')) return true
-  if (headers.bearerHeaderCustom?.trim()) return true
-  if (headers.integradorToken?.trim()) return true
-  return false
-}

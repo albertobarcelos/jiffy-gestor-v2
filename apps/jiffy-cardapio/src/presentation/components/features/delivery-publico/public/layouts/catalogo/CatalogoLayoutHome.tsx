@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { DeliveryPedidoFooter } from '../../../shared/components/DeliveryPedidoFooter'
 import { DeliveryPublicoLojaFooter } from '../../../shared/components/DeliveryPublicoLojaFooter'
 import { filterViewModelByBusca } from '../../../shared/utils/filterViewModelByBusca'
@@ -8,6 +8,7 @@ import type { DeliveryLayoutHomeProps } from '../DeliveryLayoutHomeProps'
 import { DeliveryCatalogoHeader } from './components/DeliveryCatalogoHeader'
 import { DeliveryCatalogoSearch } from './components/DeliveryCatalogoSearch'
 import { DeliveryCatalogoCategoriaTabs } from './components/DeliveryCatalogoCategoriaTabs'
+import { DeliveryBasicoCatalogStickyNav } from '../basico/DeliveryBasicoCatalogStickyNav'
 import { DeliveryCatalogoSecaoGrupo } from './components/DeliveryCatalogoSecaoGrupo'
 import { DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID } from '../../../shared/constants/deliveryPublicoSugestoes'
 
@@ -36,6 +37,7 @@ export function CatalogoLayoutHome({
   }, [filtered.grupos, activeGrupoId])
 
   const stickyFooterVisible = viewModel.carrinho.quantidadeItens > 0
+  const catalogRootRef = useRef<HTMLDivElement>(null)
 
   const handleGrupoClick = useCallback(
     (grupoId: string) => {
@@ -51,7 +53,7 @@ export function CatalogoLayoutHome({
   }, [filtered.grupos, handleGrupoClick])
 
   return (
-    <div className="flex min-h-full flex-col pb-24">
+    <div ref={catalogRootRef} className="delivery-home-bottom-spacer flex min-h-full flex-col">
       <DeliveryCatalogoHeader
         config={config}
         disponivel={viewModel.disponivel}
@@ -68,13 +70,17 @@ export function CatalogoLayoutHome({
         />
       </div>
 
-      <DeliveryCatalogoCategoriaTabs
-        grupos={filtered.grupos}
-        activeGrupoId={activeGrupoId}
-        interactive={interactive}
-        onGrupoClick={handleGrupoClick}
-        onMenuClick={handleMenuClick}
-      />
+      <div className="mt-3">
+        <DeliveryBasicoCatalogStickyNav catalogRootRef={catalogRootRef}>
+          <DeliveryCatalogoCategoriaTabs
+            grupos={filtered.grupos}
+            activeGrupoId={activeGrupoId}
+            interactive={interactive}
+            onGrupoClick={handleGrupoClick}
+            onMenuClick={handleMenuClick}
+          />
+        </DeliveryBasicoCatalogStickyNav>
+      </div>
 
       <div className="flex-1 pb-4">
         {filtered.grupos.map((grupo, index) => (

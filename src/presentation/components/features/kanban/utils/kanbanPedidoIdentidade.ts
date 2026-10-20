@@ -15,12 +15,12 @@ export function nomeClienteCurtoKanban(nome: string | null | undefined): string 
   return inicial ? `${primeiro} ${inicial}.` : primeiro
 }
 
-export function tipoAtendimentoKanban(tipoVenda: string | null | undefined): TipoAtendimentoKanban {
-  const tipo = String(tipoVenda ?? '')
+export function tipoAtendimentoKanban(tipoEntrega: string | null | undefined): TipoAtendimentoKanban {
+  const tipo = String(tipoEntrega ?? '')
     .trim()
     .toLowerCase()
   if (tipo === 'retirada') return 'retirada'
-  if (tipo === 'entrega' || tipo === 'delivery') return 'entrega'
+  if (tipo === 'entrega') return 'entrega'
   return 'balcao'
 }
 

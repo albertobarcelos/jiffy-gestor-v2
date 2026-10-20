@@ -3,8 +3,18 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { showToast } from '@/src/shared/utils/toast'
 import {
+  notificarEnderecoForaDaCobertura,
+  useHrefCoberturaEntregaPedido,
+} from '../../utils/coberturaEntregaPedidoUi'
+import {
   validarInformacoesPedido as validarInformacoesPedidoEntrega,
 } from '../useNovoPedidoSubmit'
+import {
+  clienteCadastradoNestaEmpresa,
+  deveAbrirCadastroClienteNoAvancar,
+  telefoneMinimoDigitosBuscaEntrega,
+} from '@/src/domain/policies/pedido/ClienteEntregaPolicy'
+import { extrairDigitosTelefone } from '@/src/shared/utils/telefoneBr'
 import type { PagamentoSelecionado, ProdutoSelecionado } from '../../types'
 
 export interface UseNovoPedidoNavegacaoParams {
@@ -12,7 +22,7 @@ export interface UseNovoPedidoNavegacaoParams {
   onClose: () => void
   vendaId?: string
   modoVisualizacao?: boolean
-  tipoInicioPedido: 'balcao' | 'entrega'
+  tipoInicioPedido: 'balcao' | 'delivery'
   produtos: ProdutoSelecionado[]
   pagamentos: PagamentoSelecionado[]
   clienteId: string
@@ -28,11 +38,19 @@ export interface UseNovoPedidoNavegacaoParams {
   taxaEntregaOverride?: 'automatica' | 'sem_taxa' | 'catalogo'
   /** Edição de produtos de pedido existente: trava a navegação entre etapas. */
   modoEdicaoProdutos?: boolean
+  /** ESC/fechar no modo edição: restaura o snapshot e sai da edição. */
+  onFecharEdicaoProdutos?: () => void
+  /** true quando a edição começou na aba Lista Produtos (não fecha o painel). */
+  edicaoProdutosPermaneceNoPainel?: boolean
+  /** Após editar itens, o pagamento divergiu — não deixa sair sem gravar a cobrança. */
+  ajustandoPagamentoAposEdicaoItens?: boolean
   /**
    * Fecha o painel sem descartar o lançamento (atalho WhatsApp).
    * O rascunho volta ao reabrir o pedido da mesma conversa.
    */
   preservarRascunhoAoFechar?: boolean
+  /** Abre o painel de cadastro rápido (cliente+endereço ou só endereço). */
+  onAbrirCadastroRapidoCliente?: () => void
 }
 
 export function useNovoPedidoNavegacao({
@@ -55,8 +73,13 @@ export function useNovoPedidoNavegacao({
   enderecoEntregaCoberturaStatus,
   taxaEntregaOverride,
   modoEdicaoProdutos,
+  onFecharEdicaoProdutos,
+  edicaoProdutosPermaneceNoPainel = false,
+  ajustandoPagamentoAposEdicaoItens = false,
   preservarRascunhoAoFechar = false,
+  onAbrirCadastroRapidoCliente,
 }: UseNovoPedidoNavegacaoParams) {
+  const hrefCoberturaEntrega = useHrefCoberturaEntregaPedido()
   const [modalConfirmacaoSaidaOpen, setModalConfirmacaoSaidaOpen] = useState(false)
   const [internalDialogOpen, setInternalDialogOpen] = useState(open)
   const ignorarBackdropAteRef = useRef(0)
@@ -67,6 +90,14 @@ export function useNovoPedidoNavegacao({
   }, [vendaId, modoVisualizacao, produtos.length, pagamentos.length, clienteId, currentStep])
 
   const handleClose = useCallback(() => {
+    if (ajustandoPagamentoAposEdicaoItens) {
+      showToast.warning('Ajuste o pagamento do pedido antes de sair.')
+      return
+    }
+    if (modoEdicaoProdutos && onFecharEdicaoProdutos) {
+      onFecharEdicaoProdutos()
+      return
+    }
     if (vendaId && modoVisualizacao) {
       onClose()
       return
@@ -76,7 +107,15 @@ export function useNovoPedidoNavegacao({
     } else {
       onClose()
     }
-  }, [vendaId, modoVisualizacao, temDadosVenda, onClose])
+  }, [
+    ajustandoPagamentoAposEdicaoItens,
+    modoEdicaoProdutos,
+    onFecharEdicaoProdutos,
+    vendaId,
+    modoVisualizacao,
+    temDadosVenda,
+    onClose,
+  ])
 
   const handleConfirmarSaida = useCallback(() => {
     setModalConfirmacaoSaidaOpen(false)
@@ -100,7 +139,13 @@ export function useNovoPedidoNavegacao({
         enderecoEntregaCoberturaStatus,
         taxaEntregaOverride,
         exibirToast,
-        onError: showToast.error,
+        onError: message => {
+          if (enderecoEntregaCoberturaStatus === 'fora') {
+            notificarEnderecoForaDaCobertura(hrefCoberturaEntrega)
+            return
+          }
+          showToast.error(message)
+        },
       }),
     [
       pedidoDeliveryGestor,
@@ -111,6 +156,7 @@ export function useNovoPedidoNavegacao({
       enderecoEntregaTemGeo,
       enderecoEntregaCoberturaStatus,
       taxaEntregaOverride,
+      hrefCoberturaEntrega,
     ]
   )
 
@@ -119,7 +165,7 @@ export function useNovoPedidoNavegacao({
   }, [produtos.length])
 
   const canGoToStep3 = useCallback(() => {
-    if (tipoInicioPedido === 'entrega') return validarInformacoesPedido(false)
+    if (tipoInicioPedido === 'delivery') return validarInformacoesPedido(false)
     return produtos.length > 0
   }, [tipoInicioPedido, validarInformacoesPedido, produtos.length])
 
@@ -128,13 +174,33 @@ export function useNovoPedidoNavegacao({
     if (modoEdicaoProdutos) return
 
     if (currentStep === 1 && canGoToStep2()) {
-      setCurrentStep(tipoInicioPedido === 'entrega' ? 2 : 3)
+      setCurrentStep(tipoInicioPedido === 'delivery' ? 2 : 3)
     } else if (currentStep === 1 && !canGoToStep2()) {
       showToast.error('Adicione pelo menos um produto antes de continuar')
     } else if (currentStep === 2 && canGoToStep3()) {
       setCurrentStep(3)
     } else if (currentStep === 2 && !canGoToStep3()) {
-      if (tipoInicioPedido === 'entrega') {
+      if (tipoInicioPedido === 'delivery') {
+        const telefoneCompleto =
+          extrairDigitosTelefone(telefoneClienteDelivery ?? '').length >=
+          telefoneMinimoDigitosBuscaEntrega(pedidoDeliveryGestor)
+        if (
+          deveAbrirCadastroClienteNoAvancar({
+            clienteId: clienteEntregaVinculadoId,
+            telefoneCompleto,
+          })
+        ) {
+          onAbrirCadastroRapidoCliente?.()
+          return
+        }
+        if (
+          clienteCadastradoNestaEmpresa(clienteEntregaVinculadoId) &&
+          pedidoComEntrega &&
+          !temEnderecoEntrega
+        ) {
+          onAbrirCadastroRapidoCliente?.()
+          return
+        }
         validarInformacoesPedido(true)
       } else {
         showToast.error('Adicione pelo menos um produto antes de continuar')
@@ -150,6 +216,12 @@ export function useNovoPedidoNavegacao({
     setCurrentStep,
     validarInformacoesPedido,
     modoEdicaoProdutos,
+    pedidoDeliveryGestor,
+    clienteEntregaVinculadoId,
+    telefoneClienteDelivery,
+    pedidoComEntrega,
+    temEnderecoEntrega,
+    onAbrirCadastroRapidoCliente,
   ])
 
   const handlePreviousStep = useCallback(() => {
@@ -159,7 +231,7 @@ export function useNovoPedidoNavegacao({
     if (currentStep === 2) {
       setCurrentStep(1)
     } else if (currentStep === 3) {
-      setCurrentStep(tipoInicioPedido === 'entrega' ? 2 : 1)
+      setCurrentStep(tipoInicioPedido === 'delivery' ? 2 : 1)
     }
   }, [vendaId, modoVisualizacao, currentStep, tipoInicioPedido, setCurrentStep, modoEdicaoProdutos])
 
@@ -170,9 +242,23 @@ export function useNovoPedidoNavegacao({
           setInternalDialogOpen(true)
           return
         }
+        if (ajustandoPagamentoAposEdicaoItens) {
+          setInternalDialogOpen(true)
+          showToast.warning('Ajuste o pagamento do pedido antes de sair.')
+          return
+        }
         if (preservarRascunhoAoFechar && reason === 'backdropClick') {
           setInternalDialogOpen(false)
           onClose()
+          return
+        }
+        if (modoEdicaoProdutos && onFecharEdicaoProdutos) {
+          if (edicaoProdutosPermaneceNoPainel) {
+            setInternalDialogOpen(true)
+          } else {
+            setInternalDialogOpen(false)
+          }
+          onFecharEdicaoProdutos()
           return
         }
         if (temDadosVenda()) {
@@ -186,7 +272,15 @@ export function useNovoPedidoNavegacao({
         setInternalDialogOpen(true)
       }
     },
-    [temDadosVenda, onClose, preservarRascunhoAoFechar]
+    [
+      temDadosVenda,
+      onClose,
+      preservarRascunhoAoFechar,
+      ajustandoPagamentoAposEdicaoItens,
+      modoEdicaoProdutos,
+      onFecharEdicaoProdutos,
+      edicaoProdutosPermaneceNoPainel,
+    ]
   )
 
   useEffect(() => {

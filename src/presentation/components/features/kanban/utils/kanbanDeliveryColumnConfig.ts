@@ -1,5 +1,8 @@
 import type { StatusDeliveryApi } from '@/src/application/dto/api/pedidoDeliveryApi'
-import type { ColunaKanbanId } from '../types'
+import { isPedidoEntregaKanban } from '@/src/shared/helpers/pedidoEntregaKanban'
+import { EtapaOperacionalDelivery, statusDeliveryQueryDaColunaKanban } from '@/src/domain/value-objects/EtapaOperacionalDelivery'
+import { StatusFiscalVenda } from '@/src/domain/value-objects/StatusFiscalVenda'
+import type { ColunaKanbanId, FiltroStatusEntreguesKanban } from '../types'
 import type { PedidosDeliveryInfiniteParams } from '../hooks/usePedidosDeliveryInfinite'
 import type { VendaUnificadaDTO } from '../hooks/useVendasUnificadas'
 
@@ -10,7 +13,6 @@ export const DELIVERY_KANBAN_COLUMN_IDS: ColunaKanbanId[] = [
   'PRONTO_ENTREGA',
   'EM_ROTA',
   'FINALIZADAS',
-  'COM_FISCAL',
 ]
 
 export interface PedidosDeliveryKanbanColumnFilterOptions {
@@ -42,13 +44,6 @@ export function paramsOperacionaisDeliveryKanbanColumn(
   return result
 }
 
-/** @deprecated Use `paramsOperacionaisDeliveryKanbanColumn` */
-export function paramsApiOperacionaisDeliveryKanban(
-  params: PedidosDeliveryInfiniteParams
-): PedidosDeliveryInfiniteParams {
-  return paramsOperacionaisDeliveryKanbanColumn(params)
-}
-
 function paramsFinalizadosKanbanColumn(
   params: PedidosDeliveryInfiniteParams,
   options?: Pick<PedidosDeliveryKanbanColumnFilterOptions, 'enviarFiltroFinalizacaoNaApi'>
@@ -62,18 +57,14 @@ function paramsFinalizadosKanbanColumn(
 
   return {
     ...base,
-    statusDelivery: 'FINALIZADO',
-    cancelado: false,
-    dataFinalizacaoInicio: temFiltroFinalizacao ? params.dataFinalizacaoInicio : undefined,
-    dataFinalizacaoFim: temFiltroFinalizacao ? params.dataFinalizacaoFim : undefined,
+    statusDelivery: ['FINALIZADO', 'CANCELADO'],
+    cancelado: null,
+    dataFinalizacaoInicio: undefined,
+    dataFinalizacaoFim: undefined,
+    dataUltimaModificacaoInicial: temFiltroFinalizacao
+      ? params.dataFinalizacaoInicio
+      : undefined,
   }
-}
-
-const STATUS_POR_COLUNA_OPERACIONAL: Partial<Record<ColunaKanbanId, StatusDeliveryApi>> = {
-  NOVOS_PEDIDOS: 'PENDENTE',
-  EM_PREPARO: 'EM_PREPARO',
-  PRONTO_ENTREGA: 'PRONTO',
-  EM_ROTA: 'EM_ROTA',
 }
 
 /** Monta filtros da API para cada coluna do Kanban delivery. */
@@ -82,25 +73,25 @@ export function buildPedidosDeliveryParamsForKanbanColumn(
   params: PedidosDeliveryInfiniteParams,
   options?: PedidosDeliveryKanbanColumnFilterOptions
 ): PedidosDeliveryInfiniteParams {
-  if (columnId === 'FINALIZADAS' || columnId === 'COM_FISCAL') {
+  const statusQuery = statusDeliveryQueryDaColunaKanban(columnId)
+  if (Array.isArray(statusQuery)) {
     return paramsFinalizadosKanbanColumn(params, options)
   }
 
-  const status = STATUS_POR_COLUNA_OPERACIONAL[columnId]
-  if (!status) {
+  if (!statusQuery) {
     return { ...paramsOperacionaisDeliveryKanbanColumn(params, options), cancelado: false }
   }
 
   return {
     ...paramsOperacionaisDeliveryKanbanColumn(params, options),
-    statusDelivery: status,
+    statusDelivery: statusQuery as StatusDeliveryApi,
     cancelado: false,
   }
 }
 
-/** Colunas que compartilham a mesma query API (`FINALIZADO`) e exigem split client-side. */
+/** Coluna visual Entregues: pool FINALIZADO+CANCELADO filtrado no client por status. */
 export function isColunaKanbanDeliveryFiscalSplit(columnId: ColunaKanbanId): boolean {
-  return columnId === 'FINALIZADAS' || columnId === 'COM_FISCAL'
+  return columnId === 'FINALIZADAS'
 }
 
 /** Filtra itens da listagem para a coluna visual (etapa Kanban + regras delivery). */
@@ -121,13 +112,75 @@ export function vendaPertenceColunaDeliveryKanban(
     case 'EM_ROTA':
       return etapa === 'EM_ROTA'
     case 'FINALIZADAS':
-      return etapa === 'FINALIZADAS' || etapa === 'PENDENTE_EMISSAO'
-    case 'COM_FISCAL':
-      return etapa === 'COM_FISCAL'
+      if (
+        pedidoDeliveryCancelado(venda) &&
+        isPedidoEntregaKanban(venda.tabelaOrigem, venda.tipoVenda)
+      ) {
+        return true
+      }
+      return (
+        etapa === 'FINALIZADAS' ||
+        etapa === 'COM_FISCAL' ||
+        etapa === 'REJEITADAS' ||
+        etapa === 'PENDENTE_EMISSAO'
+      )
     default:
       return false
   }
 }
+
+function pedidoDeliveryCancelado(venda: VendaUnificadaDTO): boolean {
+  if (String(venda.dataCancelamento ?? '').trim()) return true
+  return EtapaOperacionalDelivery.tryParse(venda.statusEtapaOperacional)?.isCancelado() ?? false
+}
+
+function vendaEntreguesTemNotaEmitida(venda: VendaUnificadaDTO): boolean {
+  const fiscal = StatusFiscalVenda.tryParse(venda.statusFiscal)
+  if (fiscal?.isEmitida()) return true
+  const bucket = fiscal?.bucketEntregues()
+  if (bucket && bucket !== 'EMITIDA') return false
+  return Boolean(String(venda.dataEmissaoFiscal ?? '').trim())
+}
+
+export function bucketStatusEntreguesKanban(
+  venda: VendaUnificadaDTO,
+  getEtapaKanban: (v: VendaUnificadaDTO) => string
+): Exclude<FiltroStatusEntreguesKanban, 'TODAS'> | null {
+  const fiscal = StatusFiscalVenda.tryParse(venda.statusFiscal)
+  if (fiscal?.bucketEntregues() === 'CANCELADA' || pedidoDeliveryCancelado(venda)) return 'CANCELADA'
+  if (vendaEntreguesTemNotaEmitida(venda)) return 'EMITIDA'
+  if (fiscal?.isRejeitada()) return 'REJEITADA'
+
+  const etapa = getEtapaKanban(venda)
+  if (etapa === 'REJEITADAS') return 'REJEITADA'
+  if (etapa === 'PENDENTE_EMISSAO' || fiscal?.bucketEntregues() === 'PENDENTE') return 'PENDENTE'
+  if (etapa === 'COM_FISCAL') return 'PENDENTE'
+  if (etapa === 'FINALIZADAS') return 'FINALIZADA'
+  return null
+}
+
+export function vendaAtendeFiltroStatusEntregues(
+  venda: VendaUnificadaDTO,
+  filtro: FiltroStatusEntreguesKanban,
+  getEtapaKanban: (v: VendaUnificadaDTO) => string
+): boolean {
+  if (filtro === 'TODAS') return true
+  return bucketStatusEntreguesKanban(venda, getEtapaKanban) === filtro
+}
+
+export const FILTRO_STATUS_ENTREGUES_PADRAO: FiltroStatusEntreguesKanban = 'TODAS'
+
+export const OPCOES_FILTRO_STATUS_ENTREGUES: {
+  value: FiltroStatusEntreguesKanban
+  label: string
+}[] = [
+  { value: 'TODAS', label: 'Todas' },
+  { value: 'FINALIZADA', label: 'Finalizada' },
+  { value: 'EMITIDA', label: 'Emitida' },
+  { value: 'PENDENTE', label: 'Pendente' },
+  { value: 'REJEITADA', label: 'Rejeitada' },
+  { value: 'CANCELADA', label: 'Cancelada' },
+]
 
 /**
  * Extrai o id da coluna de keys no padrão:

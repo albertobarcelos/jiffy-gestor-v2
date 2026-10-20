@@ -10,24 +10,39 @@ export interface KanbanColumn {
   borderColor: string
   icon: ReactNode
   placeholder: string
+  /** Cor do título no cabeçalho (padrão cinza). */
+  tituloClasse?: string
 }
 
 export type Venda = VendaUnificadaDTO
 
-export type ColunaKanbanId =
-  | 'NOVOS_PEDIDOS'
-  | 'EM_PREPARO'
-  | 'PRONTO_ENTREGA'
-  | 'EM_ROTA'
-  | 'FINALIZADAS'
-  | 'PENDENTE_EMISSAO'
-  | 'COM_FISCAL'
-  | 'REJEITADAS'
+export type { ColunaKanbanId } from '@/src/domain/types/kanbanPedido'
 
 export type CriterioOrdenacaoKanban = 'data' | 'numero'
 export type DirecaoOrdenacaoKanban = 'asc' | 'desc'
 
-export type OrigemFiltro = '' | 'PDV' | 'GESTOR' | 'DELIVERY'
+/** Filtro do cabeçalho da coluna Entregues no Kanban delivery. */
+export type FiltroStatusEntreguesKanban =
+  | 'TODAS'
+  | 'FINALIZADA'
+  | 'EMITIDA'
+  | 'PENDENTE'
+  | 'REJEITADA'
+  | 'CANCELADA'
+
+/**
+ * Origem real da venda (contrato GET /vendas/unificado).
+ * Não existe origem `DELIVERY` — delivery é `TipoCanalFiltro`.
+ */
+export type OrigemFiltro = '' | 'PDV' | 'GESTOR' | 'JIFFY_DELIVERY' | 'AIQFOME' | 'IFOOD'
+
+/**
+ * Tipo/canal de negócio unificado (`tipo` na API).
+ * - PDV → vendas do PDV
+ * - GESTOR → só balcão (não delivery)
+ * - DELIVERY → qualquer delivery (qualquer origem)
+ */
+export type TipoCanalFiltro = '' | 'PDV' | 'GESTOR' | 'DELIVERY'
 
 /** Filtro de tipo de entrega no modo delivery (`''` = todos). */
 export type TipoEntregaFiltro = '' | 'entrega' | 'retirada'

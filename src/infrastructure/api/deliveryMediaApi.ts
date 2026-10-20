@@ -7,6 +7,9 @@ import {
   resolveDeliveryImageMimeTypeForUpload,
   validateDeliveryImageFile,
 } from '@/src/shared/constants/deliveryImageUpload'
+import { parseImagemUrlProdutoIndex } from '@/src/shared/utils/catalogoProdutoIndex'
+import { urlImagemHttp } from '@/src/shared/utils/imagemUrl'
+import type { ICadastroImagemMedia } from '@/src/application/ports/ICadastroImagemMedia'
 
 export class DeliveryMediaApiError extends Error {
   constructor(
@@ -43,6 +46,33 @@ function authHeaders(token: string): Record<string, string> {
     Accept: 'application/json',
     'Content-Type': 'application/json',
   }
+}
+
+const knownImagemUrlsPorComplementoId = new Map<string, string>()
+const knownImagemUrlsPorGrupoComplementoId = new Map<string, string>()
+
+function rememberImagemUrl(store: Map<string, string>, id: string, url: string | null | undefined): string | null {
+  const key = id.trim()
+  const value = urlImagemHttp(url)
+  if (!key || !value) return store.get(key) ?? null
+  store.set(key, value)
+  return value
+}
+
+function rememberComplementoImagemUrl(id: string, url: string | null | undefined): string | null {
+  return rememberImagemUrl(knownImagemUrlsPorComplementoId, id, url)
+}
+
+function peekComplementoImagemUrl(id: string): string | null {
+  return knownImagemUrlsPorComplementoId.get(id.trim()) ?? null
+}
+
+function rememberGrupoComplementoImagemUrl(id: string, url: string | null | undefined): string | null {
+  return rememberImagemUrl(knownImagemUrlsPorGrupoComplementoId, id, url)
+}
+
+function peekGrupoComplementoImagemUrl(id: string): string | null {
+  return knownImagemUrlsPorGrupoComplementoId.get(id.trim()) ?? null
 }
 
 async function resolveMimeOrThrow(file: File): Promise<DeliveryImageMimeType> {
@@ -331,7 +361,12 @@ export async function fetchGruposComplementoImagemUrlsBatch(
     return Object.fromEntries(
       ids.map(id => {
         const url = resolved[id]
-        return [id, typeof url === 'string' && url.trim() ? url.trim() : null] as const
+        const fromCatalog = urlImagemHttp(typeof url === 'string' ? url : null)
+        if (fromCatalog) {
+          knownImagemUrlsPorGrupoComplementoId.set(id, fromCatalog)
+          return [id, fromCatalog] as const
+        }
+        return [id, knownImagemUrlsPorGrupoComplementoId.get(id) ?? null] as const
       })
     )
   })().finally(() => {
@@ -346,8 +381,15 @@ export async function fetchGrupoComplementoImagemUrl(
   grupoComplementoId: string,
   token: string
 ): Promise<string | null> {
-  const map = await fetchGruposComplementoImagemUrlsBatch([grupoComplementoId], token)
-  return map[grupoComplementoId.trim()] ?? null
+  const id = grupoComplementoId.trim()
+  const map = await fetchGruposComplementoImagemUrlsBatch([id], token)
+  const fromCatalog = map[id]
+  if (fromCatalog) return rememberGrupoComplementoImagemUrl(id, fromCatalog)
+  const fromCadastro = await fetchImagemUrlCadastro(
+    `/api/grupos-complementos/${encodeURIComponent(id)}`,
+    token
+  )
+  return rememberGrupoComplementoImagemUrl(id, fromCadastro)
 }
 
 let produtosBatchInFlight: Promise<Record<string, string | null>> | null = null
@@ -443,7 +485,12 @@ export async function fetchComplementosImagemUrlsBatch(
     return Object.fromEntries(
       ids.map(id => {
         const url = resolved[id]
-        return [id, typeof url === 'string' && url.trim() ? url.trim() : null] as const
+        const fromCatalog = urlImagemHttp(typeof url === 'string' ? url : null)
+        if (fromCatalog) {
+          knownImagemUrlsPorComplementoId.set(id, fromCatalog)
+          return [id, fromCatalog] as const
+        }
+        return [id, knownImagemUrlsPorComplementoId.get(id) ?? null] as const
       })
     )
   })().finally(() => {
@@ -458,8 +505,67 @@ export async function fetchComplementoImagemUrl(
   complementoId: string,
   token: string
 ): Promise<string | null> {
-  const map = await fetchComplementosImagemUrlsBatch([complementoId], token)
-  return map[complementoId.trim()] ?? null
+  const id = complementoId.trim()
+  const map = await fetchComplementosImagemUrlsBatch([id], token)
+  const fromCatalog = map[id]
+  if (fromCatalog) return rememberComplementoImagemUrl(id, fromCatalog)
+  const fromCadastro = await fetchImagemUrlCadastro(
+    `/api/complementos/${encodeURIComponent(id)}`,
+    token
+  )
+  return rememberComplementoImagemUrl(id, fromCadastro)
+}
+
+function imagemUrlDePayloadCadastro(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null
+  const rec = payload as Record<string, unknown>
+  const nested =
+    rec.data && typeof rec.data === 'object' && !Array.isArray(rec.data)
+      ? (rec.data as Record<string, unknown>)
+      : rec
+  return parseImagemUrlProdutoIndex(nested)
+}
+
+async function fetchImagemUrlCadastro(url: string, token: string): Promise<string | null> {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+    })
+    if (!response.ok) return null
+    const json = await response.json().catch(() => null)
+    return imagemUrlDePayloadCadastro(json)
+  } catch {
+    return null
+  }
+}
+
+async function resolverDoCadastroLote(
+  ids: string[],
+  token: string,
+  pathDe: (id: string) => string,
+  remember: (id: string, url: string | null | undefined) => string | null
+): Promise<Record<string, string | null>> {
+  const unique = [...new Set(ids.map(id => id.trim()).filter(Boolean))]
+  const result: Record<string, string | null> = Object.fromEntries(unique.map(id => [id, null]))
+  if (unique.length === 0) return result
+
+  let cursor = 0
+  const worker = async () => {
+    while (cursor < unique.length) {
+      const id = unique[cursor]
+      cursor += 1
+      const url = await fetchImagemUrlCadastro(pathDe(id), token)
+      if (url) {
+        remember(id, url)
+        result[id] = url
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(4, unique.length) }, () => worker()))
+  return result
 }
 
 async function uploadDeliveryImage(
@@ -476,7 +582,7 @@ async function uploadDeliveryImage(
 export function mensagemLegivelDeliveryMediaError(error: unknown): string {
   if (error instanceof DeliveryMediaApiError) {
     if (error.status === 404) {
-      return 'Item não encontrado no cardápio delivery. Configure o cardápio digital em Configurações.'
+      return 'Não foi possível enviar a imagem deste item. Recarregue a página e tente novamente.'
     }
     if (/INVALID_MIME_TYPE/i.test(error.message)) {
       return 'O conteúdo da imagem não corresponde ao formato informado. Salve novamente como JPEG, PNG ou WebP.'
@@ -490,4 +596,40 @@ export function mensagemLegivelDeliveryMediaError(error: unknown): string {
     return error.message
   }
   return 'Não foi possível enviar a imagem.'
+}
+
+export const complementoImagemMedia: ICadastroImagemMedia = {
+  resolverLote: fetchComplementosImagemUrlsBatch,
+  resolverUma: fetchComplementoImagemUrl,
+  resolverDoCadastro: (ids, token) =>
+    resolverDoCadastroLote(
+      ids,
+      token,
+      id => `/api/complementos/${encodeURIComponent(id)}`,
+      rememberComplementoImagemUrl
+    ),
+  async enviar(id, file, token) {
+    await uploadComplementoImagem(id, file, token)
+    return fetchComplementoImagemUrl(id, token)
+  },
+  lembrar: rememberComplementoImagemUrl,
+  conhecida: peekComplementoImagemUrl,
+}
+
+export const grupoComplementoImagemMedia: ICadastroImagemMedia = {
+  resolverLote: fetchGruposComplementoImagemUrlsBatch,
+  resolverUma: fetchGrupoComplementoImagemUrl,
+  resolverDoCadastro: (ids, token) =>
+    resolverDoCadastroLote(
+      ids,
+      token,
+      id => `/api/grupos-complementos/${encodeURIComponent(id)}`,
+      rememberGrupoComplementoImagemUrl
+    ),
+  async enviar(id, file, token) {
+    await uploadGrupoComplementoImagem(id, file, token)
+    return fetchGrupoComplementoImagemUrl(id, token)
+  },
+  lembrar: rememberGrupoComplementoImagemUrl,
+  conhecida: peekGrupoComplementoImagemUrl,
 }

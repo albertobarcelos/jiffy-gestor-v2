@@ -16,17 +16,20 @@ export function formatarValorComplemento(
   valor: number,
   tipoImpactoPreco?: 'aumenta' | 'diminui' | 'nenhum'
 ): string {
-  const valorFormatado = formatarNumeroComMilhar(valor)
   const tipo = tipoImpactoPreco || 'nenhum'
+  if (tipo === 'nenhum' || !Number.isFinite(valor) || Math.abs(valor) < 0.005) {
+    return ''
+  }
+
+  const valorFormatado = formatarNumeroComMilhar(Math.abs(valor))
 
   switch (tipo) {
     case 'aumenta':
       return `+ ${valorFormatado}`
     case 'diminui':
       return `- ${valorFormatado}`
-    case 'nenhum':
     default:
-      return formatarNumeroComMilhar(0)
+      return ''
   }
 }
 

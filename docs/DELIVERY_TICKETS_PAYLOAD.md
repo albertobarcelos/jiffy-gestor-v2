@@ -120,6 +120,9 @@ Regras importantes:
   no `/tickets`. Sem esse parâmetro, o backend ainda retorna tickets, mas pode
   retornar sem o nome Windows (legado). A impressão física usa o agente Windows.
 
+Como o Gestor monta o `PrintJob` (produção híbrida vs expedição):
+`docs/IMPRESSAO_CUPOM_DELIVERY.md`.
+
 Exemplo de complemento com dado extra apenas para impressao:
 
 ```json

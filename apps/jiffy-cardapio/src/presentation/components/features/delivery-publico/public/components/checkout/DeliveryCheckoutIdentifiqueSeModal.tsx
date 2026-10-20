@@ -58,6 +58,11 @@ type DeliveryCheckoutIdentifiqueSeModalProps = {
   onSalvarNome: (nome: string) => Promise<void>
   /** Remove cliente/lookup e reabre o input para buscar outro número. */
   onLimparIdentificacao: () => void
+  /**
+   * Busca o telefone sem avançar de step (ex.: após limpar com X e Continuar
+   * com o mesmo número — status idle/erro).
+   */
+  onBuscarTelefone: (telefoneDigits: string) => Promise<void>
   onClose: () => void
   onContinuar: (telefoneDigits: string) => Promise<void>
 }
@@ -85,6 +90,7 @@ export function DeliveryCheckoutIdentifiqueSeModal({
   novoEnderecoBloqueado = false,
   onSalvarNome,
   onLimparIdentificacao,
+  onBuscarTelefone,
   onClose,
   onContinuar,
 }: DeliveryCheckoutIdentifiqueSeModalProps) {
@@ -171,14 +177,30 @@ export function DeliveryCheckoutIdentifiqueSeModal({
       alertarCelularIncompleto()
       return
     }
-    if (lookupStatus === 'loading' || lookupStatus === 'idle') {
+    if (lookupStatus === 'loading') {
       showToast.error('Aguarde a consulta do telefone')
       return
     }
-    if (lookupStatus === 'erro') {
-      showToast.error('Erro ao consultar cadastro. Tente novamente.')
+
+    /**
+     * Após o X o lookup volta a idle com o telefone preenchido.
+     * Continuar deve reconsultar (sem avançar); com cache válido
+     * (encontrado/nao_encontrado) o fluxo abaixo avança normalmente.
+     */
+    if (lookupStatus === 'idle' || lookupStatus === 'erro') {
+      setEnviando(true)
+      try {
+        await onBuscarTelefone(digits)
+      } catch (error) {
+        showToast.error(
+          error instanceof Error ? error.message : 'Erro ao consultar cadastro'
+        )
+      } finally {
+        setEnviando(false)
+      }
       return
     }
+
     if (precisaNome && !isNomeCompletoCheckoutValido(nome)) {
       setTentouNome(true)
       showToast.error('Informe nome e sobrenome')

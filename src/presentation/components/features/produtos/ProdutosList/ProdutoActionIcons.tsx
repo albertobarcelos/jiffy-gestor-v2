@@ -31,7 +31,7 @@ export function ProdutoActionIcons({
   }
 
   return (
-    <div className="flex flex-nowrap items-center gap-2.5 md:gap-3">
+    <div className="flex w-full flex-nowrap items-center justify-start gap-1 md:w-auto md:justify-center md:gap-3">
       {actionIconsConfig.map(def => (
         <CatalogQuickActionButton
           key={`${produtoId}-${def.key}`}

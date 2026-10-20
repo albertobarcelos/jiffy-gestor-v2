@@ -35,8 +35,22 @@ import {
   calcularTotalComplementos,
 } from '@/src/domain/services/pedido/CalculadoraPedido'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
+import { listarComplementosVisiveisNoPedido } from '@/src/domain/policies/pedido/ComplementoCatalogoVendaPolicy'
+import {
+  grupoComplementoAtingiuMaximo,
+  limiteMaximoEfetivoGrupo,
+  mensagemMaximoGrupoComplemento,
+  podeIncrementarComplementoNoGrupo,
+  somarQuantidadeComplementosNoGrupo,
+  validarLimitesGruposComplementosLancamento,
+} from '@/src/domain/policies/pedido/GrupoComplementoLimitesPolicy'
 
 const PANEL_MS = { enter: 420, exit: 380 } as const
+
+function rotuloLimitesGrupoComplemento(grupo: { qtdMinima: number; qtdMaxima: number }): string {
+  const maximo = limiteMaximoEfetivoGrupo(grupo.qtdMaxima)
+  return `Mín: ${grupo.qtdMinima} · Máx: ${maximo ?? '∞'}`
+}
 
 /** Label na borda (outlined), alinhado a NovoMeioPagamento / filtros da lista */
 const sxValorPainelOutlined = {
@@ -105,9 +119,9 @@ interface ModalLancamentoProdutoPainelProps {
   produto: Produto | null
   /** Cadastro `permiteAlterarPreco` — exibe input de valor */
   mostrarAlterarPreco: boolean
-  /** Cadastro `abreComplementos` ou edição via carrinho — exibe seção de seleção de complementos */
+  /** Produto do menu com `abreComplementos` ou edição via carrinho — exibe a seleção de complementos */
   mostrarComplementos: boolean
-  /** Complementos ainda sendo carregados (GET produto por id) */
+  /** Complementos ainda sendo carregados (GET do produto do menu + grupos) */
   carregandoComplementos?: boolean
   /**
    * Lançamento pelo catálogo com `abreComplementos` desativado — orienta a usar o menu ⋮ no carrinho.
@@ -137,7 +151,7 @@ interface ModalLancamentoProdutoPainelProps {
 function produtoTemComplementosVinculados(produto: Produto): boolean {
   const grupos = produto.getGruposComplementos()
   if (!grupos || grupos.length === 0) return false
-  return grupos.some(grupo => grupo.complementos && grupo.complementos.length > 0)
+  return grupos.some(grupo => listarComplementosVisiveisNoPedido(grupo.complementos).length > 0)
 }
 
 function buildMapQuantidadesComplementos(
@@ -146,7 +160,7 @@ function buildMapQuantidadesComplementos(
 ): Record<string, number> {
   const map: Record<string, number> = {}
   for (const grupo of produto.getGruposComplementos()) {
-    for (const comp of grupo.complementos ?? []) {
+    for (const comp of listarComplementosVisiveisNoPedido(grupo.complementos)) {
       const chave = `${grupo.id}-${comp.id}`
       const qtd = iniciais?.[chave]
       map[chave] =
@@ -162,7 +176,7 @@ function montarComplementosSelecionados(
 ): ComplementoLancamentoPainelPayload[] {
   const out: ComplementoLancamentoPainelPayload[] = []
   produto.getGruposComplementos().forEach(grupo => {
-    grupo.complementos.forEach(comp => {
+    listarComplementosVisiveisNoPedido(grupo.complementos).forEach(comp => {
       const chave = `${grupo.id}-${comp.id}`
       const quantidade = Math.max(0, Math.floor(quantidades[chave] ?? 0))
       if (quantidade < 1) return
@@ -216,25 +230,35 @@ export function ModalLancamentoProdutoPainel({
     onAfterClose?.()
   }, [onAfterClose])
 
-  // Inicializa preço/complementos ao abrir (uma vez por abertura — não sobrescreve toggles durante a edição)
+  // Inicializa preço/complementos ao abrir. Se o cadastro hidratar grupos depois (lazy load),
+  // completa o mapa sem apagar quantidades já escolhidas.
   useEffect(() => {
     if (!open) {
       painelJaAbertoRef.current = false
       return
     }
     if (!produto) return
-    if (painelJaAbertoRef.current) return
-    painelJaAbertoRef.current = true
 
-    const base =
-      valorUnitarioInicial !== undefined && valorUnitarioInicial !== null
-        ? valorUnitarioInicial
-        : produto.getValor()
-    setValorInput(formatarNumeroComMilhar(Number.isFinite(base) && base >= 0 ? base : 0))
-    setQuantidadesComplementos(
-      buildMapQuantidadesComplementos(produto, quantidadesComplementosIniciais)
-    )
-    setObservacaoInput(observacaoInicial ?? '')
+    if (!painelJaAbertoRef.current) {
+      painelJaAbertoRef.current = true
+      const base =
+        valorUnitarioInicial !== undefined && valorUnitarioInicial !== null
+          ? valorUnitarioInicial
+          : produto.getValor()
+      setValorInput(formatarNumeroComMilhar(Number.isFinite(base) && base >= 0 ? base : 0))
+      setQuantidadesComplementos(
+        buildMapQuantidadesComplementos(produto, quantidadesComplementosIniciais)
+      )
+      setObservacaoInput(observacaoInicial ?? '')
+      return
+    }
+
+    setQuantidadesComplementos(prev => {
+      const hidratado = buildMapQuantidadesComplementos(produto, quantidadesComplementosIniciais)
+      const chavesNovas = Object.keys(hidratado).filter(chave => !(chave in prev))
+      if (chavesNovas.length === 0) return prev
+      return { ...hidratado, ...prev }
+    })
   }, [open, produto, valorUnitarioInicial, quantidadesComplementosIniciais, observacaoInicial])
 
   const complementosSelecionadosPreview = useMemo(() => {
@@ -313,14 +337,47 @@ export function ModalLancamentoProdutoPainel({
       ? montarComplementosSelecionados(produto, quantidadesComplementos)
       : []
 
+    if (mostrarComplementos) {
+      const gruposComItens = produto
+        .getGruposComplementos()
+        .map(grupo => ({
+          ...grupo,
+          complementos: listarComplementosVisiveisNoPedido(grupo.complementos),
+        }))
+        .filter(grupo => grupo.complementos.length > 0)
+      const limites = validarLimitesGruposComplementosLancamento(
+        gruposComItens,
+        quantidadesComplementos
+      )
+      if (!limites.valido) {
+        showToast.error(limites.mensagem ?? 'Complementos fora dos limites do grupo.')
+        return
+      }
+    }
+
     onConfirm({ valorUnitario, complementos })
     onOpenChange(false)
   }
 
-  const ajustarQuantidadeComplemento = (chave: string, delta: number) => {
+  const ajustarQuantidadeComplemento = (
+    chave: string,
+    delta: number,
+    grupo: { id: string; nome: string; qtdMaxima: number }
+  ) => {
     setQuantidadesComplementos(prev => {
       const atual = Math.max(0, Math.floor(prev[chave] ?? 0))
-      return { ...prev, [chave]: Math.max(0, atual + delta) }
+      const nova = Math.max(0, atual + delta)
+      if (delta > 0) {
+        const totalNoGrupo = somarQuantidadeComplementosNoGrupo(prev, grupo.id, {
+          key: chave,
+          quantidade: nova,
+        })
+        if (!podeIncrementarComplementoNoGrupo(grupo, totalNoGrupo)) {
+          showToast.error(mensagemMaximoGrupoComplemento(grupo))
+          return prev
+        }
+      }
+      return { ...prev, [chave]: nova }
     })
   }
 
@@ -421,12 +478,29 @@ export function ModalLancamentoProdutoPainel({
                   <p className="text-sm text-secondary-text">Carregando complementos...</p>
                 ) : produtoTemComplementosVinculados(produto) ? (
                   <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-                    {produto.getGruposComplementos().map(grupo => (
+                    {produto.getGruposComplementos().map(grupo => {
+                      const complementosVisiveis = listarComplementosVisiveisNoPedido(
+                        grupo.complementos
+                      )
+                      if (complementosVisiveis.length === 0) return null
+                      const totalNoGrupo = somarQuantidadeComplementosNoGrupo(
+                        quantidadesComplementos,
+                        grupo.id
+                      )
+                      const atingiuMaximo = grupoComplementoAtingiuMaximo(grupo, totalNoGrupo)
+                      return (
                       <div key={grupo.id} className="rounded-md border border-gray-100 px-2 py-1.5">
-                        <h4 className="mb-1 text-sm font-semibold text-gray-800">{grupo.nome}</h4>
-                        {grupo.complementos && grupo.complementos.length > 0 ? (
+                        <div className="mb-1 flex items-baseline justify-between gap-2">
+                          <h4 className="min-w-0 truncate text-sm font-semibold text-gray-800">
+                            {grupo.nome}
+                          </h4>
+                          <span className="shrink-0 text-[11px] font-medium tabular-nums text-secondary-text">
+                            {rotuloLimitesGrupoComplemento(grupo)}
+                          </span>
+                        </div>
+                        {complementosVisiveis.length > 0 ? (
                           <div className="space-y-0.5">
-                            {grupo.complementos.map(comp => {
+                            {complementosVisiveis.map(comp => {
                               const chaveUnica = `${grupo.id}-${comp.id}`
                               const quantidade = Math.max(
                                 0,
@@ -460,7 +534,9 @@ export function ModalLancamentoProdutoPainel({
                                       type="button"
                                       aria-label="Diminuir quantidade do complemento"
                                       disabled={quantidade <= 0}
-                                      onClick={() => ajustarQuantidadeComplemento(chaveUnica, -1)}
+                                      onClick={() =>
+                                        ajustarQuantidadeComplemento(chaveUnica, -1, grupo)
+                                      }
                                       className="flex h-7 w-7 items-center justify-center bg-primary/10 font-normal text-gray-600 transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-40"
                                     >
                                       <MdRemove className="h-4 w-4" />
@@ -474,8 +550,11 @@ export function ModalLancamentoProdutoPainel({
                                     <button
                                       type="button"
                                       aria-label="Aumentar quantidade do complemento"
-                                      onClick={() => ajustarQuantidadeComplemento(chaveUnica, 1)}
-                                      className="flex h-7 w-7 items-center justify-center bg-primary/10 font-normal text-gray-600 transition-colors hover:bg-primary/20"
+                                      disabled={atingiuMaximo}
+                                      onClick={() =>
+                                        ajustarQuantidadeComplemento(chaveUnica, 1, grupo)
+                                      }
+                                      className="flex h-7 w-7 items-center justify-center bg-primary/10 font-normal text-gray-600 transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-40"
                                     >
                                       <MdAdd className="h-4 w-4" />
                                     </button>
@@ -488,7 +567,8 @@ export function ModalLancamentoProdutoPainel({
                           <p className="text-sm text-gray-500">Nenhum item neste grupo.</p>
                         )}
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 ) : (
                   <p className="py-4 text-center text-sm text-gray-500">

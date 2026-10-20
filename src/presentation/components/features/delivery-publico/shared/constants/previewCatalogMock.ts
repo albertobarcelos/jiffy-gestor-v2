@@ -65,6 +65,8 @@ export const PREVIEW_DESIGN_PRODUTOS = [
     nome: 'Lanche exemplo',
     descricao: 'Visualização no preview do design',
     preco: 22,
+    precoRegular: 29.9,
+    descontoPercentual: 26.42,
     grupoId: 'lanches',
   },
 ]

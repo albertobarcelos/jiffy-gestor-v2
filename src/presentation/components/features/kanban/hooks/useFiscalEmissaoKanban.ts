@@ -6,7 +6,12 @@ import { deveUsarModuloDeliveryParaEmissaoFiscal } from '@/src/presentation/hook
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { fiscalPendentePodeReemitirAposCooldown } from '@/src/domain/services/pedido/RegrasFiscaisVenda'
-import { STATUS_FISCAL_AGUARDANDO_SEFAZ } from '../rules/vendasKanban.rules'
+import {
+  MENSAGEM_EMISSAO_DELIVERY_SO_FINALIZADO,
+  numeroOpcionalReemitirNotaDelivery,
+} from '@/src/domain/services/pedido/RegrasEmissaoFiscalDelivery'
+import { vendaKanbanPermiteEmissaoFiscalDelivery } from '../rules/emissaoFiscalDelivery.kanban'
+import { statusFiscalTextoAguardandoSefaz } from '../rules/vendasKanban.rules'
 import {
   aplicarPatchFiscalKanbanSemRefetch,
   extrairPatchFiscalKanban,
@@ -81,8 +86,7 @@ function normalizarStatusFiscal(status: string | null | undefined): string {
 }
 
 function statusFiscalAguardando(status: string | null | undefined): boolean {
-  const s = normalizarStatusFiscal(status)
-  return STATUS_FISCAL_AGUARDANDO_SEFAZ.has(s)
+  return statusFiscalTextoAguardandoSefaz(status)
 }
 
 /**
@@ -97,7 +101,7 @@ export function deveEncerrarPollComStatus(
 ): boolean {
   const s = normalizarStatusFiscal(status)
   if (!s) return false
-  if (s === 'EMITIDA' || s === 'CANCELADA' || s === 'INUTILIZADA') return true
+  if (s === 'EMITIDA' || s === 'AUTORIZADA' || s === 'AUTORIZADO' || s === 'CANCELADA' || s === 'INUTILIZADA') return true
   if ((s === 'REJEITADA' || s === 'DENEGADA') && viuAguardando) return true
   if ((s === 'REJEITADA' || s === 'DENEGADA') && s !== statusAnterior) return true
   return false
@@ -126,6 +130,7 @@ interface UseFiscalEmissaoKanbanParams {
     documentId: string
     numero?: number
   }) => Promise<unknown>
+  reemitirNfeDelivery: (payload: { id: string; numero?: number }) => Promise<unknown>
   emitirNotaPdv: (payload: { id: string; modelo: 55 | 65 }) => Promise<unknown>
   emitirNotaGestor: (payload: { id: string; modelo: 55 | 65 }) => Promise<unknown>
   emitirNotaDelivery: (payload: { id: string; modelo: 55 | 65 }) => Promise<unknown>
@@ -139,6 +144,7 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
   const {
     reemitirNfePdv,
     reemitirNfeGestor,
+    reemitirNfeDelivery,
     emitirNotaPdv,
     emitirNotaGestor,
     emitirNotaDelivery,
@@ -163,6 +169,7 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
   }
   const emissaoFiscalLock = emissaoFiscalLockRef.current
   const backgroundSyncIdsRef = useRef(new Set<string>())
+  const vendaIdEmissaoPreparandoRef = useRef<string | null>(null)
 
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -279,9 +286,13 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
       venda: Venda,
       acao: AcaoFiscalKanbanEmAndamento,
       statusAnterior: Venda['statusFiscal'],
-      executar: () => Promise<unknown>
+      executar: () => Promise<unknown>,
+      opcoes?: { jaTravado?: boolean }
     ) => {
-      if (!iniciarAcaoFiscal(venda.id, acao)) return
+      if (!opcoes?.jaTravado && !iniciarAcaoFiscal(venda.id, acao)) return
+      if (opcoes?.jaTravado) {
+        setAcaoFiscalEmAndamento(venda.id, acao)
+      }
 
       const iniciadoEm = Date.now()
       let precisaSyncBackground = false
@@ -330,12 +341,27 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
       iniciarSyncBackgroundStatusFiscal,
       pollStatusFiscalAteResolver,
       queryClient,
+      setAcaoFiscalEmAndamento,
     ]
   )
 
   const handleEmitirNfe = useCallback(
     async (venda: Venda) => {
       if (emissaoFiscalLock.isLocked(venda.id)) return
+      if (!iniciarAcaoFiscal(venda.id, 'emitindo')) return
+      vendaIdEmissaoPreparandoRef.current = venda.id
+
+      if (!vendaKanbanPermiteEmissaoFiscalDelivery(venda)) {
+        showToast.error(MENSAGEM_EMISSAO_DELIVERY_SO_FINALIZADO)
+        encerrarAcaoFiscal(venda.id)
+        vendaIdEmissaoPreparandoRef.current = null
+        return
+      }
+
+      const usarDelivery = deveUsarModuloDeliveryParaEmissaoFiscal(
+        venda.tabelaOrigem,
+        venda.tipoVenda
+      )
 
       const podeReemitirInterativo =
         venda.statusFiscal === 'REJEITADA' ||
@@ -353,7 +379,18 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
 
       if (podeReemitirInterativo) {
         const docId = venda.documentoFiscalId?.trim()
+        const numeroFiscal = numeroOpcionalReemitirNotaDelivery(venda.numeroFiscal)
         const executarAtalho = async () => {
+          if (usarDelivery) {
+            await executarAcaoFiscalComLock(
+              venda,
+              'reemitindo',
+              venda.statusFiscal,
+              () => reemitirNfeDelivery({ id: venda.id, numero: numeroFiscal }),
+              { jaTravado: true }
+            )
+            return
+          }
           if (docId) {
             const payload = {
               id: venda.id,
@@ -368,7 +405,8 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
                   return reemitirNfeGestor(payload)
                 }
                 return reemitirNfePdv(payload)
-              }
+              },
+              { jaTravado: true }
             )
             return
           }
@@ -379,15 +417,21 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
               showToast.error(
                 'Para emitir NF-e (modelo 55) é obrigatório que a venda tenha um cliente cadastrado. Vincule o cliente na origem do pedido e tente novamente.'
               )
+              encerrarAcaoFiscal(venda.id)
+              vendaIdEmissaoPreparandoRef.current = null
               return
             }
-            await executarAcaoFiscalComLock(venda, 'emitindo', venda.statusFiscal, () =>
-              emitirNotaParaVenda(venda, modeloEmitir)
+            await executarAcaoFiscalComLock(
+              venda,
+              'emitindo',
+              venda.statusFiscal,
+              () => emitirNotaParaVenda(venda, modeloEmitir),
+              { jaTravado: true }
             )
           }
         }
 
-        if (docId || resolveModeloParaEmitirNota(venda) !== null) {
+        if (usarDelivery || docId || resolveModeloParaEmitirNota(venda) !== null) {
           try {
             const itens = await verificarCbenef.mutateAsync({
               vendaId: venda.id,
@@ -410,13 +454,17 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
         }
       }
 
-      setPrimeiroPorColuna(prev => ({ ...prev, COM_FISCAL: venda.id }))
+      setPrimeiroPorColuna(prev => ({
+        ...prev,
+        COM_FISCAL: venda.id,
+        FINALIZADAS: venda.id,
+      }))
       setVendaSelecionadaParaEmissao({
         id: venda.id,
         tabelaOrigem: venda.tabelaOrigem,
         numeroVenda: venda.numeroVenda,
         codigoVenda: venda.codigoVenda,
-        origemVenda: venda.origem,
+        origemVenda: venda.origem ?? undefined,
         clienteId: venda.cliente?.id ?? null,
         clienteNome: venda.cliente?.nome ?? null,
         tipoVenda: venda.tipoVenda,
@@ -426,9 +474,11 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
     },
     [
       emissaoFiscalLock,
-      emitirNotaDelivery,
       emitirNotaParaVenda,
+      encerrarAcaoFiscal,
       executarAcaoFiscalComLock,
+      iniciarAcaoFiscal,
+      reemitirNfeDelivery,
       reemitirNfeGestor,
       reemitirNfePdv,
       setEmitirNfeModalOpen,
@@ -438,6 +488,13 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
       verificarCbenef,
     ]
   )
+
+  const liberarEmissaoPreparando = useCallback(() => {
+    const vendaId = vendaIdEmissaoPreparandoRef.current
+    if (!vendaId) return
+    encerrarAcaoFiscal(vendaId)
+    vendaIdEmissaoPreparandoRef.current = null
+  }, [encerrarAcaoFiscal])
 
   const handleContinuarCbenefKanban = useCallback(async () => {
     const executar = pendenciaCbenefRef.current
@@ -454,12 +511,14 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
       path: PORTAL_CONTADOR_PATH,
     })
     setAlertaCbenef(null)
-  }, [addTab])
+    liberarEmissaoPreparando()
+  }, [addTab, liberarEmissaoPreparando])
 
   const handleCancelarCbenefKanban = useCallback(() => {
     pendenciaCbenefRef.current = null
     setAlertaCbenef(null)
-  }, [])
+    liberarEmissaoPreparando()
+  }, [liberarEmissaoPreparando])
 
   return {
     acaoFiscalEmAndamentoPorVenda,
@@ -469,5 +528,6 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
     handleContinuarCbenefKanban,
     handleConfigurarCbenefKanban,
     handleCancelarCbenefKanban,
+    liberarEmissaoPreparando,
   }
 }

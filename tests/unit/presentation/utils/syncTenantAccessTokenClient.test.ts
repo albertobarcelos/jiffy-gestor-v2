@@ -34,12 +34,16 @@ vi.mock('@/src/shared/utils/tabSession', () => ({
   setTabEmpresaId: (id: string) => mockSetTabEmpresaId(id),
 }))
 
-vi.mock('@/src/shared/utils/buildAuthFromAccessToken', () => ({
-  buildAuthFromAccessToken: (token: string) => ({
-    getAccessToken: () => token,
-    isExpired: () => false,
-  }),
-}))
+vi.mock('@/src/shared/utils/buildAuthFromAccessToken', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/src/shared/utils/buildAuthFromAccessToken')>()
+  return {
+    ...actual,
+    buildAuthFromAccessToken: (token: string) => ({
+      getAccessToken: () => token,
+      isExpired: () => false,
+    }),
+  }
+})
 
 vi.mock('@/src/shared/utils/validateToken', () => ({
   extractTokenInfo: (token: string) => {
@@ -61,11 +65,17 @@ describe('syncTenantAccessTokenClient', () => {
     })
   })
 
+  const usuarioSessao = {
+    getId: () => 'user-1',
+    getEmail: () => 'ana@loja.com',
+    getName: () => 'Ana',
+  }
+
   beforeEach(() => {
     vi.resetAllMocks()
     _sessionStore.clear()
     mockGetState.mockReturnValue({
-      getUser: () => null,
+      getUser: () => usuarioSessao,
       tenantAuth: null,
       setTenantAuth: mockSetTenantAuth,
     })

@@ -5,6 +5,10 @@ import {
   colunaKanbanDeStatusEtapa,
   colunaKanbanDeTimestampsEntrega,
   resolverColunaDetalhePedido,
+  deveUsarVisaoUnicaDetalhePedido,
+  modalidadeLogisticaDetalhePedido,
+  pedidoDetalheEhEntrega,
+  pedidoDetalheEhRetirada,
   rotuloEtapaDetalhePedido,
   rotuloTipoAtendimento,
 } from '@/src/presentation/components/features/pedidos/utils/detalheVisaoUnica'
@@ -23,7 +27,7 @@ function dtoDetalhe(
     fluxoPagamentoEntrega: 'cobrar_entregador',
     detalhesPedidoMeta: {
       statusEtapaOperacional: 'EM_PREPARO',
-      tipoVenda: 'entrega',
+      tipoVenda: 'delivery',
     },
     resumoFiscal: null,
     resumoFinanceiroDetalhes: null,
@@ -49,6 +53,8 @@ describe('colunaKanbanDeStatusEtapa', () => {
     expect(colunaKanbanDeStatusEtapa('DESPACHADO')).toBe('EM_ROTA')
     expect(colunaKanbanDeStatusEtapa('FINALIZADAS')).toBe('FINALIZADAS')
     expect(colunaKanbanDeStatusEtapa('ENTREGUE')).toBe('FINALIZADAS')
+    expect(colunaKanbanDeStatusEtapa(null)).toBeNull()
+    expect(colunaKanbanDeStatusEtapa('ABERTA')).toBeNull()
   })
 })
 
@@ -121,6 +127,33 @@ describe('rotuloTipoAtendimento', () => {
   it('nomeia entrega, retirada e balcão', () => {
     expect(rotuloTipoAtendimento('entrega')).toBe('Entrega')
     expect(rotuloTipoAtendimento('retirada')).toBe('Retirada')
+    expect(rotuloTipoAtendimento('delivery')).toBe('Delivery')
     expect(rotuloTipoAtendimento('balcao')).toBe('Balcão')
+  })
+})
+
+describe('modalidadeLogisticaDetalhePedido', () => {
+  it('usa tipoEntrega e não tipoVenda=delivery', () => {
+    expect(modalidadeLogisticaDetalhePedido('retirada')).toBe('retirada')
+    expect(modalidadeLogisticaDetalhePedido('entrega')).toBe('entrega')
+    expect(modalidadeLogisticaDetalhePedido('delivery')).toBeNull()
+    expect(modalidadeLogisticaDetalhePedido(null)).toBeNull()
+    expect(pedidoDetalheEhRetirada('retirada')).toBe(true)
+    expect(pedidoDetalheEhEntrega('retirada')).toBe(false)
+    expect(pedidoDetalheEhEntrega('entrega')).toBe(true)
+    expect(pedidoDetalheEhEntrega('delivery')).toBe(false)
+  })
+})
+
+describe('deveUsarVisaoUnicaDetalhePedido', () => {
+  it('usa o resumo de delivery só com tipoVenda delivery', () => {
+    expect(deveUsarVisaoUnicaDetalhePedido({ tipoInicioPedido: 'delivery' })).toBe(true)
+    expect(deveUsarVisaoUnicaDetalhePedido({ tipoInicioPedido: 'balcao' })).toBe(false)
+    expect(
+      deveUsarVisaoUnicaDetalhePedido({ tipoInicioPedido: 'balcao', tipoVenda: 'delivery' })
+    ).toBe(false)
+    expect(deveUsarVisaoUnicaDetalhePedido({ tipoVenda: 'delivery' })).toBe(true)
+    expect(deveUsarVisaoUnicaDetalhePedido({ tipoVenda: 'retirada' })).toBe(false)
+    expect(deveUsarVisaoUnicaDetalhePedido({ tipoVenda: 'balcao' })).toBe(false)
   })
 })

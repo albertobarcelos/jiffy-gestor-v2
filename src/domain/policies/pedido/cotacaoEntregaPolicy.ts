@@ -38,9 +38,25 @@ export type TaxaEntregaOverrideModoPolicy = 'automatica' | 'sem_taxa' | 'catalog
 
 export type StatusCoberturaEntregaPedido = 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
 
+export const MENSAGEM_ENDERECO_FORA_COBERTURA =
+  'Este endereço está fora da área de cobertura. Ajuste a cobertura para poder avançar.'
+
+/**
+ * Fora da cobertura bloqueia o wizard mesmo com taxa de catálogo ou sem taxa.
+ */
+export function mensagemBloqueioForaDaCobertura(params: {
+  pedidoComEntrega: boolean
+  enderecoEntregaCoberturaStatus?: StatusCoberturaEntregaPedido
+}): string | null {
+  if (!params.pedidoComEntrega) return null
+  if (params.enderecoEntregaCoberturaStatus !== 'fora') return null
+  return MENSAGEM_ENDERECO_FORA_COBERTURA
+}
+
 /**
  * Impede avançar para Pagamento enquanto a taxa automática não terminou
  * (ou falhou). Override de catálogo / sem taxa libera o passo.
+ * Fora da cobertura é tratado em `mensagemBloqueioForaDaCobertura`.
  */
 export function mensagemBloqueioTaxaAutomatica(params: {
   pedidoComEntrega: boolean

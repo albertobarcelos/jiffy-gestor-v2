@@ -3,12 +3,15 @@ import {
   clienteAtingiuMaxEnderecosDelivery,
   MAX_ENDERECOS_CLIENTE_DELIVERY,
 } from '@/src/domain/policies/LimiteEnderecosClienteDelivery'
-import { isTokenCotacaoExpirado } from '@/src/domain/policies/ValidadeTokenCotacao'
+import { isTokenCotacaoExpirado, tokenCotacaoPertoDeVencer, MARGEM_RENOVACAO_TOKEN_COTACAO_MS } from '@/src/domain/policies/ValidadeTokenCotacao'
 import {
   isErroCoberturaEntregaPublica,
   MSG_FORA_COBERTURA_ENTREGA_PUBLICA,
 } from '@/src/domain/policies/CoberturaEntregaPublica'
-import { calcularTotalComplementos } from '@/src/domain/services/pedido/CalculadoraPedido'
+import {
+  calcularTotalComplementos,
+  calcularTotalProduto,
+} from '@/src/domain/services/pedido/CalculadoraPedido'
 
 describe('LimiteEnderecosClienteDelivery', () => {
   it('bloqueia a partir do máximo', () => {
@@ -26,6 +29,15 @@ describe('ValidadeTokenCotacao', () => {
 
   it('considera inválido se expiresAt não parseia', () => {
     expect(isTokenCotacaoExpirado('nao-e-data')).toBe(true)
+  })
+
+  it('trata como perto de vencer dentro da margem e depois dela', () => {
+    const now = Date.parse('2026-01-01T12:00:00.000Z')
+    const dentro = new Date(now + MARGEM_RENOVACAO_TOKEN_COTACAO_MS - 1_000).toISOString()
+    const fora = new Date(now + MARGEM_RENOVACAO_TOKEN_COTACAO_MS + 60_000).toISOString()
+    expect(tokenCotacaoPertoDeVencer(dentro, now)).toBe(true)
+    expect(tokenCotacaoPertoDeVencer(fora, now)).toBe(false)
+    expect(tokenCotacaoPertoDeVencer('2026-01-01T11:00:00.000Z', now)).toBe(true)
   })
 })
 
@@ -56,5 +68,26 @@ describe('CalculadoraPedido', () => {
       ],
     })
     expect(total).toBe(4)
+  })
+
+  it('cobra impacto da receita × quantidade do produto sem alterar a receita', () => {
+    const produto = {
+      produtoId: 'p1',
+      nome: 'Burger',
+      quantidade: 2,
+      valorUnitario: 39.9,
+      complementos: [
+        {
+          id: 'c1',
+          grupoId: 'g1',
+          nome: 'Farinha',
+          valor: 10,
+          quantidade: 1,
+          tipoImpactoPreco: 'diminui' as const,
+        },
+      ],
+    }
+    expect(calcularTotalComplementos(produto)).toBe(-10)
+    expect(calcularTotalProduto(produto)).toBeCloseTo(59.8, 5)
   })
 })

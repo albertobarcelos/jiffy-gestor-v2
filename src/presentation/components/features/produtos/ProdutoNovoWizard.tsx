@@ -40,6 +40,11 @@ import { JiffyUnsavedChangesDialog } from '@/src/presentation/components/ui/Jiff
 import {
   unirMenuIds,
 } from '@/src/presentation/utils/uploadImagemProdutoMenus'
+import {
+  descricaoVinculoMenusCriacao,
+  garantirMenuPrincipalNosIds,
+  idsMenuPrincipalTravados,
+} from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
 
 function CategoriaIconeNome({ grupo, size = 18 }: { grupo: GrupoProduto; size?: number }) {
   const cor = grupo.getCorHex() || '#530CA3'
@@ -132,16 +137,16 @@ export function ProdutoNovoWizard({
 
   const stepLabels = STEP_LABELS
 
-  /** Cadastro → Principal pré-marcado (desmarcável). Cardápio → menu atual travado. */
+  /** Cadastro/cardápio: principal sempre entra. Cardápio secundário também trava o menu atual. */
   const menusIniciaisWizard = useMemo(() => {
-    if (origem === 'menu') return menuId ? [menuId] : []
-    return principalMenuId ? [principalMenuId] : []
+    const origemIds = origem === 'menu' && menuId ? [menuId] : []
+    return garantirMenuPrincipalNosIds(origemIds, principalMenuId)
   }, [origem, menuId, principalMenuId])
 
   const menusTravadosWizard = useMemo(() => {
-    if (origem !== 'menu') return [] as string[]
-    return menuId ? [menuId] : []
-  }, [origem, menuId])
+    const origemIds = origem === 'menu' && menuId ? [menuId] : []
+    return idsMenuPrincipalTravados(principalMenuId, origemIds)
+  }, [origem, menuId, principalMenuId])
 
   const previewMenuId = origem === 'menu' ? menuId : undefined
 
@@ -350,10 +355,10 @@ export function ProdutoNovoWizard({
         ? []
         : (impressorasRef.current?.getSelectedIds() ?? [])
       const menusEscolhidos = menusRef.current?.getSelectedIds() ?? []
-      let menuIds = unirMenuIds(menusEscolhidos)
+      let menuIds = garantirMenuPrincipalNosIds(menusEscolhidos, principalMenuId)
 
       if (origem === 'menu') {
-        menuIds = unirMenuIds(menuId, menusEscolhidos)
+        menuIds = garantirMenuPrincipalNosIds(unirMenuIds(menuId, menusEscolhidos), principalMenuId)
         if (!menuId || !menuIds.includes(menuId)) {
           showToast.error('Mantenha o cardápio atual vinculado ao produto')
           return
@@ -385,6 +390,7 @@ export function ProdutoNovoWizard({
     onSuccess,
     skipComplementos,
     skipImpressoras,
+    principalMenuId,
   ])
 
   const footerActions = useMemo((): JiffySidePanelFooterActions => {
@@ -744,11 +750,7 @@ export function ProdutoNovoWizard({
                 isEmbedded
                 initialMenuIds={menusIniciaisWizard}
                 lockedMenuIds={menusTravadosWizard}
-                description={
-                  origem === 'menu'
-                    ? 'Este cardápio já entra e não pode ser desmarcado. Marque outros se quiser o produto em mais menus (incluindo o principal).'
-                    : 'O menu principal já vem marcado. Você pode desmarcá-lo e salvar só o produto base, ou incluir outros cardápios.'
-                }
+                description={descricaoVinculoMenusCriacao(origem === 'menu')}
               />
             </div>
           ) : null}

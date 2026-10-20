@@ -14,6 +14,7 @@ import {
   type CatalogoProdutoListaIndex,
 } from '@/src/shared/utils/menuProdutoPermissoes'
 import { CATALOGO_PRODUTOS_INDEX_QUERY_KEY } from '@/src/presentation/hooks/produtos/useProdutosCodigoPorId'
+import { invalidarCatalogoVendaQueries } from '@/src/presentation/cache/catalogoVendaQueryCache'
 
 export type ProdutoPatchPayload =
   | { type: 'nome'; produtoId: string; novoNome: string }
@@ -138,6 +139,17 @@ export function useProdutoPatchMutation() {
 
     onSuccess: (_data, payload) => {
       showToast.success(successMessage(payload))
+      invalidarCatalogoVendaQueries(
+        queryClient,
+        empresaId,
+        payload.type === 'grupo'
+          ? {
+              tipo: 'categoria',
+              produtoId: payload.produtoId,
+              grupoProdutoId: payload.novoGrupoId,
+            }
+          : { tipo: 'produto-campos-simples', produtoId: payload.produtoId }
+      )
     },
 
     onSettled: () => {

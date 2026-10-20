@@ -25,17 +25,93 @@ export function obterStatusVendaLabel(venda: VendaListItem): string {
   return 'Aberta'
 }
 
+export type TipoVendaIconeRelatorio =
+  | 'mesa'
+  | 'balcao'
+  | 'gestor'
+  | 'entrega'
+  | 'retirada'
+  | 'delivery'
+
+export function tipoVendaIconeRelatorio(
+  venda: Pick<VendaListItem, 'tipoVenda' | 'tipoEntrega' | 'tabelaOrigem' | 'numeroMesa'>
+): TipoVendaIconeRelatorio {
+  if (venda.tipoEntrega === 'retirada' || venda.tipoEntrega === 'entrega') {
+    return venda.tipoEntrega
+  }
+  const tipo = String(venda.tipoVenda ?? '').trim().toLowerCase()
+  if (tipo === 'delivery') {
+    return 'delivery'
+  }
+  if (tipo === 'mesa' || tipo === 'balcao' || tipo === 'gestor' || tipo === 'entrega' || tipo === 'retirada') {
+    return tipo
+  }
+  if (venda.tabelaOrigem === 'venda_gestor') {
+    return 'gestor'
+  }
+  return venda.numeroMesa != null ? 'mesa' : 'balcao'
+}
+
 export function obterTipoVendaLabel(venda: VendaListItem): string {
-  switch (venda.tipoVenda) {
+  const tipo = String(tipoVendaIconeRelatorio(venda) ?? '').toLowerCase()
+  switch (tipo) {
     case 'mesa':
       return venda.numeroMesa != null ? `Mesa ${venda.numeroMesa}` : 'Mesa'
     case 'balcao':
       return 'Balcão'
     case 'gestor':
       return 'Gestor'
+    case 'entrega':
+      return 'Entrega'
+    case 'retirada':
+      return 'Retirada'
+    case 'delivery':
+      return 'Delivery'
     default:
       return String(venda.tipoVenda ?? '')
   }
+}
+
+export function origemDeliveryExterno(origem?: string | null): boolean {
+  const o = String(origem ?? '')
+    .trim()
+    .toUpperCase()
+  return o === 'IFOOD' || o === 'AIQFOME'
+}
+
+export function vendaEhPdvRelatorio(venda: VendaListItem): boolean {
+  if (venda.tabelaOrigem === 'venda') return true
+  return String(venda.origem ?? '').trim().toUpperCase() === 'PDV'
+}
+
+/** Quem lançou a venda. Canal externo (iFood / Aiqfome) não tem operador da loja. */
+export function nomeLancadorRelatorio(
+  venda: VendaListItem,
+  usuariosLojaPorId: Map<string, string>
+): string {
+  if (origemDeliveryExterno(venda.origem)) return '—'
+
+  const id = String(venda.abertoPorId ?? '').trim()
+  if (id && id !== '—') {
+    const doCadastro = usuariosLojaPorId.get(id)
+    if (doCadastro) return doCadastro
+  }
+
+  const origem = String(venda.origem ?? '')
+    .trim()
+    .toUpperCase()
+  if (origem === 'JIFFY_DELIVERY') return '—'
+
+  const nome = venda.abertoPorNome?.trim()
+  if (!nome || nome === '—') return '—'
+  return nome
+}
+
+/** Código de terminal só existe em venda PDV. */
+export function codigoTerminalCelulaRelatorio(venda: VendaListItem): string {
+  if (!vendaEhPdvRelatorio(venda)) return '—'
+  const codigo = String(venda.codigoTerminal ?? '').trim()
+  return codigo ? `#${codigo}` : '—'
 }
 
 export function formatarDataHoraRelatorio(dateString: string | undefined): string {

@@ -1,97 +1,22 @@
+import { ehPedidoModuloDelivery } from '@/src/domain/services/pedido/PedidoModuloDelivery'
+import { atorUsuarioId } from '@/src/application/mappers/atorPedidoDelivery'
 import type {
   PagamentoApiItem,
   ProdutoLancadoApiItem,
   VendaGestorApiResponse,
 } from '@/src/application/dto/api/vendaGestorApi'
+import { mapCobrancaDeliveryToPagamento } from '@/src/application/mappers/CobrancaDeliveryPagamentoMapper'
 import {
   enderecoSnapshotParaEnderecoEntregaDetalhe,
   extrairContextoEntregaDeVendaData,
 } from '@/src/application/mappers/ContextoEntregaDeliveryMapper'
+import { resolverTrocoLevarPedidoEntrega } from '@/src/application/mappers/resolverTrocoLevarPedidoEntrega'
+import { mapearPagamentoDetalheVenda } from '@/src/application/mappers/VendaDetalhePagamentoMapper'
 
 function isoString(value: unknown): string | null {
   if (value == null) return null
   const s = String(value).trim()
   return s || null
-}
-
-function atorUsuarioId(ator: unknown): string | null {
-  if (!ator || typeof ator !== 'object') return null
-  const a = ator as Record<string, unknown>
-  const ref = String(a.sourceReference ?? a.id ?? '').trim()
-  return ref || null
-}
-
-function mapCobrancaDeliveryToPagamento(raw: unknown): PagamentoApiItem | null {
-  if (!raw || typeof raw !== 'object') return null
-  const c = raw as Record<string, unknown>
-  const momento = String(c.momentoCobranca ?? '').trim().toLowerCase()
-  const status = String(c.status ?? '').trim().toLowerCase()
-  const cancelado = status === 'cancelada' || isoString(c.dataCancelamento) != null
-  const paga = status === 'paga'
-
-  const pagamentoEfetivado =
-    c.pagamentoEfetivado && typeof c.pagamentoEfetivado === 'object'
-      ? (c.pagamentoEfetivado as Record<string, unknown>)
-      : null
-
-  const efetivada = paga || pagamentoEfetivado != null
-  const cobrarNaEntrega = !efetivada && !cancelado && momento === 'na_entrega'
-
-  const meioPagamentoId = String(
-    c.meioPagamentoId ?? pagamentoEfetivado?.meioPagamentoId ?? ''
-  ).trim()
-  if (!meioPagamentoId) return null
-
-  const isTefUsed =
-    pagamentoEfetivado?.isTefUsed === true || pagamentoEfetivado?.is_tef_used === true
-  let isTefConfirmed: boolean | undefined
-  if (isTefUsed) {
-    if (pagamentoEfetivado?.isTefConfirmed === true || pagamentoEfetivado?.is_tef_confirmed === true) {
-      isTefConfirmed = true
-    } else if (
-      pagamentoEfetivado?.isTefConfirmed === false ||
-      pagamentoEfetivado?.is_tef_confirmed === false
-    ) {
-      isTefConfirmed = false
-    }
-  }
-
-  const realizadoPorNested =
-    pagamentoEfetivado?.realizadoPor && typeof pagamentoEfetivado.realizadoPor === 'object'
-      ? (pagamentoEfetivado.realizadoPor as Record<string, unknown>)
-      : null
-
-  return {
-    id: c.id != null ? String(c.id) : undefined,
-    meioPagamentoId,
-    valor: typeof c.valor === 'number' ? c.valor : Number(c.valor) || 0,
-    cobrarNaEntrega,
-    efetivado: efetivada,
-    cancelado,
-    dataCancelamento: isoString(c.dataCancelamento),
-    dataCriacao: isoString(c.dataCriacao),
-    canceladoPorId: atorUsuarioId(c.canceladaPor),
-    realizadoPorId:
-      pagamentoEfetivado?.realizadoPorId != null
-        ? String(pagamentoEfetivado.realizadoPorId)
-        : realizadoPorNested
-          ? atorUsuarioId(realizadoPorNested)
-          : undefined,
-    isTefUsed,
-    isTefConfirmed,
-    tefIdentifier:
-      pagamentoEfetivado?.tefIdentifier != null
-        ? String(pagamentoEfetivado.tefIdentifier)
-        : pagamentoEfetivado?.tef_identifier != null
-          ? String(pagamentoEfetivado.tef_identifier)
-          : undefined,
-    tefAdquirente:
-      pagamentoEfetivado?.tefAdquirente != null
-        ? String(pagamentoEfetivado.tefAdquirente)
-        : pagamentoEfetivado?.tef_adquirente != null
-          ? String(pagamentoEfetivado.tef_adquirente)
-          : undefined,
-  }
 }
 
 /**
@@ -145,18 +70,32 @@ export function adaptPedidoDeliveryToVendaGestorApiResponse(
       ? (registro.entregador as Record<string, unknown>)
       : null
 
-  const tipoEntrega = String(registro.tipoEntrega ?? registro.tipoVenda ?? '')
+  const tipoVenda = String(registro.tipoVenda ?? 'delivery')
+    .trim()
+    .toLowerCase() || 'delivery'
+  const tipoEntregaRaw = String(registro.tipoEntrega ?? '')
     .trim()
     .toLowerCase()
+  const tipoEntrega =
+    tipoEntregaRaw === 'entrega' || tipoEntregaRaw === 'retirada' ? tipoEntregaRaw : null
 
   const cobrancas = Array.isArray(registro.cobrancas) ? registro.cobrancas : []
   const pagamentos = cobrancas
     .map(mapCobrancaDeliveryToPagamento)
     .filter((p): p is PagamentoApiItem => p != null)
 
-  const produtosLancados = Array.isArray(registro.produtosLancados)
+  const produtosLancados = (Array.isArray(registro.produtosLancados)
     ? (registro.produtosLancados as ProdutoLancadoApiItem[])
     : []
+  ).map(item => {
+    const lancadoPorId = atorUsuarioId(item.lancadoPor) ?? String(item.lancadoPorId ?? '').trim()
+    const removidoPorId = atorUsuarioId(item.removidoPor) ?? String(item.removidoPorId ?? '').trim()
+    return {
+      ...item,
+      ...(lancadoPorId ? { lancadoPorId } : {}),
+      ...(removidoPorId ? { removidoPorId } : {}),
+    }
+  })
 
   const dataFinalizacao = isoString(registro.dataFinalizacao)
   const statusDeliveryCandidatos = [
@@ -173,13 +112,11 @@ export function adaptPedidoDeliveryToVendaGestorApiResponse(
   }
 
   const totalFaltaPagar = Number(registro.totalFaltaPagar ?? 0) || 0
-  const cobrarNaEntregaPendente = cobrancas.some(c => {
-    if (!c || typeof c !== 'object') return false
-    const cob = c as Record<string, unknown>
-    const momento = String(cob.momentoCobranca ?? '').toLowerCase()
-    const status = String(cob.status ?? '').toLowerCase()
-    return momento === 'na_entrega' && status !== 'paga' && status !== 'cancelada'
-  })
+  const pagamentosNaEntrega = pagamentos.filter(p => p.cobrarNaEntrega && !p.cancelado)
+  const cobrarNaEntregaPendente = pagamentosNaEntrega.length > 0
+  const pagamentosSelecionados = pagamentos.map(p =>
+    mapearPagamentoDetalheVenda(p as Record<string, unknown>)
+  )
 
   const pedidoDeliveryFinalizado = statusDelivery === 'FINALIZADO'
 
@@ -194,7 +131,8 @@ export function adaptPedidoDeliveryToVendaGestorApiResponse(
     enderecoEntrega: enderecoSnapshot ?? registro.enderecoEntrega,
     id: registro.id != null ? String(registro.id) : undefined,
     origem: registro.origem != null ? String(registro.origem) : 'GESTOR',
-    tipoVenda: tipoEntrega || String(registro.tipoVenda ?? ''),
+    tipoVenda,
+    tipoEntrega,
     statusVenda: dataFinalizacao || pedidoDeliveryFinalizado ? 'FINALIZADA' : 'ABERTA',
     statusEtapaOperacional: statusDelivery || undefined,
     statusOperacional: statusDelivery || undefined,
@@ -219,7 +157,7 @@ export function adaptPedidoDeliveryToVendaGestorApiResponse(
     ultimoResponsavelId: atorUsuarioId(registro.ultimoResponsavel),
     canceladoPorId: atorUsuarioId(registro.canceladoPor),
     valorFinal: registro.valorFinal as VendaGestorApiResponse['valorFinal'],
-    troco: registro.troco as VendaGestorApiResponse['troco'],
+    troco: resolverTrocoLevarPedidoEntrega(registro, pagamentosSelecionados) as VendaGestorApiResponse['troco'],
     totalDesconto: registro.totalDesconto,
     totalAcrescimo: registro.totalAcrescimo,
     taxasLancadas: Array.isArray(registro.taxasLancadas) ? registro.taxasLancadas : [],
@@ -234,6 +172,10 @@ export function adaptPedidoDeliveryToVendaGestorApiResponse(
       valorReceber: Number(registro.valorFinal ?? 0) || 0,
       valorRecebido: Number(registro.totalPago ?? 0) || 0,
       valorFaltante: totalFaltaPagar,
+      valorCobrarNaEntrega: pagamentosNaEntrega.reduce(
+        (soma, p) => soma + (Number(p.valor) || 0),
+        0
+      ),
     },
   }
 }
@@ -242,8 +184,5 @@ export function deveUsarModuloDeliveryParaDetalhe(
   tabelaOrigem: 'venda' | 'venda_gestor',
   tipoVenda?: string | null
 ): boolean {
-  if (tabelaOrigem !== 'venda_gestor') return false
-  const tipo = String(tipoVenda ?? '').trim().toLowerCase()
-  if (!tipo || tipo === 'balcao') return false
-  return tipo === 'entrega' || tipo === 'retirada'
+  return ehPedidoModuloDelivery(tabelaOrigem, tipoVenda)
 }

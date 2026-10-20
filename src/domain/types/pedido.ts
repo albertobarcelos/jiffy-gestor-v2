@@ -41,7 +41,6 @@ export interface ProdutoSelecionado {
   removidoPorId?: string
   dataLancamento?: string
   dataRemocao?: string
-  ncm?: string
   /** Texto único na UI; enviado como `observacoes: [texto]` na API. */
   observacao?: string
 }
@@ -53,6 +52,8 @@ export interface PagamentoSelecionado {
   cobrarNaEntrega?: boolean
   naoEfetivo?: boolean
   realizadoPorId?: string
+  /** Nome embutido no GET (`criadaPor.nome`) — evita lookup após gravar a cobrança. */
+  realizadoPorNome?: string
   cancelado?: boolean
   canceladoPorId?: string
   dataCriacao?: string

@@ -27,7 +27,6 @@ export interface ProdutoListItemProps {
   gruposProdutos: GrupoProduto[]
   isLoadingGruposProdutos?: boolean
   isSavingValor?: boolean
-  isSavingStatus?: boolean
   isSavingNome?: boolean
   isSavingGrupo?: boolean
   onNomeChange?: (produtoId: string, nome: string) => void | boolean | Promise<void | boolean>
@@ -37,7 +36,7 @@ export interface ProdutoListItemProps {
     novoGrupoId: string,
     novoGrupoNome: string
   ) => void | boolean | Promise<void | boolean>
-  onSwitchToggle: (produtoId: string, status: boolean) => void
+  onRemove?: (produtoId: string) => void
   onToggleBoolean: (produtoId: string, field: ToggleField, value: boolean) => void
   onEditProduto: (produtoId: string) => void
   onCopyProduto: (produtoId: string) => void
@@ -48,13 +47,12 @@ function ProdutoListItemBase({
   gruposProdutos,
   isLoadingGruposProdutos,
   isSavingValor,
-  isSavingStatus,
   isSavingNome,
   isSavingGrupo,
   onNomeChange,
   onValorChange,
   onGrupoChange,
-  onSwitchToggle,
+  onRemove,
   onToggleBoolean,
   onEditProduto,
   onCopyProduto,
@@ -71,11 +69,10 @@ function ProdutoListItemBase({
       ativo={produto.isAtivo()}
       codigo={produto.getCodigoProduto()}
       isSavingValor={isSavingValor}
-      isSavingStatus={isSavingStatus}
       isSavingNome={isSavingNome}
       onNomeChange={onNomeChange}
       onValorChange={onValorChange}
-      onSwitchToggle={onSwitchToggle}
+      onRemove={onRemove}
       onEdit={onEditProduto}
       categoriaSlot={
         onGrupoChange ? (
@@ -111,13 +108,12 @@ function arePropsEqual(prev: ProdutoListItemProps, next: ProdutoListItemProps): 
     prev.gruposProdutos === next.gruposProdutos &&
     prev.isLoadingGruposProdutos === next.isLoadingGruposProdutos &&
     prev.isSavingValor === next.isSavingValor &&
-    prev.isSavingStatus === next.isSavingStatus &&
     prev.isSavingNome === next.isSavingNome &&
     prev.isSavingGrupo === next.isSavingGrupo &&
     prev.onNomeChange === next.onNomeChange &&
     prev.onValorChange === next.onValorChange &&
     prev.onGrupoChange === next.onGrupoChange &&
-    prev.onSwitchToggle === next.onSwitchToggle &&
+    prev.onRemove === next.onRemove &&
     prev.onToggleBoolean === next.onToggleBoolean &&
     prev.onEditProduto === next.onEditProduto &&
     prev.onCopyProduto === next.onCopyProduto

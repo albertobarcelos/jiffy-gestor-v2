@@ -6,6 +6,7 @@ import {
   mapOrigemApiDeliveryParaVendaUnificada,
   mapPedidoDeliverySummaryParaVendaUnificadaDTO,
   mapPedidosDeliveryListResponseParaVendaUnificadaDTO,
+  normalizarPedidoDeliverySummaryJson,
   normalizarPedidosDeliveryListResponse,
   pedidoDeliverySummaryParaUnifiedRecord,
 } from '@/src/application/mappers/PedidoDeliveryListMapper'
@@ -47,9 +48,12 @@ function criarSummary(
 }
 
 describe('PedidoDeliveryListMapper — origem e financeiro', () => {
-  it('mapeia JIFFY_DELIVERY para origem GESTOR no DTO unificado', () => {
-    expect(mapOrigemApiDeliveryParaVendaUnificada('JIFFY_DELIVERY')).toBe('GESTOR')
+  it('preserva origem real da API delivery no DTO unificado', () => {
+    expect(mapOrigemApiDeliveryParaVendaUnificada('JIFFY_DELIVERY')).toBe('JIFFY_DELIVERY')
     expect(mapOrigemApiDeliveryParaVendaUnificada('GESTOR')).toBe('GESTOR')
+    expect(mapOrigemApiDeliveryParaVendaUnificada('AIQFOME')).toBe('AIQFOME')
+    expect(mapOrigemApiDeliveryParaVendaUnificada('IFOOD')).toBe('IFOOD')
+    expect(mapOrigemApiDeliveryParaVendaUnificada('DELIVERY_IFOOD')).toBe('IFOOD')
   })
 
   it('deriva status financeiro pago, pendente e parcial', () => {
@@ -108,16 +112,29 @@ describe('PedidoDeliveryListMapper — origem e financeiro', () => {
 })
 
 describe('PedidoDeliveryListMapper — summary → VendaUnificadaDTO', () => {
-  it('usa tipoEntrega como tipoVenda (não o campo delivery da API)', () => {
+  it('carrega início e fim do preparo no card do quadro', () => {
+    const dto = mapPedidoDeliverySummaryParaVendaUnificadaDTO(
+      criarSummary({
+        dataInicioPreparo: '2026-06-15T10:05:00.000Z',
+        dataFinalizacaoPreparo: '2026-06-15T10:18:00.000Z',
+      })
+    )
+    expect(dto.dataInicioPreparo).toBe('2026-06-15T10:05:00.000Z')
+    expect(dto.dataFinalizacaoPreparo).toBe('2026-06-15T10:18:00.000Z')
+  })
+
+  it('mantém tipoVenda delivery e tipoEntrega separados', () => {
     const record = pedidoDeliverySummaryParaUnifiedRecord(
       criarSummary({ tipoVenda: 'delivery', tipoEntrega: 'retirada' })
     )
-    expect(record.tipoVenda).toBe('retirada')
+    expect(record.tipoVenda).toBe('delivery')
+    expect(record.tipoEntrega).toBe('retirada')
 
     const dto = mapPedidoDeliverySummaryParaVendaUnificadaDTO(
       criarSummary({ tipoEntrega: 'entrega' })
     )
-    expect(dto.tipoVenda).toBe('entrega')
+    expect(dto.tipoVenda).toBe('delivery')
+    expect(dto.tipoEntrega).toBe('entrega')
     expect(dto.tabelaOrigem).toBe('venda_gestor')
   })
 
@@ -146,6 +163,30 @@ describe('PedidoDeliveryListMapper — summary → VendaUnificadaDTO', () => {
     expect(dto.cobrancasDelivery).toEqual([
       { meioPagamentoId: 'mp1', status: 'pendente', momentoCobranca: 'na_entrega' },
     ])
+  })
+
+  it('deriva troco da cédula na cobrança quando a listagem manda troco 0', () => {
+    const summary = normalizarPedidoDeliverySummaryJson({
+      ...criarSummary({
+        valorFinal: 39.9,
+        troco: 0,
+        totalPago: 0,
+        totalFaltaPagar: 39.9,
+        cobrancas: [
+          {
+            id: 'c1',
+            valor: 50,
+            meioPagamentoId: 'mp-dinheiro',
+            momentoCobranca: 'na_entrega',
+            status: 'pendente',
+            dataCriacao: '2026-06-15T10:00:00.000Z',
+            meioPagamento: { id: 'mp-dinheiro', nome: 'Dinheiro' },
+          },
+        ],
+      }),
+    })
+
+    expect(summary?.troco).toBe(10.1)
   })
 
   it('propaga entregador e contextoEntrega do summary', () => {
@@ -307,7 +348,8 @@ describe('PedidoDeliveryListMapper — resposta paginada', () => {
     expect(normalizado.items[0]?.origem).toBe('JIFFY_DELIVERY')
 
     const mapeado = mapPedidosDeliveryListResponseParaVendaUnificadaDTO(normalizado)
-    expect(mapeado.items[0]?.tipoVenda).toBe('entrega')
+    expect(mapeado.items[0]?.tipoVenda).toBe('delivery')
+    expect(mapeado.items[0]?.tipoEntrega).toBe('entrega')
     expect(mapeado.items[0]?.getEtapaKanban()).toBe('PRONTO_ENTREGA')
     expect(mapeado.items[0]?.statusFinanceiro).toBe('pendente')
   })

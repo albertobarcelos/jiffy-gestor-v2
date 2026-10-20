@@ -1,7 +1,10 @@
+import { StatusFiscalVenda } from '@/src/domain/value-objects/StatusFiscalVenda'
+import type { StatusFiscalVendaValor } from '@/src/domain/types/statusFiscalVenda'
+
 /**
  * Entidade de domínio representando uma Nota Fiscal Eletrônica (NFe)
  */
-export type NFeStatus = 'PENDENTE' | 'EM_PROCESSAMENTO' | 'AUTORIZADA' | 'REJEITADA' | 'CANCELADA'
+export type NFeStatus = StatusFiscalVendaValor
 
 export interface NFeItem {
   produtoId: string
@@ -82,7 +85,7 @@ export class NFe {
       data.clienteNome?.toString() || '',
       data.clienteCpfCnpj?.toString() || '',
       data.dataEmissao ? new Date(data.dataEmissao) : new Date(),
-      (data.status || 'PENDENTE') as NFeStatus,
+      StatusFiscalVenda.tryParse(data.status)?.valor ?? 'PENDENTE',
       typeof data.valorTotal === 'number' ? data.valorTotal : parseFloat(data.valorTotal) || 0,
       (data.itens || []).map((item: any) => ({
         produtoId: item.produtoId?.toString() || '',

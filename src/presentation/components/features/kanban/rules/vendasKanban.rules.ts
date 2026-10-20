@@ -1,4 +1,7 @@
 import { fiscalPendentePodeReemitirAposCooldown } from '@/src/domain/services/pedido/RegrasFiscaisVenda'
+import { StatusFiscalVenda } from '@/src/domain/value-objects/StatusFiscalVenda'
+import { ehPedidoModuloDelivery } from '@/src/domain/services/pedido/PedidoModuloDelivery'
+import { vendaKanbanPermiteEmissaoFiscalDelivery } from './emissaoFiscalDelivery.kanban'
 import {
   clienteTelefoneContem,
   digitosTelefone,
@@ -18,6 +21,10 @@ import type {
   DirecaoOrdenacaoKanban,
   Venda,
 } from '../types'
+import {
+  ancoraInicioPreparoKanban,
+  escolherIsoMaisRecente,
+} from '../utils/kanbanPedidoTempo'
 
 export const COLUNAS_ENTREGA_OPERACIONAIS: ColunaKanbanId[] = [
   'NOVOS_PEDIDOS',
@@ -42,19 +49,16 @@ export type AcaoAvancoEntrega = Extract<
   'iniciar_preparo' | 'marcar_pronto' | 'despachar'
 >
 
-export const STATUS_FISCAL_AGUARDANDO_SEFAZ = new Set([
-  'PENDENTE',
-  'PENDENTE_AUTORIZACAO',
-  'EMITINDO',
-  'CONTINGENCIA',
-])
+export function statusFiscalTextoAguardandoSefaz(raw?: string | null): boolean {
+  return StatusFiscalVenda.tryParse(raw)?.aguardandoSefaz() ?? false
+}
 
 /** Exibido quando o nome do cliente está vazio (Kanban e arraste). */
 export const LABEL_SEM_CLIENTE = 'SEM CLIENTE'
 
 /** Pedidos de retirada não exigem entregador para avançar até Em Rota / Retirada. */
 export function vendaExigeEntregadorParaDespachar(venda: Venda): boolean {
-  return isPedidoEntregaComEntregador(venda.tipoVenda)
+  return isPedidoEntregaComEntregador(venda.tipoEntrega)
 }
 
 /** Fiscal: arrastar entre Finalizadas ↔ Pendente emissão (e para Com nota). */
@@ -74,29 +78,31 @@ export const COLUNAS_KANBAN_DESTINO_PIN = new Set([
 ])
 
 /**
- * Data/hora exibida no card de entrega (gestor) nas colunas operacionais, no mesmo estilo de “Finalizada: …”.
- * - Novos pedidos: quando o pedido entrou (criação).
- * - Demais etapas: `dataUltimaModificacao` da API quando existir (proxy de transição); senão data de criação.
+ * Data/hora exibida no card de entrega (gestor) nas colunas operacionais.
+ * - Novos pedidos: criação.
+ * - Em preparo: mesma âncora do cronômetro (`dataInicioPreparo`).
+ * - Pronto / Em rota: entrada na etapa (`dataUltimaModificacao` / transição local).
  */
 export function getLinhaTempoPedidoEntregaKanban(
   columnId: ColunaKanbanId,
   v: VendaUnificadaDTO,
-  /** Timestamp local de transição (DnD ou botão), tem prioridade sobre `dataUltimaModificacao` da API. */
   isoLocalTransicao?: string
 ): { prefixo: string; iso: string } | null {
   const entregaGestor =
-    isPedidoEntregaKanban(v.tabelaOrigem, v.tipoVenda, v.statusEtapaOperacional)
+    isPedidoEntregaKanban(v.tabelaOrigem, v.tipoVenda)
   if (!entregaGestor || !COLUNAS_ENTREGA_OPERACIONAIS.includes(columnId)) return null
 
   if (columnId === 'NOVOS_PEDIDOS') {
     return { prefixo: 'Recebido em:', iso: v.dataCriacao }
   }
 
-  const ultimaApi = v.dataUltimaModificacao?.trim()
-  const escolhida =
-    isoLocalTransicao && (!ultimaApi || isoLocalTransicao > ultimaApi)
-      ? isoLocalTransicao
-      : ultimaApi
+  if (columnId === 'EM_PREPARO') {
+    const ancora = ancoraInicioPreparoKanban(v, isoLocalTransicao)
+    if (ancora) return { prefixo: 'Desde:', iso: ancora }
+    return { prefixo: 'Pedido em:', iso: v.dataCriacao }
+  }
+
+  const escolhida = escolherIsoMaisRecente(v.dataUltimaModificacao, isoLocalTransicao)
   if (escolhida) {
     return { prefixo: 'Desde:', iso: escolhida }
   }
@@ -140,16 +146,16 @@ export type RotuloAvancarEtapaKanban = {
   loading: string
 }
 
-function vendaEhRetiradaKanban(tipoVenda?: string | null): boolean {
-  return String(tipoVenda ?? '').trim().toLowerCase() === 'retirada'
+function vendaEhRetiradaKanban(tipoEntrega?: string | null): boolean {
+  return String(tipoEntrega ?? '').trim().toLowerCase() === 'retirada'
 }
 
 /** Texto do botão de avanço: diz a próxima etapa (entrega ≠ retirada nos dois últimos). */
 export function rotuloBotaoAvancarEtapaKanban(
   colunaAtual: ColunaKanbanId,
-  tipoVenda?: string | null
+  tipoEntrega?: string | null
 ): RotuloAvancarEtapaKanban {
-  const retirada = vendaEhRetiradaKanban(tipoVenda)
+  const retirada = vendaEhRetiradaKanban(tipoEntrega)
 
   if (colunaAtual === 'NOVOS_PEDIDOS') {
     return { label: 'Iniciar preparo', loading: 'Iniciando…' }
@@ -189,18 +195,20 @@ export function fiscalKanbanPodeReemitirAposCooldown(v: VendaUnificadaDTO): bool
 
 export function statusFiscalAguardandoSefaz(v: VendaUnificadaDTO): boolean {
   if (fiscalKanbanPodeReemitirAposCooldown(v)) return false
-  const sf = String(v.statusFiscal ?? '')
-    .trim()
-    .toUpperCase()
-  return STATUS_FISCAL_AGUARDANDO_SEFAZ.has(sf)
+  return statusFiscalTextoAguardandoSefaz(v.statusFiscal)
 }
 
 /** Faixa esquerda da etapa — a mesma dos cards do quadro. */
-export function classeBordaEsquerdaColunaKanban(columnId: ColunaKanbanId): string {
-  if (columnId === 'FINALIZADAS') return 'border-l-primary'
-  if (columnId === 'NOVOS_PEDIDOS') return 'border-l-sky-500'
+export function classeBordaEsquerdaColunaKanban(
+  columnId: ColunaKanbanId,
+  _modoKanbanVendas?: ModoKanbanVendas
+): string {
+  if (columnId === 'FINALIZADAS') {
+    return 'border-l-primary'
+  }
+  if (columnId === 'NOVOS_PEDIDOS') return 'border-l-slate-500'
   if (columnId === 'EM_PREPARO') return 'border-l-amber-500'
-  if (columnId === 'PRONTO_ENTREGA') return 'border-l-teal-500'
+  if (columnId === 'PRONTO_ENTREGA') return 'border-l-sky-500'
   if (columnId === 'EM_ROTA') return 'border-l-indigo-500'
   if (columnId === 'PENDENTE_EMISSAO') return 'border-l-yellow-400'
   if (columnId === 'COM_FISCAL') return 'border-l-green-400'
@@ -210,13 +218,15 @@ export function classeBordaEsquerdaColunaKanban(columnId: ColunaKanbanId): strin
 
 /**
  * Borda esquerda e fundo do card conforme coluna e statusFiscal.
- * Finalizadas: primary. Pendente/Com nota: fiscal (emitida/cancelada/rejeitada), sem status na pendente → amarelo,
+ * Finalizadas (sem nota): primary — no delivery evita confundir com NF emitida.
+ * Pendente/Com nota: fiscal (emitida/cancelada/rejeitada), sem status na pendente → amarelo,
  * reemitindo, emitindo (emitir-nota direto) ou aguardando SEFAZ → custom-2.
  */
 export function getCardBorderEFundoKanban(
   columnId: ColunaKanbanId,
   v: VendaUnificadaDTO,
-  acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
+  acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>,
+  modoKanbanVendas?: ModoKanbanVendas
 ): { borderClass: string; cardBgClass: string } {
   if (
     columnId === 'FINALIZADAS' ||
@@ -225,7 +235,10 @@ export function getCardBorderEFundoKanban(
     columnId === 'PRONTO_ENTREGA' ||
     columnId === 'EM_ROTA'
   ) {
-    return { borderClass: classeBordaEsquerdaColunaKanban(columnId), cardBgClass: 'bg-white' }
+    return {
+      borderClass: classeBordaEsquerdaColunaKanban(columnId, modoKanbanVendas),
+      cardBgClass: 'bg-white',
+    }
   }
 
   const acao = acaoFiscalEmAndamentoPorVenda[v.id]
@@ -284,8 +297,8 @@ export function vendaBloqueadaParaEmissaoInterativa(
 }
 
 /**
- * Exibe o botão Emitir/Reemitir (mesmo de Pendente emissão) em Pendente, em Finalizadas para entrega gestor,
- * ou enquanto reemissão/emissão direta estiver em andamento (qualquer coluna visível).
+ * Exibe o botão Emitir/Reemitir conforme a etapa fiscal da venda — não só o id da coluna.
+ * No delivery, Entregues (FINALIZADAS) mistura finalizada/emitida/pendente/rejeitada.
  */
 export function deveExibirBotaoEmitirNotaNoKanban(
   columnId: ColunaKanbanId,
@@ -295,21 +308,38 @@ export function deveExibirBotaoEmitirNotaNoKanban(
   if (venda.statusFiscal === 'INUTILIZADA') return false
   const acao = acaoFiscalEmAndamentoPorVenda[venda.id]
   if (acao === 'reemitindo' || acao === 'emitindo') return true
-  if (columnId === 'PENDENTE_EMISSAO') return true
-  if (columnId === 'REJEITADAS') return true
+
+  if (!vendaKanbanPermiteEmissaoFiscalDelivery(venda, columnId)) {
+    return false
+  }
+
   if (
-    columnId === 'COM_FISCAL' &&
+    COLUNAS_ENTREGA_OPERACIONAIS.includes(columnId) &&
+    venda.isPedidoEntregaGestor()
+  ) {
+    return false
+  }
+
+  const etapa = venda.getEtapaKanban()
+  if (columnId === 'PENDENTE_EMISSAO' || etapa === 'PENDENTE_EMISSAO') return true
+  if (columnId === 'REJEITADAS' || etapa === 'REJEITADAS') return true
+
+  const colunaArquivo = columnId === 'COM_FISCAL' || columnId === 'FINALIZADAS'
+  if (
+    colunaArquivo &&
     (venda.statusFiscal === 'REJEITADA' ||
       venda.statusFiscal === 'DENEGADA' ||
       fiscalKanbanPodeReemitirAposCooldown(venda))
   ) {
     return true
   }
-  if (columnId === 'FINALIZADAS' && venda.isPedidoEntregaGestor()) return true
+  if (colunaArquivo && venda.isPedidoEntregaGestor() && etapa === 'FINALIZADAS') {
+    return true
+  }
   return false
 }
 
-/** Delivery (gestor entrega/retirada ou integradores): pedido já concluído na operação. */
+/** Pedido do módulo delivery (`tipoVenda=delivery`). */
 export function isPedidoTipoDeliveryKanban(venda: VendaUnificadaDTO): boolean {
   return venda.isDelivery() || venda.isPedidoEntregaGestor()
 }
@@ -360,7 +390,8 @@ function dataOrdenacaoPadraoKanban(v: Venda): string {
 /**
  * Data usada para ordenar o card na coluna, espelhando a data exibida no próprio card:
  * - Novos pedidos → criação ("Recebido em")
- * - Em preparo / Pronto / Em rota → entrada na etapa ("Desde", `dataUltimaModificacao`/transição local)
+ * - Em preparo → início de preparo (mesma âncora do cronômetro)
+ * - Pronto / Em rota → entrada na etapa (`dataUltimaModificacao`/transição local)
  * - Demais colunas → finalização → emissão fiscal → criação
  */
 export function dataOrdenacaoCardKanban(
@@ -470,6 +501,9 @@ export function vendaAtendeBuscaKanban(
   const numero = String(venda.numeroVenda ?? '').trim()
   if (numero && numero.includes(t)) return true
 
+  // Trecho de telefone (4536, 929345) não pode perder para o parse de valor.
+  if (vendaAtendeTelefoneBuscaKanban(venda, termoOriginal ?? termoNormalizado)) return true
+
   // Busca por valor não deve misturar com match parcial de nome/código confuso.
   if (valorBusca != null) return false
 
@@ -477,8 +511,6 @@ export function vendaAtendeBuscaKanban(
     .trim()
     .toLowerCase()
   if (nome && nome.includes(t)) return true
-
-  if (vendaAtendeTelefoneBuscaKanban(venda, termoOriginal ?? termoNormalizado)) return true
 
   const id = String(venda.id ?? '')
     .trim()
@@ -488,9 +520,17 @@ export function vendaAtendeBuscaKanban(
   return false
 }
 
-/** 8+ dígitos: telefone, não número de pedido nem valor. */
+/** Trecho mínimo para filtrar telefone no quadro (ex.: 4536 em 65992934536). */
+export const MIN_DIGITOS_BUSCA_TELEFONE_KANBAN = 4
+
+/** 8+ dígitos: telefone completo para a API (DDI 55 → DDD+número). */
 export function ehTermoBuscaTelefoneKanban(termo: string): boolean {
   return digitosTelefone(termo).length >= 8
+}
+
+/** 4+ dígitos: trecho ou número completo — filtro local, não `q` da listagem delivery. */
+export function ehTermoBuscaTrechoTelefoneKanban(termo: string): boolean {
+  return digitosTelefone(termo).length >= MIN_DIGITOS_BUSCA_TELEFONE_KANBAN
 }
 
 /** `q` da API: telefone WhatsApp (55…) vira DDD+número. */
@@ -504,6 +544,18 @@ export function termoBuscaKanbanParaApi(termo: string): string {
     return termoBuscaClientePorTelefone(trimmed)
   }
   return trimmed
+}
+
+/**
+ * Listagem delivery (`GET /pedidos`) não filtra `q` por telefone.
+ * Se enviarmos o número (ou um trecho), a API devolve vazio e o quadro some após o debounce.
+ * Telefone fica só no filtro local do Kanban (mesmo critério do Gestor).
+ */
+export function qListagemDeliveryKanban(q: string | undefined): string | undefined {
+  const t = String(q ?? '').trim()
+  if (!t) return undefined
+  if (ehTermoBuscaTrechoTelefoneKanban(t)) return undefined
+  return t
 }
 
 export function telefonesDoPedidoKanban(
@@ -522,10 +574,10 @@ export function vendaAtendeTelefoneBuscaKanban(
   venda: Pick<Venda, 'cliente' | 'contextoEntrega'>,
   termo: string
 ): boolean {
-  if (!ehTermoBuscaTelefoneKanban(termo)) return false
+  const digits = digitosTelefone(termo)
+  if (!ehTermoBuscaTrechoTelefoneKanban(termo)) return false
   const tels = telefonesDoPedidoKanban(venda)
   if (tels.length === 0) return false
-  const digits = digitosTelefone(termo)
   return tels.some(
     tel => telefonesCorrespondem(tel, termo) || clienteTelefoneContem(tel, digits)
   )
@@ -572,19 +624,17 @@ const ORIGENS_CUPOM_PUBLICO_NFCE = new Set([
   'PDV',
   'GESTOR',
   'JIFFY_DELIVERY',
-  'DELIVERY',
 ])
 
 export function kanbanVendaUsaCupomPublicoNfce(
   v: Pick<Venda, 'origem' | 'tipoDocFiscal'>
 ): boolean {
-  return (
-    v.tipoDocFiscal === 'NFCE' && ORIGENS_CUPOM_PUBLICO_NFCE.has(v.origem)
-  )
+  const origem = v.origem
+  return v.tipoDocFiscal === 'NFCE' && origem != null && ORIGENS_CUPOM_PUBLICO_NFCE.has(origem)
 }
 
 /**
- * No modo Delivery, pendente emissão aparece na coluna Finalizadas — borda/cores da etapa real.
+ * No modo Delivery, Entregues mistura etapas fiscais — borda/cores seguem a etapa real.
  */
 export function colunaParaEstiloCardKanban(
   columnId: ColunaKanbanId,
@@ -594,9 +644,11 @@ export function colunaParaEstiloCardKanban(
   if (
     modoKanbanVendas === 'delivery' &&
     columnId === 'FINALIZADAS' &&
-    etapaKanbanCard === 'PENDENTE_EMISSAO'
+    (etapaKanbanCard === 'PENDENTE_EMISSAO' ||
+      etapaKanbanCard === 'REJEITADAS' ||
+      etapaKanbanCard === 'COM_FISCAL')
   ) {
-    return 'PENDENTE_EMISSAO'
+    return etapaKanbanCard
   }
   return columnId
 }
@@ -645,7 +697,7 @@ export function podeEditarClienteNaKanbanCard(
 
 /**
  * Permite alterar os produtos do pedido delivery (botão "Editar produtos" no card).
- * Liberado apenas nas etapas anteriores a EM_ROTA, em pedidos de entrega/retirada do gestor.
+ * Liberado apenas nas etapas anteriores a EM_ROTA, em pedidos `tipoVenda=delivery`.
  */
 export function podeEditarProdutosNaKanbanCard(
   columnId: ColunaKanbanId,
@@ -682,6 +734,7 @@ export function vendaElegivelParaReemissaoAutomaticaLote(
   acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
 ): boolean {
   if (vendaBloqueadaParaEmissaoInterativa(venda, acaoFiscalEmAndamentoPorVenda)) return false
+  if (!vendaKanbanPermiteEmissaoFiscalDelivery(venda)) return false
 
   const sf = String(venda.statusFiscal ?? '')
     .trim()
@@ -689,6 +742,7 @@ export function vendaElegivelParaReemissaoAutomaticaLote(
   if (sf !== 'REJEITADA' && sf !== 'DENEGADA') return false
 
   if (venda.documentoFiscalId?.trim()) return true
+  if (ehPedidoModuloDelivery(venda.tabelaOrigem, venda.tipoVenda)) return true
 
   const tipoDoc = String(venda.tipoDocFiscal ?? '')
     .trim()
@@ -720,7 +774,6 @@ export function rotuloBotaoEmissaoKanban(
     }
     return 'Reemitir nota'
   }
-  if (venda.statusFiscal === 'PENDENTE_EMISSAO') return 'Em emissão'
   if (statusFiscalAguardandoSefaz(venda)) return 'Em emissão'
   return 'Emitir Nota'
 }

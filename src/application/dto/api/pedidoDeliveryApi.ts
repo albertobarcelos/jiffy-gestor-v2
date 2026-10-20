@@ -1,3 +1,5 @@
+import type { EtapaOperacionalDeliveryValor } from '@/src/domain/types/etapaOperacionalDelivery'
+
 /** Contrato alinhado ao Swagger `CreatePedidoDeliveryRequest` / `PedidoDeliveryResponse`. */
 
 export type TipoEntregaDeliveryApi = 'entrega' | 'retirada'
@@ -153,13 +155,7 @@ export interface PedidoDeliveryApiResponse {
   contextoEntrega?: ContextoEntregaDeliveryApi | null
 }
 
-export type StatusDeliveryApi =
-  | 'PENDENTE'
-  | 'EM_PREPARO'
-  | 'PRONTO'
-  | 'EM_ROTA'
-  | 'FINALIZADO'
-  | 'CANCELADO'
+export type StatusDeliveryApi = EtapaOperacionalDeliveryValor
 
 export interface TransicaoPedidoDeliveryApiRequest {
   toStatus: StatusDeliveryApi

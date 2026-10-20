@@ -2,20 +2,25 @@
 
 import { useCallback, useMemo, useRef } from 'react'
 import type { CriarVendaGestorInputDTO } from '@/src/application/dto/CriarVendaGestorDTO'
+import { extrairIdPedidoDeliveryCriado } from '@/src/application/use-cases/delivery/CriarPedidoDeliveryUseCase'
 import {
-  CriarPedidoDeliveryUseCase,
-  extrairIdPedidoDeliveryCriado,
-} from '@/src/application/use-cases/delivery/CriarPedidoDeliveryUseCase'
+  criarPedidoDeliveryUseCase,
+  resolverEstacaoIdParaCriarVendaGestorUseCase,
+} from '@/src/infrastructure/composition/pedidoUseCases'
 import {
   CriarVendaGestorUseCase,
   extrairIdVendaCriada,
   validarCriarVendaGestor,
   validarInformacoesPedido,
 } from '@/src/application/use-cases/vendas/CriarVendaGestorUseCase'
+import { MSG_ESTACAO_OBRIGATORIA_CRIAR_PEDIDO } from '@/src/domain/policies/pedido/estacaoCriarVendaGestor'
 import type { CriarPedidoDeliveryApiRequest } from '@/src/application/dto/api/pedidoDeliveryApi'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
+import { notificarEnderecoForaDaCobertura, useHrefCoberturaEntregaPedido } from '../utils/coberturaEntregaPedidoUi'
 import { validarObservacoesPedido } from '@/src/shared/helpers/observacaoPedido'
+import { salvarRascunhoInformacoesAdicionais } from '@/src/shared/helpers/informacoesAdicionaisNota'
+import { solicitarAbrirConfigEstacaoImpressao } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
 
 export { validarInformacoesPedido }
 
@@ -88,6 +93,7 @@ export interface UseNovoPedidoSubmitParams {
   setInternalDialogOpen: (open: boolean) => void
   setCurrentStep: (step: 1 | 2 | 3 | 4) => void
   setVendaIdCriada: (id: string | null) => void
+  observacaoNota?: string
   status: CriarVendaGestorInputDTO['status']
   tipoInicioPedido: CriarVendaGestorInputDTO['tipoInicioPedido']
   processarAposTransicaoVendaGestorId?: (
@@ -111,14 +117,15 @@ export function useNovoPedidoSubmit({
   setInternalDialogOpen,
   setCurrentStep,
   setVendaIdCriada,
+  observacaoNota,
   status,
   tipoInicioPedido,
   processarAposTransicaoVendaGestorId,
   preferenciasAutoIniciarPreparo,
   accessToken,
 }: UseNovoPedidoSubmitParams) {
+  const hrefCoberturaEntrega = useHrefCoberturaEntregaPedido()
   const criarVendaGestorUseCase = useMemo(() => new CriarVendaGestorUseCase(), [])
-  const criarPedidoDeliveryUseCase = useMemo(() => new CriarPedidoDeliveryUseCase(), [])
 
   const handleSubmit = useCallback(async () => {
     if (isPending) return
@@ -156,6 +163,12 @@ export function useNovoPedidoSubmit({
     })
 
     if (!validacaoResult.ok) {
+      if (validacaoResult.code === 'cobertura') {
+        notificarEnderecoForaDaCobertura(hrefCoberturaEntrega)
+        setCurrentStep(validacaoResult.goToStep ?? 2)
+        return
+      }
+
       if (validacaoResult.goToStep === 2 || validacaoResult.goToStep === 1) {
         showToast.error(validacaoResult.message)
         setCurrentStep(validacaoResult.goToStep)
@@ -163,8 +176,13 @@ export function useNovoPedidoSubmit({
       }
 
       if (validacaoResult.code === 'pagamentos_total') {
+        const valorInformado =
+          validacao.entregaComCobrancaPeloEntregador ||
+          input.totalPagamentosLancados > input.totalPagamentos
+            ? input.totalPagamentosLancados
+            : input.totalPagamentos
         showToast.error(
-          `Valor dos pagamentos (${transformarParaReal(input.totalPagamentos)}) não corresponde ao total (${transformarParaReal(input.totalProdutos)})`
+          `Valor dos pagamentos (${transformarParaReal(valorInformado)}) não corresponde ao total (${transformarParaReal(input.totalProdutos)})`
         )
         return
       }
@@ -173,16 +191,29 @@ export function useNovoPedidoSubmit({
       return
     }
 
-    if (tipoInicioPedido === 'entrega' && !createPedidoDelivery) {
+    if (tipoInicioPedido === 'delivery' && !createPedidoDelivery) {
       showToast.error('Criação de pedido delivery não disponível.')
       return
+    }
+
+    const isPedidoDelivery = tipoInicioPedido === 'delivery'
+    let estacaoIdCriacao = ''
+
+    if (!isPedidoDelivery) {
+      const estacao = await resolverEstacaoIdParaCriarVendaGestorUseCase.execute(accessToken)
+      if (!estacao.ok) {
+        showToast.error(estacao.mensagem)
+        if (estacao.codigo === 'AUSENTE') {
+          solicitarAbrirConfigEstacaoImpressao()
+        }
+        return
+      }
+      estacaoIdCriacao = estacao.estacaoId
     }
 
     if (!iniciarSubmit()) return
 
     try {
-      const isPedidoDelivery = tipoInicioPedido === 'entrega'
-
       const resultado = isPedidoDelivery
         ? await criarPedidoDeliveryUseCase.execute(
             {
@@ -195,8 +226,9 @@ export function useNovoPedidoSubmit({
             payload => createPedidoDelivery!.mutateAsync(payload),
             accessToken
           )
-        : await criarVendaGestorUseCase.execute(input, payload =>
-            createVendaGestor.mutateAsync(payload)
+        : await criarVendaGestorUseCase.execute(
+            { ...input, estacaoId: estacaoIdCriacao },
+            payload => createVendaGestor.mutateAsync(payload)
           )
 
       showToast.success('Pedido criado com sucesso!')
@@ -207,6 +239,9 @@ export function useNovoPedidoSubmit({
 
       if (idCriado) {
         setVendaIdCriada(idCriado)
+        if (observacaoNota) {
+          salvarRascunhoInformacoesAdicionais(idCriado, observacaoNota)
+        }
       }
 
       setInternalDialogOpen(false)
@@ -215,7 +250,7 @@ export function useNovoPedidoSubmit({
 
       if (
         idCriado &&
-        tipoInicioPedido === 'entrega' &&
+        tipoInicioPedido === 'delivery' &&
         status === 'ABERTA' &&
         preferenciasAutoIniciarPreparo
       ) {
@@ -258,12 +293,19 @@ export function useNovoPedidoSubmit({
       }
 
       if (
+        /estacaoId|esta[cç][aã]o.*obrigat/i.test(rawMessage) ||
+        /esta[cç][aã]o do gestor/i.test(rawMessage)
+      ) {
+        showToast.error(MSG_ESTACAO_OBRIGATORIA_CRIAR_PEDIDO)
+        solicitarAbrirConfigEstacaoImpressao()
+        return
+      }
+
+      if (
         code.includes('ENDERECO_FORA_COBERTURA_ENTREGA') ||
         /fora da cobertura|não está coberto/i.test(rawMessage)
       ) {
-        showToast.error(
-          'O endereço ficou fora da cobertura cadastrada. Ajuste a área no hub Delivery se precisar aceitar este pedido.'
-        )
+        notificarEnderecoForaDaCobertura(hrefCoberturaEntrega)
         setCurrentStep(2)
         return
       }
@@ -283,6 +325,7 @@ export function useNovoPedidoSubmit({
     createVendaGestor,
     createPedidoDelivery,
     setVendaIdCriada,
+    observacaoNota,
     status,
     tipoInicioPedido,
     processarAposTransicaoVendaGestorId,
@@ -292,6 +335,7 @@ export function useNovoPedidoSubmit({
     onClose,
     setCurrentStep,
     accessToken,
+    hrefCoberturaEntrega,
   ])
 
   return { handleSubmit }

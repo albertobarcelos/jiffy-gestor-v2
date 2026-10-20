@@ -42,10 +42,8 @@ export function mapContagemOperacionalFromListagemColunas(
 }
 
 /**
- * Divide o total `FINALIZADO` da API entre colunas fiscais do Kanban.
- *
- * Com paginação ativa, estima via proporção do pool já carregado (mesmos filtros da listagem).
- * Sem próxima página, usa contagem exata por etapa fiscal no pool.
+ * Divide o total `FINALIZADO` da API. No delivery a coluna Entregues absorve
+ * todos os status fiscais; COM_FISCAL fica 0 (coluna só existe no balcão).
  */
 export function derivarContagensColunasFiscaisKanban(
   finalizadoApiCount: number,
@@ -53,28 +51,25 @@ export function derivarContagensColunasFiscaisKanban(
   getEtapaKanban: (v: VendaUnificadaDTO) => string,
   hasNextPage: boolean
 ): { FINALIZADAS: number; COM_FISCAL: number } {
-  let comFiscalLoaded = 0
-  let finalizadasLoaded = 0
-
-  for (const venda of poolItems) {
+  const poolLoaded = poolItems.filter(venda => {
     const etapa = getEtapaKanban(venda)
-    if (etapa === 'COM_FISCAL') comFiscalLoaded += 1
-    else if (etapa === 'FINALIZADAS' || etapa === 'PENDENTE_EMISSAO') finalizadasLoaded += 1
-  }
-
-  const poolLoaded = poolItems.length
+    return (
+      etapa === 'FINALIZADAS' ||
+      etapa === 'COM_FISCAL' ||
+      etapa === 'REJEITADAS' ||
+      etapa === 'PENDENTE_EMISSAO'
+    )
+  }).length
 
   if (!hasNextPage) {
-    return { FINALIZADAS: finalizadasLoaded, COM_FISCAL: comFiscalLoaded }
+    return { FINALIZADAS: poolLoaded, COM_FISCAL: 0 }
   }
 
   if (poolLoaded === 0 || finalizadoApiCount <= 0) {
     return { FINALIZADAS: 0, COM_FISCAL: 0 }
   }
 
-  const comFiscal = Math.round((finalizadoApiCount * comFiscalLoaded) / poolLoaded)
-  const finalizadas = Math.max(0, finalizadoApiCount - comFiscal)
-  return { FINALIZADAS: finalizadas, COM_FISCAL: comFiscal }
+  return { FINALIZADAS: finalizadoApiCount, COM_FISCAL: 0 }
 }
 
 export function combinarContagensColunasDeliveryKanban(

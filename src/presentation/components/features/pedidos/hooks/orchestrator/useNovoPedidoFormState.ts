@@ -15,13 +15,14 @@ import type {
 import { useNovoPedidoCatalogo } from '../useNovoPedidoCatalogo'
 import { useNovoPedidoDetalhe } from '../useNovoPedidoDetalhe'
 
-export function useNovoPedidoFormState(tipoInicioPedido: 'balcao' | 'entrega') {
+export function useNovoPedidoFormState(tipoInicioPedido: 'balcao' | 'delivery') {
   const [origem, setOrigem] = useState<OrigemVenda>('GESTOR')
   const [status, setStatus] = useState<StatusVenda>(() => statusPadraoNovoPedido(tipoInicioPedido))
   const [clienteId, setClienteId] = useState<string>('')
   const [clienteNome, setClienteNome] = useState<string>('')
   const [produtos, setProdutos] = useState<ProdutoSelecionado[]>([])
   const [observacaoPedido, setObservacaoPedido] = useState<string>('')
+  const [observacaoNota, setObservacaoNota] = useState<string>('')
   const { catalogoProdutosPorId, setCatalogoProdutosPorId } = useNovoPedidoCatalogo()
   const [pagamentos, setPagamentos] = useState<PagamentoSelecionado[]>([])
   const [meioPagamentoId, setMeioPagamentoId] = useState<string>('')
@@ -33,6 +34,8 @@ export function useNovoPedidoFormState(tipoInicioPedido: 'balcao' | 'entrega') {
   const [grupoSelecionadoId, setGrupoSelecionadoId] = useState<string | null>(null)
   const [buscaProdutoTexto, setBuscaProdutoTexto] = useState<string>('')
   const [seletorClienteOpen, setSeletorClienteOpen] = useState(false)
+  /** Incrementado pelo botão Novo Cliente do seletor — abre o mesmo painel de “Cadastrar”. */
+  const [abrirCadastroRapidoEntregaPedido, setAbrirCadastroRapidoEntregaPedido] = useState(0)
   const [tooltipGrupoId, setTooltipGrupoId] = useState<string | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null)
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1)
@@ -87,6 +90,8 @@ export function useNovoPedidoFormState(tipoInicioPedido: 'balcao' | 'entrega') {
     setProdutos,
     observacaoPedido,
     setObservacaoPedido,
+    observacaoNota,
+    setObservacaoNota,
     catalogoProdutosPorId,
     setCatalogoProdutosPorId,
     pagamentos,
@@ -105,6 +110,8 @@ export function useNovoPedidoFormState(tipoInicioPedido: 'balcao' | 'entrega') {
     setBuscaProdutoTexto,
     seletorClienteOpen,
     setSeletorClienteOpen,
+    abrirCadastroRapidoEntregaPedido,
+    setAbrirCadastroRapidoEntregaPedido,
     tooltipGrupoId,
     setTooltipGrupoId,
     tooltipPosition,

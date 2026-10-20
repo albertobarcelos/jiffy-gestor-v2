@@ -13,16 +13,19 @@ import {
   isCotacaoDesatualizadaError,
   isEmpresaDeliveryFechadaError,
 } from '@/src/application/errors/publicDeliveryErrors'
-import { normalizarClienteDeliveryPublico } from '@/src/application/mappers/ClienteDeliveryPublicoMapper'
-import { montarPedidoPublico } from '@/src/application/mappers/MontarPedidoPublicoMapper'
-import type {
-  IClienteDeliveryPublicoPort,
-  IPedidoPublicoPort,
-} from '@/src/application/ports/delivery-publico'
+import {
+  montarPedidoPublico,
+  validarCpfPedidoPublico,
+} from '@/src/application/mappers/MontarPedidoPublicoMapper'
+import { validarPagamentosPedidoPublico } from '@/src/domain/policies/PagamentoObrigatorioPedidoPublico'
+import type { IPedidoPublicoPort } from '@/src/application/ports/delivery-publico'
+import { GarantirClienteDeliveryPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirClienteDeliveryPublicoUseCase'
 import {
   GarantirEnderecoEntregaPublicoUseCase,
   resolverEnderecoIdEntregaSeJaGarantido,
 } from '@/src/application/use-cases/delivery-publico/GarantirEnderecoEntregaPublicoUseCase'
+
+export type EtapaEnvioPedidoPublico = 'salvando_endereco' | 'enviando_pedido'
 
 export type EnviarPedidoPublicoInput = {
   slug: string
@@ -33,6 +36,9 @@ export type EnviarPedidoPublicoInput = {
   form: CheckoutFormData
   clienteLookup: ClienteDeliveryPublicoDTO | null
   tokenCotacao: string
+  /** Quando true, o CPF é obrigatório no payload. */
+  exigeCpfVenda?: boolean
+  onEtapa?: (etapa: EtapaEnvioPedidoPublico) => void
 }
 
 export type EnviarPedidoPublicoResult =
@@ -52,13 +58,14 @@ export type EnviarPedidoPublicoResult =
 
 /**
  * Orquestra envio do pedido público:
- * garante endereço (se entrega) → monta payload → PATCH CPF se necessário → create.
+ * garante cliente (retirada) ou endereço (entrega) → monta payload → create.
+ * CPF da nota vai em `documentoCpfCnpj`; o cadastro do cliente não é atualizado aqui.
  */
 export class EnviarPedidoPublicoUseCase {
   constructor(
     private readonly pedidoPort: IPedidoPublicoPort,
-    private readonly clientePort: IClienteDeliveryPublicoPort,
-    private readonly garantirEndereco: GarantirEnderecoEntregaPublicoUseCase
+    private readonly garantirEndereco: GarantirEnderecoEntregaPublicoUseCase,
+    private readonly garantirCliente: GarantirClienteDeliveryPublicoUseCase
   ) {}
 
   async execute(input: EnviarPedidoPublicoInput): Promise<EnviarPedidoPublicoResult> {
@@ -73,10 +80,39 @@ export class EnviarPedidoPublicoUseCase {
       return { ok: false, error: 'Cotação do pedido não encontrada. Aguarde a atualização dos valores.' }
     }
 
+    const cpfGate = validarCpfPedidoPublico(
+      input.form.cpfNotaFiscal,
+      input.exigeCpfVenda === true
+    )
+    if (!cpfGate.ok) {
+      return cpfGate
+    }
+
+    const pagamentosGate = validarPagamentosPedidoPublico(input.form.pagamentos, input.total)
+    if (!pagamentosGate.ok) {
+      return pagamentosGate
+    }
+
     let enderecoIdEntrega: string | null = null
+    let clienteLookup = input.clienteLookup
     const formComNome: CheckoutFormData = {
       ...input.form,
       nome: input.nomeEfetivo ?? input.form.nome,
+    }
+
+    if (formComNome.tipoEntrega === 'retirada') {
+      try {
+        clienteLookup = await this.garantirCliente.execute({
+          telefone: tel,
+          nome: input.nomeEfetivo,
+          clienteLookup,
+        })
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : 'Erro ao cadastrar cliente',
+        }
+      }
     }
 
     if (formComNome.tipoEntrega === 'entrega') {
@@ -89,6 +125,7 @@ export class EnviarPedidoPublicoUseCase {
         if (jaGarantido) {
           enderecoIdEntrega = jaGarantido
         } else {
+          input.onEtapa?.('salvando_endereco')
           const garantido = await this.garantirEndereco.execute({
             telefone: tel,
             nome: input.nomeEfetivo,
@@ -108,6 +145,7 @@ export class EnviarPedidoPublicoUseCase {
             },
           })
           enderecoIdEntrega = garantido.enderecoId
+          clienteLookup = garantido.cliente ?? clienteLookup
         }
       } catch (error) {
         return {
@@ -125,6 +163,7 @@ export class EnviarPedidoPublicoUseCase {
       enderecoIdEntrega,
       telefoneApi: tel,
       tokenCotacao: input.tokenCotacao,
+      exigeCpfVenda: input.exigeCpfVenda === true,
     })
     if (!resultado.ok) {
       return resultado
@@ -136,22 +175,10 @@ export class EnviarPedidoPublicoUseCase {
     }
     const payload: CreatePedidoPublicoInput = parsed.data
 
-    let clienteAtualizado: ClienteDeliveryPublicoDTO | null = null
-    const cpfPedido = payload.documentoCpfCnpj?.replace(/\D/g, '') ?? ''
-    if (cpfPedido.length === 11) {
-      const rawAtual = await this.clientePort.buscarPorTelefone(tel)
-      const cpfAtual = rawAtual?.cpf?.replace(/\D/g, '') ?? ''
-      if (rawAtual && !cpfAtual) {
-        const atualizadoRaw = await this.clientePort.atualizar(tel, {
-          cpf: cpfPedido,
-        })
-        clienteAtualizado = normalizarClienteDeliveryPublico(atualizadoRaw)
-      }
-    }
-
     try {
+      input.onEtapa?.('enviando_pedido')
       const pedido = await this.pedidoPort.criar(payload)
-      return { ok: true, clienteAtualizado, pedido }
+      return { ok: true, clienteAtualizado: clienteLookup, pedido }
     } catch (error) {
       if (isCotacaoDesatualizadaError(error)) {
         return {

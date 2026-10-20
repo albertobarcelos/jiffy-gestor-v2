@@ -1,5 +1,4 @@
 import type { INovoPedidoReadRepository } from '@/src/domain/repositories/INovoPedidoReadRepository'
-import { novoPedidoReadRepository } from '@/src/infrastructure/api/repositories/NovoPedidoReadRepository'
 import {
   buildSalvarTaxaPedidoDeliveryPatch,
   extrairCobrancasPendentesNaEntregaPedidoDelivery,
@@ -28,7 +27,7 @@ export interface SalvarTaxaPedidoDeliveryResult {
  * A taxa atual é sempre lida do GET fresco do pedido (taxas ativas), nunca do estado da UI.
  */
 export class SalvarTaxaPedidoDeliveryUseCase {
-  constructor(private readonly repo: INovoPedidoReadRepository = novoPedidoReadRepository) {}
+  constructor(private readonly repo: INovoPedidoReadRepository) {}
 
   async execute(input: SalvarTaxaPedidoDeliveryInput): Promise<SalvarTaxaPedidoDeliveryResult> {
     const taxaSelecionada = input.taxaSelecionadaId?.trim() || null
@@ -80,5 +79,3 @@ export class SalvarTaxaPedidoDeliveryUseCase {
     return { atualizado: true, pedido: pedidoAtualizado }
   }
 }
-
-export const salvarTaxaPedidoDeliveryUseCase = new SalvarTaxaPedidoDeliveryUseCase()

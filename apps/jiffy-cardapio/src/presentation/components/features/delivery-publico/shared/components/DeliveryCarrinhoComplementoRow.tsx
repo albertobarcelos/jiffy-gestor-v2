@@ -14,6 +14,11 @@ export function DeliveryCarrinhoComplementoRow({
   complemento,
   onRemove,
 }: DeliveryCarrinhoComplementoRowProps) {
+  const valorTxt = formatarValorComplemento(
+    complemento.valor,
+    normalizeTipoImpactoPreco(complemento.tipoImpactoPreco)
+  )
+
   return (
     <li className="flex items-center gap-2 py-0.5 text-xs">
       <span className="w-6 shrink-0 text-right font-medium tabular-nums delivery-text-secondary">
@@ -25,12 +30,9 @@ export function DeliveryCarrinhoComplementoRow({
       >
         {complemento.nome}
       </span>
-      <span className="shrink-0 font-medium tabular-nums delivery-text-accent">
-        {formatarValorComplemento(
-          complemento.valor,
-          normalizeTipoImpactoPreco(complemento.tipoImpactoPreco)
-        )}
-      </span>
+      {valorTxt ? (
+        <span className="shrink-0 font-medium tabular-nums delivery-text-accent">{valorTxt}</span>
+      ) : null}
       <button
         type="button"
         onClick={onRemove}

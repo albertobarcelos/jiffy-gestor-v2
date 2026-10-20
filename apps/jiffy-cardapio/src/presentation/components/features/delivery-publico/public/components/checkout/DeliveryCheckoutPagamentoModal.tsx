@@ -9,6 +9,7 @@ import {
   calcularTrocoCheckout,
   calcularTrocoReceberCheckout,
   pagamentosCobremTotalCheckout,
+  pagamentosExcedemTotalSemTroco,
   restantePagamentoCheckout,
   resolverAdicaoPagamentoCheckout,
   somaPagamentosCheckout,
@@ -20,7 +21,10 @@ import {
 import { showToast } from '@/src/shared/utils/toast'
 import { useHorizontalDragScroll } from '@/src/presentation/hooks/useHorizontalDragScroll'
 import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurrency'
-import { isMeioPagamentoDinheiro } from '../../../shared/utils/isMeioPagamentoDinheiro'
+import {
+  isMeioPagamentoDinheiro,
+  ordenarMeioDinheiroPrimeiro,
+} from '../../../shared/utils/isMeioPagamentoDinheiro'
 import { obterIconeMeioPagamento } from '../../../shared/utils/obterIconeMeioPagamento'
 import { obterEstiloMeioPagamentoPublico } from '../../../shared/utils/obterEstiloMeioPagamentoPublico'
 import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
@@ -91,6 +95,11 @@ export function DeliveryCheckoutPagamentoModal({
     return map
   }, [meiosPagamento])
 
+  const meiosOrdenados = useMemo(
+    () => ordenarMeioDinheiroPrimeiro(meiosPagamento),
+    [meiosPagamento]
+  )
+
   const isEntrega = tipoEntrega === 'entrega'
   const subtotalExibicao = subtotalOficial ?? subtotal
   const taxaExibicao = taxaEntregaOficial ?? 0
@@ -100,8 +109,17 @@ export function DeliveryCheckoutPagamentoModal({
     : formatDeliveryCurrency(taxaExibicao)
   const totalLancado = somaPagamentosCheckout(pagamentos)
   const restante = restantePagamentoCheckout(total, pagamentos)
-  const pagamentoCompleto = restante <= 0.01 && pagamentos.length > 0
-  const cardsDesabilitados = pagamentoCompleto || cotacaoLoading || !cotacaoPronta
+  const isDinheiroId = (meioPagamentoId: string) =>
+    isMeioPagamentoDinheiro(meiosById.get(meioPagamentoId))
+  const pagamentoInconsistente = pagamentosExcedemTotalSemTroco(
+    total,
+    pagamentos,
+    isDinheiroId
+  )
+  const pagamentoCompleto =
+    !pagamentoInconsistente && restante <= 0.01 && pagamentos.length > 0
+  const cardsDesabilitados =
+    pagamentoCompleto || pagamentoInconsistente || cotacaoLoading || !cotacaoPronta
 
   const meioSelecionado = meioSelecionadoId
     ? (meiosById.get(meioSelecionadoId) ?? null)
@@ -114,9 +132,6 @@ export function DeliveryCheckoutPagamentoModal({
     ehDinheiro && precisaTroco === true
       ? calcularTrocoReceberCheckout(valorCedula, restante)
       : 0
-
-  const isDinheiroId = (meioPagamentoId: string) =>
-    isMeioPagamentoDinheiro(meiosById.get(meioPagamentoId))
 
   const trocoReceberPersistido = useMemo(
     () => calcularTrocoCheckout(total, pagamentos, isDinheiroId),
@@ -252,6 +267,12 @@ export function DeliveryCheckoutPagamentoModal({
     }
 
     const listaFinal = result.nextPagamentos
+    if (pagamentosExcedemTotalSemTroco(total, listaFinal, isDinheiroId)) {
+      showToast.error(
+        'O valor dos pagamentos é maior que o total do pedido. Remova e lance novamente.'
+      )
+      return
+    }
     if (!pagamentosCobremTotalCheckout(total, listaFinal, isDinheiroId)) {
       showToast.error(
         listaFinal.length === 0
@@ -261,6 +282,8 @@ export function DeliveryCheckoutPagamentoModal({
       return
     }
 
+    // Garante o estado final no form antes de ir à revisão (evita race do último lançamento).
+    onChangePagamentos(listaFinal)
     onContinuar()
   }
 
@@ -270,7 +293,17 @@ export function DeliveryCheckoutPagamentoModal({
     !cotacaoLoading &&
     cotacaoPronta
 
-  const continuarDisabled = cotacaoLoading || !cotacaoPronta
+  const continuarDisabled =
+    cotacaoLoading || !cotacaoPronta || pagamentoInconsistente
+
+  /** Duas linhas só com mais de 4 meios; com 4 ou menos, uma linha. */
+  const quantidadeMeios = meiosPagamento.length
+  const usarDuasLinhasMeios = quantidadeMeios > 4
+  /** Preenche por linha (4 por linha). Com >8, amplia colunas e usa scroll. */
+  const colunasMeios = usarDuasLinhasMeios
+    ? Math.max(4, Math.ceil(quantidadeMeios / 2))
+    : 4
+  const precisaScrollMeios = colunasMeios > 4
 
   const fieldClass =
     'w-full rounded-xl border bg-transparent px-3 py-3 text-base outline-none delivery-text-primary'
@@ -313,7 +346,17 @@ export function DeliveryCheckoutPagamentoModal({
               {cotacaoLoading ? 'Calculando...' : formatDeliveryCurrency(total)}
             </span>
           </div>
-          {restante > 0.01 ? (
+          {pagamentoInconsistente ? (
+            <div className="flex flex-col gap-0.5 text-sm font-semibold">
+              <div className="flex items-center justify-between">
+                <span className="text-red-600">Pagamento inconsistente</span>
+                <span className="text-red-600">{formatDeliveryCurrency(totalLancado)}</span>
+              </div>
+              <p className="text-xs font-medium text-red-600">
+                O valor lançado é maior que o total. Remova e lance novamente.
+              </p>
+            </div>
+          ) : restante > 0.01 ? (
             <div className="flex items-center justify-between text-sm font-semibold">
               <span className="text-red-600">Falta pagar</span>
               <span className="text-red-600">{formatDeliveryCurrency(restante)}</span>
@@ -341,17 +384,36 @@ export function DeliveryCheckoutPagamentoModal({
           ) : (
             <div
               ref={scrollRef}
-              className={`scrollbar-thin overflow-x-auto px-0.5 py-2 ${
-                cardsDesabilitados
-                  ? 'cursor-default'
-                  : 'cursor-grab select-none active:cursor-grabbing'
+              className={`px-0.5 py-2 ${
+                precisaScrollMeios
+                  ? `scrollbar-thin overflow-x-auto ${
+                      cardsDesabilitados
+                        ? 'cursor-default'
+                        : 'cursor-grab select-none active:cursor-grabbing'
+                    }`
+                  : 'overflow-x-hidden'
               }`}
-              style={{ scrollbarWidth: 'thin' }}
-              onMouseDown={cardsDesabilitados ? undefined : handleMouseDown}
-              onWheel={handleWheel}
+              style={precisaScrollMeios ? { scrollbarWidth: 'thin' } : undefined}
+              onMouseDown={
+                cardsDesabilitados || !precisaScrollMeios
+                  ? undefined
+                  : handleMouseDown
+              }
+              onWheel={precisaScrollMeios ? handleWheel : undefined}
             >
-              <div className="grid w-max grid-flow-col grid-rows-2 gap-2.5 auto-cols-[132px]">
-                {meiosPagamento.map(meio => {
+              <div
+                className={
+                  precisaScrollMeios
+                    ? 'grid w-max grid-rows-2 gap-2.5'
+                    : 'grid w-full gap-2.5'
+                }
+                style={{
+                  gridTemplateColumns: precisaScrollMeios
+                    ? `repeat(${colunasMeios}, 132px)`
+                    : 'repeat(4, minmax(0, 1fr))',
+                }}
+              >
+                {meiosOrdenados.map(meio => {
                   const Icone = obterIconeMeioPagamento(meio.nome)
                   const estilo = obterEstiloMeioPagamentoPublico(meio)
                   const selecionado = meioSelecionadoId === meio.id
@@ -361,20 +423,26 @@ export function DeliveryCheckoutPagamentoModal({
                       type="button"
                       disabled={cardsDesabilitados}
                       onClick={() => handleSelecionarMeio(meio.id)}
-                      className={`flex ${MEIO_CARD_CLASS} flex-col items-center justify-center gap-1 rounded-xl border p-2 transition-opacity ${
+                      className={`flex ${MEIO_CARD_CLASS} flex-col items-center justify-center gap-1 rounded-lg border-2 p-2 transition-opacity hover:brightness-110 ${
                         cardsDesabilitados ? 'cursor-not-allowed opacity-45' : ''
                       } ${selecionado ? 'outline outline-2 outline-offset-2 outline-[var(--delivery-primary,#171717)]' : ''}`}
                       style={{
-                        borderColor: estilo.backgroundColor,
+                        borderColor: estilo.borderColor,
                         backgroundColor: estilo.backgroundColor,
                         color: estilo.color,
                       }}
                     >
                       <Icone
-                        className="h-9 w-9 shrink-0"
-                        style={{ color: estilo.iconColor ?? estilo.color }}
+                        className="h-8 w-8 shrink-0"
+                        style={{ color: estilo.iconColor }}
                       />
-                      <span className="line-clamp-2 w-full text-center text-[11px] font-medium leading-tight">
+                      <span
+                        className="line-clamp-2 w-full text-center text-xs leading-tight"
+                        style={{
+                          color: estilo.labelColor,
+                          fontWeight: estilo.labelFontWeight ?? 500,
+                        }}
+                      >
                         {meio.nome}
                       </span>
                     </button>
@@ -405,6 +473,7 @@ export function DeliveryCheckoutPagamentoModal({
               placeholder="R$ 0,00"
               value={valorInput}
               onChange={e => handleValorChange(e.target.value)}
+              onFocus={e => e.currentTarget.select()}
               aria-label="Valor deste pagamento"
             />
             <p className="text-xs delivery-text-secondary">
@@ -483,6 +552,7 @@ export function DeliveryCheckoutPagamentoModal({
                   placeholder="R$ 0,00"
                   value={valorInput}
                   onChange={e => handleValorChange(e.target.value)}
+                  onFocus={e => e.currentTarget.select()}
                   aria-label="Valor deste pagamento em dinheiro"
                 />
                 <p className="text-xs delivery-text-secondary">
@@ -539,29 +609,46 @@ export function DeliveryCheckoutPagamentoModal({
               {pagamentos.map((pagamento, index) => {
                 const meio = meiosById.get(pagamento.meioPagamentoId)
                 const Icone = obterIconeMeioPagamento(meio?.nome ?? '')
+                const estilo = obterEstiloMeioPagamentoPublico({
+                  nome: meio?.nome ?? '',
+                  formaPagamentoFiscal: meio?.formaPagamentoFiscal,
+                })
                 return (
                   <li
                     key={`${pagamento.meioPagamentoId}-${index}`}
-                    className={`relative flex ${MEIO_CARD_CLASS} flex-col items-center justify-center gap-0.5 rounded-xl border px-2 pt-2 pb-1.5`}
+                    className={`group relative flex ${MEIO_CARD_CLASS} flex-col items-center justify-center gap-0.5 rounded-lg border-2 p-2`}
                     style={{
-                      borderColor: 'color-mix(in srgb, #16a34a 35%, var(--delivery-border))',
-                      backgroundColor:
-                        'color-mix(in srgb, #16a34a 10%, var(--delivery-surface))',
+                      borderColor: estilo.borderColor,
+                      backgroundColor: estilo.backgroundColor,
+                      color: estilo.color,
                     }}
                   >
                     <button
                       type="button"
                       onClick={() => handleRemover(index)}
                       aria-label={`Remover ${meio?.nome ?? 'pagamento'}`}
-                      className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full text-red-600"
+                      className="absolute right-0.5 top-0.5 flex h-6 w-6 items-center justify-center rounded-md hover:bg-black/10"
+                      style={{ color: estilo.color }}
                     >
-                      <MdDelete className="h-4 w-4" />
+                      <MdDelete className="h-3.5 w-3.5" />
                     </button>
-                    <Icone className="h-6 w-6 shrink-0 delivery-text-primary" />
-                    <span className="line-clamp-1 w-full px-1 text-center text-[10px] font-medium leading-tight delivery-text-primary">
+                    <Icone
+                      className="h-6 w-6 shrink-0"
+                      style={{ color: estilo.iconColor }}
+                    />
+                    <span
+                      className="line-clamp-2 w-full px-1 text-center text-[11px] font-medium leading-tight"
+                      style={{
+                        color: estilo.labelColor,
+                        fontWeight: estilo.labelFontWeight ?? 500,
+                      }}
+                    >
                       {meio?.nome ?? 'Pagamento'}
                     </span>
-                    <span className="text-xs font-bold tabular-nums text-green-700">
+                    <span
+                      className="w-full truncate text-center text-xs font-semibold leading-tight"
+                      style={{ color: estilo.labelColor }}
+                    >
                       {formatDeliveryCurrency(pagamento.valor)}
                     </span>
                   </li>

@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { montarDiffProdutosPedidoDelivery } from '@/src/application/delivery/montarDiffProdutosPedidoDelivery'
-import { AtualizarProdutosPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/AtualizarProdutosPedidoDeliveryUseCase'
+import { atualizarProdutosPedidoDeliveryUseCase } from '@/src/infrastructure/composition/pedidoUseCases'
 import type { ProdutoSelecionado } from '../../types'
 import { validarObservacoesPedido } from '@/src/shared/helpers/observacaoPedido'
 import { showToast } from '@/src/shared/utils/toast'
@@ -19,6 +19,12 @@ export interface UseEdicaoProdutosDeliveryParams {
   onSuccess: () => void
   onClose: () => void
   setInternalDialogOpen: (open: boolean) => void
+  /**
+   * Quando true, salvar/cancelar não fecha o painel (volta ao detalhe).
+   * Usado ao editar itens a partir da aba Lista Produtos.
+   */
+  permanecerNoPainel?: boolean
+  restaurarProdutos?: (produtos: ProdutoSelecionado[]) => void
 }
 
 /**
@@ -35,8 +41,10 @@ export function useEdicaoProdutosDelivery({
   onSuccess,
   onClose,
   setInternalDialogOpen,
+  permanecerNoPainel = false,
+  restaurarProdutos,
 }: UseEdicaoProdutosDeliveryParams) {
-  const useCase = useMemo(() => new AtualizarProdutosPedidoDeliveryUseCase(), [])
+  const useCase = atualizarProdutosPedidoDeliveryUseCase
   const [salvandoProdutos, setSalvandoProdutos] = useState(false)
 
   // Snapshot dos produtos como vieram do detalhe (base para o diff).
@@ -84,7 +92,6 @@ export function useEdicaoProdutosDelivery({
     }
 
     const validacaoObservacoes = validarObservacoesPedido({
-      observacaoPedido: observacaoRef.current,
       produtos: produtosRef.current,
     })
     if (!validacaoObservacoes.ok) {
@@ -112,6 +119,10 @@ export function useEdicaoProdutosDelivery({
     try {
       await useCase.execute({ pedidoId, token, add: diff.add, remove: diff.remove })
       showToast.success('Produtos atualizados com sucesso!')
+      if (permanecerNoPainel) {
+        onSuccess()
+        return
+      }
       setInternalDialogOpen(false)
       onSuccess()
       onClose()
@@ -139,7 +150,21 @@ export function useEdicaoProdutosDelivery({
     onSuccess,
     onClose,
     setInternalDialogOpen,
+    permanecerNoPainel,
   ])
 
-  return { salvandoProdutos, handleSalvarProdutos }
+  const handleCancelarEdicao = useCallback(() => {
+    const originais = produtosOriginaisRef.current
+    if (originais && restaurarProdutos) {
+      restaurarProdutos(
+        originais.map(p => ({
+          ...p,
+          complementos: p.complementos.map(c => ({ ...c })),
+        }))
+      )
+    }
+    onClose()
+  }, [onClose, restaurarProdutos])
+
+  return { salvandoProdutos, handleSalvarProdutos, handleCancelarEdicao }
 }

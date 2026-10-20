@@ -1,3 +1,4 @@
+import { temSeloCanalOrigem } from '@/src/domain/policies/pedido/origemCanalMarketplace'
 import type { Venda } from '../types'
 
 export type TipoVendaExibicaoCard =
@@ -19,24 +20,27 @@ export interface KanbanVendaCardTipoVendaViewModel {
 
 export function derivarTipoVendaCardKanban(venda: Venda): KanbanVendaCardTipoVendaViewModel {
   const tipoVendaStr = String(venda.tipoVenda ?? '').trim().toLowerCase()
-  const isDeliveryOuRetirada = tipoVendaStr === 'entrega' || tipoVendaStr === 'retirada'
+  const tipoEntrega = venda.tipoAtendimento()
+  const isDeliveryOuRetirada = tipoVendaStr === 'delivery'
   const isPedidoBalcaoGestor = venda.tabelaOrigem === 'venda_gestor' && !isDeliveryOuRetirada
 
   const tipoVendaExibicao: TipoVendaExibicaoCard =
     venda.tabelaOrigem === 'venda_gestor'
       ? isDeliveryOuRetirada
-        ? tipoVendaStr
+        ? tipoEntrega ?? 'delivery'
         : 'gestor'
       : (venda.tipoVenda ?? '')
 
   const prefixoLinhaOrigemCard =
     venda.tabelaOrigem === 'venda_gestor' && isDeliveryOuRetirada
-      ? tipoVendaStr === 'retirada'
+      ? tipoEntrega === 'retirada'
         ? 'Retirada'
-        : 'Entrega'
+        : tipoEntrega === 'entrega'
+          ? 'Entrega'
+          : 'Delivery'
       : isPedidoBalcaoGestor
         ? 'Balcão'
-        : venda.origem
+        : (venda.origem ?? '')
 
   const exibirColunaTipoVenda = Boolean(
     tipoVendaExibicao &&
@@ -44,7 +48,8 @@ export function derivarTipoVendaCardKanban(venda: Venda): KanbanVendaCardTipoVen
         tipoVendaExibicao === 'mesa' ||
         tipoVendaExibicao === 'gestor' ||
         tipoVendaExibicao === 'entrega' ||
-        tipoVendaExibicao === 'retirada')
+        tipoVendaExibicao === 'retirada' ||
+        tipoVendaExibicao === 'delivery')
   )
 
   return {
@@ -57,6 +62,28 @@ export function derivarTipoVendaCardKanban(venda: Venda): KanbanVendaCardTipoVen
   }
 }
 
+export function codigoVendaKanban(venda: Venda): string | null {
+  const codigo = String(venda.codigoVenda ?? '').trim()
+  return codigo ? `#${codigo}` : null
+}
+
+export function exibirSeloCanalMarketplace(origem: string | null | undefined): boolean {
+  return temSeloCanalOrigem(origem)
+}
+
+function rotuloIdentificacaoKanban(venda: Venda): 'Pedido' | 'Venda' {
+  const tipoVendaStr = String(venda.tipoVenda ?? '').trim().toLowerCase()
+  return tipoVendaStr === 'delivery' ? 'Pedido' : 'Venda'
+}
+
+/** "Pedido 123" ou "Venda 123" — rótulo sem o código de pedido externo. */
+export function rotuloNumeroVendaKanban(venda: Venda): string {
+  return `${rotuloIdentificacaoKanban(venda)} ${venda.numeroVenda}`
+}
+
 export function linhaIdentificacaoVendaKanban(venda: Venda): string {
-  return `Venda ${venda.numeroVenda}${venda.codigoVenda ? ` - #${venda.codigoVenda}` : ''}`
+  const codigo = codigoVendaKanban(venda)
+  return codigo
+    ? `${rotuloNumeroVendaKanban(venda)} - ${codigo}`
+    : rotuloNumeroVendaKanban(venda)
 }

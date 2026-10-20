@@ -2,6 +2,9 @@ import { defineConfig } from 'vitest/config'
 import path from 'path'
 
 export default defineConfig({
+  esbuild: {
+    jsx: 'automatic',
+  },
   test: {
     environment: 'jsdom',
     globals: true,
@@ -11,6 +14,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, '.'),
+      '@jiffy/preco-vigente-snapshot': path.resolve(
+        __dirname,
+        '../../src/domain/policies/menu/precoVigenteSnapshot.ts'
+      ),
     },
   },
 })

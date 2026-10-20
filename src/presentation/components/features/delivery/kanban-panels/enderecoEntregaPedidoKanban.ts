@@ -17,20 +17,17 @@ export const COLUNAS_KANBAN_ALTERAR_ENDERECO_ENTREGA: ColunaKanbanId[] = [
 ]
 
 export function normalizarTipoEntregaVendaKanban(
-  venda: Pick<Venda, 'tipoVenda'>
-): TipoEntregaDeliveryApi {
-  const tipo = String(venda.tipoVenda ?? '')
-    .trim()
-    .toLowerCase()
-  return tipo === 'retirada' ? 'retirada' : 'entrega'
+  venda: Pick<Venda, 'tipoAtendimento'>
+): TipoEntregaDeliveryApi | null {
+  return venda.tipoAtendimento()
 }
 
-export function extrairTipoEntregaPedidoDeliveryApi(data: unknown): TipoEntregaDeliveryApi {
+export function extrairTipoEntregaPedidoDeliveryApi(data: unknown): TipoEntregaDeliveryApi | null {
   const registro = normalizarRegistroApi(data)
-  const tipo = String(registro.tipoEntrega ?? registro.tipoVenda ?? '')
+  const tipo = String(registro.tipoEntrega ?? '')
     .trim()
     .toLowerCase()
-  return tipo === 'retirada' ? 'retirada' : 'entrega'
+  return tipo === 'entrega' || tipo === 'retirada' ? tipo : null
 }
 
 function podeAlterarPedidoEntregaKanban(
@@ -40,12 +37,10 @@ function podeAlterarPedidoEntregaKanban(
   tiposPermitidos: readonly TipoEntregaDeliveryApi[]
 ): boolean {
   if (modoKanbanVendas !== 'delivery') return false
-
-  const tipo = String(venda.tipoVenda ?? '')
-    .trim()
-    .toLowerCase()
-  if (!tiposPermitidos.includes(tipo as TipoEntregaDeliveryApi)) return false
   if (!pedidoKanbanUsaEndpointDelivery(venda)) return false
+
+  const tipo = venda.tipoAtendimento()
+  if (!tipo || !tiposPermitidos.includes(tipo)) return false
 
   return COLUNAS_KANBAN_ALTERAR_ENDERECO_ENTREGA.includes(columnId)
 }

@@ -15,7 +15,7 @@ interface PedidoKanbanQuickViewWhatsappAcoesProps {
   nomeEmpresa: string
   enderecoEmpresa: EnderecoEmpresaMe | null | undefined
   colunaAtual: ColunaKanbanId
-  tipoVenda: 'entrega' | 'retirada'
+  tipoEntrega: 'entrega' | 'retirada'
 }
 
 const whatsappButtonSx = {
@@ -50,17 +50,17 @@ export function PedidoKanbanQuickViewWhatsappAcoes({
   nomeEmpresa,
   enderecoEmpresa,
   colunaAtual,
-  tipoVenda,
+  tipoEntrega,
 }: PedidoKanbanQuickViewWhatsappAcoesProps) {
   const telefoneCliente = dados.detalhesEntrega.clienteCelular
   const telefoneEntregador = dados.telefoneEntregador
-  const exibirEntregador = tipoVenda === 'entrega'
+  const exibirEntregador = tipoEntrega === 'entrega'
 
   const handleCliente = () => {
     const mensagem = montarMensagemWhatsappClienteKanban({
       clienteNome: dados.clienteNome,
       colunaAtual,
-      tipoVenda,
+      tipoEntrega,
       dados,
       enderecoEmpresa,
       nomeEmpresa,

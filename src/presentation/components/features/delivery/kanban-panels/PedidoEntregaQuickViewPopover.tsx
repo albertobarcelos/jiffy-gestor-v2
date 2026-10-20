@@ -16,7 +16,8 @@ interface PedidoEntregaQuickViewPopoverProps {
   vendaId: string
   tabelaOrigem: 'venda' | 'venda_gestor'
   colunaAtual: ColunaKanbanId
-  tipoVenda: 'entrega' | 'retirada'
+  tipoVenda?: string | null
+  tipoEntrega: 'entrega' | 'retirada'
   observacaoPedidoHint?: string | null
   anchorEl: HTMLElement | null
   open: boolean
@@ -34,11 +35,13 @@ export function PedidoEntregaQuickViewPopover({
   tabelaOrigem,
   colunaAtual,
   tipoVenda,
+  tipoEntrega,
   observacaoPedidoHint,
   anchorEl,
   open,
   onClose,
-}: PedidoEntregaQuickViewPopoverProps) {  const { empresa } = useEmpresaMe()
+}: PedidoEntregaQuickViewPopoverProps) {
+  const { empresa } = useEmpresaMe()
   const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [dados, setDados] = useState<PedidoKanbanQuickViewData | null>(null)
@@ -139,7 +142,7 @@ export function PedidoEntregaQuickViewPopover({
             nomeEmpresa={empresa?.nomeExibicao ?? 'Empresa'}
             enderecoEmpresa={empresa?.endereco ?? null}
             colunaAtual={colunaAtual}
-            tipoVenda={tipoVenda}
+            tipoEntrega={tipoEntrega}
           />
         )}
       </div>

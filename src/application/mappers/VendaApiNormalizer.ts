@@ -1,3 +1,4 @@
+import { canonicalizarAliasOrigemApi } from '@/src/application/mappers/canonicalizarAliasOrigemApi'
 import type { StatusVenda } from '@/src/domain/types/pedido'
 import type { OrigemVenda } from '@/src/domain/types/vendaDetalhe'
 import type {
@@ -26,10 +27,12 @@ export function normalizeStatusVenda(venda: VendaGestorApiResponse): StatusVenda
 
 const ORIGEM_API_MAP: Record<string, OrigemVenda> = {
   GESTOR: 'GESTOR',
+  JIFFY_DELIVERY: 'DELIVERY',
+  DELIVERY: 'DELIVERY',
   IFOOD: 'IFOOD',
-  DELIVERY_IFOOD: 'IFOOD',
   RAPPI: 'RAPPI',
   DELIVERY_UBER: 'RAPPI',
+  AIQFOME: 'AIQFOME',
   OUTROS: 'OUTROS',
 }
 
@@ -37,15 +40,17 @@ export function normalizeOrigemApi(raw: string | null | undefined): OrigemVenda 
   if (raw == null || String(raw).trim() === '') {
     return null
   }
-  const key = String(raw).trim().toUpperCase()
+  const key = canonicalizarAliasOrigemApi(raw)
   return ORIGEM_API_MAP[key] ?? 'OUTROS'
 }
 
 /** Rótulo de exibição para origem (UI). */
 export function rotuloOrigemParaExibicao(origem: OrigemVenda | null, origemBrutaApi?: string | null): string {
   if (origem === 'GESTOR') return 'Gestor'
+  if (origem === 'DELIVERY') return 'Delivery'
   if (origem === 'IFOOD') return 'iFood'
   if (origem === 'RAPPI') return 'Rappi'
+  if (origem === 'AIQFOME') return 'Aiqfome'
   if (origem === 'OUTROS') return 'Outros'
   if (origemBrutaApi == null || String(origemBrutaApi).trim() === '') {
     return 'PDV'
@@ -57,7 +62,7 @@ export function rotuloOrigemParaExibicao(origem: OrigemVenda | null, origemBruta
 
 export function normalizeTipoImpactoPreco(raw: unknown): 'aumenta' | 'diminui' | 'nenhum' {
   if (!raw) return 'nenhum'
-  const tipo = String(raw).toLowerCase()
+  const tipo = String(raw).trim().toLowerCase()
   if (tipo === 'aumenta' || tipo === 'increase') return 'aumenta'
   if (tipo === 'diminui' || tipo === 'decrease') return 'diminui'
   return 'nenhum'

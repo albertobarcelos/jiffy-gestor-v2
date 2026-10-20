@@ -1,6 +1,12 @@
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 import type { GetCatalogoPublicoResponseDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import { normalizarCatalogoPublicoImagens } from '@/src/application/mappers/normalizarCatalogoPublicoImagens'
+import {
+  CATALOGO_PUBLICO_REVALIDATE_SECONDS,
+  catalogoPublicoCacheTag,
+} from '@/src/infrastructure/cache/catalogoPublicoCache'
 import { CATALOGO_GRUPOS_PAGE_LIMIT } from '@/src/presentation/hooks/publicDeliveryCatalogKeys'
+import { normalizarSlugPublico } from '@/src/application/delivery-publico/normalizarSlugPublico'
 
 /**
  * Busca catálogo direto no backend (server-side / RSC).
@@ -10,7 +16,7 @@ export async function fetchCatalogoPublicoUpstream(
   slug: string,
   params?: { offset?: number; limit?: number }
 ): Promise<GetCatalogoPublicoResponseDTO> {
-  const slugNormalizado = slug.trim()
+  const slugNormalizado = normalizarSlugPublico(slug)
   if (!slugNormalizado) {
     throw new Error('Slug é obrigatório')
   }
@@ -29,12 +35,16 @@ export async function fetchCatalogoPublicoUpstream(
       {
         method: 'GET',
         headers: { Accept: 'application/json' },
+        next: {
+          revalidate: CATALOGO_PUBLICO_REVALIDATE_SECONDS,
+          tags: [catalogoPublicoCacheTag(slugNormalizado)],
+        },
       }
     )
     if (!response.data) {
       throw new Error('Catálogo vazio')
     }
-    return response.data
+    return normalizarCatalogoPublicoImagens(response.data)
   } catch (error) {
     if (error instanceof ApiError) throw error
     throw error

@@ -1,10 +1,33 @@
 import { Suspense } from 'react'
+import type { Metadata } from 'next'
 import { HydrationBoundary } from '@tanstack/react-query'
 import { DeliveryPublicoHomeScreen } from '@/src/presentation/components/features/delivery-publico/public/screens/DeliveryPublicoHomeScreen'
 import { dehydrateCatalogoPrimeiraPagina } from '@/src/infrastructure/api/dehydrateCatalogoPrimeiraPagina'
+import { jsonLdCardapioSlug } from '@/src/infrastructure/seo/buildCardapioSlugSeo'
+import { carregarEmpresaPublicaSeo } from '@/src/infrastructure/seo/carregarEmpresaPublicaSeo'
+import {
+  metadataCardapioNaoIndexavel,
+  metadataCardapioSlug,
+} from '@/src/infrastructure/seo/cardapioSlugMetadata'
+import { exigirSlugPublicoDaPagina } from '@/src/infrastructure/seo/exigirSlugPublicoDaPagina'
+import { CardapioSlugJsonLd } from '@/src/presentation/components/features/delivery-publico/shared/seo/CardapioSlugJsonLd'
+
+export { generateStaticParams } from './catalogoSlugCache'
+
+/** Precisa ser literal neste arquivo — o Next não lê re-export. */
+export const revalidate = 30
+export const dynamicParams = true
 
 type PageProps = {
   params: Promise<{ slug: string }>
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug: rawSlug } = await params
+  const slug = exigirSlugPublicoDaPagina(rawSlug)
+  const empresa = await carregarEmpresaPublicaSeo(slug)
+  if (!empresa) return metadataCardapioNaoIndexavel
+  return metadataCardapioSlug(empresa)
 }
 
 function HomeFallback() {
@@ -20,11 +43,16 @@ function HomeFallback() {
 
 export default async function CardapioSlugPage({ params }: PageProps) {
   const { slug: rawSlug } = await params
-  const slug = rawSlug?.trim() ?? ''
-  const state = await dehydrateCatalogoPrimeiraPagina(slug)
+  const slug = exigirSlugPublicoDaPagina(rawSlug)
+
+  const [state, empresa] = await Promise.all([
+    dehydrateCatalogoPrimeiraPagina(slug),
+    carregarEmpresaPublicaSeo(slug),
+  ])
 
   return (
     <Suspense fallback={<HomeFallback />}>
+      {empresa ? <CardapioSlugJsonLd data={jsonLdCardapioSlug(empresa)} /> : null}
       <HydrationBoundary state={state}>
         <DeliveryPublicoHomeScreen slug={slug} />
       </HydrationBoundary>

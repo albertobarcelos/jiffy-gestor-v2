@@ -15,7 +15,7 @@ export const DeliveryCheckoutUppercaseInput = forwardRef<
   HTMLInputElement,
   DeliveryCheckoutUppercaseInputProps
 >(function DeliveryCheckoutUppercaseInput(
-  { value, onValueChange, maxLength, className, style, ...props },
+  { value, onValueChange, maxLength, className, style, onFocus, ...props },
   forwardedRef
 ) {
   const { inputRef, handleChange } = useLocaleUppercaseInputHandler(value, onValueChange, {
@@ -34,12 +34,27 @@ export const DeliveryCheckoutUppercaseInput = forwardRef<
     [forwardedRef, inputRef]
   )
 
+  const handleFocus = useCallback(
+    (event: React.FocusEvent<HTMLInputElement>) => {
+      onFocus?.(event)
+      if (event.defaultPrevented) return
+      if (!value.trim()) return
+      // Seleciona após o foco estabilizar (melhor em mobile/Safari).
+      const el = event.currentTarget
+      requestAnimationFrame(() => {
+        el.select()
+      })
+    },
+    [onFocus, value]
+  )
+
   return (
     <input
       {...props}
       ref={setRefs}
       value={value}
       onChange={handleChange}
+      onFocus={handleFocus}
       maxLength={maxLength}
       className={className}
       style={style}
