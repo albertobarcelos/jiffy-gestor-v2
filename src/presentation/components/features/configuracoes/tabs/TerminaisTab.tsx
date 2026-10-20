@@ -2,7 +2,14 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import {
+  getPreferenciaTerminal,
+  listarImpressorasPagina,
+  listarPreferenciasPagina,
+  listarTerminaisPagina,
+  patchTerminal,
+  salvarPreferenciasTerminal,
+} from '@/src/infrastructure/api/terminaisConfigApi'
 import { Terminal } from '@/src/domain/entities/Terminal'
 import { MdDelete, MdPhone, MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
@@ -301,29 +308,17 @@ export function TerminaisTab() {
 
         // Loop para carregar todas as páginas
         while (hasMore) {
-          const params = new URLSearchParams({
-            limit: String(PAGE_SIZE_TERMINAIS),
-            offset: currentOffset.toString(),
-          })
-
-          if (searchQueryRef.current) {
-            params.append('q', searchQueryRef.current)
-          }
-
-          const response = await fetchGestorApi(`/api/terminais?${params.toString()}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
+          const response = await listarTerminaisPagina(token, {
+            limit: PAGE_SIZE_TERMINAIS,
+            offset: currentOffset,
+            q: searchQueryRef.current || undefined,
           })
 
           if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}))
-            const errorMessage = errorData.error || `Erro ${response.status}: ${response.statusText}`
-            throw new Error(errorMessage)
+            throw new Error(response.error)
           }
 
-          const data = await response.json()
+          const data = response.data
 
           // Debug: log da resposta da API
           if (process.env.NODE_ENV === 'development') {
@@ -377,19 +372,10 @@ export function TerminaisTab() {
           let listOk = false
 
           while (prefsHasMore) {
-            const pParams = new URLSearchParams({
-              limit: String(PAGE_SIZE_PREFS),
-              offset: String(prefsOffset),
-            })
-            if (q) {
-              pParams.append('q', q)
-            }
-
-            const listResp = await fetchGestorApi(`/api/preferencias-terminal?${pParams.toString()}`, {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              },
+            const listResp = await listarPreferenciasPagina(token, {
+              limit: PAGE_SIZE_PREFS,
+              offset: prefsOffset,
+              q: q || undefined,
             })
 
             if (!listResp.ok) {
@@ -397,7 +383,7 @@ export function TerminaisTab() {
             }
 
             listOk = true
-            const listData = await listResp.json()
+            const listData = listResp.data
             const items: any[] = listData.items || []
 
             for (const row of items) {
@@ -417,16 +403,11 @@ export function TerminaisTab() {
             const prefsEntries = await Promise.all(
               allTerminais.map(async (item) => {
                 try {
-                  const resp = await fetchGestorApi(`/api/preferencias-terminal/${item.terminal.getId()}`, {
-                    headers: {
-                      Authorization: `Bearer ${token}`,
-                      'Content-Type': 'application/json',
-                    },
-                  })
+                  const resp = await getPreferenciaTerminal(token, item.terminal.getId())
                   if (!resp.ok) {
                     return null
                   }
-                  const data = await resp.json()
+                  const data = resp.data
                   return {
                     terminalId: item.terminal.getId(),
                     ...rawToPreferenceData(data),
@@ -474,24 +455,13 @@ export function TerminaisTab() {
       const limit = 50
 
       while (hasMore) {
-        const params = new URLSearchParams({
-          limit: limit.toString(),
-          offset: currentOffset.toString(),
-        })
-
-        const resp = await fetchGestorApi(`/api/impressoras?${params.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
+        const resp = await listarImpressorasPagina(token, { limit, offset: currentOffset })
 
         if (!resp.ok) {
-          const errorData = await resp.json().catch(() => ({}))
-          throw new Error(errorData.error || 'Erro ao buscar impressoras')
+          throw new Error(resp.error)
         }
 
-        const data = await resp.json()
+        const data = resp.data
         const list = (data.items || []).map((i: any) => ({
           id: i.id,
           nome: i.nome || 'Sem nome',
@@ -563,18 +533,10 @@ export function TerminaisTab() {
       )
 
       try {
-        const response = await fetchGestorApi(`/api/terminais/${terminalId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ bloqueado: novoBloqueado }),
-        })
+        const response = await patchTerminal(token, terminalId, { bloqueado: novoBloqueado })
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.error || 'Erro ao atualizar terminal')
+          throw new Error(response.error)
         }
 
         showToast.success(
@@ -626,36 +588,23 @@ export function TerminaisTab() {
       }))
 
       try {
-        const response = await fetchGestorApi(`/api/preferencias-terminal`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
+        const response = await salvarPreferenciasTerminal(token, {
             terminaisId: terminalId,
             fields: {
               compartilharMesas: novoValor,
             },
-          }),
-        })
+          })
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.error || 'Erro ao atualizar preferências')
+          throw new Error(response.error)
         }
 
         // Busca as preferências atualizadas do backend para garantir sincronização
         try {
-          const prefsResponse = await fetchGestorApi(`/api/preferencias-terminal/${terminalId}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          })
+          const prefsResponse = await getPreferenciaTerminal(token, terminalId)
 
           if (prefsResponse.ok) {
-            const prefsData = await prefsResponse.json()
+            const prefsData = prefsResponse.data
             // Atualiza o estado com os dados confirmados do backend
             setPreferencesMap((prev) => ({
               ...prev,
@@ -720,35 +669,22 @@ export function TerminaisTab() {
       }))
 
       try {
-        const response = await fetchGestorApi(`/api/preferencias-terminal`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
+        const response = await salvarPreferenciasTerminal(token, {
             terminaisId: terminalId,
             fields: {
               fiscalAtivo: novoValor,
             },
-          }),
-        })
+          })
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.error || 'Erro ao atualizar preferências')
+          throw new Error(response.error)
         }
 
         try {
-          const prefsResponse = await fetchGestorApi(`/api/preferencias-terminal/${terminalId}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          })
+          const prefsResponse = await getPreferenciaTerminal(token, terminalId)
 
           if (prefsResponse.ok) {
-            const prefsData = await prefsResponse.json()
+            const prefsData = prefsResponse.data
             setPreferencesMap((prev) => ({
               ...prev,
               [terminalId]: rawToPreferenceData(prefsData),
@@ -811,35 +747,22 @@ export function TerminaisTab() {
       }))
 
       try {
-        const response = await fetchGestorApi(`/api/preferencias-terminal`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
+        const response = await salvarPreferenciasTerminal(token, {
             terminaisId: terminalId,
             fields: {
               leitorHabilitado: novoValor,
             },
-          }),
-        })
+          })
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.error || 'Erro ao atualizar preferências')
+          throw new Error(response.error)
         }
 
         try {
-          const prefsResponse = await fetchGestorApi(`/api/preferencias-terminal/${terminalId}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          })
+          const prefsResponse = await getPreferenciaTerminal(token, terminalId)
 
           if (prefsResponse.ok) {
-            const prefsData = await prefsResponse.json()
+            const prefsData = prefsResponse.data
             setPreferencesMap((prev) => ({
               ...prev,
               [terminalId]: rawToPreferenceData(prefsData),
@@ -903,32 +826,19 @@ export function TerminaisTab() {
       })
 
       try {
-        const response = await fetchGestorApi(`/api/preferencias-terminal`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
+        const response = await salvarPreferenciasTerminal(token, {
             terminaisId: terminalId,
             fields,
-          }),
-        })
+          })
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.error || 'Erro ao atualizar preferências')
+          throw new Error(response.error)
         }
 
         try {
-          const prefsResponse = await fetchGestorApi(`/api/preferencias-terminal/${terminalId}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          })
+          const prefsResponse = await getPreferenciaTerminal(token, terminalId)
           if (prefsResponse.ok) {
-            const prefsData = await prefsResponse.json()
+            const prefsData = prefsResponse.data
             setPreferencesMap(prev => ({
               ...prev,
               [terminalId]: rawToPreferenceData(prefsData),
@@ -985,23 +895,15 @@ export function TerminaisTab() {
       }))
 
       try {
-        const response = await fetchGestorApi(`/api/preferencias-terminal`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
+        const response = await salvarPreferenciasTerminal(token, {
             terminaisId: terminalId,
             fields: {
               impressoraFinalizacaoId: impressoraId || null,
             },
-          }),
-        })
+          })
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.error || 'Erro ao atualizar impressora de finalização')
+          throw new Error(response.error)
         }
 
         showToast.success('Impressora de finalização atualizada!')
@@ -1090,20 +992,10 @@ export function TerminaisTab() {
     try {
       const results = await Promise.allSettled(
         terminalIds.map(async terminalId => {
-          const response = await fetchGestorApi(`/api/terminais/${terminalId}`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ menuPrincipalId: newMenuId }),
-          })
+          const response = await patchTerminal(token, terminalId, { menuPrincipalId: newMenuId })
 
           if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}))
-            throw new Error(
-              (errorData as { error?: string }).error || 'Erro ao atualizar menu do terminal'
-            )
+            throw new Error(response.error)
           }
         })
       )

@@ -89,6 +89,8 @@ export function recalcularLinhaCarrinho(
     valorTotal,
     observacoes: item.observacoes,
     complementos,
+    precoRegular: item.precoRegular,
+    descontoPercentual: item.descontoPercentual,
   }
 }
 
@@ -103,6 +105,8 @@ export function normalizarItemCarrinho(item: DeliveryCarrinhoItem): DeliveryCarr
     observacoes: item.observacoes,
     complementos: item.complementos,
     valorUnitarioBase: base,
+    precoRegular: item.precoRegular,
+    descontoPercentual: item.descontoPercentual,
   })
   return {
     ...recalculado,
@@ -195,5 +199,7 @@ export function itemSemComplemento(
     observacoes: normalizado.observacoes,
     complementos,
     valorUnitarioBase: normalizado.valorUnitario,
+    precoRegular: item.precoRegular,
+    descontoPercentual: item.descontoPercentual,
   })
 }

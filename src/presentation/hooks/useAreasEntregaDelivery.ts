@@ -3,8 +3,13 @@
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
+import { requireGestorConfig } from '@/src/infrastructure/api/gestorConfigRequest'
+import {
+  criarAreaEntregaDelivery,
+  excluirAreaEntregaDelivery,
+  listarAreasEntregaDelivery,
+  patchAreaEntregaDelivery,
+} from '@/src/infrastructure/api/deliveryConfigApi'
 import type {
   AreaEntregaDTO,
   CreateAreaEntregaInput,
@@ -17,35 +22,15 @@ import {
 
 export const AREAS_ENTREGA_DELIVERY_QUERY_KEY = ['delivery', 'areas-entrega'] as const
 
-async function parseJsonOrThrow(res: Response): Promise<unknown> {
-  const raw: unknown = await res.json().catch(() => ({}))
-  if (!res.ok) {
-    const msg =
-      textoErroCorpoApi(raw) ||
-      (raw &&
-      typeof raw === 'object' &&
-      'error' in raw &&
-      typeof (raw as { error: unknown }).error === 'string'
-        ? (raw as { error: string }).error
-        : '') ||
-      `Erro HTTP ${res.status}`
-    throw new Error(msg)
-  }
-  return raw
-}
-
 export function useAreasEntregaDelivery(options?: { enabled?: boolean }) {
   const enabled = options?.enabled ?? true
 
   return useSecureTenantQuery<AreaEntregaDTO[]>(
     AREAS_ENTREGA_DELIVERY_QUERY_KEY,
-    async ({ token }) => {
-      const res = await fetchGestorApi('/api/delivery/empresas/me/areas-entrega', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const data = await parseJsonOrThrow(res)
-      return normalizarListaAreasEntrega(data)
-    },
+    async ({ token }) =>
+      normalizarListaAreasEntrega(
+        requireGestorConfig(await listarAreasEntregaDelivery(token))
+      ),
     {
       enabled,
       staleTime: 1000 * 60,
@@ -60,16 +45,9 @@ export function useCriarAreaEntregaDelivery() {
 
   return useSecureTenantMutation<AreaEntregaDTO, CreateAreaEntregaInput>(
     async ({ token }, input) => {
-      const res = await fetchGestorApi('/api/delivery/empresas/me/areas-entrega', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(input),
-      })
-      const data = await parseJsonOrThrow(res)
-      const area = normalizarAreaEntregaResposta(data)
+      const area = normalizarAreaEntregaResposta(
+        requireGestorConfig(await criarAreaEntregaDelivery(token, input))
+      )
       if (!area) throw new Error('Resposta inválida ao criar área de entrega')
       return area
     },
@@ -89,19 +67,9 @@ export function useAtualizarAreaEntregaDelivery() {
     { id: string; input: UpdateAreaEntregaInput }
   >(
     async ({ token }, { id, input }) => {
-      const res = await fetchGestorApi(
-        `/api/delivery/empresas/me/areas-entrega/${encodeURIComponent(id)}`,
-        {
-          method: 'PATCH',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(input),
-        }
+      const area = normalizarAreaEntregaResposta(
+        requireGestorConfig(await patchAreaEntregaDelivery(token, id, input))
       )
-      const data = await parseJsonOrThrow(res)
-      const area = normalizarAreaEntregaResposta(data)
       if (!area) throw new Error('Resposta inválida ao atualizar área de entrega')
       return area
     },
@@ -124,23 +92,8 @@ export function useAtualizarAreasEntregaEmLote() {
     async ({ token }, patches) => {
       let ok = 0
       for (const patch of patches) {
-        const res = await fetchGestorApi(
-          `/api/delivery/empresas/me/areas-entrega/${encodeURIComponent(patch.id)}`,
-          {
-            method: 'PATCH',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(patch.input),
-          }
-        )
-        try {
-          await parseJsonOrThrow(res)
-          ok += 1
-        } catch {
-          // Continua as demais áreas; o Salvar reporta o parcial.
-        }
+        const res = await patchAreaEntregaDelivery(token, patch.id, patch.input)
+        if (res.ok) ok += 1
       }
       return { ok, total: patches.length }
     },
@@ -157,16 +110,7 @@ export function useExcluirAreaEntregaDelivery() {
 
   return useSecureTenantMutation<void, string>(
     async ({ token }, id) => {
-      const res = await fetchGestorApi(
-        `/api/delivery/empresas/me/areas-entrega/${encodeURIComponent(id)}`,
-        {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      )
-      if (!res.ok && res.status !== 204) {
-        await parseJsonOrThrow(res)
-      }
+      requireGestorConfig(await excluirAreaEntregaDelivery(token, id))
     },
     {
       onSuccess: async () => {

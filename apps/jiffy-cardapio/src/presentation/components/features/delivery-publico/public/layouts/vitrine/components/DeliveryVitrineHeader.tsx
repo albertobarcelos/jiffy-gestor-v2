@@ -58,7 +58,7 @@ export function DeliveryVitrineHeader({
         <button
           type="button"
           aria-label="Perfil"
-          className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/20 text-white backdrop-blur-sm @sm:right-4 @sm:top-4"
+          className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/20 text-white @sm:right-4 @sm:top-4"
         >
           <User className="h-5 w-5" aria-hidden />
         </button>
