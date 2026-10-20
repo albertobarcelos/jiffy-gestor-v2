@@ -3,6 +3,7 @@ import type {
   ProdutoSelecionado,
   StatusVenda,
 } from '@/src/domain/types/pedido'
+import type { AvisoNotificacaoWhatsApp } from '@/src/application/mappers/avisoNotificacaoWhatsAppEtapa'
 import type {
   DetalhesEntregaPedido,
   DetalhesPedidoMeta,
@@ -24,7 +25,7 @@ export interface VendaDetalheCarregadaDTO {
   pagamentos: PagamentoSelecionado[]
   fluxoPagamentoEntrega: FluxoPagamentoEntrega
   detalhesPedidoMeta: DetalhesPedidoMeta | null
-  avisoNotificacaoWhatsApp: string | null
+  avisoNotificacaoWhatsApp: AvisoNotificacaoWhatsApp | null
   resumoFiscal: ResumoFiscalVenda | null
   resumoFinanceiroDetalhes: ResumoFinanceiroDetalhes | null
   detalhesEntregaPedido: DetalhesEntregaPedido | null

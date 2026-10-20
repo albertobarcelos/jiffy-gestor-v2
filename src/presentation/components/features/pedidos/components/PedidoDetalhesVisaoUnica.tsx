@@ -16,6 +16,7 @@ import {
   totalCobrarNaEntregaPagamentos,
   rotuloOrigemExibicao,
 } from '@/src/application/mappers/PedidoDisplayMapper'
+import { AvisoNotificacaoWhatsAppPedido } from '@/src/presentation/components/features/pedidos/components/AvisoNotificacaoWhatsAppPedido'
 import { PedidoKanbanProgressoEntrega } from '@/src/presentation/components/features/delivery/kanban-panels/PedidoKanbanProgressoEntrega'
 import type { PedidoKanbanQuickViewData } from '@/src/presentation/components/features/delivery/kanban-panels/carregarPedidoKanbanQuickView'
 import { OrigemCanalMark } from '@/src/presentation/components/features/origem/OrigemCanalMark'
@@ -308,17 +309,7 @@ export function PedidoDetalhesVisaoUnica() {
             detalhesEntrega={detalhesEntregaPedido}
           />
         </div>
-        {avisoNotificacaoWhatsApp ? (
-          <p
-            className={`px-1 text-center text-[11px] leading-tight ${
-              avisoNotificacaoWhatsApp.includes('Notificação enviada com sucesso')
-                ? 'font-medium text-green-700'
-                : 'font-medium text-amber-700'
-            }`}
-          >
-            {avisoNotificacaoWhatsApp}
-          </p>
-        ) : null}
+        <AvisoNotificacaoWhatsAppPedido aviso={avisoNotificacaoWhatsApp} />
       </Cartao>
 
       {pedidoEntrega && enderecoLinhas.length > 0 && enderecoLinhas[0] !== '—' ? (

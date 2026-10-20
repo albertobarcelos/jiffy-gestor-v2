@@ -19,7 +19,7 @@ import { useVendaDetalheCarregadaQuery } from './useVendaDetalheCarregadaQuery'
 
 export interface AplicarVendaDetalheHandlers {
   setDetalhesPedidoMeta: (meta: DetalhesPedidoMeta | null) => void
-  setAvisoNotificacaoWhatsApp: (aviso: string | null) => void
+  setAvisoNotificacaoWhatsApp: (aviso: VendaDetalheCarregadaDTO['avisoNotificacaoWhatsApp']) => void
   setResumoFiscal: (resumo: ResumoFiscalVenda | null) => void
   setStatusFiscalDetalhe: (status: string | null) => void
   setOrigem: (origem: OrigemVenda) => void

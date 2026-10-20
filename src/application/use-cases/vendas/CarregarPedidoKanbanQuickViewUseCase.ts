@@ -22,7 +22,10 @@ import type {
   FluxoPagamentoEntrega,
   TabelaOrigemVenda,
 } from '@/src/domain/types/vendaDetalhe'
-import { avisoNotificacaoWhatsAppDaVenda } from '@/src/application/mappers/avisoNotificacaoWhatsAppEtapa'
+import {
+  avisoNotificacaoWhatsAppDaVenda,
+  type AvisoNotificacaoWhatsApp,
+} from '@/src/application/mappers/avisoNotificacaoWhatsAppEtapa'
 import { deveUsarModuloDeliveryParaDetalhe } from '@/src/application/mappers/PedidoDeliveryDetalheAdapter'
 import {
   textoFromObservacoesApi,
@@ -54,8 +57,8 @@ export interface PedidoKanbanQuickViewData {
   tipoPagamento: string
   linhasPagamento: string[]
   observacaoPedido: string | null
-  /** Frase do WhatsApp automático da etapa atual. Vazio enquanto o envio não termina. */
-  avisoNotificacaoWhatsApp: string | null
+  /** Resultado do WhatsApp automático da etapa atual. Vazio enquanto o envio não termina. */
+  avisoNotificacaoWhatsApp: AvisoNotificacaoWhatsApp | null
 }
 
 function calcularTotalAReceberPagamentos(pagamentos: PagamentoSelecionado[]): number {

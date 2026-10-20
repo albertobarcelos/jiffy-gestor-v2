@@ -21,15 +21,17 @@ const sequencia = [
 
 describe('avisoNotificacaoWhatsAppDaEtapaAtual', () => {
   it('mostra o sucesso da etapa atual', () => {
-    expect(avisoNotificacaoWhatsAppDaEtapaAtual(sequencia, 'EM_PREPARO')).toBe(
-      'WhatsApp: Notificação enviada com sucesso'
-    )
+    expect(avisoNotificacaoWhatsAppDaEtapaAtual(sequencia, 'EM_PREPARO')).toEqual({
+      resultado: 'sucesso',
+      texto: 'WhatsApp: Notificação enviada com sucesso',
+    })
   })
 
   it('mostra o motivo quando o envio falhou', () => {
-    expect(avisoNotificacaoWhatsAppDaEtapaAtual(sequencia, 'pronto')).toBe(
-      'Mensagem não entregue: Número inválido'
-    )
+    expect(avisoNotificacaoWhatsAppDaEtapaAtual(sequencia, 'pronto')).toEqual({
+      resultado: 'falha',
+      texto: 'Mensagem não entregue: Número inválido',
+    })
   })
 
   it('omite a linha enquanto não há resultado', () => {
@@ -66,7 +68,10 @@ describe('avisoNotificacaoWhatsAppDaEtapaAtual', () => {
         ],
         'PRONTO'
       )
-    ).toBe('WhatsApp: Notificação enviada com sucesso')
+    ).toEqual({
+      resultado: 'sucesso',
+      texto: 'WhatsApp: Notificação enviada com sucesso',
+    })
   })
 })
 
@@ -77,7 +82,10 @@ describe('avisoNotificacaoWhatsAppDaVenda', () => {
         sequenciaTransicoes: sequencia,
         statusEtapaOperacional: 'PRONTO',
       })
-    ).toBe('Mensagem não entregue: Número inválido')
+    ).toEqual({
+      resultado: 'falha',
+      texto: 'Mensagem não entregue: Número inválido',
+    })
   })
 
   it('usa os campos alternativos de status quando necessário', () => {
@@ -86,7 +94,10 @@ describe('avisoNotificacaoWhatsAppDaVenda', () => {
         sequenciaTransicoes: sequencia,
         statusDelivery: 'EM_PREPARO',
       })
-    ).toBe('WhatsApp: Notificação enviada com sucesso')
+    ).toEqual({
+      resultado: 'sucesso',
+      texto: 'WhatsApp: Notificação enviada com sucesso',
+    })
   })
 
   it('não exibe mensagem se não houver status ou resultado de transição', () => {

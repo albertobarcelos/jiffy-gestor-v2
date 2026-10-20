@@ -45,6 +45,7 @@ import type {
   UsuarioPdvEntregadorOption,
 } from '../types'
 import type { UnidadeMedidaProduto } from '@/src/shared/types/unidadeMedidaProduto'
+import type { AvisoNotificacaoWhatsApp } from '@/src/application/mappers/avisoNotificacaoWhatsAppEtapa'
 
 type EmpresaMe = ReturnType<typeof useEmpresaMe>['empresa']
 type StatusPagamentoExibicao = 'pendente' | 'parcial' | 'pago'
@@ -276,7 +277,7 @@ export interface NovoPedidoDetalheSlice {
   isLoadingVenda: boolean
   abaDetalhesPedido: AbaDetalhesPedido
   detalhesPedidoMeta: DetalhesPedidoMeta | null
-  avisoNotificacaoWhatsApp: string | null
+  avisoNotificacaoWhatsApp: AvisoNotificacaoWhatsApp | null
   detalhesEntregaPedido: DetalhesEntregaPedido | null
   resumoFinanceiroDetalhes: ResumoFinanceiroDetalhes | null
   resumoFiscal: ResumoFiscalVenda | null

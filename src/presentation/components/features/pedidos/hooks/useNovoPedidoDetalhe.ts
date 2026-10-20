@@ -8,11 +8,13 @@ import type {
   ResumoFinanceiroDetalhes,
   ResumoFiscalVenda,
 } from '../types'
+import type { AvisoNotificacaoWhatsApp } from '@/src/application/mappers/avisoNotificacaoWhatsAppEtapa'
 
 export function useNovoPedidoDetalhe() {
   const [abaDetalhesPedido, setAbaDetalhesPedido] = useState<AbaDetalhesPedido>('infoPedido')
   const [detalhesPedidoMeta, setDetalhesPedidoMeta] = useState<DetalhesPedidoMeta | null>(null)
-  const [avisoNotificacaoWhatsApp, setAvisoNotificacaoWhatsApp] = useState<string | null>(null)
+  const [avisoNotificacaoWhatsApp, setAvisoNotificacaoWhatsApp] =
+    useState<AvisoNotificacaoWhatsApp | null>(null)
   const [detalhesEntregaPedido, setDetalhesEntregaPedido] = useState<DetalhesEntregaPedido | null>(
     null
   )

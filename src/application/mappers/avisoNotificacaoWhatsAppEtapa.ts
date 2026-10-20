@@ -1,13 +1,18 @@
 const TEXTO_SUCESSO = 'Notificação enviada com sucesso'
 
+export type AvisoNotificacaoWhatsApp = {
+  resultado: 'sucesso' | 'falha'
+  texto: string
+}
+
 /**
- * Frase da notificação automática da etapa atual do pedido.
+ * Resultado da notificação automática da etapa atual do pedido.
  * Sem data e sem feedback, o envio ainda não terminou e a linha não aparece.
  */
 export function avisoNotificacaoWhatsAppDaEtapaAtual(
   sequencia: unknown,
   statusAtual: string | null | undefined
-): string | null {
+): AvisoNotificacaoWhatsApp | null {
   const status = String(statusAtual ?? '').trim().toUpperCase()
   if (!status || !Array.isArray(sequencia)) return null
 
@@ -27,15 +32,15 @@ export function avisoNotificacaoWhatsAppDaEtapaAtual(
       : ''
 
   if (enviada || feedback === TEXTO_SUCESSO) {
-    return `WhatsApp: ${TEXTO_SUCESSO}`
+    return { resultado: 'sucesso', texto: `WhatsApp: ${TEXTO_SUCESSO}` }
   }
-  if (feedback) return `Mensagem não entregue: ${feedback}`
+  if (feedback) return { resultado: 'falha', texto: `Mensagem não entregue: ${feedback}` }
   return null
 }
 
 export function avisoNotificacaoWhatsAppDaVenda(
   vendaData: Record<string, unknown>
-): string | null {
+): AvisoNotificacaoWhatsApp | null {
   const statusAtual = String(
     vendaData.statusEtapaOperacional ??
       vendaData.statusDelivery ??
