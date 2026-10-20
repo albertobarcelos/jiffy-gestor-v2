@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { Complemento } from '@/src/domain/entities/Complemento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { criarPersistirCadastroComplementoUseCase } from '@/src/presentation/hooks/complementos/criarPersistirCadastroComplementoUseCase'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { MdImageNotSupported, MdPhotoCamera, MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
@@ -516,19 +516,11 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
           if (decisao.tipo === 'aplicar') vinculosParaCopiar = decisao.vinculos
         }
 
-        const response = await fetchGestorApi(`/api/complementos/${complementoId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ valor: novoValor }),
+        await criarPersistirCadastroComplementoUseCase().atualizar({
+          token,
+          id: complementoId,
+          dados: { valor: novoValor },
         })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.message || 'Erro ao atualizar valor')
-        }
 
         showToast.success('Valor atualizado com sucesso!')
         if (vinculosParaCopiar.length > 0) {
@@ -590,19 +582,11 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
       setTogglingStatus(prev => ({ ...prev, [complementoId]: true }))
 
       try {
-        const response = await fetchGestorApi(`/api/complementos/${complementoId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ ativo: novoStatus }),
+        await criarPersistirCadastroComplementoUseCase().atualizar({
+          token,
+          id: complementoId,
+          dados: { ativo: novoStatus },
         })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.message || 'Erro ao atualizar complemento')
-        }
 
         showToast.success(
           novoStatus ? 'Complemento ativado com sucesso!' : 'Complemento desativado com sucesso!'
