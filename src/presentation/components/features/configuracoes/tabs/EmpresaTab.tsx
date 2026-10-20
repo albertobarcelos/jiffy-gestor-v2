@@ -409,26 +409,23 @@ export function EmpresaTab({ mostrarStatusFuso = false }: { mostrarStatusFuso?: 
         } catch (error) {
           console.error('Erro ao criar Cliente a partir dos dados da API:', error, 'Dados:', data)
           // Criar um Cliente vazio para evitar quebra da UI
+          const texto = (valor: unknown) => (typeof valor === 'string' ? valor : undefined)
           const empresaData = Cliente.create(
-            data.id || `temp-${Date.now()}`,
-            data.nome || data.razaoSocial || data.nomeFantasia || 'Empresa',
-            data.razaoSocial,
-            data.cpf,
-            data.cnpj,
-            data.telefone,
-            data.email,
-            data.nomeFantasia
+            texto(data.id) || `temp-${Date.now()}`,
+            texto(data.nome) || texto(data.razaoSocial) || texto(data.nomeFantasia) || 'Empresa',
+            texto(data.razaoSocial),
+            texto(data.cpf),
+            texto(data.cnpj),
+            texto(data.telefone),
+            texto(data.email),
+            texto(data.nomeFantasia)
           )
           setEmpresa(empresaData)
         }
 
         await refreshSavedLogoImpressao(token)
       } else {
-        console.error(
-          'Erro na resposta da API:',
-          response.status,
-          await response.text().catch(() => '')
-        )
+        console.error('Erro na resposta da API:', response.status, response.error)
       }
     } catch (error) {
       console.error('Erro ao carregar empresa:', error)

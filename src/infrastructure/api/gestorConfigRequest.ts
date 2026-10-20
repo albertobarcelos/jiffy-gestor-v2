@@ -3,7 +3,7 @@ import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
 
 export type GestorConfigResult<T> =
   | { ok: true; status: number; data: T }
-  | { ok: false; status: number; error: string }
+  | { ok: false; status: number; error: string; data?: unknown }
 
 export function requireGestorConfig<T>(res: GestorConfigResult<T>): T {
   if (!res.ok) {
@@ -37,6 +37,7 @@ export async function gestorConfigJson<T = unknown>(
       ok: false,
       status: res.status,
       error: textoErroCorpoApi(data) || `Erro ${res.status}`,
+      data,
     }
   }
   return { ok: true, status: res.status, data }
@@ -59,6 +60,7 @@ export async function gestorConfigDelete(
     ok: false,
     status: res.status,
     error: textoErroCorpoApi(data) || `Erro ${res.status}`,
+    data,
   }
 }
 

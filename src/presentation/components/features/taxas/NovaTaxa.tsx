@@ -280,11 +280,15 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
       const data = response.data
       const items = data.items || []
       for (const terminal of items) {
-        const id = String(terminal.id || terminal._id || '')
+        const id = String(terminal.id ?? terminal._id ?? '')
         if (!id) continue
+        const nome =
+          [terminal.nome, terminal.name, terminal.codigoInterno].find(
+            (valor): valor is string => typeof valor === 'string' && valor.trim().length > 0
+          ) ?? 'Terminal sem nome'
         acumulado.push({
           terminalId: id,
-          nome: terminal.nome || terminal.name || terminal.codigoInterno || 'Terminal sem nome',
+          nome,
         })
       }
 

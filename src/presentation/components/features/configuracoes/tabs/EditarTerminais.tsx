@@ -302,12 +302,10 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
         }
 
         const data = response.data
-        const newImpressoras = (data.items || []).map(
-          (i: { id: string; nome?: string | null }) => ({
-            id: i.id,
-            nome: i.nome || 'Sem nome',
-          })
-        )
+        const newImpressoras = (data.items || []).map(i => ({
+          id: String(i.id ?? ''),
+          nome: typeof i.nome === 'string' && i.nome.trim() ? i.nome : 'Sem nome',
+        }))
 
         allImpressoras.push(...newImpressoras)
 
@@ -343,7 +341,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
         throw new Error(response.error)
       }
 
-      const data = response.data as TerminalData
+      const data = response.data as unknown as TerminalData
 
       // Preenche campos do formulário
       setNomeTerminal(maiusculasPt(data.nome || ''))
@@ -381,7 +379,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
         throw new Error(response.error)
       }
 
-      const data = response.data as TerminalPreferences
+      const data = response.data as unknown as TerminalPreferences
 
       // Preenche preferências
       setCompartilhaValue(data.compartilharMesas || false)

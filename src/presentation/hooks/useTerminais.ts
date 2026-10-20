@@ -37,7 +37,7 @@ export function useTerminais(params: TerminaisQueryParams = {}) {
         throw new ApiError(response.error, response.status)
       }
 
-      return response.data.items || []
+      return (response.data.items || []) as Terminal[]
     },
     { staleTime: 1000 * 60 * 10 }
   )
