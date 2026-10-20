@@ -10,6 +10,12 @@ import {
   calcularDistanciaAproximadaDaLoja,
   pontoClienteParaDistancia,
 } from '../../../shared/utils/formatarDistanciaAproximadaDaLoja'
+import { usePwaInstallPrompt } from '../../../shared/hooks/usePwaInstallPrompt'
+import {
+  DeliveryPwaInstallAndroidGuide,
+  DeliveryPwaInstallBanner,
+  DeliveryPwaInstallIosGuide,
+} from '../../../shared/components/DeliveryPwaInstallBanner'
 import {
   DeliveryCheckoutShellFooter,
   DeliveryCheckoutShellHeader,
@@ -22,12 +28,14 @@ import type {
 } from '@/src/domain/services/pedido/etapasAcompanhamentoPedido'
 
 type DeliveryCheckoutSucessoModalProps = {
+  slug: string
   nomeCliente: string
   tipoEntrega: DeliveryTipoEntrega
   modoTempo: 'imediato' | 'agendado'
   enderecoCliente: EnderecoClienteDeliveryPublicoDTO | null
   enderecoEmpresaTexto: string | null
   localizacaoEmpresa?: GeoJsonPoint | null
+  nomeEmpresa?: string | null
   codigoVenda: string | null
   statusDelivery: StatusAcompanhamentoPedido
   transicoesStatus?: readonly TransicaoAcompanhamentoPedido[]
@@ -43,12 +51,14 @@ function primeiroNome(nome: string): string {
 }
 
 export function DeliveryCheckoutSucessoModal({
+  slug,
   nomeCliente,
   tipoEntrega,
   modoTempo,
   enderecoCliente,
   enderecoEmpresaTexto,
   localizacaoEmpresa = null,
+  nomeEmpresa = null,
   codigoVenda,
   statusDelivery,
   transicoesStatus = [],
@@ -59,6 +69,7 @@ export function DeliveryCheckoutSucessoModal({
   const isEntrega = tipoEntrega === 'entrega'
   const nomeCurto = primeiroNome(nomeCliente)
   const titulo = nomeCurto ? `Obrigado, ${nomeCurto}!` : 'Pedido enviado!'
+  const pwa = usePwaInstallPrompt({ slug, contexto: 'sucesso' })
 
   const orientacao = isEntrega
     ? 'Seu pedido será confirmado e iniciaremos o preparo, siga abaixo.'
@@ -185,8 +196,24 @@ export function DeliveryCheckoutSucessoModal({
               </div>
             </div>
           ) : null}
+
+          {pwa.visivel ? (
+            <DeliveryPwaInstallBanner
+              nomeLoja={nomeEmpresa}
+              variante="embutido"
+              onInstalar={() => void pwa.instalar()}
+              onAgoraNao={pwa.agoraNao}
+              onNaoMostrarDeNovo={pwa.naoMostrarDeNovo}
+            />
+          ) : null}
         </div>
       </div>
+
+      <DeliveryPwaInstallIosGuide open={pwa.guiaIosAberto} onClose={pwa.fecharGuiaIos} />
+      <DeliveryPwaInstallAndroidGuide
+        open={pwa.guiaAndroidAberto}
+        onClose={pwa.fecharGuiaAndroid}
+      />
 
       <DeliveryCheckoutShellFooter>
         <div className="flex w-full flex-col">

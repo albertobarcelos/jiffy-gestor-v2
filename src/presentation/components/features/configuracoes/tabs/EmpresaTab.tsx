@@ -2,7 +2,14 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import {
+  deleteLogoImpressao,
+  getEmpresaMe,
+  getLogoImpressao,
+  patchEmpresa,
+  postLogoImpressao,
+  validarCidadeIbge,
+} from '@/src/infrastructure/api/empresaConfigApi'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -146,10 +153,8 @@ function LogoImpressaoPreviewImage({ src, alt }: { src: string; alt: string }) {
 
 const LOGO_COLUNA_LARGURA_CLASS = 'w-full shrink-0 lg:w-[280px]'
 
-/**
- * Tab de Empresa - Edição de dados da empresa
- */
-export function EmpresaTab() {
+/** Tab de Empresa. `mostrarStatusFuso` só no passo Delivery (Empresa e endereço). */
+export function EmpresaTab({ mostrarStatusFuso = false }: { mostrarStatusFuso?: boolean }) {
   const [empresa, setEmpresa] = useState<Cliente | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
@@ -236,11 +241,8 @@ export function EmpresaTab() {
       return null
     })
     try {
-      const res = await fetchGestorApi('/api/empresas/me/logo-impressao', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (res.ok) {
-        const blob = await res.blob()
+      const blob = await getLogoImpressao(token)
+      if (blob) {
         setServerLogoObjectUrl(URL.createObjectURL(blob))
         setServerHasLogo(true)
       } else {
@@ -330,14 +332,10 @@ export function EmpresaTab() {
 
     setIsLoading(true)
     try {
-      const response = await fetchGestorApi('/api/empresas/me', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+      const response = await getEmpresaMe(token)
 
       if (response.ok) {
-        const data = await response.json()
+        const data = response.data
 
         // Debug: log da resposta da API
         if (process.env.NODE_ENV === 'development') {
@@ -411,26 +409,23 @@ export function EmpresaTab() {
         } catch (error) {
           console.error('Erro ao criar Cliente a partir dos dados da API:', error, 'Dados:', data)
           // Criar um Cliente vazio para evitar quebra da UI
+          const texto = (valor: unknown) => (typeof valor === 'string' ? valor : undefined)
           const empresaData = Cliente.create(
-            data.id || `temp-${Date.now()}`,
-            data.nome || data.razaoSocial || data.nomeFantasia || 'Empresa',
-            data.razaoSocial,
-            data.cpf,
-            data.cnpj,
-            data.telefone,
-            data.email,
-            data.nomeFantasia
+            texto(data.id) || `temp-${Date.now()}`,
+            texto(data.nome) || texto(data.razaoSocial) || texto(data.nomeFantasia) || 'Empresa',
+            texto(data.razaoSocial),
+            texto(data.cpf),
+            texto(data.cnpj),
+            texto(data.telefone),
+            texto(data.email),
+            texto(data.nomeFantasia)
           )
           setEmpresa(empresaData)
         }
 
         await refreshSavedLogoImpressao(token)
       } else {
-        console.error(
-          'Erro na resposta da API:',
-          response.status,
-          await response.text().catch(() => '')
-        )
+        console.error('Erro na resposta da API:', response.status, response.error)
       }
     } catch (error) {
       console.error('Erro ao carregar empresa:', error)
@@ -485,25 +480,12 @@ export function EmpresaTab() {
     }
 
     try {
-      const body = new FormData()
-      body.append('file', file)
-      const response = await fetchGestorApi('/api/empresas/me/logo-impressao', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body,
-      })
-      const responseData = await response.json().catch(() => ({}))
+      const response = await postLogoImpressao(token, file)
 
       if (response.ok) {
         return { ok: true }
       }
-      const msg =
-        (typeof responseData.error === 'string' && responseData.error) ||
-        (typeof responseData.message === 'string' && responseData.message) ||
-        `Erro ${response.status}`
-      return { ok: false, message: msg }
+      return { ok: false, message: response.error }
     } catch (error) {
       console.error('Erro ao enviar logo de impressão:', error)
       return { ok: false, message: 'Falha ao enviar a logo.' }
@@ -512,21 +494,11 @@ export function EmpresaTab() {
 
   const deleteLogoImpressaoFromApi = async (token: string): Promise<UploadLogoResult> => {
     try {
-      const response = await fetchGestorApi('/api/empresas/me/logo-impressao', {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-      if (response.ok || response.status === 204 || response.status === 404) {
+      const response = await deleteLogoImpressao(token)
+      if (response.ok || response.status === 404) {
         return { ok: true }
       }
-      const responseData = await response.json().catch(() => ({}))
-      const msg =
-        (typeof responseData.error === 'string' && responseData.error) ||
-        (typeof responseData.message === 'string' && responseData.message) ||
-        `Erro ${response.status}`
-      return { ok: false, message: msg }
+      return { ok: false, message: response.error }
     } catch (error) {
       console.error('Erro ao remover logo de impressão:', error)
       return { ok: false, message: 'Falha ao remover a logo.' }
@@ -660,33 +632,29 @@ export function EmpresaTab() {
             setCidade(ultimaCidadeBuscada.current)
           }
         } else {
-          // Se não tem código IBGE, validar via API
-          // Usar o nome da cidade do formulário, mas se tivermos ultimaCidadeBuscada, usar ela
           const nomeCidadeParaValidar = ultimaCidadeBuscada.current || cidade.trim()
-
           try {
-            const response = await fetchGestorApi(
-              `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(nomeCidadeParaValidar)}&uf=${estado}`
-            )
-            if (response.ok) {
-              const data = await response.json()
-              if (!data.valido) {
-                showToast.error(
-                  `Cidade "${nomeCidadeParaValidar}" não encontrada no estado ${estado}. Por favor, selecione uma cidade válida.`
-                )
-                return
-              }
-              if (!codigoCidadeIbge) {
-                await buscarCodigoIbge(nomeCidadeParaValidar, estado)
-              }
-              if (nomeCidadeParaValidar !== cidade.trim()) {
-                setCidade(nomeCidadeParaValidar)
-              }
+            const response = await validarCidadeIbge(nomeCidadeParaValidar, estado)
+            if (!response.ok) {
+              throw new Error(response.error)
+            }
+            if (!response.data.valido) {
+              showToast.error(
+                `Cidade "${nomeCidadeParaValidar}" não encontrada no estado ${estado}. Por favor, selecione uma cidade válida.`
+              )
+              return
+            }
+            if (response.data.codigoCidadeIbge) {
+              setCodigoCidadeIbge(String(response.data.codigoCidadeIbge))
+              ultimaCidadeBuscada.current = nomeCidadeParaValidar
+            } else {
+              await buscarCodigoIbge(nomeCidadeParaValidar, estado)
+            }
+            if (nomeCidadeParaValidar !== cidade.trim()) {
+              setCidade(nomeCidadeParaValidar)
             }
           } catch (error) {
             console.error('Erro ao validar cidade:', error)
-            // Continuar mesmo se a validação falhar (pode ser problema de rede)
-            // Tentar buscar código IBGE mesmo assim
             if (!codigoCidadeIbge) {
               await buscarCodigoIbge(nomeCidadeParaValidar, estado)
             }
@@ -783,21 +751,11 @@ export function EmpresaTab() {
 
         console.log('Enviando dados:', body)
 
-        const response = await fetchGestorApi(`/api/empresas/${empresa.getId()}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(body),
-        })
-
-        const responseData = await response.json().catch(() => ({}))
+        const response = await patchEmpresa(token, empresa.getId(), body)
 
         if (!response.ok) {
-          console.error('Erro na resposta:', response.status, responseData)
-          const errorMessage = responseData.error || responseData.message || 'Erro desconhecido'
-          showToast.error(`Erro ao atualizar empresa: ${errorMessage}`)
+          console.error('Erro na resposta:', response.status, response.error)
+          showToast.error(`Erro ao atualizar empresa: ${response.error}`)
           return
         }
 
@@ -1285,29 +1243,42 @@ export function EmpresaTab() {
                     }
                   }}
                 />
-                <Input
-                  select
-                  label="Fuso horário (IANA)"
-                  value={timezone}
-                  onChange={e => setTimezone(e.target.value)}
-                  disabled={!isEditing}
-                  size="small"
-                  sx={sxEntradaEmpresa}
-                  InputLabelProps={{ shrink: true }}
-                  SelectProps={{ displayEmpty: true }}
-                >
-                  <MenuItem value="">
-                    <em>Selecione o fuso</em>
-                  </MenuItem>
-                  {timezone && !FUSOS_IANA_BRASIL.some(f => f.id === timezone) && (
-                    <MenuItem value={timezone}>{timezone} (registrado na API)</MenuItem>
-                  )}
-                  {FUSOS_IANA_BRASIL.map(f => (
-                    <MenuItem key={f.id} value={f.id}>
-                      {f.label}
+                <div>
+                  <Input
+                    select
+                    label="Fuso horário (IANA)"
+                    value={timezone}
+                    onChange={e => setTimezone(e.target.value)}
+                    disabled={!isEditing}
+                    size="small"
+                    sx={sxEntradaEmpresa}
+                    InputLabelProps={{ shrink: true }}
+                    SelectProps={{ displayEmpty: true }}
+                  >
+                    <MenuItem value="">
+                      <em>Selecione o fuso</em>
                     </MenuItem>
-                  ))}
-                </Input>
+                    {timezone && !FUSOS_IANA_BRASIL.some(f => f.id === timezone) && (
+                      <MenuItem value={timezone}>{timezone} (registrado na API)</MenuItem>
+                    )}
+                    {FUSOS_IANA_BRASIL.map(f => (
+                      <MenuItem key={f.id} value={f.id}>
+                        {f.label}
+                      </MenuItem>
+                    ))}
+                  </Input>
+                  {mostrarStatusFuso ? (
+                    <div className="mt-1 flex items-center justify-end gap-2">
+                      <p
+                        className={
+                          timezone.trim() ? 'text-sm text-green-500' : 'text-sm text-amber-600'
+                        }
+                      >
+                        {timezone.trim() ? 'Concluído' : 'Pendente'}
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </div>
           </div>

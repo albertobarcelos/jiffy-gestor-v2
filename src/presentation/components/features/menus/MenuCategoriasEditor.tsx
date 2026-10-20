@@ -23,6 +23,7 @@ import { showToast } from '@/src/shared/utils/toast'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
+import { categoriaAtivaNoSnapshot } from '@/src/domain/policies/menu/categoriaStatusNoMenu'
 import { coletarGruposMenuPorSnapshot } from './ordenarGruposMenuSnapshot'
 import { MenuCardapioChrome } from './MenuCardapioChrome'
 import { MenuCardapioAcoes } from './MenuCardapioAcoes'
@@ -296,6 +297,7 @@ export function MenuCategoriasEditor({ menuId }: MenuCategoriasEditorProps) {
                     variant="menu"
                     id={grupoId}
                     nome={grupo.nome || grupo.grupoBase.nome}
+                    nomeInativo={!categoriaAtivaNoSnapshot(grupo)}
                     valor={0}
                     ativo
                     imagemUrl={imagemUrlMenuGrupo(grupo)}

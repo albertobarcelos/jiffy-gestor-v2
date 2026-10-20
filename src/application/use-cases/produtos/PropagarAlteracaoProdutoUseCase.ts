@@ -1,5 +1,5 @@
 import { Produto } from '@/src/domain/entities/Produto'
-import { fetchBffJson, fetchBffVoid } from '@/src/infrastructure/api/bffClient'
+import { fetchBffDelete, fetchBffJson, fetchBffVoid } from '@/src/infrastructure/api/bffClient'
 import type { UpdateMenuProdutoInput } from '@/src/shared/types/menus'
 import type {
   MenuAlvoPropagacao,
@@ -47,10 +47,19 @@ function patchMenuProduto(snapshot: SnapshotProdutoPropagavel): UpdateMenuProdut
 function patchCadastroBase(snapshot: SnapshotProdutoPropagavel): Record<string, unknown> {
   const out: Record<string, unknown> = { ...camposCompartilhados(snapshot) }
   if (snapshot.grupoProdutoId) out.grupoId = snapshot.grupoProdutoId
-  if (snapshot.gruposComplementosIds !== undefined) {
+  if (snapshot.gruposComplementosIds && snapshot.gruposComplementosIds.length > 0) {
     out.gruposComplementosIds = snapshot.gruposComplementosIds
   }
   return out
+}
+
+function payloadProduto(data: unknown): Record<string, unknown> {
+  if (!data || typeof data !== 'object') return {}
+  const rec = data as { data?: unknown }
+  if (rec.data && typeof rec.data === 'object' && !Array.isArray(rec.data)) {
+    return rec.data as Record<string, unknown>
+  }
+  return rec as Record<string, unknown>
 }
 
 export class PropagarAlteracaoProdutoUseCase {
@@ -77,13 +86,16 @@ export class PropagarAlteracaoProdutoUseCase {
     const compartilhado = camposCompartilhados(params.snapshot)
     const menuPatch = patchMenuProduto(params.snapshot)
     const basePatch = patchCadastroBase(params.snapshot)
+    const limparGruposCadastro =
+      aplicarNoCadastroBase && params.snapshot.gruposComplementosIds?.length === 0
 
     if (
       Object.keys(compartilhado).length === 0 &&
       !params.snapshot.grupoProdutoId &&
       params.snapshot.gruposComplementosIds === undefined &&
       params.snapshot.valorPromocional === undefined &&
-      params.snapshot.promocaoAtiva === undefined
+      params.snapshot.promocaoAtiva === undefined &&
+      !limparGruposCadastro
     ) {
       return
     }
@@ -93,6 +105,10 @@ export class PropagarAlteracaoProdutoUseCase {
         method: 'PATCH',
         body: JSON.stringify(basePatch),
       })
+    }
+
+    if (limparGruposCadastro) {
+      await limparGruposComplementosDoCadastro(produtoId, token)
     }
 
     if (Object.keys(menuPatch).length === 0) return
@@ -115,6 +131,22 @@ export class PropagarAlteracaoProdutoUseCase {
         }
       )
     }
+  }
+}
+
+/** A API ignora PATCH com `gruposComplementosIds: []`. Remove cada vínculo do cadastro. */
+async function limparGruposComplementosDoCadastro(produtoId: string, token: string): Promise<void> {
+  const data = await fetchBffJson<unknown>(
+    `/api/produtos/${encodeURIComponent(produtoId)}`,
+    token
+  )
+  const produto = Produto.fromJSON(payloadProduto(data))
+  const ids = produto.getGruposComplementos().map(grupo => grupo.id).filter(Boolean)
+  for (const grupoId of ids) {
+    await fetchBffDelete(
+      `/api/produtos/${encodeURIComponent(produtoId)}/grupos-complementos/${encodeURIComponent(grupoId)}`,
+      token
+    )
   }
 }
 

@@ -85,7 +85,7 @@ export function DeliveryPublicoPedidoConfirmadoScreen({
   if (status === 'loading') {
     return (
       <DeliveryThemeScope slug={slug}>
-        <div className="flex h-full items-center justify-center">
+        <div className="flex min-h-full items-center justify-center">
           <div
             className="h-12 w-12 animate-spin rounded-full border-b-2"
             style={{ borderColor: 'var(--delivery-primary, #333)' }}
@@ -105,7 +105,7 @@ export function DeliveryPublicoPedidoConfirmadoScreen({
 
     return (
       <DeliveryThemeScope slug={slug}>
-        <div className="mx-auto flex h-full w-full max-w-md flex-col items-center justify-center gap-4 px-4 text-center">
+        <div className="mx-auto flex min-h-full w-full max-w-md flex-col items-center justify-center gap-4 px-4 text-center">
           <h1 className="delivery-font-title text-xl font-semibold delivery-text-primary">
             {titulo}
           </h1>
@@ -120,57 +120,61 @@ export function DeliveryPublicoPedidoConfirmadoScreen({
 
   return (
     <DeliveryThemeScope slug={slug} nomeExibicaoFallback={pedido.nomeEmpresa ?? ''}>
-      <DeliveryCheckoutShell
-        open
-        presentation="page"
-        stepKey={view}
-        direction={direction}
-        onClose={view === 'pedidoDetalhe' ? voltarSucesso : irParaCardapio}
-      >
-        {view === 'sucesso' ? (
-          <DeliveryCheckoutSucessoModal
-            nomeCliente={pedido.nome}
-            tipoEntrega={pedido.tipoEntrega}
-            modoTempo="imediato"
-            enderecoCliente={pedido.enderecoCliente}
-            enderecoEmpresaTexto={pedido.enderecoEmpresaTexto}
-            localizacaoEmpresa={pedido.localizacaoEmpresa}
-            codigoVenda={pedido.codigoVenda}
-            statusDelivery={pedido.statusDelivery}
-            transicoesStatus={pedido.transicoesStatus}
-            canalWhatsAppAtivo={catalogQuery.data?.pages[0]?.canalWhatsApp?.conectado === true}
-            onVerPedido={irParaDetalhe}
-            onVoltarAoCardapio={irParaCardapio}
-          />
-        ) : (
-          <DeliveryCheckoutRevisaoModal
-            modo="somenteLeitura"
-            tipoEntrega={pedido.tipoEntrega}
-            nome={pedido.nome}
-            telefone={pedido.telefone}
-            telefonePaisIso2={DELIVERY_PAIS_TELEFONE_PADRAO}
-            enderecoCliente={pedido.enderecoCliente}
-            enderecoEmpresaTexto={pedido.enderecoEmpresaTexto}
-            localizacaoEmpresa={pedido.localizacaoEmpresa}
-            itens={pedido.itens}
-            total={pedido.total}
-            subtotalOficial={pedido.subtotal}
-            taxaEntregaOficial={pedido.taxaEntrega}
-            totalOficial={pedido.total}
-            trocoOficial={pedido.troco}
-            pagamentos={pedido.pagamentos}
-            observacaoPedido={pedido.observacaoPedido}
-            cpfNotaFiscal={pedido.cpfNotaFiscal}
-            codigoVenda={pedido.codigoVenda}
-            onVoltar={voltarSucesso}
-          />
-        )}
-      </DeliveryCheckoutShell>
+      <div className="min-h-full">
+        <DeliveryCheckoutShell
+          open
+          presentation="page"
+          stepKey={view}
+          direction={direction}
+          onClose={view === 'pedidoDetalhe' ? voltarSucesso : irParaCardapio}
+        >
+          {view === 'sucesso' ? (
+            <DeliveryCheckoutSucessoModal
+              slug={slug}
+              nomeCliente={pedido.nome}
+              tipoEntrega={pedido.tipoEntrega}
+              modoTempo="imediato"
+              enderecoCliente={pedido.enderecoCliente}
+              enderecoEmpresaTexto={pedido.enderecoEmpresaTexto}
+              localizacaoEmpresa={pedido.localizacaoEmpresa}
+              nomeEmpresa={pedido.nomeEmpresa}
+              codigoVenda={pedido.codigoVenda}
+              statusDelivery={pedido.statusDelivery}
+              transicoesStatus={pedido.transicoesStatus}
+              canalWhatsAppAtivo={catalogQuery.data?.pages[0]?.canalWhatsApp?.conectado === true}
+              onVerPedido={irParaDetalhe}
+              onVoltarAoCardapio={irParaCardapio}
+            />
+          ) : (
+            <DeliveryCheckoutRevisaoModal
+              modo="somenteLeitura"
+              tipoEntrega={pedido.tipoEntrega}
+              nome={pedido.nome}
+              telefone={pedido.telefone}
+              telefonePaisIso2={DELIVERY_PAIS_TELEFONE_PADRAO}
+              enderecoCliente={pedido.enderecoCliente}
+              enderecoEmpresaTexto={pedido.enderecoEmpresaTexto}
+              localizacaoEmpresa={pedido.localizacaoEmpresa}
+              itens={pedido.itens}
+              total={pedido.total}
+              subtotalOficial={pedido.subtotal}
+              taxaEntregaOficial={pedido.taxaEntrega}
+              totalOficial={pedido.total}
+              trocoOficial={pedido.troco}
+              pagamentos={pedido.pagamentos}
+              observacaoPedido={pedido.observacaoPedido}
+              cpfNotaFiscal={pedido.cpfNotaFiscal}
+              codigoVenda={pedido.codigoVenda}
+              onVoltar={voltarSucesso}
+            />
+          )}
+        </DeliveryCheckoutShell>
+      </div>
       <DeliveryWhatsAppFab
         telefone={telefoneWhatsApp}
         nomeLoja={pedido.nomeEmpresa}
         visible={view === 'sucesso'}
-        bottomOffset="8rem"
+        acimaDoFooter
       />
     </DeliveryThemeScope>
   )

@@ -184,42 +184,46 @@ export function DesignCategoriasTab({
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[240px] items-center justify-center">
-        <JiffyLoading />
+      <div className="space-y-5">
+        <div className="flex min-h-[240px] items-center justify-center">
+          <JiffyLoading />
+        </div>
       </div>
     )
   }
 
   if (!hasMenu) {
     return (
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-        <p className="font-semibold">Cardápio do delivery não configurado</p>
-        <p className="mt-1 text-xs">
-          Em Delivery, escolha o cardápio publicado. As categorias desta tela vêm desse
-          menu.
-        </p>
-        <Link
-          href="/config/delivery"
-          className="mt-3 inline-flex text-sm font-semibold text-primary underline-offset-2 hover:underline"
-        >
-          Ir para Delivery
-        </Link>
+      <div className="space-y-5">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-semibold">Cardápio do delivery não configurado</p>
+          <p className="mt-1 text-xs">
+            Em Delivery, escolha o cardápio publicado. As categorias desta tela vêm desse
+            menu.
+          </p>
+          <Link
+            href="/config/delivery/design?secao=nome-cardapio"
+            className="mt-3 inline-flex text-sm font-semibold text-primary underline-offset-2 hover:underline"
+          >
+            Configurar nome e cardápio
+          </Link>
+        </div>
       </div>
     )
   }
 
   if (isError) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-        Não foi possível carregar os grupos do cardápio publicado. Tente recarregar a página.
+      <div className="space-y-5">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          Não foi possível carregar os grupos do cardápio publicado. Tente recarregar a página.
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-2">
-      <h3 className="text-base font-semibold text-primary">Categorias</h3>
-
+    <div className="space-y-5">
       <div className="space-y-2 rounded-xl border border-gray-200 bg-white p-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-1 items-start gap-2">
