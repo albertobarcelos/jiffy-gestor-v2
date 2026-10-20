@@ -29,6 +29,7 @@ import {
   completarNomesAtoresPedidoDelivery,
 } from '@/src/application/mappers/atorPedidoDelivery'
 import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
+import { avisoNotificacaoWhatsAppDaVenda } from '@/src/application/mappers/avisoNotificacaoWhatsAppEtapa'
 import type { IVendaDetalheReadRepository } from '@/src/domain/repositories/IVendaDetalheReadRepository'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
 import type {
@@ -671,6 +672,7 @@ export class CarregarVendaDetalheUseCase {
       pagamentos,
       fluxoPagamentoEntrega,
       detalhesPedidoMeta,
+      avisoNotificacaoWhatsApp: avisoNotificacaoWhatsAppDaVenda(vendaData),
       resumoFiscal,
       resumoFinanceiroDetalhes,
       detalhesEntregaPedido,

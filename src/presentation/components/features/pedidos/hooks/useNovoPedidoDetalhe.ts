@@ -12,6 +12,7 @@ import type {
 export function useNovoPedidoDetalhe() {
   const [abaDetalhesPedido, setAbaDetalhesPedido] = useState<AbaDetalhesPedido>('infoPedido')
   const [detalhesPedidoMeta, setDetalhesPedidoMeta] = useState<DetalhesPedidoMeta | null>(null)
+  const [avisoNotificacaoWhatsApp, setAvisoNotificacaoWhatsApp] = useState<string | null>(null)
   const [detalhesEntregaPedido, setDetalhesEntregaPedido] = useState<DetalhesEntregaPedido | null>(
     null
   )
@@ -28,6 +29,8 @@ export function useNovoPedidoDetalhe() {
     setAbaDetalhesPedido,
     detalhesPedidoMeta,
     setDetalhesPedidoMeta,
+    avisoNotificacaoWhatsApp,
+    setAvisoNotificacaoWhatsApp,
     detalhesEntregaPedido,
     setDetalhesEntregaPedido,
     nomesUsuariosPedido,

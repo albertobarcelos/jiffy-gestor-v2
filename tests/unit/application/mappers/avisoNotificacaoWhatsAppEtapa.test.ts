@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { avisoNotificacaoWhatsAppDaEtapaAtual } from '@/src/application/mappers/avisoNotificacaoWhatsAppEtapa'
+import {
+  avisoNotificacaoWhatsAppDaEtapaAtual,
+  avisoNotificacaoWhatsAppDaVenda,
+} from '@/src/application/mappers/avisoNotificacaoWhatsAppEtapa'
 
 const sequencia = [
   {
@@ -64,5 +67,29 @@ describe('avisoNotificacaoWhatsAppDaEtapaAtual', () => {
         'PRONTO'
       )
     ).toBe('WhatsApp: Notificação enviada com sucesso')
+  })
+})
+
+describe('avisoNotificacaoWhatsAppDaVenda', () => {
+  it('resolve a mensagem com o status operacional atual da venda', () => {
+    expect(
+      avisoNotificacaoWhatsAppDaVenda({
+        sequenciaTransicoes: sequencia,
+        statusEtapaOperacional: 'PRONTO',
+      })
+    ).toBe('Mensagem não entregue: Número inválido')
+  })
+
+  it('usa os campos alternativos de status quando necessário', () => {
+    expect(
+      avisoNotificacaoWhatsAppDaVenda({
+        sequenciaTransicoes: sequencia,
+        statusDelivery: 'EM_PREPARO',
+      })
+    ).toBe('WhatsApp: Notificação enviada com sucesso')
+  })
+
+  it('não exibe mensagem se não houver status ou resultado de transição', () => {
+    expect(avisoNotificacaoWhatsAppDaVenda({ sequenciaTransicoes: sequencia })).toBeNull()
   })
 })

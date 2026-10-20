@@ -99,6 +99,7 @@ export function createNovoPedidoResetForm({
     form.setResumoFiscal(null)
     form.setStatusFiscalDetalhe(null)
     form.setDetalhesPedidoMeta(null)
+    form.setAvisoNotificacaoWhatsApp(null)
     form.setDetalhesEntregaPedido(null)
     form.setNomesUsuariosPedido({})
     form.setNomesMeiosPagamentoPedido({})

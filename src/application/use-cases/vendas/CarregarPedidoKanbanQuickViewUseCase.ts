@@ -22,7 +22,7 @@ import type {
   FluxoPagamentoEntrega,
   TabelaOrigemVenda,
 } from '@/src/domain/types/vendaDetalhe'
-import { avisoNotificacaoWhatsAppDaEtapaAtual } from '@/src/application/mappers/avisoNotificacaoWhatsAppEtapa'
+import { avisoNotificacaoWhatsAppDaVenda } from '@/src/application/mappers/avisoNotificacaoWhatsAppEtapa'
 import { deveUsarModuloDeliveryParaDetalhe } from '@/src/application/mappers/PedidoDeliveryDetalheAdapter'
 import {
   textoFromObservacoesApi,
@@ -327,13 +327,7 @@ export class CarregarPedidoKanbanQuickViewUseCase {
       transformarParaReal
     ).map(linha => linha.texto)
 
-    const statusEtapa = String(
-      vendaData.statusEtapaOperacional ?? vendaData.statusDelivery ?? vendaData.statusOperacional ?? ''
-    ).trim()
-    const avisoNotificacaoWhatsApp = avisoNotificacaoWhatsAppDaEtapaAtual(
-      vendaData.sequenciaTransicoes,
-      statusEtapa
-    )
+    const avisoNotificacaoWhatsApp = avisoNotificacaoWhatsAppDaVenda(vendaData)
 
     const observacaoPedidoResolvida = (() => {
       const fromApi = resolverObservacaoPedidoQuickView(vendaData, detalhesEntrega)

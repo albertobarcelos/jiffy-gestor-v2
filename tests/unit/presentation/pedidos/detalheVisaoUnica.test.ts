@@ -29,6 +29,7 @@ function dtoDetalhe(
       statusEtapaOperacional: 'EM_PREPARO',
       tipoVenda: 'delivery',
     },
+    avisoNotificacaoWhatsApp: null,
     resumoFiscal: null,
     resumoFinanceiroDetalhes: null,
     detalhesEntregaPedido: {},

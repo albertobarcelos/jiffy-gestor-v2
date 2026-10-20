@@ -16,6 +16,7 @@ function dtoBase(
     pagamentos: [],
     fluxoPagamentoEntrega: 'ja_pago',
     detalhesPedidoMeta: null,
+    avisoNotificacaoWhatsApp: null,
     resumoFiscal: {
       status: 'PENDENTE',
       retornoSefaz: null,

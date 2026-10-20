@@ -84,7 +84,11 @@ function BotaoWhatsappNumero({
 }
 
 export function PedidoDetalhesVisaoUnica() {
-  const { detalhesPedidoMeta, detalhesEntregaPedido } = useNovoPedidoDetalheContext()
+  const {
+    avisoNotificacaoWhatsApp,
+    detalhesPedidoMeta,
+    detalhesEntregaPedido,
+  } = useNovoPedidoDetalheContext()
   const {
     clienteNome,
     origem,
@@ -304,6 +308,17 @@ export function PedidoDetalhesVisaoUnica() {
             detalhesEntrega={detalhesEntregaPedido}
           />
         </div>
+        {avisoNotificacaoWhatsApp ? (
+          <p
+            className={`px-1 text-center text-[11px] leading-tight ${
+              avisoNotificacaoWhatsApp.includes('Notificação enviada com sucesso')
+                ? 'font-medium text-green-700'
+                : 'font-medium text-amber-700'
+            }`}
+          >
+            {avisoNotificacaoWhatsApp}
+          </p>
+        ) : null}
       </Cartao>
 
       {pedidoEntrega && enderecoLinhas.length > 0 && enderecoLinhas[0] !== '—' ? (

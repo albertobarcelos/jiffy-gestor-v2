@@ -276,6 +276,7 @@ export interface NovoPedidoDetalheSlice {
   isLoadingVenda: boolean
   abaDetalhesPedido: AbaDetalhesPedido
   detalhesPedidoMeta: DetalhesPedidoMeta | null
+  avisoNotificacaoWhatsApp: string | null
   detalhesEntregaPedido: DetalhesEntregaPedido | null
   resumoFinanceiroDetalhes: ResumoFinanceiroDetalhes | null
   resumoFiscal: ResumoFiscalVenda | null

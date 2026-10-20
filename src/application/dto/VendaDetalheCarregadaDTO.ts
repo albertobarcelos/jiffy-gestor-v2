@@ -24,6 +24,7 @@ export interface VendaDetalheCarregadaDTO {
   pagamentos: PagamentoSelecionado[]
   fluxoPagamentoEntrega: FluxoPagamentoEntrega
   detalhesPedidoMeta: DetalhesPedidoMeta | null
+  avisoNotificacaoWhatsApp: string | null
   resumoFiscal: ResumoFiscalVenda | null
   resumoFinanceiroDetalhes: ResumoFinanceiroDetalhes | null
   detalhesEntregaPedido: DetalhesEntregaPedido | null

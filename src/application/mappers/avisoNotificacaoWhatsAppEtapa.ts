@@ -32,3 +32,16 @@ export function avisoNotificacaoWhatsAppDaEtapaAtual(
   if (feedback) return `Mensagem não entregue: ${feedback}`
   return null
 }
+
+export function avisoNotificacaoWhatsAppDaVenda(
+  vendaData: Record<string, unknown>
+): string | null {
+  const statusAtual = String(
+    vendaData.statusEtapaOperacional ??
+      vendaData.statusDelivery ??
+      vendaData.statusOperacional ??
+      ''
+  ).trim()
+
+  return avisoNotificacaoWhatsAppDaEtapaAtual(vendaData.sequenciaTransicoes, statusAtual)
+}

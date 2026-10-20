@@ -19,6 +19,7 @@ import { useVendaDetalheCarregadaQuery } from './useVendaDetalheCarregadaQuery'
 
 export interface AplicarVendaDetalheHandlers {
   setDetalhesPedidoMeta: (meta: DetalhesPedidoMeta | null) => void
+  setAvisoNotificacaoWhatsApp: (aviso: string | null) => void
   setResumoFiscal: (resumo: ResumoFiscalVenda | null) => void
   setStatusFiscalDetalhe: (status: string | null) => void
   setOrigem: (origem: OrigemVenda) => void
@@ -47,6 +48,7 @@ export function aplicarVendaDetalheCarregada(
   handlers: AplicarVendaDetalheHandlers
 ): void {
   handlers.setDetalhesPedidoMeta(dto.detalhesPedidoMeta)
+  handlers.setAvisoNotificacaoWhatsApp(dto.avisoNotificacaoWhatsApp)
   handlers.setResumoFiscal(dto.resumoFiscal)
   handlers.setStatusFiscalDetalhe(dto.statusFiscal)
 
