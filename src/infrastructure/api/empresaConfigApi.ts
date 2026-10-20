@@ -38,10 +38,26 @@ export function deleteLogoImpressao(token: string): Promise<GestorConfigResult<u
   return gestorConfigDelete('/api/empresas/me/logo-impressao', token)
 }
 
+export type ValidarCidadeIbgeData = {
+  valido?: boolean
+  codigoCidadeIbge?: string | null
+}
+
 export function validarCidadeIbge(
   cidade: string,
   uf: string
-): Promise<GestorConfigResult<{ valido?: boolean }>> {
+): Promise<GestorConfigResult<ValidarCidadeIbgeData>> {
   const qs = new URLSearchParams({ cidade, uf })
   return gestorConfigJson(`/api/v1/ibge/validar-cidade?${qs.toString()}`)
+}
+
+export async function consultarCodigoCidadeIbge(
+  nomeCidade: string,
+  uf: string
+): Promise<string | null> {
+  const res = await validarCidadeIbge(nomeCidade, uf)
+  if (!res.ok || !res.data.valido || !res.data.codigoCidadeIbge) {
+    return null
+  }
+  return String(res.data.codigoCidadeIbge)
 }

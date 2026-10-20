@@ -8,12 +8,12 @@ export type ListaPaginada<T> = {
 
 export function listarTerminaisPagina(
   token: string,
-  params: { limit: number; offset: number; q?: string }
+  params: { limit?: number; offset: number; q?: string }
 ): Promise<GestorConfigResult<ListaPaginada<Record<string, unknown>>>> {
   const qs = new URLSearchParams({
-    limit: String(params.limit),
     offset: String(params.offset),
   })
+  if (params.limit != null) qs.set('limit', String(params.limit))
   if (params.q) qs.set('q', params.q)
   return gestorConfigJson(`/api/terminais?${qs.toString()}`, token)
 }

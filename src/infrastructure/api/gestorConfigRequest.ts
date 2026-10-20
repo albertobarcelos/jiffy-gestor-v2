@@ -5,6 +5,13 @@ export type GestorConfigResult<T> =
   | { ok: true; status: number; data: T }
   | { ok: false; status: number; error: string }
 
+export function requireGestorConfig<T>(res: GestorConfigResult<T>): T {
+  if (!res.ok) {
+    throw new Error(res.error)
+  }
+  return res.data
+}
+
 function headersJson(token?: string): HeadersInit {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

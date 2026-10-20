@@ -635,31 +635,29 @@ export function EmpresaTab({ mostrarStatusFuso = false }: { mostrarStatusFuso?: 
             setCidade(ultimaCidadeBuscada.current)
           }
         } else {
-          // Se não tem código IBGE, validar via API
-          // Usar o nome da cidade do formulário, mas se tivermos ultimaCidadeBuscada, usar ela
           const nomeCidadeParaValidar = ultimaCidadeBuscada.current || cidade.trim()
-
           try {
             const response = await validarCidadeIbge(nomeCidadeParaValidar, estado)
-            if (response.ok) {
-              const data = response.data
-              if (!data.valido) {
-                showToast.error(
-                  `Cidade "${nomeCidadeParaValidar}" não encontrada no estado ${estado}. Por favor, selecione uma cidade válida.`
-                )
-                return
-              }
-              if (!codigoCidadeIbge) {
-                await buscarCodigoIbge(nomeCidadeParaValidar, estado)
-              }
-              if (nomeCidadeParaValidar !== cidade.trim()) {
-                setCidade(nomeCidadeParaValidar)
-              }
+            if (!response.ok) {
+              throw new Error(response.error)
+            }
+            if (!response.data.valido) {
+              showToast.error(
+                `Cidade "${nomeCidadeParaValidar}" não encontrada no estado ${estado}. Por favor, selecione uma cidade válida.`
+              )
+              return
+            }
+            if (response.data.codigoCidadeIbge) {
+              setCodigoCidadeIbge(String(response.data.codigoCidadeIbge))
+              ultimaCidadeBuscada.current = nomeCidadeParaValidar
+            } else {
+              await buscarCodigoIbge(nomeCidadeParaValidar, estado)
+            }
+            if (nomeCidadeParaValidar !== cidade.trim()) {
+              setCidade(nomeCidadeParaValidar)
             }
           } catch (error) {
             console.error('Erro ao validar cidade:', error)
-            // Continuar mesmo se a validação falhar (pode ser problema de rede)
-            // Tentar buscar código IBGE mesmo assim
             if (!codigoCidadeIbge) {
               await buscarCodigoIbge(nomeCidadeParaValidar, estado)
             }

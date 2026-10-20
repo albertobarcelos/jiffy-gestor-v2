@@ -4,6 +4,18 @@ import {
   type GestorConfigResult,
 } from '@/src/infrastructure/api/gestorConfigRequest'
 
+export function listarTaxasPagina(
+  token: string,
+  params: { limit: number; offset: number; q?: string }
+): Promise<GestorConfigResult<{ items?: Record<string, unknown>[]; count?: number }>> {
+  const qs = new URLSearchParams({
+    limit: String(params.limit),
+    offset: String(params.offset),
+  })
+  if (params.q) qs.set('q', params.q)
+  return gestorConfigJson(`/api/taxas?${qs.toString()}`, token)
+}
+
 export function getTaxa(
   token: string,
   taxaId: string
