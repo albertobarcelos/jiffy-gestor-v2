@@ -100,7 +100,8 @@ export function useDeliveryProdutoModalState({
     obterGruposPendentes,
   } = useProdutoComplementos(slug, produto, complementosIniciaisModal)
 
-  const valorBaseProduto = resolverPrecosDeliveryProduto(produto).preco
+  const precosProduto = resolverPrecosDeliveryProduto(produto)
+  const valorBaseProduto = precosProduto.preco
   const valorUnitario = valorBaseProduto
   const valorTotal = calcularTotalProduto(
     itemCarrinhoParaProdutoSelecionado(
@@ -184,6 +185,8 @@ export function useDeliveryProdutoModalState({
         valorTotal,
         observacoes,
         complementos: complementosSelecionados,
+        precoRegular: precosProduto.precoRegular,
+        descontoPercentual: precosProduto.descontoPercentual,
       }
 
       if (itemEdicao) {

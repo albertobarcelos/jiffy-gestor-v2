@@ -26,12 +26,15 @@ import {
   type MenuCategoriaNesteCardapioHandle,
 } from './MenuCategoriaNesteCardapioCampos'
 import { MenuProdutoPromocaoControl } from './MenuProdutoPromocaoControl'
+import { deveTravarPrecoNormal } from '@/src/domain/policies/menu/atualizarPrecoNormalSnapshot'
 import {
   VALOR_PROMOCIONAL_MINIMO,
   descontoPercentualFromPrecos,
   isValorPromocionalValido,
   produtoTemPromocaoPreenchida,
+  promocaoSnapshotVigente,
   valorPromocionalFromDesconto,
+  type SnapshotPrecoMenu,
 } from '@/src/domain/policies/menu/precoVigenteSnapshot'
 import { ProdutoFormWithPreviewLayout } from '@/src/presentation/components/features/produtos/preview/ProdutoFormWithPreviewLayout'
 import { parsePrecoPreviewFromInput } from '@/src/presentation/components/features/produtos/preview/produtoPreviewModel'
@@ -74,15 +77,41 @@ function parseCurrency(value: string): number {
   return parseFloat(digits) / 100
 }
 
+function snapshotPrecoDoForm(
+  valor: string,
+  valorPromocional: string,
+  promocaoAtiva: boolean,
+  modoPromocao: boolean
+): SnapshotPrecoMenu {
+  return {
+    valor: parseCurrency(valor),
+    valorPromocional: parseCurrency(valorPromocional),
+    promocaoAtiva: modoPromocao && promocaoAtiva,
+  }
+}
+
 function formatDescontoPct(value: number | null): string {
   if (value == null || !Number.isFinite(value)) return ''
-  return String(value).replace('.', ',')
+  // Inteiro sem casas; senão 1 casa (passo 0,1%).
+  if (Number.isInteger(value)) return String(value)
+  return value.toFixed(1).replace('.', ',')
 }
 
 function parseDescontoPct(value: string): number {
   const normalized = value.replace('%', '').trim().replace(',', '.')
   if (!normalized) return NaN
   return Number(normalized)
+}
+
+/** Aceita só dígitos e no máximo 1 casa decimal (vírgula ou ponto). */
+function sanitizeDescontoPctInput(raw: string): string {
+  const cleaned = raw.replace(/[^\d.,]/g, '').replace(',', '.')
+  const match = cleaned.match(/^(\d{0,3})(?:\.(\d{0,1}))?/)
+  if (!match) return ''
+  const inteiro = match[1] ?? ''
+  if (match[2] !== undefined) return `${inteiro},${match[2]}`
+  if (cleaned.includes('.')) return `${inteiro},`
+  return inteiro
 }
 
 /** Props do input nativo: seleciona o conteúdo ao focar/clicar. */
@@ -141,6 +170,11 @@ export const MenuProdutoSnapshotForm = forwardRef<
   )
   const [ativo, setAtivo] = useState(produto.ativo)
   const [favorito, setFavorito] = useState(produto.favorito)
+  const snapshotPreco = useMemo(
+    () => snapshotPrecoDoForm(valor, valorPromocional, promocaoAtiva, modoPromocao),
+    [valor, valorPromocional, promocaoAtiva, modoPromocao]
+  )
+  const precoNormalTravado = deveTravarPrecoNormal(snapshotPreco)
 
   const syncFromProduto = useCallback((next: MenuProduto) => {
     setNome(next.nome)
@@ -232,14 +266,14 @@ export const MenuProdutoSnapshotForm = forwardRef<
   )
 
   const handleValorNormalChange = (raw: string) => {
+    if (precoNormalTravado) return
     const next = formatCurrency(raw)
     setValor(next)
     if (!modoPromocao) return
-    const normal = parseCurrency(next)
-    const promo = parseCurrency(valorPromocional)
-    if (Number.isFinite(normal) && normal > 0 && Number.isFinite(promo) && promo >= 0) {
-      setDescontoPct(formatDescontoPct(descontoPercentualFromPrecos(normal, promo)))
-    }
+    const pct = parseDescontoPct(descontoPct)
+    const promo = valorPromocionalFromDesconto(parseCurrency(next), pct)
+    if (promo == null) return
+    setValorPromocional(formatCurrencyFromNumber(promo))
   }
 
   const handleValorPromocionalChange = (raw: string) => {
@@ -253,7 +287,7 @@ export const MenuProdutoSnapshotForm = forwardRef<
   }
 
   const handleDescontoPctChange = (raw: string) => {
-    const cleaned = raw.replace(/[^\d.,]/g, '')
+    const cleaned = sanitizeDescontoPctInput(raw)
     setDescontoPct(cleaned)
     const normal = parseCurrency(valor)
     const pct = parseDescontoPct(cleaned)
@@ -314,15 +348,13 @@ export const MenuProdutoSnapshotForm = forwardRef<
       showToast.error('Informe um preço válido')
       return false
     }
-    if (modoPromocao) {
+    if (modoPromocao && !isValorPromocionalValido(promoNum, valorNum)) {
       if (!Number.isFinite(promoNum) || promoNum <= VALOR_PROMOCIONAL_MINIMO) {
         showToast.error('Informe um preço promocional maior que R$ 1,00')
         return false
       }
-      if (promoNum >= valorNum) {
-        showToast.error('O preço promocional precisa ser menor que o preço normal')
-        return false
-      }
+      showToast.error('O preço promocional precisa ser menor que o preço normal')
+      return false
     }
 
     const destinos = await pedirConfirmacao({
@@ -400,12 +432,7 @@ export const MenuProdutoSnapshotForm = forwardRef<
   const precoNormalPreview = parsePrecoPreviewFromInput(valor)
   const precoPromoPreview = parsePrecoPreviewFromInput(valorPromocional)
   const previewProduto = useMemo(() => {
-    const promoVigente =
-      modoPromocao &&
-      promocaoAtiva &&
-      precoPromoPreview != null &&
-      precoNormalPreview != null &&
-      isValorPromocionalValido(precoPromoPreview, precoNormalPreview)
+    const promoVigente = promocaoSnapshotVigente(snapshotPreco)
     const descontoNum = parseDescontoPct(descontoPct)
 
     return {
@@ -422,8 +449,7 @@ export const MenuProdutoSnapshotForm = forwardRef<
     nome,
     precoNormalPreview,
     precoPromoPreview,
-    modoPromocao,
-    promocaoAtiva,
+    snapshotPreco,
     descontoPct,
     descricao,
     imagemPreviewOverride,
@@ -489,6 +515,12 @@ export const MenuProdutoSnapshotForm = forwardRef<
                       placeholder="R$ 0,00"
                       className="bg-white"
                       sx={sxEntradaCompactaProduto}
+                      disabled={precoNormalTravado}
+                      title={
+                        precoNormalTravado
+                          ? 'Pause ou remova a promoção para alterar o preço normal'
+                          : undefined
+                      }
                       inputProps={inputPropsSelecionarConteudo}
                     />
                     <Input

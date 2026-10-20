@@ -14,6 +14,7 @@ import {
   type MenuProdutoPermissaoField,
 } from '@/src/shared/utils/menuProdutoPermissoes'
 import { podeDesvincularProdutoDoMenu } from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
+import { resolverAtualizacaoPrecoNormal } from '@/src/domain/policies/menu/atualizarPrecoNormalSnapshot'
 
 export type StatusConfirmLista = { produtoId: string; ativo: boolean }
 
@@ -83,8 +84,24 @@ export function useMenuProdutoLista({
   )
 
   const handleValorChange = useCallback(
-    (produtoId: string, valor: number) => persistirSnapshot(produtoId, { valor }),
-    [persistirSnapshot]
+    (produtoId: string, valor: number) => {
+      const produto = produtosDoMenu.find(p => p.produtoId === produtoId)
+      if (!produto) return persistirSnapshot(produtoId, { valor })
+
+      const resultado = resolverAtualizacaoPrecoNormal(valor, produto)
+      if (resultado.tipo === 'bloqueada') {
+        showToast.error('Pause ou remova a promoção para alterar o preço normal')
+        return false
+      }
+      if (resultado.tipo === 'valorEPromocional') {
+        return persistirSnapshot(produtoId, {
+          valor: resultado.valor,
+          valorPromocional: resultado.valorPromocional,
+        })
+      }
+      return persistirSnapshot(produtoId, { valor: resultado.valor })
+    },
+    [persistirSnapshot, produtosDoMenu]
   )
 
   const handleQuickPatch = useCallback(

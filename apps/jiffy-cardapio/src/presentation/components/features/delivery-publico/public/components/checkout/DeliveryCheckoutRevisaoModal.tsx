@@ -62,9 +62,8 @@ type DeliveryCheckoutRevisaoModalProps = {
   /** Loja exige CPF para finalizar — campo obrigatório, sem opção de pular. */
   exigeCpfVenda?: boolean
   /**
-   * CPF do cadastro do cliente (só dígitos ou mascarado).
-   * Usado para pré-preencher quando a loja exige CPF, ou quando o cliente
-   * opta por nota fiscal com a flag desligada.
+   * CPF do cadastro do cliente (lookup). Usado só ao marcar “Sim” na nota fiscal
+   * quando a loja não exige CPF — não pré-preenche nem marca nota sozinho.
    */
   cpfClienteCadastrado?: string | null
   enviando?: boolean
@@ -194,36 +193,26 @@ export function DeliveryCheckoutRevisaoModal({
   const [adicionarObservacao, setAdicionarObservacao] = useState(
     () => observacaoPedido.trim().length > 0
   )
+  /** Com flag da loja false, nota começa em Não — CPF no cadastro não marca Sim. */
   const [desejaNotaFiscal, setDesejaNotaFiscal] = useState(() => exigeCpfVenda)
-
-  const cpfCadastroRef = useRef('')
-  if (!cpfCadastroRef.current) {
-    const fromProp = (cpfClienteCadastrado ?? '').replace(/\D/g, '').slice(0, 11)
-    const fromForm = cpfNotaFiscal.replace(/\D/g, '').slice(0, 11)
-    const digits = fromProp.length === 11 ? fromProp : fromForm.length === 11 ? fromForm : ''
-    if (digits) cpfCadastroRef.current = formatarCpfCnpjInput(digits)
-  }
-  const cpfCadastroMascarado = cpfCadastroRef.current
+  const limpouCpfAutofillRef = useRef(false)
 
   useEffect(() => {
-    if (somenteLeitura) return
     if (exigeCpfVenda) {
       setDesejaNotaFiscal(true)
-      if (
-        onChangeCpfNotaFiscal &&
-        cpfNotaFiscal.replace(/\D/g, '').length !== 11 &&
-        cpfCadastroMascarado
-      ) {
-        onChangeCpfNotaFiscal(cpfCadastroMascarado)
-      }
       return
     }
-    // Flag desligada: nota fiscal só se o cliente optar; limpa CPF herdado do cadastro.
     setDesejaNotaFiscal(false)
-    if (onChangeCpfNotaFiscal && cpfNotaFiscal.replace(/\D/g, '').length > 0) {
-      onChangeCpfNotaFiscal('')
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- só reage à flag / modo
+  }, [exigeCpfVenda])
+
+  /** Remove CPF pré-preenchido pelo lookup quando a loja não exige CPF (uma vez). */
+  useEffect(() => {
+    if (somenteLeitura || exigeCpfVenda || limpouCpfAutofillRef.current) return
+    if (!onChangeCpfNotaFiscal) return
+    limpouCpfAutofillRef.current = true
+    onChangeCpfNotaFiscal('')
+    // Intencional: limpar só na abertura; callback do pai pode mudar a cada render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- montagem / flag
   }, [exigeCpfVenda, somenteLeitura])
 
   const telefoneTrim = telefone.trim()
@@ -276,8 +265,11 @@ export function DeliveryCheckoutRevisaoModal({
       onChangeCpfNotaFiscal('')
       return
     }
-    if (cpfCadastroMascarado) {
-      onChangeCpfNotaFiscal(cpfCadastroMascarado)
+    const cpfAtual = cpfNotaFiscal.replace(/\D/g, '')
+    if (cpfAtual.length === 11) return
+    const cpfCadastro = (cpfClienteCadastrado ?? '').replace(/\D/g, '').slice(0, 11)
+    if (cpfCadastro.length === 11) {
+      onChangeCpfNotaFiscal(formatarCpfCnpjInput(cpfCadastro))
     }
   }
 
@@ -681,6 +673,9 @@ export function DeliveryCheckoutRevisaoModal({
                     >
                       CPF <span className="text-red-500">*</span>
                     </label>
+                    <p className="text-xs delivery-text-secondary">
+                      Obrigatório para emitir a nota fiscal.
+                    </p>
                     <input
                       id="cpf-nota-fiscal"
                       className="w-full rounded-xl border bg-transparent px-3 py-3 text-base outline-none delivery-text-primary"
