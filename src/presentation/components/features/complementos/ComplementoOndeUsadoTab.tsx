@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { MdSearch } from 'react-icons/md'
 import type { ComplementoUsoNoMenu } from '@/src/domain/complemento/tipos'
+import type { VinculoComplementoOverride } from '@/src/domain/repositories/IComplementoOverrideRepository'
+import { criarPropagarAlteracaoComplementoUseCase } from '@/src/presentation/hooks/complementos/criarPropagarAlteracaoComplementoUseCase'
+import { usePropagarAlteracaoComplemento } from '@/src/presentation/hooks/complementos/usePropagarAlteracaoComplemento'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
-import {
-  buscarComplementoCompleto,
-  gravarOverridesComplemento,
-} from './complementoOverrideApi'
 
 interface ComplementoOndeUsadoTabProps {
   complementoId: string
@@ -41,6 +41,29 @@ function lerMoeda(value: string): number {
 
 function chaveUso(uso: ComplementoUsoNoMenu): string {
   return `${uso.menuProdutoId}:${uso.grupoComplementos.id}`
+}
+
+function aplicarVinculosLocais(
+  lista: ComplementoUsoNoMenu[],
+  vinculos: VinculoComplementoOverride[]
+): ComplementoUsoNoMenu[] {
+  return lista.map(item => {
+    const vinculo = vinculos.find(
+      candidato =>
+        candidato.menuId === item.menu.id &&
+        candidato.produtoId === item.produto.id &&
+        candidato.grupoComplementoId === item.grupoComplementos.id
+    )
+    if (!vinculo) return item
+    return {
+      ...item,
+      complementoConfig: {
+        ...item.complementoConfig,
+        ...(vinculo.valor !== undefined ? { valor: vinculo.valor } : {}),
+        ...(vinculo.ativo !== undefined ? { ativo: vinculo.ativo } : {}),
+      },
+    }
+  })
 }
 
 function agruparUsosPorProduto(usos: ComplementoUsoNoMenu[]): UsoAgrupadoPorProduto[] {
@@ -82,12 +105,24 @@ export function ComplementoOndeUsadoTab({ complementoId }: ComplementoOndeUsadoT
   const [isLoading, setIsLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [salvando, setSalvando] = useState<Record<string, boolean>>({})
+  const {
+    pedirConfirmacao: pedirPropagacao,
+    aplicarVinculos: aplicarPropagacao,
+    dialog: dialogPropagacao,
+  } = usePropagarAlteracaoComplemento()
 
   const carregar = useCallback(async () => {
     setIsLoading(true)
     setErro(null)
     try {
-      const completo = await buscarComplementoCompleto(complementoId)
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!token) {
+        throw new Error('Token não encontrado. Faça login novamente.')
+      }
+      const completo = await criarPropagarAlteracaoComplementoUseCase().buscarCompleto({
+        complementoId,
+        token,
+      })
       setUsos(completo.vinculos)
       setValores(
         Object.fromEntries(
@@ -125,17 +160,46 @@ export function ComplementoOndeUsadoTab({ complementoId }: ComplementoOndeUsadoT
       if (novoValor === uso.complementoConfig.valor) return
       setSalvando(prev => ({ ...prev, [chave]: true }))
       try {
-        await gravarOverridesComplemento({
-          vinculos: [
-            {
-              menuId: uso.menu.id,
-              produtoId: uso.produto.id,
-              complementoId,
-              grupoComplementoId: uso.grupoComplementos.id,
-              valor: novoValor,
-            },
-          ],
+        const decisao = await pedirPropagacao({
+          complementoId,
+          origem: {
+            menuId: uso.menu.id,
+            produtoId: uso.produto.id,
+            grupoComplementoId: uso.grupoComplementos.id,
+          },
+          alteracao: { valor: novoValor },
         })
+        if (decisao.tipo === 'cancelado') {
+          setValores(prev => ({ ...prev, [chave]: formatarMoeda(uso.complementoConfig.valor) }))
+          return
+        }
+        const vinculoOrigem = {
+          menuId: uso.menu.id,
+          produtoId: uso.produto.id,
+          complementoId,
+          grupoComplementoId: uso.grupoComplementos.id,
+          valor: novoValor,
+        }
+        const destinos = decisao.tipo === 'aplicar' ? decisao.vinculos : []
+        await aplicarPropagacao([vinculoOrigem, ...destinos])
+        if (destinos.length > 0) {
+          setUsos(prev => aplicarVinculosLocais(prev, destinos))
+          setValores(prev => {
+            const next = { ...prev }
+            for (const item of usos) {
+              const copiado = destinos.find(
+                vinculo =>
+                  vinculo.menuId === item.menu.id &&
+                  vinculo.produtoId === item.produto.id &&
+                  vinculo.grupoComplementoId === item.grupoComplementos.id &&
+                  vinculo.valor !== undefined
+              )
+              if (copiado?.valor !== undefined) next[chaveUso(item)] = formatarMoeda(copiado.valor)
+            }
+            return next
+          })
+          showToast.success('Alteração aplicada nos cardápios marcados.')
+        }
         setUsos(prev =>
           prev.map(item =>
             chaveUso(item) === chave
@@ -157,7 +221,7 @@ export function ComplementoOndeUsadoTab({ complementoId }: ComplementoOndeUsadoT
         setSalvando(prev => ({ ...prev, [chave]: false }))
       }
     },
-    [complementoId, valores]
+    [aplicarPropagacao, complementoId, pedirPropagacao, usos, valores]
   )
 
   const gravarAtivo = useCallback(
@@ -166,17 +230,29 @@ export function ComplementoOndeUsadoTab({ complementoId }: ComplementoOndeUsadoT
       const chave = chaveUso(uso)
       setSalvando(prev => ({ ...prev, [chave]: true }))
       try {
-        await gravarOverridesComplemento({
-          vinculos: [
-            {
-              menuId: uso.menu.id,
-              produtoId: uso.produto.id,
-              complementoId,
-              grupoComplementoId: uso.grupoComplementos.id,
-              ativo,
-            },
-          ],
+        const decisao = await pedirPropagacao({
+          complementoId,
+          origem: {
+            menuId: uso.menu.id,
+            produtoId: uso.produto.id,
+            grupoComplementoId: uso.grupoComplementos.id,
+          },
+          alteracao: { ativo },
         })
+        if (decisao.tipo === 'cancelado') return
+        const vinculoOrigem = {
+          menuId: uso.menu.id,
+          produtoId: uso.produto.id,
+          complementoId,
+          grupoComplementoId: uso.grupoComplementos.id,
+          ativo,
+        }
+        const destinos = decisao.tipo === 'aplicar' ? decisao.vinculos : []
+        await aplicarPropagacao([vinculoOrigem, ...destinos])
+        if (destinos.length > 0) {
+          setUsos(prev => aplicarVinculosLocais(prev, destinos))
+          showToast.success('Alteração aplicada nos cardápios marcados.')
+        }
         setUsos(prev =>
           prev.map(item =>
             chaveUso(item) === chave
@@ -191,7 +267,7 @@ export function ComplementoOndeUsadoTab({ complementoId }: ComplementoOndeUsadoT
         setSalvando(prev => ({ ...prev, [chave]: false }))
       }
     },
-    [complementoId]
+    [aplicarPropagacao, complementoId, pedirPropagacao]
   )
 
   if (isLoading) {
@@ -285,6 +361,7 @@ export function ComplementoOndeUsadoTab({ complementoId }: ComplementoOndeUsadoT
           ))}
         </div>
       )}
+      {dialogPropagacao}
     </div>
   )
 }

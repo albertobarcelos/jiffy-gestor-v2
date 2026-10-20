@@ -21,6 +21,7 @@ import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
+import { usePropagarAlteracaoComplemento } from '@/src/presentation/hooks/complementos/usePropagarAlteracaoComplemento'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { arrayMove } from '@dnd-kit/sortable'
 import type { DragEndEvent } from '@dnd-kit/core'
@@ -41,7 +42,6 @@ import {
 } from '../complementos/ComplementosTabsModal'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import {
-  gravarOverridesComplemento,
   reordenarComplementoNoMenu,
   reordenarGrupoComplementoNoMenu,
 } from '@/src/presentation/components/features/complementos/complementoOverrideApi'
@@ -363,6 +363,12 @@ export const ComplementosMultiSelectDialog = forwardRef<
   ref
 ) {
   const invalidate = useInvalidateTenantQueries()
+  const {
+    pedirConfirmacao: pedirPropagacaoComplemento,
+    aplicarVinculos: aplicarPropagacaoComplemento,
+    aberto: propagacaoComplementoAberta,
+    dialog: dialogPropagacaoComplemento,
+  } = usePropagarAlteracaoComplemento()
   const vinculoNoMenu = Boolean(menuId)
   const ocultarGestaoGrupo = vinculoNoMenu
   const rascunho = modoRascunho || !produtoId
@@ -587,17 +593,29 @@ export const ComplementosMultiSelectDialog = forwardRef<
       salvandoValorRef.current.add(chave)
       setSalvandoValorChave(prev => ({ ...prev, [chave]: true }))
       try {
-        await gravarOverridesComplemento({
-          vinculos: [
-            {
-              menuId,
-              produtoId,
-              complementoId: comp.getId(),
-              grupoComplementoId: grupoId,
-              valor: novoValor,
-            },
-          ],
+        const decisao = await pedirPropagacaoComplemento({
+          complementoId: comp.getId(),
+          origem: { menuId, produtoId, grupoComplementoId: grupoId },
+          alteracao: { valor: novoValor },
         })
+        if (decisao.tipo === 'cancelado') {
+          limparValorDigitado(chave)
+          return
+        }
+        const destinos = decisao.tipo === 'aplicar' ? decisao.vinculos : []
+        await aplicarPropagacaoComplemento([
+          {
+            menuId,
+            produtoId,
+            complementoId: comp.getId(),
+            grupoComplementoId: grupoId,
+            valor: novoValor,
+          },
+          ...destinos,
+        ])
+        if (destinos.length > 0) {
+          showToast.success('Alteração aplicada nos cardápios marcados.')
+        }
         setGroups(prev =>
           prev.map(grupo =>
             grupo.id === grupoId
@@ -621,7 +639,14 @@ export const ComplementosMultiSelectDialog = forwardRef<
         setSalvandoValorChave(prev => ({ ...prev, [chave]: false }))
       }
     },
-    [definirValorDigitado, limparValorDigitado, menuId, produtoId]
+    [
+      aplicarPropagacaoComplemento,
+      definirValorDigitado,
+      limparValorDigitado,
+      menuId,
+      pedirPropagacaoComplemento,
+      produtoId,
+    ]
   )
 
   const gravarAtivoNoMenu = useCallback(
@@ -634,17 +659,26 @@ export const ComplementosMultiSelectDialog = forwardRef<
       salvandoAtivoRef.current.add(chave)
       setSalvandoAtivoChave(prev => ({ ...prev, [chave]: true }))
       try {
-        await gravarOverridesComplemento({
-          vinculos: [
-            {
-              menuId,
-              produtoId,
-              complementoId: comp.getId(),
-              grupoComplementoId: grupoId,
-              ativo: proximo,
-            },
-          ],
+        const decisao = await pedirPropagacaoComplemento({
+          complementoId: comp.getId(),
+          origem: { menuId, produtoId, grupoComplementoId: grupoId },
+          alteracao: { ativo: proximo },
         })
+        if (decisao.tipo === 'cancelado') return
+        const destinos = decisao.tipo === 'aplicar' ? decisao.vinculos : []
+        await aplicarPropagacaoComplemento([
+          {
+            menuId,
+            produtoId,
+            complementoId: comp.getId(),
+            grupoComplementoId: grupoId,
+            ativo: proximo,
+          },
+          ...destinos,
+        ])
+        if (destinos.length > 0) {
+          showToast.success('Alteração aplicada nos cardápios marcados.')
+        }
         setGroups(prev =>
           prev.map(grupo =>
             grupo.id === grupoId
@@ -665,7 +699,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
         setSalvandoAtivoChave(prev => ({ ...prev, [chave]: false }))
       }
     },
-    [menuId, produtoId]
+    [aplicarPropagacaoComplemento, menuId, pedirPropagacaoComplemento, produtoId]
   )
 
   const loadSelectableGroups = useCallback(async (signal?: AbortSignal) => {
@@ -2235,6 +2269,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
             />
           </>
         ) : null}
+        {dialogPropagacaoComplemento}
       </>
     )
   }
@@ -2243,6 +2278,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
     <>
       <Dialog
         open={open}
+        disableEnforceFocus={propagacaoComplementoAberta}
         onOpenChange={openState => !openState && handleClose()}
         fullWidth
         maxWidth="md"
@@ -2340,6 +2376,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
         }}
         zIndex={1500}
       />
+      {dialogPropagacaoComplemento}
     </>
   )
 })

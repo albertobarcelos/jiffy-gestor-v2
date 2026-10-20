@@ -7,6 +7,9 @@ import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { MdImageNotSupported, MdPhotoCamera, MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
+import { alteracaoValorAtivo } from '@/src/domain/policies/complemento/propagarAlteracaoComplemento'
+import type { VinculoComplementoOverride } from '@/src/domain/repositories/IComplementoOverrideRepository'
+import { usePropagarAlteracaoComplemento } from '@/src/presentation/hooks/complementos/usePropagarAlteracaoComplemento'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import {
@@ -251,6 +254,12 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const invalidate = useInvalidateTenantQueries()
+  const {
+    pedirConfirmacao: pedirPropagacao,
+    aplicarVinculos: aplicarPropagacao,
+    dialog: dialogPropagacao,
+  } = usePropagarAlteracaoComplemento()
+  const savingValorIdsRef = useRef<Set<string>>(new Set())
 
   const ativoFilter = useMemo<boolean | null>(() => {
     return filterStatus === 'Ativo' ? true : filterStatus === 'Inativo' ? false : null
@@ -483,9 +492,30 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         return
       }
 
+      if (savingValorIdsRef.current.has(complementoId)) return
+      savingValorIdsRef.current.add(complementoId)
       setSavingValorMap(prev => ({ ...prev, [complementoId]: true }))
 
       try {
+        const alteracao = alteracaoValorAtivo({
+          valorAnterior: complementoAtual.getValor(),
+          ativoAnterior: complementoAtual.isAtivo(),
+          valorNovo: novoValor,
+          ativoNovo: complementoAtual.isAtivo(),
+        })
+        let vinculosParaCopiar: VinculoComplementoOverride[] = []
+        if (alteracao) {
+          const decisao = await pedirPropagacao({ complementoId, alteracao })
+          if (decisao.tipo === 'cancelado') {
+            setValorInputs(prev => ({
+              ...prev,
+              [complementoId]: formatValorFromNumber(complementoAtual.getValor()),
+            }))
+            return
+          }
+          if (decisao.tipo === 'aplicar') vinculosParaCopiar = decisao.vinculos
+        }
+
         const response = await fetchGestorApi(`/api/complementos/${complementoId}`, {
           method: 'PATCH',
           headers: {
@@ -501,6 +531,18 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         }
 
         showToast.success('Valor atualizado com sucesso!')
+        if (vinculosParaCopiar.length > 0) {
+          try {
+            await aplicarPropagacao(vinculosParaCopiar)
+            showToast.success('Alteração aplicada nos cardápios marcados.')
+          } catch (error) {
+            showToast.error(
+              error instanceof Error
+                ? error.message
+                : 'Valor salvo, mas não foi possível copiar para os outros cardápios.'
+            )
+          }
+        }
         await refetch()
         onReload?.()
       } catch (err: unknown) {
@@ -512,6 +554,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
           [complementoId]: formatValorFromNumber(complementoAtual.getValor()),
         }))
       } finally {
+        savingValorIdsRef.current.delete(complementoId)
         setSavingValorMap(prev => {
           const { [complementoId]: _, ...rest } = prev
           return rest
@@ -524,6 +567,8 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
       complementos,
       formatValorFromNumber,
       clearValorDebounceTimer,
+      pedirPropagacao,
+      aplicarPropagacao,
       refetch,
       onReload,
     ]
@@ -761,6 +806,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         onReload={handleTabsModalReload}
         onTabChange={handleTabsModalTabChange}
       />
+      {dialogPropagacao}
       {complementoCropModal}
       </CadastroListShell>
     </div>

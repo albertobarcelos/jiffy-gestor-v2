@@ -20,6 +20,9 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { DeliveryImageUploadField } from '@/src/presentation/components/ui/DeliveryImageUploadField'
 import { DELIVERY_COMPLEMENTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
 import { showToast } from '@/src/shared/utils/toast'
+import { alteracaoValorAtivo } from '@/src/domain/policies/complemento/propagarAlteracaoComplemento'
+import type { VinculoComplementoOverride } from '@/src/domain/repositories/IComplementoOverrideRepository'
+import { usePropagarAlteracaoComplemento } from '@/src/presentation/hooks/complementos/usePropagarAlteracaoComplemento'
 import { urlImagemHttp } from '@/src/application/services/cadastroImagem'
 import {
   complementoImagemMedia,
@@ -65,6 +68,17 @@ const sxEntradaCompactaComplemento = {
   '& .MuiOutlinedInput-input': entradaCompactaInput,
   '& .MuiSelect-select': entradaCompactaSelect,
 } as const
+
+function baselineValorAtivo(serializado: string): { valor: number; ativo: boolean } | null {
+  if (!serializado) return null
+  try {
+    const parsed = JSON.parse(serializado) as { valor?: unknown; ativo?: unknown }
+    if (typeof parsed.valor !== 'number' || typeof parsed.ativo !== 'boolean') return null
+    return { valor: parsed.valor, ativo: parsed.ativo }
+  } catch {
+    return null
+  }
+}
 
 /** Nome e descrição: estado normalizado no onChange (placeholder não deve ficar em caixa alta). */
 const sxCampoTextoMaiusculo = {
@@ -137,6 +151,11 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
   const [imagemPreviewUrl, setImagemPreviewUrl] = useState<string | null>(null)
   const [imageId, setImageId] = useState<string | null>(null)
   const baselineSerializedRef = useRef<string>('')
+  const {
+    pedirConfirmacao: pedirPropagacao,
+    aplicarVinculos: aplicarPropagacao,
+    dialog: dialogPropagacao,
+  } = usePropagarAlteracaoComplemento()
 
   const applyImagemUrl = useCallback((url: string | null) => {
     setServerImagemUrl(url)
@@ -373,6 +392,24 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
 
     try {
       const valorNumero = parseValorToNumber(valor)
+      let vinculosParaCopiar: VinculoComplementoOverride[] = []
+
+      if (isEditing && complementoId) {
+        const anterior = baselineValorAtivo(baselineSerializedRef.current)
+        const alteracao = anterior
+          ? alteracaoValorAtivo({
+              valorAnterior: anterior.valor,
+              ativoAnterior: anterior.ativo,
+              valorNovo: valorNumero,
+              ativoNovo: ativo,
+            })
+          : null
+        if (alteracao) {
+          const decisao = await pedirPropagacao({ complementoId, alteracao })
+          if (decisao.tipo === 'cancelado') return
+          if (decisao.tipo === 'aplicar') vinculosParaCopiar = decisao.vinculos
+        }
+      }
 
       const nomeUpper = nome.trim().toUpperCase()
       const descUpper = descricao.trim().toUpperCase()
@@ -407,6 +444,18 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
       const savedData = (await response.json().catch(() => ({}))) as { id?: string }
       const savedId = savedData?.id?.toString() || complementoId
       showToast.success(isEditing ? 'Complemento atualizado com sucesso!' : 'Complemento criado com sucesso!')
+      if (vinculosParaCopiar.length > 0) {
+        try {
+          await aplicarPropagacao(vinculosParaCopiar)
+          showToast.success('Alteração aplicada nos cardápios marcados.')
+        } catch (error) {
+          showToast.error(
+            error instanceof Error
+              ? error.message
+              : 'Complemento salvo, mas não foi possível copiar para os outros cardápios.'
+          )
+        }
+      }
       commitBaselineLatestRef.current()
       let imagemPersistida =
         urlImagemHttp(serverImagemUrl) ?? urlImagemHttp(imagemPreviewUrl)
@@ -438,6 +487,8 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
     tipoImpactoPreco,
     isEmbedded,
     onSaved,
+    pedirPropagacao,
+    aplicarPropagacao,
     router,
     serverImagemUrl,
     imagemPreviewUrl,
@@ -665,6 +716,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
           )}
         </form>
       </div>
+      {dialogPropagacao}
     </div>
   )
 })
