@@ -9,7 +9,6 @@ import { MdImageNotSupported, MdPhotoCamera, MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { alteracaoValorAtivo } from '@/src/domain/policies/complemento/propagarAlteracaoComplemento'
 import type { VinculoComplementoOverride } from '@/src/domain/repositories/IComplementoOverrideRepository'
-import { gravarOverridesComplemento } from '@/src/presentation/components/features/complementos/complementoOverrideApi'
 import { usePropagarAlteracaoComplemento } from '@/src/presentation/hooks/complementos/usePropagarAlteracaoComplemento'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -255,8 +254,11 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const invalidate = useInvalidateTenantQueries()
-  const { pedirConfirmacao: pedirPropagacao, dialog: dialogPropagacao } =
-    usePropagarAlteracaoComplemento()
+  const {
+    pedirConfirmacao: pedirPropagacao,
+    aplicarVinculos: aplicarPropagacao,
+    dialog: dialogPropagacao,
+  } = usePropagarAlteracaoComplemento()
   const savingValorIdsRef = useRef<Set<string>>(new Set())
 
   const ativoFilter = useMemo<boolean | null>(() => {
@@ -531,7 +533,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         showToast.success('Valor atualizado com sucesso!')
         if (vinculosParaCopiar.length > 0) {
           try {
-            await gravarOverridesComplemento({ vinculos: vinculosParaCopiar })
+            await aplicarPropagacao(vinculosParaCopiar)
             showToast.success('Alteração aplicada nos cardápios marcados.')
           } catch (error) {
             showToast.error(
@@ -566,6 +568,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
       formatValorFromNumber,
       clearValorDebounceTimer,
       pedirPropagacao,
+      aplicarPropagacao,
       refetch,
       onReload,
     ]

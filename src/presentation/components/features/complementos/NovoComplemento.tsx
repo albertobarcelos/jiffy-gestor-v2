@@ -23,7 +23,6 @@ import { showToast } from '@/src/shared/utils/toast'
 import { alteracaoValorAtivo } from '@/src/domain/policies/complemento/propagarAlteracaoComplemento'
 import type { VinculoComplementoOverride } from '@/src/domain/repositories/IComplementoOverrideRepository'
 import { usePropagarAlteracaoComplemento } from '@/src/presentation/hooks/complementos/usePropagarAlteracaoComplemento'
-import { gravarOverridesComplemento } from '@/src/presentation/components/features/complementos/complementoOverrideApi'
 import { urlImagemHttp } from '@/src/application/services/cadastroImagem'
 import {
   complementoImagemMedia,
@@ -152,8 +151,11 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
   const [imagemPreviewUrl, setImagemPreviewUrl] = useState<string | null>(null)
   const [imageId, setImageId] = useState<string | null>(null)
   const baselineSerializedRef = useRef<string>('')
-  const { pedirConfirmacao: pedirPropagacao, dialog: dialogPropagacao } =
-    usePropagarAlteracaoComplemento()
+  const {
+    pedirConfirmacao: pedirPropagacao,
+    aplicarVinculos: aplicarPropagacao,
+    dialog: dialogPropagacao,
+  } = usePropagarAlteracaoComplemento()
 
   const applyImagemUrl = useCallback((url: string | null) => {
     setServerImagemUrl(url)
@@ -444,7 +446,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
       showToast.success(isEditing ? 'Complemento atualizado com sucesso!' : 'Complemento criado com sucesso!')
       if (vinculosParaCopiar.length > 0) {
         try {
-          await gravarOverridesComplemento({ vinculos: vinculosParaCopiar })
+          await aplicarPropagacao(vinculosParaCopiar)
           showToast.success('Alteração aplicada nos cardápios marcados.')
         } catch (error) {
           showToast.error(
@@ -486,6 +488,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
     isEmbedded,
     onSaved,
     pedirPropagacao,
+    aplicarPropagacao,
     router,
     serverImagemUrl,
     imagemPreviewUrl,

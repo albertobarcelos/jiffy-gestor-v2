@@ -6,12 +6,12 @@ import type { VinculoComplementoOverride } from '@/src/domain/repositories/IComp
 import {
   chaveUsoComplemento,
   montarVinculosPropagacao,
-  usosParaPropagar,
   type AlteracaoComplementoPropagavel,
   type OrigemUsoComplemento,
 } from '@/src/domain/policies/complemento/propagarAlteracaoComplemento'
 import { PropagarAlteracaoComplementoDialog } from '@/src/presentation/components/features/complementos/PropagarAlteracaoComplementoDialog'
-import { buscarComplementoCompleto } from '@/src/presentation/components/features/complementos/complementoOverrideApi'
+import { criarPropagarAlteracaoComplementoUseCase } from '@/src/presentation/hooks/complementos/criarPropagarAlteracaoComplementoUseCase'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 
 export type DecisaoPropagacaoComplemento =
@@ -38,6 +38,7 @@ export function usePropagarAlteracaoComplemento(): {
     origem?: OrigemUsoComplemento
     alteracao: AlteracaoComplementoPropagavel
   }) => Promise<DecisaoPropagacaoComplemento>
+  aplicarVinculos: (vinculos: VinculoComplementoOverride[]) => Promise<void>
   aberto: boolean
   dialog: ReactNode
 } {
@@ -62,10 +63,19 @@ export function usePropagarAlteracaoComplemento(): {
     }): Promise<DecisaoPropagacaoComplemento> => {
       if (pedidoRef.current) return { tipo: 'so-origem' }
 
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!token) {
+        showToast.error('Não foi possível listar os cardápios. A alteração fica só neste local.')
+        return { tipo: 'so-origem' }
+      }
+
       let usos: ComplementoUsoNoMenu[] = []
       try {
-        const completo = await buscarComplementoCompleto(opts.complementoId)
-        usos = usosParaPropagar(completo.vinculos ?? [], opts.origem)
+        usos = await criarPropagarAlteracaoComplementoUseCase().listarUsosParaPropagar({
+          complementoId: opts.complementoId,
+          token,
+          origem: opts.origem,
+        })
       } catch {
         showToast.error('Não foi possível listar os cardápios. A alteração fica só neste local.')
         return { tipo: 'so-origem' }
@@ -88,6 +98,14 @@ export function usePropagarAlteracaoComplemento(): {
     },
     []
   )
+
+  const aplicarVinculos = useCallback(async (vinculos: VinculoComplementoOverride[]) => {
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+    if (!token) {
+      throw new Error('Token não encontrado. Faça login novamente.')
+    }
+    await criarPropagarAlteracaoComplementoUseCase().aplicarVinculos({ token, vinculos })
+  }, [])
 
   const confirmarEscolha = useCallback(() => {
     const atual = pedidoRef.current
@@ -137,5 +155,5 @@ export function usePropagarAlteracaoComplemento(): {
     />
   )
 
-  return { pedirConfirmacao, aberto: pedido !== null, dialog }
+  return { pedirConfirmacao, aplicarVinculos, aberto: pedido !== null, dialog }
 }

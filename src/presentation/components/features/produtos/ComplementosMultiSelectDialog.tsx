@@ -21,10 +21,7 @@ import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
-import {
-  usePropagarAlteracaoComplemento,
-  type DecisaoPropagacaoComplemento,
-} from '@/src/presentation/hooks/complementos/usePropagarAlteracaoComplemento'
+import { usePropagarAlteracaoComplemento } from '@/src/presentation/hooks/complementos/usePropagarAlteracaoComplemento'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { arrayMove } from '@dnd-kit/sortable'
 import type { DragEndEvent } from '@dnd-kit/core'
@@ -45,7 +42,6 @@ import {
 } from '../complementos/ComplementosTabsModal'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import {
-  gravarOverridesComplemento,
   reordenarComplementoNoMenu,
   reordenarGrupoComplementoNoMenu,
 } from '@/src/presentation/components/features/complementos/complementoOverrideApi'
@@ -55,20 +51,6 @@ import { cn } from '@/src/shared/utils/cn'
 import type { JiffySidePanelFooterActions } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { espelharSnapshotNoCadastroSeMenuPrincipal } from '@/src/presentation/utils/espelharCadastroMenuPrincipal'
-
-async function copiarPropagacaoComplemento(decisao: DecisaoPropagacaoComplemento): Promise<void> {
-  if (decisao.tipo !== 'aplicar' || decisao.vinculos.length === 0) return
-  try {
-    await gravarOverridesComplemento({ vinculos: decisao.vinculos })
-    showToast.success('Alteração aplicada nos cardápios marcados.')
-  } catch (err) {
-    showToast.error(
-      err instanceof Error
-        ? err.message
-        : 'Salvo neste local, mas não foi possível copiar para os outros cardápios.'
-    )
-  }
-}
 
 /** Grupo vinculado ao produto (estado local da aba). */
 interface GrupoComplementoItem {
@@ -383,6 +365,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
   const invalidate = useInvalidateTenantQueries()
   const {
     pedirConfirmacao: pedirPropagacaoComplemento,
+    aplicarVinculos: aplicarPropagacaoComplemento,
     aberto: propagacaoComplementoAberta,
     dialog: dialogPropagacaoComplemento,
   } = usePropagarAlteracaoComplemento()
@@ -619,18 +602,20 @@ export const ComplementosMultiSelectDialog = forwardRef<
           limparValorDigitado(chave)
           return
         }
-        await gravarOverridesComplemento({
-          vinculos: [
-            {
-              menuId,
-              produtoId,
-              complementoId: comp.getId(),
-              grupoComplementoId: grupoId,
-              valor: novoValor,
-            },
-          ],
-        })
-        await copiarPropagacaoComplemento(decisao)
+        const destinos = decisao.tipo === 'aplicar' ? decisao.vinculos : []
+        await aplicarPropagacaoComplemento([
+          {
+            menuId,
+            produtoId,
+            complementoId: comp.getId(),
+            grupoComplementoId: grupoId,
+            valor: novoValor,
+          },
+          ...destinos,
+        ])
+        if (destinos.length > 0) {
+          showToast.success('Alteração aplicada nos cardápios marcados.')
+        }
         setGroups(prev =>
           prev.map(grupo =>
             grupo.id === grupoId
@@ -654,7 +639,14 @@ export const ComplementosMultiSelectDialog = forwardRef<
         setSalvandoValorChave(prev => ({ ...prev, [chave]: false }))
       }
     },
-    [definirValorDigitado, limparValorDigitado, menuId, pedirPropagacaoComplemento, produtoId]
+    [
+      aplicarPropagacaoComplemento,
+      definirValorDigitado,
+      limparValorDigitado,
+      menuId,
+      pedirPropagacaoComplemento,
+      produtoId,
+    ]
   )
 
   const gravarAtivoNoMenu = useCallback(
@@ -673,18 +665,20 @@ export const ComplementosMultiSelectDialog = forwardRef<
           alteracao: { ativo: proximo },
         })
         if (decisao.tipo === 'cancelado') return
-        await gravarOverridesComplemento({
-          vinculos: [
-            {
-              menuId,
-              produtoId,
-              complementoId: comp.getId(),
-              grupoComplementoId: grupoId,
-              ativo: proximo,
-            },
-          ],
-        })
-        await copiarPropagacaoComplemento(decisao)
+        const destinos = decisao.tipo === 'aplicar' ? decisao.vinculos : []
+        await aplicarPropagacaoComplemento([
+          {
+            menuId,
+            produtoId,
+            complementoId: comp.getId(),
+            grupoComplementoId: grupoId,
+            ativo: proximo,
+          },
+          ...destinos,
+        ])
+        if (destinos.length > 0) {
+          showToast.success('Alteração aplicada nos cardápios marcados.')
+        }
         setGroups(prev =>
           prev.map(grupo =>
             grupo.id === grupoId
@@ -705,7 +699,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
         setSalvandoAtivoChave(prev => ({ ...prev, [chave]: false }))
       }
     },
-    [menuId, pedirPropagacaoComplemento, produtoId]
+    [aplicarPropagacaoComplemento, menuId, pedirPropagacaoComplemento, produtoId]
   )
 
   const loadSelectableGroups = useCallback(async (signal?: AbortSignal) => {
