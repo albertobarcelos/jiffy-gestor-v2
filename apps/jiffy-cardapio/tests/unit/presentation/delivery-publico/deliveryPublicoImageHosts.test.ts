@@ -21,6 +21,12 @@ describe('deliveryPublicoImageHosts', () => {
     expect(deveUsarOtimizadorImagem('/assets/local.jpg')).toBe(true)
     expect(deveUsarOtimizadorImagem('https://cdn.desconhecido.com/foto.jpg')).toBe(false)
     expect(deveUsarOtimizadorImagem('javascript:alert(1)')).toBe(false)
+    expect(
+      deveUsarOtimizadorImagem('https://midia.s3.amazonaws.com/tenant/logo.svg?v=1')
+    ).toBe(false)
+    expect(deveUsarOtimizadorImagem('https://midia.s3.amazonaws.com/tenant/anim.gif')).toBe(
+      false
+    )
   })
 
   it('marca so os primeiros cards da primeira secao', () => {

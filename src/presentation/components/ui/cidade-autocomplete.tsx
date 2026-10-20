@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Input, type InputProps } from './input'
 
 interface Municipio {
@@ -42,16 +43,7 @@ const SCROLL_SPEED = 8
 const SCROLL_INTERVAL_MS = 16 // ~60fps
 
 /**
- * Componente de autocomplete de cidade via API do IBGE.
- *
- * Funcionalidades:
- * - Carrega todas as cidades do estado ao selecionar a UF
- * - Abre o dropdown ao focar no campo (sem precisar digitar)
- * - Filtra a lista localmente enquanto o usuário digita
- * - Botões ▲/▼ com scroll contínuo ao passar o mouse (igual ao Select de estado)
- * - Ao selecionar uma cidade da lista, marca como válido automaticamente
- * - Valida via API ao perder foco caso o usuário tenha digitado sem selecionar da lista
- * - Feedback visual de validação (verde=válido, vermelho=inválido)
+ * Autocomplete de cidade via BFF do Gestor (`/api/v1/ibge/*`).
  */
 export function CidadeAutocomplete({
   value,
@@ -300,23 +292,22 @@ export function CidadeAutocomplete({
   }
 
   /**
-   * Carrega todos os municípios do estado selecionado via API.
-   * Executado uma única vez por estado — a filtragem é feita localmente.
+   * Carrega os municípios do estado pelo BFF. Filtragem é local.
    */
   const carregarMunicipios = async (uf: string) => {
     try {
       setIsLoadingMunicipios(true)
-      const response = await fetch(`/api/v1/ibge/municipios?uf=${uf}`)
-
-      if (response.ok) {
-        const data = await response.json()
-        setAllMunicipios(data.municipios || [])
-      } else {
-        setAllMunicipios([])
+      setErro(null)
+      const response = await fetchGestorApi(`/api/v1/ibge/municipios?uf=${uf}`)
+      if (!response.ok) {
+        throw new Error('Falha ao listar municípios')
       }
+      const data = await response.json()
+      setAllMunicipios(data.municipios || [])
     } catch (error) {
       console.error('Erro ao carregar municípios:', error)
       setAllMunicipios([])
+      setErro('Não foi possível carregar as cidades. Tente novamente.')
     } finally {
       setIsLoadingMunicipios(false)
     }
@@ -586,35 +577,28 @@ export function CidadeAutocomplete({
 
     try {
       setIsValidating(true)
-      const response = await fetch(
+      const response = await fetchGestorApi(
         `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(nomeCidade)}&uf=${estado}`
       )
 
-      if (response.ok) {
-        const data = await response.json()
-        const valido = data.valido === true
+      if (cidadeSelecionadaDuranteBlurRef.current || selectedFromList) {
+        return
+      }
 
-        // Verificar novamente antes de atualizar o estado
-        // (pode ter sido selecionada durante a requisição)
-        if (cidadeSelecionadaDuranteBlurRef.current || selectedFromList) {
-          return // Cidade foi selecionada durante a validação, não atualizar
-        }
-
-        setIsValid(valido)
-        setErro(valido ? null : `Cidade "${nomeCidade}" não encontrada no estado ${estado}`)
-        onValidationChangeRef.current?.(valido)
-      } else {
-        // Verificar novamente antes de atualizar o estado
-        if (cidadeSelecionadaDuranteBlurRef.current || selectedFromList) {
-          return
-        }
+      if (!response.ok) {
         setIsValid(false)
         setErro('Erro ao validar cidade')
         onValidationChangeRef.current?.(false)
+        return
       }
+
+      const data = await response.json()
+      const valido = data.valido === true
+      setIsValid(valido)
+      setErro(valido ? null : `Cidade "${nomeCidade}" não encontrada no estado ${estado}`)
+      onValidationChangeRef.current?.(valido)
     } catch (error) {
       console.error('Erro ao validar cidade:', error)
-      // Verificar novamente antes de atualizar o estado
       if (cidadeSelecionadaDuranteBlurRef.current || selectedFromList) {
         return
       }

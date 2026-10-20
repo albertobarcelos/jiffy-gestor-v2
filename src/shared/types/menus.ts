@@ -61,6 +61,10 @@ export interface MenuProdutoComplementoItemResumo {
   nome: string
   valor?: number
   tipoImpactoPreco?: 'aumenta' | 'diminui' | 'nenhum'
+  /** Efetivo no produto deste cardápio (`ComplementoMenuConfig`). Ausente = ativo. */
+  ativo?: boolean
+  /** Ordem efetiva neste produto/grupo do cardápio. */
+  ordem?: number
 }
 
 export interface MenuProdutoComplementoResumo {

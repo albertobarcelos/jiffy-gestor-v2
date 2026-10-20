@@ -14,7 +14,7 @@ const CADASTRO_LIST_GRID: Record<CadastroListVariant, string> = {
   'grupos-complementos':
     'grid-cols-[auto_minmax(0,1fr)_auto_auto] md:grid-cols-[auto_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_3.5rem]',
   complementos:
-    'grid-cols-[auto_minmax(0,1fr)_auto_auto_auto] md:grid-cols-[auto_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,8.5rem)_minmax(0,7.5rem)_3.5rem]',
+    'grid-cols-[auto_minmax(0,1fr)_auto_auto] md:grid-cols-[auto_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,9.5rem)_3.5rem]',
 }
 
 type CadastroListShellProps = {
