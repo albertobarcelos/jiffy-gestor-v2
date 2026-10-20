@@ -5,4 +5,5 @@ export type DesignCategoriaGrupo = {
   /** Cor hex do grupo (`corHex` do endpoint de listagem). */
   cor: string
   imagemUrl: string | null
+  imageId?: string | null
 }

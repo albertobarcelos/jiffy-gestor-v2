@@ -10,6 +10,10 @@ import {
   useMenuProdutos,
 } from '@/src/presentation/hooks/menus/useMenuCatalog'
 import { useMenuMutations } from '@/src/presentation/hooks/menus/useMenuMutations'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { mensagemLegivelDeliveryMediaError } from '@/src/infrastructure/api/deliveryMediaApi'
+import { removerImagemUseCase } from '@/src/presentation/hooks/media/criarImagemMediaUseCases'
 import { useEntityImageCropUpload } from '@/src/presentation/hooks/useEntityImageCropUpload'
 import { MENU_GRUPO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
 import {
@@ -58,6 +62,8 @@ export function MenuCategoriasEditor({ menuId }: MenuCategoriasEditorProps) {
   const [removerBusy, setRemoverBusy] = useState(false)
   const tipoCadastro = useEscolherTipoProdutoCadastro()
   const { syncProdutos, uploadImagemGrupo } = useMenuMutations(menuId)
+  const invalidate = useInvalidateTenantQueries()
+  const { auth } = useAuthStore()
 
   useEffect(() => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
@@ -139,6 +145,31 @@ export function MenuCategoriasEditor({ menuId }: MenuCategoriasEditorProps) {
       }
     },
     [uploadImagemGrupo]
+  )
+
+  const handleClearImage = useCallback(
+    async (grupoProdutoId: string) => {
+      const grupo = gruposTodos.find(item => item.grupoBase.id === grupoProdutoId)
+      const idImagem = grupo?.image?.imageId?.trim()
+      if (!idImagem) {
+        showToast.error('Não foi possível identificar a imagem para remover.')
+        return
+      }
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado')
+        return
+      }
+      const toastId = showToast.loading('Removendo imagem...')
+      try {
+        await removerImagemUseCase().execute({ imageId: idImagem, token })
+        await invalidate(['menu-grupos', menuId])
+        showToast.successLoading(toastId, 'Imagem removida desta categoria.')
+      } catch (error) {
+        showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+      }
+    },
+    [auth, gruposTodos, invalidate, menuId]
   )
 
   const { selectForEntity, cropModal } = useEntityImageCropUpload({
@@ -315,6 +346,7 @@ export function MenuCategoriasEditor({ menuId }: MenuCategoriasEditorProps) {
                     onEdit={handleEdit}
                     onRemove={handleAskRemove}
                     onChangeImage={handleChangeImage}
+                    onClearImage={grupo.image?.imageId ? handleClearImage : undefined}
                   />
                 </div>
               )

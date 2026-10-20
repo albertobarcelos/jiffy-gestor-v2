@@ -1,4 +1,7 @@
-import { parseImagemUrlProdutoIndex } from '@/src/shared/utils/catalogoProdutoIndex'
+import {
+  parseImageIdProdutoIndex,
+  parseImagemUrlProdutoIndex,
+} from '@/src/shared/utils/catalogoProdutoIndex'
 
 function asPlainRecord(value: unknown): Record<string, unknown> {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
@@ -19,7 +22,8 @@ export class Complemento {
     private readonly ativo: boolean = true,
     private readonly tipoImpactoPreco?: string,
     private readonly ordem?: number,
-    private readonly imagemUrl?: string | null
+    private readonly imagemUrl?: string | null,
+    private readonly imageId?: string | null
   ) {}
 
   static create(
@@ -30,7 +34,8 @@ export class Complemento {
     ativo: boolean = true,
     tipoImpactoPreco?: string,
     ordem?: number,
-    imagemUrl?: string | null
+    imagemUrl?: string | null,
+    imageId?: string | null
   ): Complemento {
     if (!id || !nome) {
       throw new Error('ID e nome são obrigatórios')
@@ -44,7 +49,8 @@ export class Complemento {
       ativo,
       tipoImpactoPreco,
       ordem,
-      imagemUrl
+      imagemUrl,
+      imageId
     )
   }
 
@@ -76,7 +82,8 @@ export class Complemento {
       Complemento.parseAtivo(raw.ativo),
       raw.tipoImpactoPreco != null ? String(raw.tipoImpactoPreco) : undefined,
       raw.ordem != null ? parseInt(String(raw.ordem), 10) : undefined,
-      parseImagemUrlProdutoIndex(payload)
+      parseImagemUrlProdutoIndex(payload),
+      parseImageIdProdutoIndex(payload)
     )
   }
 
@@ -112,11 +119,21 @@ export class Complemento {
     return this.imagemUrl
   }
 
+  getImageId(): string | null {
+    const id = this.imageId?.trim()
+    return id || null
+  }
+
   /** Cópia imutável com a URL persistida da foto — mesma identidade de negócio. */
-  withImagemUrl(imagemUrl: string | null): Complemento {
+  withImagemUrl(imagemUrl: string | null, imageId?: string | null): Complemento {
     const next = imagemUrl?.trim() || null
+    const nextImageId = next
+      ? imageId === undefined
+        ? this.getImageId()
+        : imageId?.trim() || null
+      : null
     const current = this.imagemUrl?.trim() || null
-    if (next === current) return this
+    if (next === current && nextImageId === this.getImageId()) return this
     return new Complemento(
       this.id,
       this.nome,
@@ -125,7 +142,8 @@ export class Complemento {
       this.ativo,
       this.tipoImpactoPreco,
       this.ordem,
-      next
+      next,
+      nextImageId
     )
   }
 
@@ -139,6 +157,7 @@ export class Complemento {
       tipoImpactoPreco: this.tipoImpactoPreco,
       ordem: this.ordem,
       imagemUrl: this.imagemUrl ?? null,
+      imageId: this.getImageId(),
     }
   }
 }

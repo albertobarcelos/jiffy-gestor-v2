@@ -5,10 +5,14 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { DeliveryImageUploadField } from '@/src/presentation/components/ui/DeliveryImageUploadField'
 import { DELIVERY_PRODUTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
 import {
-  fetchProdutoImagemUrl,
   mensagemLegivelDeliveryMediaError,
   uploadProdutoImagem,
 } from '@/src/infrastructure/api/deliveryMediaApi'
+import {
+  buscarImagemProdutoUseCase,
+  removerImagemUseCase,
+} from '@/src/presentation/hooks/media/criarImagemMediaUseCases'
+import { previewImagemEhLocal } from '@/src/presentation/utils/previewImagemLocal'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 
@@ -28,8 +32,10 @@ export function ProdutoImagemPanel({
   const { auth } = useAuthStore()
   const [isLoading, setIsLoading] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [removendoImagem, setRemovendoImagem] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [serverUrl, setServerUrl] = useState<string | null>(null)
+  const [imageId, setImageId] = useState<string | null>(null)
   const loadedProdutoIdRef = useRef<string | null>(null)
 
   const applyImagemUrl = useCallback((url: string | null) => {
@@ -54,10 +60,12 @@ export function ProdutoImagemPanel({
     let cancelled = false
     setIsLoading(true)
 
-    void fetchProdutoImagemUrl(produtoId, token)
-      .then(url => {
+    void buscarImagemProdutoUseCase()
+      .execute({ produtoId, token })
+      .then(produto => {
         if (cancelled) return
-        applyImagemUrl(url)
+        setImageId(produto.getImageId())
+        applyImagemUrl(produto.getImagemUrl())
         loadedProdutoIdRef.current = produtoId
       })
       .catch(() => {
@@ -95,9 +103,11 @@ export function ProdutoImagemPanel({
       const toastId = showToast.loading('Enviando imagem...')
 
       try {
-        await uploadProdutoImagem(produtoId, file, token)
-        const persistedUrl = await fetchProdutoImagemUrl(produtoId, token)
-        applyImagemUrl(persistedUrl ?? preview)
+        const confirmado = await uploadProdutoImagem(produtoId, file, token)
+        setImageId(confirmado.imageId)
+        const persisted = await buscarImagemProdutoUseCase().execute({ produtoId, token })
+        setImageId(persisted.getImageId() ?? confirmado.imageId)
+        applyImagemUrl(persisted.getImagemUrl() ?? preview)
         showToast.successLoading(toastId, 'Imagem enviada com sucesso!')
         onReload?.()
       } catch (error) {
@@ -119,6 +129,38 @@ export function ProdutoImagemPanel({
       return serverUrl
     })
   }, [serverUrl])
+
+  const handleRemoverImagem = useCallback(async () => {
+    const previewLocal = previewImagemEhLocal(previewUrl, serverUrl)
+    if (previewLocal) {
+      handleClearPreview()
+      return
+    }
+    if (!imageId) {
+      showToast.error('Não foi possível identificar a imagem para remover.')
+      return
+    }
+    const token = auth?.getAccessToken()
+    if (!token) {
+      showToast.error('Token não encontrado')
+      return
+    }
+    setRemovendoImagem(true)
+    setIsUploading(true)
+    const toastId = showToast.loading('Removendo imagem...')
+    try {
+      await removerImagemUseCase().execute({ imageId, token })
+      setImageId(null)
+      applyImagemUrl(null)
+      showToast.successLoading(toastId, 'Imagem removida.')
+      onReload?.()
+    } catch (error) {
+      showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+    } finally {
+      setRemovendoImagem(false)
+      setIsUploading(false)
+    }
+  }, [applyImagemUrl, auth, handleClearPreview, imageId, onReload, previewUrl, serverUrl])
 
   if (!produtoId) {
     return (
@@ -151,14 +193,17 @@ export function ProdutoImagemPanel({
         <DeliveryImageUploadField
           label="Imagem (cardápio digital)"
           busy={isUploading}
+          busyLabel={removendoImagem ? 'Removendo imagem…' : 'Enviando foto…'}
           previewUrl={previewUrl}
           cropPreset={DELIVERY_PRODUTO_CROP_PRESET}
           helperText="Após escolher o arquivo, ajuste o recorte (máx. 280×280). JPEG, PNG ou WebP até 1 MB."
           emptyHint="Arraste uma imagem ou clique para selecionar"
           onFileSelected={handleImagemUpload}
           onClearPreview={
-            previewUrl?.startsWith('blob:') && previewUrl !== serverUrl
-              ? handleClearPreview
+            (previewUrl?.startsWith('blob:') && previewUrl !== serverUrl) || imageId
+              ? () => {
+                  void handleRemoverImagem()
+                }
               : undefined
           }
         />

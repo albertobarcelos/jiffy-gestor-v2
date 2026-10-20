@@ -330,7 +330,8 @@ export function menuProdutoToProduto(snapshot: MenuProduto, base?: Produto | nul
     undefined,
     'UN',
     undefined,
-    snapshot.image?.imageUrl ?? null
+    snapshot.image?.imageUrl ?? null,
+    snapshot.image?.imageId ?? null
   )
 }
 
@@ -367,7 +368,8 @@ export function mergeProdutoComSnapshotMenu(base: Produto, snapshot: MenuProduto
     base.getIndicadorProducaoEscala(),
     base.getUnidadeMedida(),
     base.getMenus(),
-    snapshot.image?.imageUrl ?? base.getImagemUrl()
+    snapshot.image?.imageUrl ?? base.getImagemUrl(),
+    snapshot.image?.imageId ?? base.getImageId()
   )
 }
 
