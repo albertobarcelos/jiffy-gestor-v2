@@ -2,7 +2,14 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import {
+  deleteLogoImpressao,
+  getEmpresaMe,
+  getLogoImpressao,
+  patchEmpresa,
+  postLogoImpressao,
+  validarCidadeIbge,
+} from '@/src/infrastructure/api/empresaConfigApi'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -234,11 +241,8 @@ export function EmpresaTab({ mostrarStatusFuso = false }: { mostrarStatusFuso?: 
       return null
     })
     try {
-      const res = await fetchGestorApi('/api/empresas/me/logo-impressao', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (res.ok) {
-        const blob = await res.blob()
+      const blob = await getLogoImpressao(token)
+      if (blob) {
         setServerLogoObjectUrl(URL.createObjectURL(blob))
         setServerHasLogo(true)
       } else {
@@ -328,14 +332,10 @@ export function EmpresaTab({ mostrarStatusFuso = false }: { mostrarStatusFuso?: 
 
     setIsLoading(true)
     try {
-      const response = await fetchGestorApi('/api/empresas/me', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+      const response = await getEmpresaMe(token)
 
       if (response.ok) {
-        const data = await response.json()
+        const data = response.data
 
         // Debug: log da resposta da API
         if (process.env.NODE_ENV === 'development') {
@@ -483,25 +483,12 @@ export function EmpresaTab({ mostrarStatusFuso = false }: { mostrarStatusFuso?: 
     }
 
     try {
-      const body = new FormData()
-      body.append('file', file)
-      const response = await fetchGestorApi('/api/empresas/me/logo-impressao', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body,
-      })
-      const responseData = await response.json().catch(() => ({}))
+      const response = await postLogoImpressao(token, file)
 
       if (response.ok) {
         return { ok: true }
       }
-      const msg =
-        (typeof responseData.error === 'string' && responseData.error) ||
-        (typeof responseData.message === 'string' && responseData.message) ||
-        `Erro ${response.status}`
-      return { ok: false, message: msg }
+      return { ok: false, message: response.error }
     } catch (error) {
       console.error('Erro ao enviar logo de impressão:', error)
       return { ok: false, message: 'Falha ao enviar a logo.' }
@@ -510,21 +497,11 @@ export function EmpresaTab({ mostrarStatusFuso = false }: { mostrarStatusFuso?: 
 
   const deleteLogoImpressaoFromApi = async (token: string): Promise<UploadLogoResult> => {
     try {
-      const response = await fetchGestorApi('/api/empresas/me/logo-impressao', {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-      if (response.ok || response.status === 204 || response.status === 404) {
+      const response = await deleteLogoImpressao(token)
+      if (response.ok || response.status === 404) {
         return { ok: true }
       }
-      const responseData = await response.json().catch(() => ({}))
-      const msg =
-        (typeof responseData.error === 'string' && responseData.error) ||
-        (typeof responseData.message === 'string' && responseData.message) ||
-        `Erro ${response.status}`
-      return { ok: false, message: msg }
+      return { ok: false, message: response.error }
     } catch (error) {
       console.error('Erro ao remover logo de impressão:', error)
       return { ok: false, message: 'Falha ao remover a logo.' }
@@ -663,11 +640,9 @@ export function EmpresaTab({ mostrarStatusFuso = false }: { mostrarStatusFuso?: 
           const nomeCidadeParaValidar = ultimaCidadeBuscada.current || cidade.trim()
 
           try {
-            const response = await fetchGestorApi(
-              `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(nomeCidadeParaValidar)}&uf=${estado}`
-            )
+            const response = await validarCidadeIbge(nomeCidadeParaValidar, estado)
             if (response.ok) {
-              const data = await response.json()
+              const data = response.data
               if (!data.valido) {
                 showToast.error(
                   `Cidade "${nomeCidadeParaValidar}" não encontrada no estado ${estado}. Por favor, selecione uma cidade válida.`
@@ -781,21 +756,11 @@ export function EmpresaTab({ mostrarStatusFuso = false }: { mostrarStatusFuso?: 
 
         console.log('Enviando dados:', body)
 
-        const response = await fetchGestorApi(`/api/empresas/${empresa.getId()}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(body),
-        })
-
-        const responseData = await response.json().catch(() => ({}))
+        const response = await patchEmpresa(token, empresa.getId(), body)
 
         if (!response.ok) {
-          console.error('Erro na resposta:', response.status, responseData)
-          const errorMessage = responseData.error || responseData.message || 'Erro desconhecido'
-          showToast.error(`Erro ao atualizar empresa: ${errorMessage}`)
+          console.error('Erro na resposta:', response.status, response.error)
+          showToast.error(`Erro ao atualizar empresa: ${response.error}`)
           return
         }
 

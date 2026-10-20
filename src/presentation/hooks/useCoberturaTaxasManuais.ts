@@ -3,11 +3,10 @@
 import { useCallback, useMemo } from 'react'
 import { Taxa } from '@/src/domain/entities/Taxa'
 import { montarPayloadPatchTaxaEntrega } from '@/src/application/taxas/montarPayloadPatchTaxaEntrega'
-import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
+import { criarTaxa, excluirTaxa, getTaxa, patchTaxa } from '@/src/infrastructure/api/taxasConfigApi'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { useTaxasInfinite } from '@/src/presentation/hooks/useTaxas'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 function exigirToken(): string {
   const token = useAuthStore.getState().tenantAuth?.getAccessToken()
@@ -15,14 +14,6 @@ function exigirToken(): string {
     throw new Error('Sessão inválida. Faça login novamente.')
   }
   return token
-}
-
-function mensagemErroTaxa(body: unknown, fallback: string): string {
-  return textoErroCorpoApi(body) || fallback
-}
-
-async function parseJson(res: Response): Promise<unknown> {
-  return res.json().catch(() => ({}))
 }
 
 export type AtualizarTaxaManualEntregaInput = {
@@ -52,24 +43,16 @@ export function useCoberturaTaxasManuais() {
   const criar = useCallback(
     async (input: { nome: string; valor: number }) => {
       const token = exigirToken()
-      const response = await fetchGestorApi('/api/taxas', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          nome: input.nome,
-          valor: input.valor,
-          tipo: 'entrega',
-          ativo: true,
-          tributado: false,
-          ncm: null,
-        }),
+      const response = await criarTaxa(token, {
+        nome: input.nome,
+        valor: input.valor,
+        tipo: 'entrega',
+        ativo: true,
+        tributado: false,
+        ncm: null,
       })
       if (!response.ok) {
-        const err = await parseJson(response)
-        throw new Error(mensagemErroTaxa(err, 'Erro ao criar taxa'))
+        throw new Error(response.error)
       }
       await invalidarTaxas()
     },
@@ -83,28 +66,15 @@ export function useCoberturaTaxasManuais() {
       opcoes?: { invalidar?: boolean }
     ) => {
       const token = exigirToken()
-      const getRes = await fetchGestorApi(`/api/taxas/${encodeURIComponent(taxa.getId())}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const getRes = await getTaxa(token, taxa.getId())
       if (!getRes.ok) {
-        const err = await parseJson(getRes)
-        throw new Error(mensagemErroTaxa(err, 'Não foi possível carregar a taxa.'))
+        throw new Error(getRes.error)
       }
 
-      const detalhe = (await getRes.json()) as Record<string, unknown>
-      const payload = montarPayloadPatchTaxaEntrega(detalhe, campos)
-
-      const patchRes = await fetchGestorApi(`/api/taxas/${encodeURIComponent(taxa.getId())}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      })
+      const payload = montarPayloadPatchTaxaEntrega(getRes.data, campos)
+      const patchRes = await patchTaxa(token, taxa.getId(), payload)
       if (!patchRes.ok) {
-        const err = await parseJson(patchRes)
-        throw new Error(mensagemErroTaxa(err, 'Erro ao atualizar taxa.'))
+        throw new Error(patchRes.error)
       }
       if (opcoes?.invalidar !== false) {
         await invalidarTaxas()
@@ -116,16 +86,12 @@ export function useCoberturaTaxasManuais() {
   const excluir = useCallback(
     async (taxa: Taxa) => {
       const token = exigirToken()
-      const res = await fetchGestorApi(`/api/taxas/${encodeURIComponent(taxa.getId())}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (res.status === 204 || res.ok) {
+      const res = await excluirTaxa(token, taxa.getId())
+      if (res.ok) {
         await invalidarTaxas()
         return
       }
-      const err = await parseJson(res)
-      throw new Error(mensagemErroTaxa(err, 'Erro ao excluir taxa.'))
+      throw new Error(res.error)
     },
     [invalidarTaxas]
   )

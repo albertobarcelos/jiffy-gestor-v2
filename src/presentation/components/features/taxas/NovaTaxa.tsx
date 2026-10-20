@@ -13,7 +13,8 @@ import { useRouter } from 'next/navigation'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { FormControl, InputLabel, MenuItem, Select } from '@mui/material'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { criarTaxa, getTaxa, patchTaxa } from '@/src/infrastructure/api/taxasConfigApi'
+import { listarTerminaisPagina } from '@/src/infrastructure/api/terminaisConfigApi'
 import { Input } from '@/src/presentation/components/ui/input'
 import { UppercaseLocaleInput } from '@/src/presentation/components/ui/UppercaseLocaleInput'
 import { Button } from '@/src/presentation/components/ui/button'
@@ -269,24 +270,14 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
 
     while (hasMore && iterations < maxIterations) {
       iterations++
-      const params = new URLSearchParams({
-        limit: String(PAGE_SIZE_TERMINAIS),
-        offset: String(offset),
-      })
-      if (q) {
-        params.set('q', q)
-      }
-
-      const response = await fetchGestorApi(`/api/terminais?${params.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${bearerToken}`,
-          'Content-Type': 'application/json',
-        },
+      const response = await listarTerminaisPagina(bearerToken, {
+        limit: PAGE_SIZE_TERMINAIS,
+        offset,
+        q: q || undefined,
       })
 
       if (!response.ok) break
-
-      const data = await response.json()
+      const data = response.data
       const items = data.items || []
       for (const terminal of items) {
         const id = String(terminal.id || terminal._id || '')
@@ -363,24 +354,14 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
       try {
         const [lista, taxaRes] = await Promise.all([
           fetchListaTerminais(t),
-          fetchGestorApi(`/api/taxas/${encodeURIComponent(editId)}`, {
-            headers: {
-              Authorization: `Bearer ${t}`,
-              'Content-Type': 'application/json',
-            },
-          }),
+          getTaxa(t, editId),
         ])
 
         if (!taxaRes.ok) {
-          const err = await taxaRes.json().catch(() => ({}))
-          const msg =
-            (typeof err.error === 'string' && err.error) ||
-            (typeof err.message === 'string' && err.message) ||
-            'Taxa não encontrada'
-          throw new Error(msg)
+          throw new Error(taxaRes.error)
         }
 
-        const detalhe = (await taxaRes.json()) as Record<string, unknown>
+        const detalhe = taxaRes.data
 
         setTerminaisLista(lista)
 
@@ -565,13 +546,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
     setEnviando(true)
     try {
       if (taxaEditId) {
-        const response = await fetchGestorApi(`/api/taxas/${encodeURIComponent(taxaEditId)}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
+        const response = await patchTaxa(token, taxaEditId, {
             nome: nomeTrim,
             valor: valorApi,
             tipo,
@@ -580,33 +555,17 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
             ncm: ncmNorm ? ncmNorm : null,
             dataAtualizacao,
             terminaisConfig: terminaisConfig.length > 0 ? terminaisConfig : undefined,
-          }),
-        })
+          })
         if (!response.ok) {
-          const err = await response.json().catch(() => ({}))
-          const msg =
-            (typeof err.error === 'string' && err.error) ||
-            (typeof err.message === 'string' && err.message) ||
-            'Erro ao atualizar taxa'
-          showToast.error(msg)
+          showToast.error(response.error)
           return
         }
-        const atualizado = (await response.json().catch(() => null)) as Record<
-          string,
-          unknown
-        > | null
-        if (atualizado && typeof atualizado.dataAtualizacao === 'string') {
-          dataAtualizacaoServidorRef.current = atualizado.dataAtualizacao
+        if (typeof response.data.dataAtualizacao === 'string') {
+          dataAtualizacaoServidorRef.current = response.data.dataAtualizacao
         }
         showToast.success('Taxa atualizada com sucesso!')
       } else {
-        const response = await fetchGestorApi('/api/taxas', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
+        const response = await criarTaxa(token, {
             nome: nomeTrim,
             valor: valorApi,
             tipo,
@@ -614,14 +573,9 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
             tributado,
             ncm: ncmNorm ? ncmNorm : null,
             terminaisConfig: terminaisConfig.length > 0 ? terminaisConfig : undefined,
-          }),
-        })
+          })
         if (!response.ok) {
-          const err = await response.json().catch(() => ({}))
-          const msg =
-            (typeof err.error === 'string' && err.error) ||
-            (typeof err.message === 'string' && err.message) ||
-            'Erro ao criar taxa'
+          const msg = response.error || 'Erro ao criar taxa'
           showToast.error(msg)
           return
         }

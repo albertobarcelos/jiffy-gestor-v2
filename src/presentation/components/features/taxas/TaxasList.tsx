@@ -11,7 +11,7 @@ import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitc
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useTaxasInfinite } from '@/src/presentation/hooks/useTaxas'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { excluirTaxa, getTaxa, patchTaxa } from '@/src/infrastructure/api/taxasConfigApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { cn } from '@/src/shared/utils/cn'
 import {
@@ -227,46 +227,28 @@ export function TaxasList() {
       savingAtivoLockRef.current = true
       setSavingAtivoParaId(taxaId)
       try {
-        const getRes = await fetchGestorApi(`/api/taxas/${encodeURIComponent(taxaId)}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        const getRes = await getTaxa(token, taxaId)
         if (!getRes.ok) {
-          const err = await getRes.json().catch(() => ({}))
-          const msg =
-            (typeof err.error === 'string' && err.error) ||
-            (typeof err.message === 'string' && err.message) ||
-            'Não foi possível carregar a taxa.'
-          throw new Error(msg)
+          throw new Error(getRes.error)
         }
 
-        const detalhe = (await getRes.json()) as Record<string, unknown>
+        const detalhe = getRes.data
         const vr = detalhe.valor
         const valorNum =
           typeof vr === 'number' ? vr : parseFloat(vr != null ? String(vr) : '0')
 
-        const patchRes = await fetchGestorApi(`/api/taxas/${encodeURIComponent(taxaId)}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(
-            montarPayloadPatchTaxa(detalhe, {
+        const patchRes = await patchTaxa(
+          token,
+          taxaId,
+          montarPayloadPatchTaxa(detalhe, {
               nome: String(detalhe.nome ?? ''),
               valor: Number.isFinite(valorNum) ? valorNum : 0,
               tipo: tipoTaxaParaPatch(detalhe.tipo),
               ativo: novoAtivo,
             })
-          ),
-        })
-
+        )
         if (!patchRes.ok) {
-          const err = await patchRes.json().catch(() => ({}))
-          const msg =
-            (typeof err.error === 'string' && err.error) ||
-            (typeof err.message === 'string' && err.message) ||
-            'Erro ao atualizar status.'
-          throw new Error(msg)
+          throw new Error(patchRes.error)
         }
 
         showToast.success(novoAtivo ? 'Taxa ativada.' : 'Taxa desativada.')
@@ -307,12 +289,9 @@ export function TaxasList() {
     setIsDeletingTaxa(true)
     setExcluindoTaxaId(taxa.getId())
     try {
-      const res = await fetchGestorApi(`/api/taxas/${encodeURIComponent(taxa.getId())}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res = await excluirTaxa(token, taxa.getId())
 
-      if (res.status === 204 || res.ok) {
+      if (res.ok) {
         showToast.success('Taxa removida.')
         await invalidate(['taxas'], { refetchType: 'all' })
         setConfirmDeleteOpen(false)
@@ -320,12 +299,7 @@ export function TaxasList() {
         return
       }
 
-      const err = await res.json().catch(() => ({}))
-      const msg =
-        (typeof err.error === 'string' && err.error) ||
-        (typeof err.message === 'string' && err.message) ||
-        'Erro ao excluir taxa.'
-      throw new Error(msg)
+      throw new Error(res.error)
     } catch (e) {
       console.error('confirmarExclusaoTaxa:', e)
       showToast.error(e instanceof Error ? e.message : 'Erro ao excluir taxa.')
