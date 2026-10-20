@@ -5,12 +5,13 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { TaxasNovaModal } from '@/src/presentation/components/features/taxas/TaxasNovaModal'
 import { Taxa } from '@/src/domain/entities/Taxa'
+import { montarPayloadPatchTaxa } from '@/src/application/taxas/montarPayloadPatchTaxaEntrega'
 import { MdDeleteOutline, MdSearch } from 'react-icons/md'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useTaxasInfinite } from '@/src/presentation/hooks/useTaxas'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { excluirTaxa, getTaxa, patchTaxa } from '@/src/infrastructure/api/taxasConfigApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { cn } from '@/src/shared/utils/cn'
 import {
@@ -43,7 +44,6 @@ function formatTipoLabel(tipo: string): string {
   const t = tipo.toLowerCase()
   if (t === 'percentual') return 'Percentual'
   if (t === 'fixo' || t === 'valor_fixo') return 'Valor fixo'
-  if (t === 'entrega') return 'Entrega'
   if (!tipo) return '—'
   return tipo.charAt(0).toLocaleUpperCase('pt-BR') + tipo.slice(1)
 }
@@ -56,33 +56,8 @@ function tipoTaxaParaPatch(raw: unknown): 'percentual' | 'fixo' | 'entrega' {
   return 'percentual'
 }
 
-type TerminalTaxaCfgPayload = {
-  terminalId: string
-  ativo: boolean
-  automatico: boolean
-  mesa: boolean
-  balcao: boolean
-}
-
-/** Monta `terminaisConfig` a partir da resposta GET /api/taxas/:id. */
-function terminaisConfigDoDetalhe(detalhe: Record<string, unknown>): TerminalTaxaCfgPayload[] | undefined {
-  const tcRaw = detalhe.terminaisConfig
-  if (!Array.isArray(tcRaw)) return undefined
-  const out: TerminalTaxaCfgPayload[] = []
-  for (const item of tcRaw) {
-    if (!item || typeof item !== 'object') continue
-    const o = item as Record<string, unknown>
-    const tid = o.terminalId != null ? String(o.terminalId) : ''
-    if (!tid) continue
-    out.push({
-      terminalId: tid,
-      ativo: o.ativo === true || o.ativo === 'true',
-      automatico: o.automatico === true || o.automatico === 'true',
-      mesa: o.mesa === true || o.mesa === 'true',
-      balcao: o.balcao === true || o.balcao === 'true',
-    })
-  }
-  return out.length > 0 ? out : undefined
+function taxaEhTipoEntrega(taxa: Taxa): boolean {
+  return taxa.getTipo().toLowerCase() === 'entrega'
 }
 
 const TaxaRow = memo(function TaxaRow({
@@ -252,60 +227,28 @@ export function TaxasList() {
       savingAtivoLockRef.current = true
       setSavingAtivoParaId(taxaId)
       try {
-        const getRes = await fetchGestorApi(`/api/taxas/${encodeURIComponent(taxaId)}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        const getRes = await getTaxa(token, taxaId)
         if (!getRes.ok) {
-          const err = await getRes.json().catch(() => ({}))
-          const msg =
-            (typeof err.error === 'string' && err.error) ||
-            (typeof err.message === 'string' && err.message) ||
-            'Não foi possível carregar a taxa.'
-          throw new Error(msg)
+          throw new Error(getRes.error)
         }
 
-        const detalhe = (await getRes.json()) as Record<string, unknown>
-
+        const detalhe = getRes.data
         const vr = detalhe.valor
         const valorNum =
           typeof vr === 'number' ? vr : parseFloat(vr != null ? String(vr) : '0')
 
-        const dataAtualizacao =
-          typeof detalhe.dataAtualizacao === 'string' && detalhe.dataAtualizacao
-            ? detalhe.dataAtualizacao
-            : new Date().toISOString()
-
-        const ncmRaw = detalhe.ncm
-        const ncm =
-          ncmRaw === null || ncmRaw === undefined || ncmRaw === ''
-            ? null
-            : String(ncmRaw)
-
-        const patchRes = await fetchGestorApi(`/api/taxas/${encodeURIComponent(taxaId)}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            nome: String(detalhe.nome ?? ''),
-            valor: Number.isFinite(valorNum) ? valorNum : 0,
-            tipo: tipoTaxaParaPatch(detalhe.tipo),
-            ativo: novoAtivo,
-            tributado: detalhe.tributado === true || detalhe.tributado === 'true',
-            ncm,
-            dataAtualizacao,
-            terminaisConfig: terminaisConfigDoDetalhe(detalhe),
-          }),
-        })
-
+        const patchRes = await patchTaxa(
+          token,
+          taxaId,
+          montarPayloadPatchTaxa(detalhe, {
+              nome: String(detalhe.nome ?? ''),
+              valor: Number.isFinite(valorNum) ? valorNum : 0,
+              tipo: tipoTaxaParaPatch(detalhe.tipo),
+              ativo: novoAtivo,
+            })
+        )
         if (!patchRes.ok) {
-          const err = await patchRes.json().catch(() => ({}))
-          const msg =
-            (typeof err.error === 'string' && err.error) ||
-            (typeof err.message === 'string' && err.message) ||
-            'Erro ao atualizar status.'
-          throw new Error(msg)
+          throw new Error(patchRes.error)
         }
 
         showToast.success(novoAtivo ? 'Taxa ativada.' : 'Taxa desativada.')
@@ -346,12 +289,9 @@ export function TaxasList() {
     setIsDeletingTaxa(true)
     setExcluindoTaxaId(taxa.getId())
     try {
-      const res = await fetchGestorApi(`/api/taxas/${encodeURIComponent(taxa.getId())}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res = await excluirTaxa(token, taxa.getId())
 
-      if (res.status === 204 || res.ok) {
+      if (res.ok) {
         showToast.success('Taxa removida.')
         await invalidate(['taxas'], { refetchType: 'all' })
         setConfirmDeleteOpen(false)
@@ -359,12 +299,7 @@ export function TaxasList() {
         return
       }
 
-      const err = await res.json().catch(() => ({}))
-      const msg =
-        (typeof err.error === 'string' && err.error) ||
-        (typeof err.message === 'string' && err.message) ||
-        'Erro ao excluir taxa.'
-      throw new Error(msg)
+      throw new Error(res.error)
     } catch (e) {
       console.error('confirmarExclusaoTaxa:', e)
       showToast.error(e instanceof Error ? e.message : 'Erro ao excluir taxa.')
@@ -403,10 +338,26 @@ export function TaxasList() {
   }, [isLoading, isFetching])
 
   const taxas = useMemo(() => {
-    return data?.pages.flatMap(page => page.taxas) || []
+    return (data?.pages.flatMap(page => page.taxas) || []).filter(
+      taxa => !taxaEhTipoEntrega(taxa)
+    )
   }, [data])
 
-  const totalTaxas = useMemo(() => data?.pages[0]?.count ?? 0, [data])
+  const totalTaxas = useMemo(() => {
+    const apiCount = data?.pages[0]?.count ?? 0
+    const entregaCarregadas = (data?.pages.flatMap(page => page.taxas) || []).filter(
+      taxaEhTipoEntrega
+    ).length
+    // API não filtra por tipo; ao carregar tudo, desconta as de entrega já vistas.
+    if (!hasNextPage) return Math.max(0, apiCount - entregaCarregadas)
+    return Math.max(taxas.length, apiCount - entregaCarregadas)
+  }, [data, hasNextPage, taxas.length])
+
+  // Se a página atual só tinha taxas de entrega, busca a próxima para não ficar lista vazia.
+  useEffect(() => {
+    if (taxas.length > 0 || !hasNextPage || isFetchingNextPage || isLoading) return
+    void fetchNextPage()
+  }, [taxas.length, hasNextPage, isFetchingNextPage, isLoading, fetchNextPage])
 
   useEffect(() => {
     if (debounceTimerRef.current) {

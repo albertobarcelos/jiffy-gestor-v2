@@ -30,7 +30,7 @@ function Rotulo({
 function AcoesHeader({ incluirCopiar }: { incluirCopiar: boolean }) {
   const defs = incluirCopiar ? actionIconsConfig : menuQuickActionIconsConfig
   return (
-    <div className="flex w-full flex-nowrap items-center justify-center gap-2.5 md:gap-3" aria-hidden>
+    <div className="flex w-full flex-nowrap items-center justify-center gap-3" aria-hidden>
       {defs.map(def => (
         <span key={def.key} title={def.label} className="relative flex h-8 w-8 shrink-0 items-center justify-center">
           <span className="absolute left-1/2 top-1/2 w-max max-w-[3.5rem] -translate-x-1/2 -translate-y-1/2 text-center text-[9px] font-semibold leading-tight text-secondary-text">
@@ -60,7 +60,7 @@ export function CatalogProductColumnHeader({
       role="row"
       aria-label="Colunas da lista"
       className={cn(
-        'sticky top-0 z-20 hidden items-center justify-items-center gap-x-1.5 border-b border-gray-200 bg-gray-50/95 px-2 py-1.5 backdrop-blur-sm md:grid md:gap-x-2 md:px-4',
+        'sticky top-0 z-20 hidden items-center gap-x-2 border-b border-gray-200 bg-gray-50/95 px-2 py-1.5 backdrop-blur-sm md:grid md:px-4',
         catalogRowGridClass({
           isMenu,
           hideCodigo: false,
@@ -77,7 +77,7 @@ export function CatalogProductColumnHeader({
         <AcoesHeader incluirCopiar={!isMenu} />
       </div>
       {isMenu ? null : <Rotulo className="catalog-row-area-categ">Categoria</Rotulo>}
-      <div className="catalog-row-area-meta flex w-full items-center justify-end gap-2 md:mr-4 md:gap-4">
+      <div className="catalog-row-area-meta flex w-full items-center justify-end gap-2 md:mr-4 md:w-auto md:justify-end md:gap-4">
         <Rotulo className="w-24">Valor</Rotulo>
         {isMenu ? <Rotulo className="w-14">Pause</Rotulo> : null}
         <span className="w-8" aria-hidden />

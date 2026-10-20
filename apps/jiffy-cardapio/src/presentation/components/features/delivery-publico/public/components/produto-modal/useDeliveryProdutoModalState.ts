@@ -14,7 +14,7 @@ import {
   buildProdutoShareUrl,
   compartilharLinkDelivery,
 } from '../../../shared/utils/compartilharProdutoDelivery'
-import { getProdutoImageSourceRect } from '../../../shared/utils/getProdutoImageSourceRect'
+import { getProdutoImageFlySource } from '../../../shared/utils/getProdutoImageSourceRect'
 import type { FlySourceRect } from '../../../shared/components/FlyingProduct'
 import { observacaoItemCarrinho } from '../../../shared/utils/deliveryCarrinhoItemUtils'
 import type { GrupoComplementoPendente } from '../../../shared/utils/produtoComplementosUtils'
@@ -100,7 +100,8 @@ export function useDeliveryProdutoModalState({
     obterGruposPendentes,
   } = useProdutoComplementos(slug, produto, complementosIniciaisModal)
 
-  const valorBaseProduto = resolverPrecosDeliveryProduto(produto).preco
+  const precosProduto = resolverPrecosDeliveryProduto(produto)
+  const valorBaseProduto = precosProduto.preco
   const valorUnitario = valorBaseProduto
   const valorTotal = calcularTotalProduto(
     itemCarrinhoParaProdutoSelecionado(
@@ -184,6 +185,8 @@ export function useDeliveryProdutoModalState({
         valorTotal,
         observacoes,
         complementos: complementosSelecionados,
+        precoRegular: precosProduto.precoRegular,
+        descontoPercentual: precosProduto.descontoPercentual,
       }
 
       if (itemEdicao) {
@@ -192,11 +195,12 @@ export function useDeliveryProdutoModalState({
         requestClose()
       } else {
         adicionarItem(slug, payload)
+        const flySource = getProdutoImageFlySource(produto.id)
         onAdicionado?.({
           produtoId: produto.id,
           nome: produto.nome,
-          imagemUrl: produto.imagemUrl,
-          sourceRect: getProdutoImageSourceRect(produto.id),
+          imagemUrl: flySource?.loadedSrc?.trim() || produto.imagemUrl,
+          sourceRect: flySource?.rect ?? null,
         })
         requestClose()
       }

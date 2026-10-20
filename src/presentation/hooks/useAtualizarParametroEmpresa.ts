@@ -1,7 +1,6 @@
 'use client'
 
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
+import { patchEmpresa } from '@/src/infrastructure/api/empresaConfigApi'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 
@@ -14,19 +13,11 @@ export function useAtualizarParametroEmpresa() {
 
   return useSecureTenantMutation<unknown, Record<string, unknown>>(
     async ({ token, empresaId }, parametroEmpresa) => {
-      const res = await fetchGestorApi(`/api/empresas/${encodeURIComponent(empresaId)}`, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ parametroEmpresa }),
-      })
-      const raw: unknown = await res.json().catch(() => ({}))
+      const res = await patchEmpresa(token, empresaId, { parametroEmpresa })
       if (!res.ok) {
-        throw new Error(textoErroCorpoApi(raw) || `Erro HTTP ${res.status}`)
+        throw new Error(res.error)
       }
-      return raw
+      return res.data
     },
     {
       onSuccess: async () => {

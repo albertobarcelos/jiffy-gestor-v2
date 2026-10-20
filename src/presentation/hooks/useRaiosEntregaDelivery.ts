@@ -7,8 +7,13 @@ import {
   dispararEmpresaDeliveryAtualizada,
   EMPRESA_DELIVERY_ME_QUERY_KEY,
 } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
+import { requireGestorConfig } from '@/src/infrastructure/api/gestorConfigRequest'
+import {
+  criarRaioEntregaDelivery,
+  excluirRaioEntregaDelivery,
+  listarRaiosEntregaDelivery,
+  patchRaioEntregaDelivery,
+} from '@/src/infrastructure/api/deliveryConfigApi'
 import type {
   CreateRaioEntregaInput,
   RaioEntregaDTO,
@@ -21,35 +26,15 @@ import {
 
 export const RAIOS_ENTREGA_DELIVERY_QUERY_KEY = ['delivery', 'raios-entrega'] as const
 
-async function parseJsonOrThrow(res: Response): Promise<unknown> {
-  const raw: unknown = await res.json().catch(() => ({}))
-  if (!res.ok) {
-    const msg =
-      textoErroCorpoApi(raw) ||
-      (raw &&
-      typeof raw === 'object' &&
-      'error' in raw &&
-      typeof (raw as { error: unknown }).error === 'string'
-        ? (raw as { error: string }).error
-        : '') ||
-      `Erro HTTP ${res.status}`
-    throw new Error(msg)
-  }
-  return raw
-}
-
 export function useRaiosEntregaDelivery(options?: { enabled?: boolean }) {
   const enabled = options?.enabled ?? true
 
   return useSecureTenantQuery<RaioEntregaDTO[]>(
     RAIOS_ENTREGA_DELIVERY_QUERY_KEY,
-    async ({ token }) => {
-      const res = await fetchGestorApi('/api/delivery/empresas/me/raios-entrega', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const data = await parseJsonOrThrow(res)
-      return normalizarListaRaiosEntrega(data)
-    },
+    async ({ token }) =>
+      normalizarListaRaiosEntrega(
+        requireGestorConfig(await listarRaiosEntregaDelivery(token))
+      ),
     {
       enabled,
       staleTime: 1000 * 60,
@@ -65,15 +50,7 @@ export function useCriarRaiosEntregaEmLote() {
   return useSecureTenantMutation<number, CreateRaioEntregaInput[]>(
     async ({ token }, inputs) => {
       for (const input of inputs) {
-        const res = await fetchGestorApi('/api/delivery/empresas/me/raios-entrega', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(input),
-        })
-        await parseJsonOrThrow(res)
+        requireGestorConfig(await criarRaioEntregaDelivery(token, input))
       }
       return inputs.length
     },
@@ -95,19 +72,9 @@ export function useAtualizarRaioEntregaDelivery() {
     { id: string; input: UpdateRaioEntregaInput }
   >(
     async ({ token }, { id, input }) => {
-      const res = await fetchGestorApi(
-        `/api/delivery/empresas/me/raios-entrega/${encodeURIComponent(id)}`,
-        {
-          method: 'PATCH',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(input),
-        }
+      const raio = normalizarRaioEntregaResposta(
+        requireGestorConfig(await patchRaioEntregaDelivery(token, id, input))
       )
-      const data = await parseJsonOrThrow(res)
-      const raio = normalizarRaioEntregaResposta(data)
       if (!raio) throw new Error('Resposta inválida ao atualizar raio de entrega')
       return raio
     },
@@ -130,23 +97,8 @@ export function useAtualizarRaiosEntregaEmLote() {
     async ({ token }, patches) => {
       let ok = 0
       for (const patch of patches) {
-        const res = await fetchGestorApi(
-          `/api/delivery/empresas/me/raios-entrega/${encodeURIComponent(patch.id)}`,
-          {
-            method: 'PATCH',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(patch.input),
-          }
-        )
-        try {
-          await parseJsonOrThrow(res)
-          ok += 1
-        } catch {
-          // Continua as demais faixas; o Salvar reporta o parcial.
-        }
+        const res = await patchRaioEntregaDelivery(token, patch.id, patch.input)
+        if (res.ok) ok += 1
       }
       return { ok, total: patches.length }
     },
@@ -167,16 +119,7 @@ export function useExcluirRaiosEntregaEmLote() {
   return useSecureTenantMutation<number, string[]>(
     async ({ token }, ids) => {
       for (const id of ids) {
-        const res = await fetchGestorApi(
-          `/api/delivery/empresas/me/raios-entrega/${encodeURIComponent(id)}`,
-          {
-            method: 'DELETE',
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        )
-        if (!res.ok && res.status !== 204) {
-          await parseJsonOrThrow(res)
-        }
+        requireGestorConfig(await excluirRaioEntregaDelivery(token, id))
       }
       return ids.length
     },

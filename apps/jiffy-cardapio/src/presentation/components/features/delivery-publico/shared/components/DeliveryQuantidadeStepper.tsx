@@ -35,8 +35,8 @@ export function DeliveryQuantidadeStepper({
   removeLabel = 'Remover item',
   hideDecreaseWhenMin = false,
 }: DeliveryQuantidadeStepperProps) {
-  const btnSize = size === 'sm' ? 'h-8 w-8' : 'h-9 w-9'
-  const iconSize = size === 'sm' ? 'h-4 w-4' : 'h-4 w-4'
+  const btnSize = size === 'sm' ? 'h-10 w-10' : 'h-11 w-11'
+  const iconSize = size === 'sm' ? 'h-4 w-4' : 'h-5 w-5'
   const valueMinWidth = size === 'sm' ? 'min-w-[1.75rem]' : 'min-w-[2rem]'
   const showRemove = removeAtMin && value <= min
   const somenteAumentar = hideDecreaseWhenMin && !showRemove && value <= min

@@ -35,6 +35,7 @@ describe('syncCadastroComMenuPrincipal', () => {
       ])
     ).toBeNull()
     expect(idMenuPrincipalDeLista([{ id: PRINCIPAL }])).toBe(PRINCIPAL)
+    expect(idMenuPrincipalDeLista([])).toBeNull()
   })
 
   it('cadastro novo manda valor/nome no snapshot do menu principal por padrão', () => {

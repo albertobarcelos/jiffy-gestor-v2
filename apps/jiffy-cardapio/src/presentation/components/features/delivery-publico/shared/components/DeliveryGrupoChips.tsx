@@ -5,11 +5,10 @@ import type { DeliveryPublicoDesignConfig } from '../types/deliveryPublicoDesign
 import type { DeliveryPublicoGrupoViewModel } from '../types/deliveryPublicoViewModel'
 
 const CHIP_GAP_PX = 8
-const SIDE_PADDING_PX = 16
-/** Distância mínima para tratar o gesto como arraste (evita engolir clique). */
-const DRAG_THRESHOLD_PX = 10
 /** Folga ao trazer o chip ativo para a área visível da barra. */
 const VISIBLE_EDGE_PADDING_PX = 16
+/** Distância mínima para tratar o gesto como arraste (evita engolir clique). */
+const DRAG_THRESHOLD_PX = 10
 
 type DeliveryGrupoChipsProps = {
   config: DeliveryPublicoDesignConfig
@@ -20,7 +19,7 @@ type DeliveryGrupoChipsProps = {
   onGrupoClick?: (grupoId: string) => void
 }
 
-/** Mantém o chip ativo visível; centraliza quando ele está fora da área visível. */
+/** Mantém o chip ativo visível; centraliza quando ele está fora da área visível da barra. */
 function ensureChipVisible(scroller: HTMLElement, chip: HTMLElement) {
   const scrollerRect = scroller.getBoundingClientRect()
   const chipRect = chip.getBoundingClientRect()
@@ -29,15 +28,14 @@ function ensureChipVisible(scroller: HTMLElement, chip: HTMLElement) {
   const leftBound = scrollerRect.left + VISIBLE_EDGE_PADDING_PX
   const rightBound = scrollerRect.right - VISIBLE_EDGE_PADDING_PX
 
-  let nextLeft = scroller.scrollLeft
-  if (chipRect.left < leftBound || chipRect.right > rightBound) {
-    const chipOffset = chipRect.left - scrollerRect.left + scroller.scrollLeft
-    nextLeft = chipOffset - (scroller.clientWidth - chipRect.width) / 2
-  } else {
-    return
-  }
+  if (chipRect.left >= leftBound && chipRect.right <= rightBound) return
 
-  nextLeft = Math.max(0, Math.min(nextLeft, maxScroll))
+  const chipOffset = chipRect.left - scrollerRect.left + scroller.scrollLeft
+  const nextLeft = Math.max(
+    0,
+    Math.min(chipOffset - (scroller.clientWidth - chipRect.width) / 2, maxScroll)
+  )
+
   if (Math.abs(scroller.scrollLeft - nextLeft) < 1) return
   scroller.scrollTo({ left: nextLeft, behavior: 'auto' })
 }
@@ -120,65 +118,74 @@ export function DeliveryGrupoChips({
   }
 
   return (
-    <div className={`w-full max-w-full min-w-0 ${marginClass}`.trim()}>
+    <div className={`w-full max-w-full min-w-0 px-4 ${marginClass}`.trim()}>
+      {/* Mesma margem da busca (`px-4`) + barra com borda e cantos arredondados. */}
       <div
-        ref={scrollRef}
-        className="w-full max-w-full min-w-0 cursor-grab touch-pan-x overflow-x-auto overflow-y-hidden overscroll-x-contain active:cursor-grabbing [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        style={{ WebkitOverflowScrolling: 'touch' }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
+        className="max-w-full min-w-0 overflow-hidden rounded-lg border"
+        style={{
+          borderColor: 'var(--delivery-border, #e5e7eb)',
+          backgroundColor: 'var(--delivery-surface, #ffffff)',
+        }}
       >
         <div
-          className="flex"
-          style={{
-            width: 'max-content',
-            gap: `${CHIP_GAP_PX}px`,
-            paddingLeft: SIDE_PADDING_PX,
-            paddingRight: SIDE_PADDING_PX,
-          }}
+          ref={scrollRef}
+          className="w-full max-w-full min-w-0 cursor-grab touch-pan-x overflow-x-auto overflow-y-hidden overscroll-x-contain active:cursor-grabbing [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
         >
-          {grupos.map(grupo => {
-            const active = grupo.id === activeGrupoId
-            const className =
-              'shrink-0 rounded-lg border-2 px-3 py-1.5 text-center text-xs font-medium leading-tight transition-[border-color,color] duration-150 @sm:px-3.5 @sm:text-sm @lg:text-base'
-            const style = {
-              color: active ? 'var(--delivery-primary-dark)' : 'var(--delivery-text)',
-              fontFamily: 'var(--delivery-font-body)',
-              borderColor: active
-                ? 'var(--delivery-primary-dark)'
-                : 'var(--delivery-border)',
-              backgroundColor: 'var(--delivery-surface)',
-            } as const
+          <div
+            className="flex py-1.5"
+            style={{
+              width: 'max-content',
+              gap: `${CHIP_GAP_PX}px`,
+              paddingLeft: 10,
+              paddingRight: 10,
+            }}
+          >
+            {grupos.map(grupo => {
+              const active = grupo.id === activeGrupoId
+              const className =
+                'shrink-0 rounded-lg border-2 px-3 py-1.5 text-center text-xs font-medium leading-tight transition-[border-color,color] duration-150 @sm:px-3.5 @sm:text-sm @lg:text-base'
+              const style = {
+                color: active ? 'var(--delivery-primary-dark)' : 'var(--delivery-text)',
+                fontFamily: 'var(--delivery-font-body)',
+                borderColor: active
+                  ? 'var(--delivery-primary-dark)'
+                  : 'var(--delivery-border)',
+                backgroundColor: 'var(--delivery-surface)',
+              } as const
 
-            if (interactive && onGrupoClick) {
+              if (interactive && onGrupoClick) {
+                return (
+                  <button
+                    key={grupo.id}
+                    ref={active ? el => { activeChipRef.current = el } : undefined}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => handleGrupoActivate(grupo.id)}
+                    className={className}
+                    style={style}
+                  >
+                    {grupo.nome}
+                  </button>
+                )
+              }
+
               return (
-                <button
+                <div
                   key={grupo.id}
                   ref={active ? el => { activeChipRef.current = el } : undefined}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => handleGrupoActivate(grupo.id)}
                   className={className}
                   style={style}
                 >
                   {grupo.nome}
-                </button>
+                </div>
               )
-            }
-
-            return (
-              <div
-                key={grupo.id}
-                ref={active ? el => { activeChipRef.current = el } : undefined}
-                className={className}
-                style={style}
-              >
-                {grupo.nome}
-              </div>
-            )
-          })}
+            })}
+          </div>
         </div>
       </div>
     </div>

@@ -54,6 +54,7 @@ import {
 import { FixedRowsScrollArea } from '@/src/presentation/components/ui/FixedRowsScrollArea'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import {
+  intersecaoIdsVinculosDosAlvos,
   uniaoIdsVinculosDosAlvos,
   TEXTOS_VINCULO_IMPRESSORAS,
   TEXTOS_VINCULO_GRUPOS_COMPLEMENTOS,
@@ -2099,27 +2100,34 @@ export function AtualizarPrecoLote() {
    * Listas de vínculo em lote (impressoras / grupos): ver
    * docs/arquitetura-jiffy/5.presentation/3.FLUXO_VINCULO_LOTE.md
    */
-  const idsImpressorasVinculadas = useMemo(
-    () =>
-      uniaoIdsVinculosDosAlvos(
-        produtos,
-        produtosSelecionados,
-        getProdutoId,
-        getProdutoImpressoraIds
-      ),
-    [produtos, produtosSelecionados]
-  )
+  const idsImpressorasVinculadas = useMemo(() => {
+    // Mesma regra dos grupos: Vincular esconde só o que todos os produtos já têm.
+    const calcular =
+      modoImpressora === 'adicionar'
+        ? intersecaoIdsVinculosDosAlvos
+        : uniaoIdsVinculosDosAlvos
+    return calcular(
+      produtos,
+      produtosSelecionados,
+      getProdutoId,
+      getProdutoImpressoraIds
+    )
+  }, [produtos, produtosSelecionados, modoImpressora])
 
-  const idsGruposComplementosVinculados = useMemo(
-    () =>
-      uniaoIdsVinculosDosAlvos(
-        produtos,
-        produtosSelecionados,
-        getProdutoId,
-        getProdutoGrupoComplementoIds
-      ),
-    [produtos, produtosSelecionados]
-  )
+  const idsGruposComplementosVinculados = useMemo(() => {
+    // Vincular esconde o grupo só quando todos os produtos marcados já o têm.
+    // Desvincular continua na união: o grupo aparece se ao menos um o tiver.
+    const calcular =
+      modoGrupoComplemento === 'adicionar'
+        ? intersecaoIdsVinculosDosAlvos
+        : uniaoIdsVinculosDosAlvos
+    return calcular(
+      produtos,
+      produtosSelecionados,
+      getProdutoId,
+      getProdutoGrupoComplementoIds
+    )
+  }, [produtos, produtosSelecionados, modoGrupoComplemento])
 
   const listaImpressorasVinculo = useListaVinculoLote({
     catalogo: impressorasDisponiveis,
