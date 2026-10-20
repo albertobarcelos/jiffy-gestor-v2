@@ -3,10 +3,6 @@ import {
   type EmpresaDeliveryPendenciaItem,
   EMPRESA_DELIVERY_PENDENCIA_TYPES,
 } from '@/src/shared/constants/empresaDeliveryPendencias'
-import {
-  deliveryHubEtapaPath,
-  type DeliveryEtapaId,
-} from '@/src/shared/constants/configuracoesRoutes'
 
 export type DeliveryPassoChecklistId =
   | 'delivery-geolocalizacao'
@@ -16,11 +12,8 @@ export type DeliveryPassoChecklistId =
 
 export type DeliveryPassoChecklist = {
   id: DeliveryPassoChecklistId
-  label: string
   obrigatoria: boolean
   concluido: boolean
-  etapaId: DeliveryEtapaId
-  href: string
 }
 
 /** Sinais locais: a API não marca agenda/cobertura como obrigatórias de forma confiável. */
@@ -29,35 +22,11 @@ export type DeliveryHubProgressoSinais = {
   coberturaConfigurada?: boolean
 }
 
-const PASSOS_BASE: Omit<DeliveryPassoChecklist, 'concluido'>[] = [
-  {
-    id: 'delivery-geolocalizacao',
-    label: 'Empresa e endereço',
-    obrigatoria: true,
-    etapaId: 'delivery-geolocalizacao',
-    href: deliveryHubEtapaPath('delivery-geolocalizacao'),
-  },
-  {
-    id: 'delivery-nome-cardapio',
-    label: 'Nome da loja e cardápio',
-    obrigatoria: true,
-    etapaId: 'delivery-nome-cardapio',
-    href: `${deliveryHubEtapaPath('delivery-design')}?secao=nome-cardapio`,
-  },
-  {
-    id: 'delivery-agenda',
-    label: 'Agenda e funcionamento',
-    obrigatoria: true,
-    etapaId: 'delivery-agenda',
-    href: deliveryHubEtapaPath('delivery-agenda'),
-  },
-  {
-    id: 'delivery-cobertura',
-    label: 'Áreas de entrega e Geo da Empresa',
-    obrigatoria: true,
-    etapaId: 'delivery-cobertura',
-    href: deliveryHubEtapaPath('delivery-cobertura'),
-  },
+const PASSOS_BASE: Array<{ id: DeliveryPassoChecklistId; obrigatoria: boolean }> = [
+  { id: 'delivery-geolocalizacao', obrigatoria: true },
+  { id: 'delivery-nome-cardapio', obrigatoria: true },
+  { id: 'delivery-agenda', obrigatoria: true },
+  { id: 'delivery-cobertura', obrigatoria: true },
 ]
 
 const TIPOS_POR_PASSO: Record<DeliveryPassoChecklistId, string[]> = {
@@ -104,7 +73,6 @@ function concluidoPasso(
   }
 
   if (passoId === 'delivery-cobertura') {
-    // Pin da loja + raio/área: geo vem da API; cobertura ativa do sinal local.
     if (
       temPendenciaObrigatoriaDoTipo(lista, [
         EMPRESA_DELIVERY_PENDENCIA_TYPES.GEOLOCALIZACAO_NAO_CONFIGURADA,

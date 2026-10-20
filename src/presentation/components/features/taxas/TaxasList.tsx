@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { TaxasNovaModal } from '@/src/presentation/components/features/taxas/TaxasNovaModal'
 import { Taxa } from '@/src/domain/entities/Taxa'
+import { montarPayloadPatchTaxa } from '@/src/application/taxas/montarPayloadPatchTaxaEntrega'
 import { MdDeleteOutline, MdSearch } from 'react-icons/md'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -57,35 +58,6 @@ function tipoTaxaParaPatch(raw: unknown): 'percentual' | 'fixo' | 'entrega' {
 
 function taxaEhTipoEntrega(taxa: Taxa): boolean {
   return taxa.getTipo().toLowerCase() === 'entrega'
-}
-
-type TerminalTaxaCfgPayload = {
-  terminalId: string
-  ativo: boolean
-  automatico: boolean
-  mesa: boolean
-  balcao: boolean
-}
-
-/** Monta `terminaisConfig` a partir da resposta GET /api/taxas/:id. */
-function terminaisConfigDoDetalhe(detalhe: Record<string, unknown>): TerminalTaxaCfgPayload[] | undefined {
-  const tcRaw = detalhe.terminaisConfig
-  if (!Array.isArray(tcRaw)) return undefined
-  const out: TerminalTaxaCfgPayload[] = []
-  for (const item of tcRaw) {
-    if (!item || typeof item !== 'object') continue
-    const o = item as Record<string, unknown>
-    const tid = o.terminalId != null ? String(o.terminalId) : ''
-    if (!tid) continue
-    out.push({
-      terminalId: tid,
-      ativo: o.ativo === true || o.ativo === 'true',
-      automatico: o.automatico === true || o.automatico === 'true',
-      mesa: o.mesa === true || o.mesa === 'true',
-      balcao: o.balcao === true || o.balcao === 'true',
-    })
-  }
-  return out.length > 0 ? out : undefined
 }
 
 const TaxaRow = memo(function TaxaRow({
@@ -268,21 +240,9 @@ export function TaxasList() {
         }
 
         const detalhe = (await getRes.json()) as Record<string, unknown>
-
         const vr = detalhe.valor
         const valorNum =
           typeof vr === 'number' ? vr : parseFloat(vr != null ? String(vr) : '0')
-
-        const dataAtualizacao =
-          typeof detalhe.dataAtualizacao === 'string' && detalhe.dataAtualizacao
-            ? detalhe.dataAtualizacao
-            : new Date().toISOString()
-
-        const ncmRaw = detalhe.ncm
-        const ncm =
-          ncmRaw === null || ncmRaw === undefined || ncmRaw === ''
-            ? null
-            : String(ncmRaw)
 
         const patchRes = await fetchGestorApi(`/api/taxas/${encodeURIComponent(taxaId)}`, {
           method: 'PATCH',
@@ -290,16 +250,14 @@ export function TaxasList() {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            nome: String(detalhe.nome ?? ''),
-            valor: Number.isFinite(valorNum) ? valorNum : 0,
-            tipo: tipoTaxaParaPatch(detalhe.tipo),
-            ativo: novoAtivo,
-            tributado: detalhe.tributado === true || detalhe.tributado === 'true',
-            ncm,
-            dataAtualizacao,
-            terminaisConfig: terminaisConfigDoDetalhe(detalhe),
-          }),
+          body: JSON.stringify(
+            montarPayloadPatchTaxa(detalhe, {
+              nome: String(detalhe.nome ?? ''),
+              valor: Number.isFinite(valorNum) ? valorNum : 0,
+              tipo: tipoTaxaParaPatch(detalhe.tipo),
+              ativo: novoAtivo,
+            })
+          ),
         })
 
         if (!patchRes.ok) {

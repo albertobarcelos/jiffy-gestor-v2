@@ -22,6 +22,10 @@ export default defineConfig({
         __dirname,
         '../../src/shared/utils/intervaloHorario.ts'
       ),
+      '@jiffy/funcionamento-delivery-core': path.resolve(
+        __dirname,
+        '../../src/shared/utils/funcionamentoDeliveryCore.ts'
+      ),
     },
   },
 })

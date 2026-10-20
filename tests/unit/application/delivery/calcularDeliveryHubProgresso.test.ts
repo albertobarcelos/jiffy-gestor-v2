@@ -70,12 +70,6 @@ describe('calcularDeliveryHubProgresso', () => {
       true
     )
     expect(comPin.passos.find(passo => passo.id === 'delivery-cobertura')?.concluido).toBe(false)
-    expect(comPin.passos.find(passo => passo.id === 'delivery-cobertura')?.href).toBe(
-      '/config/delivery/cobertura'
-    )
-    expect(comPin.passos.find(passo => passo.id === 'delivery-cobertura')?.label).toBe(
-      'Áreas de entrega e Geo da Empresa'
-    )
 
     const comTimezone = calcularDeliveryHubProgresso(
       [

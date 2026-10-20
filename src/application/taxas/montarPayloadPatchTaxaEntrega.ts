@@ -6,22 +6,29 @@ export type TerminalTaxaConfigPatch = {
   balcao: boolean
 }
 
-export type CamposPatchTaxaEntrega = {
+export type TipoTaxaPatch = 'percentual' | 'fixo' | 'entrega'
+
+export type CamposPatchTaxa = {
   nome: string
   valor: number
   ativo: boolean
+  tipo: TipoTaxaPatch
 }
 
-export type PayloadPatchTaxaEntrega = {
+export type CamposPatchTaxaEntrega = Omit<CamposPatchTaxa, 'tipo'>
+
+export type PayloadPatchTaxa = {
   nome: string
   valor: number
-  tipo: 'entrega'
+  tipo: TipoTaxaPatch
   ativo: boolean
   tributado: boolean
   ncm: string | null
   dataAtualizacao: string
   terminaisConfig?: TerminalTaxaConfigPatch[]
 }
+
+export type PayloadPatchTaxaEntrega = PayloadPatchTaxa & { tipo: 'entrega' }
 
 export function terminaisConfigDoDetalheTaxa(
   detalhe: Record<string, unknown>
@@ -47,13 +54,13 @@ export function terminaisConfigDoDetalheTaxa(
 }
 
 /**
- * PATCH de taxa de entrega: preserva tributado, NCM e terminais do GET.
+ * PATCH de taxa: preserva tributado, NCM e terminais do GET.
  */
-export function montarPayloadPatchTaxaEntrega(
+export function montarPayloadPatchTaxa(
   detalhe: Record<string, unknown>,
-  campos: CamposPatchTaxaEntrega,
+  campos: CamposPatchTaxa,
   agora: Date = new Date()
-): PayloadPatchTaxaEntrega {
+): PayloadPatchTaxa {
   const dataAtualizacao =
     typeof detalhe.dataAtualizacao === 'string' && detalhe.dataAtualizacao
       ? detalhe.dataAtualizacao
@@ -65,11 +72,19 @@ export function montarPayloadPatchTaxaEntrega(
   return {
     nome: campos.nome,
     valor: campos.valor,
-    tipo: 'entrega',
+    tipo: campos.tipo,
     ativo: campos.ativo,
     tributado: detalhe.tributado === true || detalhe.tributado === 'true',
     ncm,
     dataAtualizacao,
     terminaisConfig: terminaisConfigDoDetalheTaxa(detalhe),
   }
+}
+
+export function montarPayloadPatchTaxaEntrega(
+  detalhe: Record<string, unknown>,
+  campos: CamposPatchTaxaEntrega,
+  agora: Date = new Date()
+): PayloadPatchTaxaEntrega {
+  return montarPayloadPatchTaxa(detalhe, { ...campos, tipo: 'entrega' }, agora) as PayloadPatchTaxaEntrega
 }

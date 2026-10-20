@@ -21,6 +21,9 @@
       ],
       "@jiffy/intervalo-horario": [
         "../../src/shared/utils/intervaloHorario.ts"
+      ],
+      "@jiffy/funcionamento-delivery-core": [
+        "../../src/shared/utils/funcionamentoDeliveryCore.ts"
       ]
     }
   },

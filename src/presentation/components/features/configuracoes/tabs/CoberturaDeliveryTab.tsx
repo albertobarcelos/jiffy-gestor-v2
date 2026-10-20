@@ -21,12 +21,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/src/presentation/components/ui/dialog'
-import {
-  dispararEmpresaDeliveryAtualizada,
-  EMPRESA_DELIVERY_ME_QUERY_KEY,
-  useEmpresaDeliveryMe,
-} from '@/src/presentation/hooks/useEmpresaDeliveryMe'
-import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
+import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
+import { useEmpresaEnderecoGeo } from '@/src/presentation/hooks/useEmpresaEnderecoGeo'
 import { useAtualizarRaioEntregaDelivery, useAtualizarRaiosEntregaEmLote, useCriarRaiosEntregaEmLote, useExcluirRaiosEntregaEmLote, useRaiosEntregaDelivery } from '@/src/presentation/hooks/useRaiosEntregaDelivery'
 import {
   useAreasEntregaDelivery,
@@ -35,9 +31,6 @@ import {
   useCriarAreaEntregaDelivery,
   useExcluirAreaEntregaDelivery,
 } from '@/src/presentation/hooks/useAreasEntregaDelivery'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
-import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { showToast } from '@/src/shared/utils/toast'
 import { DELIVERY_HUB_PATH, configuracoesTabPath } from '@/src/shared/constants/configuracoesRoutes'
 import {
@@ -52,14 +45,8 @@ import {
 import {
   enderecoEmpresaGeocodeMinimo,
   geocodificarEnderecoEmpresaViaGoogle,
-  lerCamposEnderecoEmpresa,
-  lerEnderecoLocalizacaoDoPayloadEmpresa,
-  montarPatchEnderecoGeolocalizacao,
 } from '@/src/shared/utils/geolocalizacaoEmpresa'
-import type {
-  EnderecoEmpresaGeocodeInput,
-  GeocodeEmpresaResult,
-} from '@/src/shared/utils/geolocalizacaoEmpresa'
+import type { GeocodeEmpresaResult } from '@/src/shared/utils/geolocalizacaoEmpresa'
 import { pontosGeoIguais, type GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import {
   latLngPathsToGeoJsonPolygon,
@@ -129,16 +116,6 @@ const CoberturaDeliveryMap = dynamic(
 
 const TEMPO_PADRAO_FAIXA_KM = 45
 const ALCANCE_INICIAL_KM = 4
-const CAMPOS_ENDERECO_PIN = [
-  'cep',
-  'rua',
-  'numero',
-  'complemento',
-  'bairro',
-  'cidade',
-  'estado',
-  'codigoCidadeIbge',
-] as const
 
 function mensagemErroArea(error: unknown): string {
   const msg = error instanceof Error ? error.message : 'Não foi possível salvar a área.'
@@ -291,35 +268,7 @@ export function CoberturaDeliveryTab() {
   const atualizarAreaMutation = useAtualizarAreaEntregaDelivery()
   const atualizarAreasLoteMutation = useAtualizarAreasEntregaEmLote()
   const excluirAreaMutation = useExcluirAreaEntregaDelivery()
-
-  const geoQuery = useSecureTenantQuery<{
-    enderecoLocalizacao: GeoJsonPoint | null
-    providerEnderecoId: string | null
-    endereco: EnderecoEmpresaGeocodeInput
-  }>(
-    ['empresa', 'endereco-geo'],
-    async ({ token }) => {
-      const res = await fetchGestorApi('/api/empresas/me', {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: 'no-store',
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(typeof body.error === 'string' ? body.error : `Erro ${res.status}`)
-      }
-      const data = await res.json()
-      const endereco =
-        data.endereco && typeof data.endereco === 'object' && !Array.isArray(data.endereco)
-          ? data.endereco
-          : null
-      const loc = lerEnderecoLocalizacaoDoPayloadEmpresa(endereco)
-      return {
-        ...loc,
-        endereco: lerCamposEnderecoEmpresa(endereco),
-      }
-    },
-    { staleTime: 1000 * 60 * 2, refetchOnWindowFocus: false }
-  )
+  const { geoQuery, atualizarOrigemMutation } = useEmpresaEnderecoGeo()
 
   const [areaExcluindo, setAreaExcluindo] = useState<AreaEntregaDTO | null>(null)
   const [ferramenta, setFerramenta] = useState<FerramentaCobertura>('navegar')
@@ -350,61 +299,6 @@ export function CoberturaDeliveryTab() {
   const geocodeAssinaturaRef = useRef('')
   const [mapaIndisponivel, setMapaIndisponivel] = useState(mapaGoogleAuthFalhou)
   const acoesDesenhoRef = useRef<AcoesDesenhoCobertura | null>(null)
-  const invalidateQueries = useInvalidateTenantQueries()
-
-  const atualizarOrigemMutation = useSecureTenantMutation<
-    void,
-    { point: GeoJsonPoint; providerEnderecoId?: string | null }
-  >(
-    async ({ token }, { point, providerEnderecoId }) => {
-      const getRes = await fetchGestorApi('/api/empresas/me', {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: 'no-store',
-      })
-      if (!getRes.ok) throw new Error('Não foi possível ler o endereço da empresa.')
-      const data: unknown = await getRes.json()
-      const payload = data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
-      const empresaId = payload.id != null ? String(payload.id) : ''
-      if (!empresaId) throw new Error('Não foi possível identificar a empresa.')
-      const atual =
-        payload.endereco && typeof payload.endereco === 'object' && !Array.isArray(payload.endereco)
-          ? (payload.endereco as Record<string, unknown>)
-          : {}
-      const endereco: Record<string, unknown> = {}
-      for (const campo of CAMPOS_ENDERECO_PIN) {
-        const valor = atual[campo]
-        if (valor != null && valor !== '') endereco[campo] = valor
-      }
-      Object.assign(endereco, montarPatchEnderecoGeolocalizacao(point, providerEnderecoId) ?? {})
-      const res = await fetchGestorApi(`/api/empresas/${encodeURIComponent(empresaId)}`, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ endereco }),
-      })
-      if (!res.ok) {
-        const body: unknown = await res.json().catch(() => ({}))
-        const erro =
-          body && typeof body === 'object' && 'error' in body && typeof body.error === 'string'
-            ? body.error
-            : 'Não foi possível atualizar o pin da loja.'
-        throw new Error(erro)
-      }
-    },
-    {
-      onSuccess: async () => {
-        await invalidateQueries(['empresa', 'endereco-geo'])
-        await invalidateQueries(['empresas', 'me'])
-        await invalidateQueries(EMPRESA_DELIVERY_ME_QUERY_KEY)
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new Event('jiffy:empresa-me-updated'))
-        }
-        dispararEmpresaDeliveryAtualizada()
-      },
-    }
-  )
 
   const empresaDelivery = empresaDeliveryQuery.data
   const raios = raiosQuery.data ?? []
