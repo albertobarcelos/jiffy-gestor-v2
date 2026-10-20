@@ -2,63 +2,30 @@ import type {
   DiaDaSemanaApi,
   FuncionamentoDoDiaDTO,
   FuncionamentoPublicoDiaDTO,
-  MotivoDisponibilidadeDelivery,
   SubstituirAgendaFuncionamentoDeliveryRequest,
 } from '@/src/application/dto/delivery/FuncionamentoDeliveryDTO'
-import { DIAS_DA_SEMANA_API } from '@/src/application/dto/delivery/FuncionamentoDeliveryDTO'
+import {
+  horarioParaMinutos,
+  intervaloCruzaMeiaNoite,
+} from '@jiffy/intervalo-horario'
+import {
+  agendaTemDiaAberto,
+  arredondarHorarioFuncionamento15Min,
+  criarAgendaSemanalVazia,
+  DIAS_DA_SEMANA_ORDEM_UI,
+  LABEL_DIA_DA_SEMANA,
+  LABEL_MOTIVO_DISPONIBILIDADE,
+  listarHorariosFuncionamento15Min,
+} from '@jiffy/funcionamento-delivery-core'
 
-/** Ordem exibida na UI (Segunda → Domingo). */
-export const DIAS_DA_SEMANA_ORDEM_UI: DiaDaSemanaApi[] = [
-  'SEGUNDA',
-  'TERCA',
-  'QUARTA',
-  'QUINTA',
-  'SEXTA',
-  'SABADO',
-  'DOMINGO',
-]
-
-export const LABEL_DIA_DA_SEMANA: Record<DiaDaSemanaApi, string> = {
-  DOMINGO: 'Domingo',
-  SEGUNDA: 'Segunda',
-  TERCA: 'Terça',
-  QUARTA: 'Quarta',
-  QUINTA: 'Quinta',
-  SEXTA: 'Sexta',
-  SABADO: 'Sábado',
-}
-
-export const LABEL_MOTIVO_DISPONIBILIDADE: Record<MotivoDisponibilidadeDelivery, string> = {
-  ABERTO_PELO_HORARIO: 'Aberta pelo horário da agenda',
-  FECHADO_FORA_DO_HORARIO: 'Fechada fora do horário da agenda',
-  FECHADO_SEM_ABERTURA_AUTOMATICA: 'Fechada — abertura automática desligada',
-  ABERTO_MANUALMENTE: 'Aberta manualmente',
-  FECHADO_MANUALMENTE: 'Fechada manualmente',
-  ABERTO_SEM_AGENDA: 'Aberta — agenda ainda não configurada',
-}
-
-const HORARIOS_15_MIN: string[] = (() => {
-  const slots: string[] = []
-  for (let h = 0; h < 24; h++) {
-    for (const m of [0, 15, 30, 45]) {
-      slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`)
-    }
-  }
-  return slots
-})()
-
-export function listarHorariosFuncionamento15Min(): readonly string[] {
-  return HORARIOS_15_MIN
-}
-
-export function arredondarHorarioFuncionamento15Min(valor: string): string {
-  const match = /^(\d{1,2}):(\d{2})$/.exec(valor.trim())
-  if (!match) return '09:00'
-  const horas = Math.min(23, Math.max(0, Number(match[1])))
-  const minutosBrutos = Math.min(59, Math.max(0, Number(match[2])))
-  const minutos = Math.round(minutosBrutos / 15) * 15
-  const minutosFinal = minutos >= 60 ? 45 : minutos
-  return `${String(horas).padStart(2, '0')}:${String(minutosFinal).padStart(2, '0')}`
+export {
+  agendaTemDiaAberto,
+  arredondarHorarioFuncionamento15Min,
+  criarAgendaSemanalVazia,
+  DIAS_DA_SEMANA_ORDEM_UI,
+  LABEL_DIA_DA_SEMANA,
+  LABEL_MOTIVO_DISPONIBILIDADE,
+  listarHorariosFuncionamento15Min,
 }
 
 export type DiaAgendaFormState = {
@@ -66,13 +33,6 @@ export type DiaAgendaFormState = {
   aberto: boolean
   abreEm: string
   fechaEm: string
-}
-
-export function criarAgendaSemanalVazia(): FuncionamentoDoDiaDTO[] {
-  return DIAS_DA_SEMANA_API.map(diaDaSemana => ({
-    diaDaSemana,
-    intervalos: [],
-  }))
 }
 
 export function criarFormAgendaPadrao(): DiaAgendaFormState[] {
@@ -122,10 +82,6 @@ export function formAgendaParaRequest(
   }
 }
 
-export function agendaTemDiaAberto(agendaSemanal: FuncionamentoDoDiaDTO[] | undefined): boolean {
-  return (agendaSemanal ?? []).some(d => d.intervalos.length > 0)
-}
-
 const MAP_JS_DIA_PARA_API: Record<number, DiaDaSemanaApi> = {
   0: 'DOMINGO',
   1: 'SEGUNDA',
@@ -145,7 +101,9 @@ function diaDaSemanaHoje(): DiaDaSemanaApi {
 }
 
 function formatarIntervalo(abreEm: string, fechaEm: string): string {
-  return `das ${abreEm} às ${fechaEm}`
+  const base = `das ${abreEm} às ${fechaEm}`
+  if (!intervaloCruzaMeiaNoite(abreEm, fechaEm)) return base
+  return `${base} (dia seguinte)`
 }
 
 function buscarIntervaloHoje(
@@ -155,14 +113,6 @@ function buscarIntervaloHoje(
   const hoje = diaDaSemanaEm(agora)
   const dia = agendaSemanal.find(d => d.diaDaSemana === hoje)
   return dia?.intervalos[0] ?? null
-}
-
-function horarioParaMinutos(hhmm: string): number {
-  const match = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim())
-  if (!match) return 0
-  const horas = Math.min(23, Math.max(0, Number(match[1])))
-  const minutos = Math.min(59, Math.max(0, Number(match[2])))
-  return horas * 60 + minutos
 }
 
 function agoraEmMinutos(agora: Date = new Date()): number {
@@ -229,11 +179,21 @@ export function formatarStatusLojaPublica(input: {
 }): StatusLojaPublica {
   if (input.aberta) {
     const intervaloHoje = buscarIntervaloHoje(input.agendaSemanal, input.agora)
+    if (!intervaloHoje?.fechaEm) {
+      return {
+        mensagem: 'Aberto, faça seu pedido!',
+        detalheHorario: null,
+      }
+    }
+    const sufixoVirada = intervaloCruzaMeiaNoite(
+      intervaloHoje.abreEm,
+      intervaloHoje.fechaEm
+    )
+      ? ' (dia seguinte)'
+      : ''
     return {
       mensagem: 'Aberto, faça seu pedido!',
-      detalheHorario: intervaloHoje?.fechaEm
-        ? `até as ${intervaloHoje.fechaEm}`
-        : null,
+      detalheHorario: `até as ${intervaloHoje.fechaEm}${sufixoVirada}`,
     }
   }
 
@@ -307,7 +267,14 @@ export function listarAgendaSemanalPublica(
     const intervalos = porDia.get(diaDaSemana)?.intervalos ?? []
     const aberto = intervalos.length > 0
     const texto = aberto
-      ? intervalos.map(i => `${i.abreEm} – ${i.fechaEm}`).join(', ')
+      ? intervalos
+          .map(i => {
+            const base = `${i.abreEm} – ${i.fechaEm}`
+            return intervaloCruzaMeiaNoite(i.abreEm, i.fechaEm)
+              ? `${base} (dia seguinte)`
+              : base
+          })
+          .join(', ')
       : 'Fechado'
 
     return {

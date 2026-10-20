@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useRef, useState } from 'react'
-import { MdAddAPhoto, MdImageNotSupported } from 'react-icons/md'
+import { MdAddAPhoto, MdDeleteOutline, MdImageNotSupported } from 'react-icons/md'
 import { MENU_PRODUTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
 import { useImageCropFlow } from '@/src/presentation/hooks/useImageCropFlow'
 import {
@@ -21,6 +21,7 @@ export type ProdutoPreviewImageUpload = {
   /** Texto quando upload está desabilitado (ex.: produto ainda não salvo) */
   disabledHint?: string
   onUpload: (file: File) => void | Promise<void>
+  onClear?: () => void | Promise<void>
 }
 
 interface ProdutoSimplePreviewCardProps extends ProdutoPreviewModel {
@@ -172,6 +173,21 @@ export function ProdutoSimplePreviewCard({
               }}
               aria-hidden
             />
+          ) : null}
+
+          {imagem && imageUpload?.onClear && !imageUpload.busy ? (
+            <button
+              type="button"
+              title="Remover imagem"
+              aria-label="Remover imagem"
+              onClick={event => {
+                event.stopPropagation()
+                void imageUpload.onClear?.()
+              }}
+              className="absolute right-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-md bg-white/90 text-neutral-600 shadow-sm ring-1 ring-black/5 hover:bg-red-50 hover:text-red-700"
+            >
+              <MdDeleteOutline className="h-4 w-4" aria-hidden />
+            </button>
           ) : null}
 
           {imagem ? (

@@ -7,6 +7,7 @@ import {
   uploadEmpresaDeliveryBanner,
   uploadEmpresaDeliveryLogo,
 } from '@/src/infrastructure/api/deliveryMediaApi'
+import { removerImagemUseCase } from '@/src/presentation/hooks/media/criarImagemMediaUseCases'
 import { fetchEmpresaPublicaMidia } from '@/src/infrastructure/api/empresaDeliveryMidiaApi'
 import { validateDeliveryImageFile } from '@/src/shared/constants/deliveryImageUpload'
 import { showToast } from '@/src/shared/utils/toast'
@@ -43,6 +44,8 @@ export function useDesignCabecalhoMidia({
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
   const [isUploadingBanner, setIsUploadingBanner] = useState(false)
   const hydratedSlugRef = useRef<string | null>(null)
+  const logoImageIdRef = useRef<string | null>(null)
+  const bannerImageIdRef = useRef<string | null>(null)
 
   const updateCabecalhoField = useCallback(
     (field: CabecalhoMidiaField, url: string | null) => {
@@ -140,11 +143,12 @@ export function useDesignCabecalhoMidia({
       )
 
       try {
-        if (field === 'logoUrl') {
-          await uploadEmpresaDeliveryLogo(file, token)
-        } else {
-          await uploadEmpresaDeliveryBanner(file, token)
-        }
+        const confirmado =
+          field === 'logoUrl'
+            ? await uploadEmpresaDeliveryLogo(file, token)
+            : await uploadEmpresaDeliveryBanner(file, token)
+        if (field === 'logoUrl') logoImageIdRef.current = confirmado.imageId
+        else bannerImageIdRef.current = confirmado.imageId
 
         const { logoUrl: apiLogo, bannerUrl: apiBanner } =
           await fetchEmpresaPublicaMidia(trimmedSlug)
@@ -178,15 +182,65 @@ export function useDesignCabecalhoMidia({
     [uploadMidia]
   )
 
+  const imageIdDaEmpresa = useCallback(
+    async (field: CabecalhoMidiaField, token: string): Promise<string | null> => {
+      const atual = field === 'logoUrl' ? logoImageIdRef.current : bannerImageIdRef.current
+      if (atual) return atual
+      const response = await fetch('/api/delivery/empresas/me', {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      })
+      if (!response.ok) return null
+      const body = (await response.json().catch(() => null)) as {
+        logo?: { imageId?: string | null } | null
+        banner?: { imageId?: string | null } | null
+      } | null
+      const logoId = body?.logo?.imageId?.trim() || null
+      const bannerId = body?.banner?.imageId?.trim() || null
+      logoImageIdRef.current = logoId
+      bannerImageIdRef.current = bannerId
+      return field === 'logoUrl' ? logoId : bannerId
+    },
+    []
+  )
+
+  const removerMidia = useCallback(
+    async (field: CabecalhoMidiaField, url: string | null) => {
+      if (url?.startsWith('blob:') || !isPersistedImageUrl(url)) {
+        revokeBlobUrl(url)
+        updateCabecalhoField(field, null)
+        return
+      }
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado')
+        return
+      }
+      const toastId = showToast.loading(field === 'logoUrl' ? 'Removendo logo...' : 'Removendo capa...')
+      try {
+        const imageId = await imageIdDaEmpresa(field, token)
+        if (!imageId) {
+          showToast.errorLoading(toastId, 'Não foi possível identificar a imagem para remover.')
+          return
+        }
+        await removerImagemUseCase().execute({ imageId, token })
+        if (field === 'logoUrl') logoImageIdRef.current = null
+        else bannerImageIdRef.current = null
+        updateCabecalhoField(field, null)
+        showToast.successLoading(toastId, field === 'logoUrl' ? 'Logo removida.' : 'Capa removida.')
+      } catch (error) {
+        showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+      }
+    },
+    [auth, imageIdDaEmpresa, updateCabecalhoField]
+  )
+
   const clearLogo = useCallback(() => {
-    revokeBlobUrl(logoUrl)
-    updateCabecalhoField('logoUrl', null)
-  }, [logoUrl, updateCabecalhoField])
+    void removerMidia('logoUrl', logoUrl)
+  }, [logoUrl, removerMidia])
 
   const clearBanner = useCallback(() => {
-    revokeBlobUrl(capaUrl)
-    updateCabecalhoField('capaUrl', null)
-  }, [capaUrl, updateCabecalhoField])
+    void removerMidia('capaUrl', capaUrl)
+  }, [capaUrl, removerMidia])
 
   return {
     isUploadingLogo,

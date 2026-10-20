@@ -515,7 +515,9 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
   const handleTabsModalReload = useCallback(async (savedId?: string, imagemUrl?: string | null) => {
     await applyAfterSave(savedId, imagemUrl)
     await handleActionsReload()
-    await refreshOne(savedId)
+    if (imagemUrl !== null) {
+      await refreshOne(savedId)
+    }
   }, [applyAfterSave, handleActionsReload, refreshOne])
 
   const handleTabsModalTabChange = useCallback((tab: 'grupo' | 'complementos') => {

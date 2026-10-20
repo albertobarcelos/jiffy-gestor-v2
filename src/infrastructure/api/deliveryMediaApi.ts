@@ -7,9 +7,13 @@ import {
   resolveDeliveryImageMimeTypeForUpload,
   validateDeliveryImageFile,
 } from '@/src/shared/constants/deliveryImageUpload'
-import { parseImagemUrlProdutoIndex } from '@/src/shared/utils/catalogoProdutoIndex'
+import {
+  parseImageIdProdutoIndex,
+  parseImagemUrlProdutoIndex,
+} from '@/src/shared/utils/catalogoProdutoIndex'
 import { urlImagemHttp } from '@/src/shared/utils/imagemUrl'
 import type { ICadastroImagemMedia } from '@/src/application/ports/ICadastroImagemMedia'
+import type { ResultadoRemocaoImagem } from '@/src/application/ports/IRemocaoImagem'
 
 export class DeliveryMediaApiError extends Error {
   constructor(
@@ -53,8 +57,13 @@ const knownImagemUrlsPorGrupoComplementoId = new Map<string, string>()
 
 function rememberImagemUrl(store: Map<string, string>, id: string, url: string | null | undefined): string | null {
   const key = id.trim()
+  if (!key) return null
+  if (url === null) {
+    store.delete(key)
+    return null
+  }
   const value = urlImagemHttp(url)
-  if (!key || !value) return store.get(key) ?? null
+  if (!value) return store.get(key) ?? null
   store.set(key, value)
   return value
 }
@@ -203,6 +212,68 @@ export async function confirmImageUploadIntent(
   )
 
   return parseJsonResponse<ConfirmImageUploadIntentResponseDTO>(response)
+}
+
+export type { ResultadoRemocaoImagem }
+
+/** Remove imagem confirmada. 400/404 significam que ela já não está ativa. */
+export async function deleteImagem(
+  imageId: string,
+  token: string
+): Promise<ResultadoRemocaoImagem> {
+  const id = imageId.trim()
+  if (!id) {
+    throw new DeliveryMediaApiError('Imagem não identificada.', 400)
+  }
+
+  const response = await fetch(`/api/media/images/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  })
+
+  if (response.status === 204 || response.ok) return 'removida'
+  if (response.status === 400 || response.status === 404) return 'ja-ausente'
+
+  const data = await response.json().catch(() => ({}))
+  throw new DeliveryMediaApiError(
+    extractErrorMessage(data, 'Não foi possível remover a imagem.'),
+    response.status,
+    data
+  )
+}
+
+export async function fetchProdutoImagemGerenciada(
+  produtoId: string,
+  token: string
+): Promise<{ imageId: string | null; imageUrl: string | null }> {
+  const id = produtoId.trim()
+  if (!id) return { imageId: null, imageUrl: null }
+
+  try {
+    const response = await fetch(`/api/produtos/${encodeURIComponent(id)}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+    })
+    if (!response.ok) {
+      return { imageId: null, imageUrl: await fetchProdutoImagemUrl(id, token) }
+    }
+    const json = (await response.json().catch(() => null)) as unknown
+    const rec =
+      json && typeof json === 'object' && !Array.isArray(json)
+        ? ((json as { data?: unknown }).data &&
+          typeof (json as { data?: unknown }).data === 'object' &&
+          !Array.isArray((json as { data?: unknown }).data)
+            ? ((json as { data: Record<string, unknown> }).data)
+            : (json as Record<string, unknown>))
+        : null
+    if (!rec) return { imageId: null, imageUrl: null }
+    const imageUrl = parseImagemUrlProdutoIndex(rec) ?? (await fetchProdutoImagemUrl(id, token))
+    return { imageId: parseImageIdProdutoIndex(rec), imageUrl }
+  } catch {
+    return { imageId: null, imageUrl: await fetchProdutoImagemUrl(id, token) }
+  }
 }
 
 export async function uploadGrupoComplementoImagem(
@@ -366,7 +437,8 @@ export async function fetchGruposComplementoImagemUrlsBatch(
           knownImagemUrlsPorGrupoComplementoId.set(id, fromCatalog)
           return [id, fromCatalog] as const
         }
-        return [id, knownImagemUrlsPorGrupoComplementoId.get(id) ?? null] as const
+        knownImagemUrlsPorGrupoComplementoId.delete(id)
+        return [id, null] as const
       })
     )
   })().finally(() => {

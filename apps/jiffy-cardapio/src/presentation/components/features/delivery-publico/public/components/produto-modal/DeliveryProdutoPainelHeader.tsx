@@ -22,7 +22,7 @@ export function DeliveryProdutoPainelHeader({ onClose }: DeliveryProdutoPainelHe
         type="button"
         onClick={onClose}
         aria-label="Fechar"
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
         style={{ color: 'var(--delivery-text-primary)' }}
       >
         <MdClose className="h-5 w-5" />

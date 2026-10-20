@@ -55,7 +55,7 @@ export function useDesignCategoriaGrupoActions(menuId: string | null) {
   )
 
   const uploadImagemGrupo = useCallback(
-    async (grupoId: string, file: File): Promise<string | null> => {
+    async (grupoId: string, file: File): Promise<{ imagemUrl: string | null; imageId: string | null }> => {
       const idMenu = exigirMenu()
       setUploadingGrupoId(grupoId)
       const toastId = showToast.loading('Enviando imagem...')
@@ -74,16 +74,19 @@ export function useDesignCategoriaGrupoActions(menuId: string | null) {
         const payload = (await response.json().catch(() => ({}))) as {
           message?: string
           imagemUrl?: string | null
+          data?: { image?: { imageId?: string | null; imageUrl?: string | null } | null }
         }
 
         if (!response.ok) {
           throw new Error(payload.message || 'Erro ao enviar imagem do grupo')
         }
 
-        const imagemUrl = payload.imagemUrl?.trim() || null
+        const imagemUrl =
+          payload.imagemUrl?.trim() || payload.data?.image?.imageUrl?.trim() || null
+        const imageId = payload.data?.image?.imageId?.trim() || null
         showToast.successLoading(toastId, 'Imagem salva no grupo!')
         await invalidateGrupos()
-        return imagemUrl
+        return { imagemUrl, imageId }
       } catch (error) {
         showToast.errorLoading(
           toastId,
@@ -98,9 +101,20 @@ export function useDesignCategoriaGrupoActions(menuId: string | null) {
   )
 
   const patchGrupoImagemUrl = useCallback(
-    (grupos: DesignCategoriaGrupo[], grupoId: string, imagemUrl: string | null) =>
+    (
+      grupos: DesignCategoriaGrupo[],
+      grupoId: string,
+      imagemUrl: string | null,
+      imageId?: string | null
+    ) =>
       grupos.map(grupo =>
-        grupo.id === grupoId ? { ...grupo, imagemUrl: imagemUrl?.trim() || null } : grupo
+        grupo.id === grupoId
+          ? {
+              ...grupo,
+              imagemUrl: imagemUrl?.trim() || null,
+              imageId: imageId === undefined ? grupo.imageId ?? null : imageId?.trim() || null,
+            }
+          : grupo
       ),
     []
   )

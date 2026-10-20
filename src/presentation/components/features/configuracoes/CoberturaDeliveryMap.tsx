@@ -40,7 +40,10 @@ import {
   onMapaGoogleAuthFailure,
 } from '@/src/shared/utils/googleMapsFalhaCliente'
 import { pathsDeAnelFaixa } from '@/src/shared/utils/geoJsonCircle'
-import { RAIO_AJUSTE_PIN_METROS } from '@/src/shared/utils/ajustePinEmpresa'
+import {
+  pinDentroDoRaioPermitido,
+  RAIO_AJUSTE_PIN_METROS,
+} from '@/src/shared/utils/ajustePinEmpresa'
 import {
   anelDaFaixaKm,
   assinaturaEnquadramentoCobertura,
@@ -146,8 +149,8 @@ function MapFitCobertura({
   return null
 }
 
-/** Limite de ajuste do pin: 1 km a partir do endereço geocodificado da empresa. */
-function MapRaioAjustePin({ centro }: { centro: LatLng }) {
+/** Limite de ajuste do pin a partir do ponto encontrado para o endereço. */
+function MapRaioAjustePin({ centro, raioMetros }: { centro: LatLng; raioMetros: number }) {
   const map = useGoogleMap()
 
   useEffect(() => {
@@ -155,7 +158,7 @@ function MapRaioAjustePin({ centro }: { centro: LatLng }) {
     const circle = new google.maps.Circle({
       map,
       center: centro,
-      radius: RAIO_AJUSTE_PIN_METROS,
+      radius: raioMetros,
       strokeColor: '#EA4335',
       strokeOpacity: 0.85,
       strokeWeight: 1,
@@ -165,7 +168,7 @@ function MapRaioAjustePin({ centro }: { centro: LatLng }) {
       zIndex: 2,
     })
     return () => circle.setMap(null)
-  }, [map, centro.lat, centro.lng])
+  }, [map, centro.lat, centro.lng, raioMetros])
 
   return null
 }
@@ -761,6 +764,8 @@ type CoberturaDeliveryMapProps = {
   pinRascunho?: GeoJsonPoint | null
   pinSnapEpoch?: number
   centroAjustePin?: GeoJsonPoint | null
+  raioAjustePinMetros?: number
+  ajusteLivre?: boolean
   onPinMovido?: (point: GeoJsonPoint) => void
   onDesenhoEstadoChange?: (estado: EstadoDesenhoCobertura) => void
   onAcoesDesenhoProntas?: (acoes: AcoesDesenhoCobertura | null) => void
@@ -798,6 +803,8 @@ export function CoberturaDeliveryMap({
   pinRascunho = null,
   pinSnapEpoch = 0,
   centroAjustePin = null,
+  raioAjustePinMetros = RAIO_AJUSTE_PIN_METROS,
+  ajusteLivre = false,
   onPinMovido,
   onDesenhoEstadoChange,
   onAcoesDesenhoProntas,
@@ -827,7 +834,11 @@ export function CoberturaDeliveryMap({
   )
   const centroAjuste = useMemo(() => latLngFromGeoJsonPoint(centroAjustePin), [centroAjustePin])
   const pinPendente = Boolean(pinRascunho && !pontosGeoIguais(pinRascunho, origem))
-  const centroMapa = centroRaios ?? centroPin ?? FALLBACK_CENTER
+  const recentrarNoEndereco = Boolean(
+    origem && centroAjustePin && !pinDentroDoRaioPermitido(centroAjustePin, origem)
+  )
+  const centroEnquadramento = recentrarNoEndereco ? centroAjuste : centroRaios
+  const centroMapa = centroEnquadramento ?? centroPin ?? FALLBACK_CENTER
   const zoomInicial = centroRaios || centroPin ? LOCALIZADO_ZOOM : FALLBACK_ZOOM
   const centroMapaRef = useRef(centroMapa)
   const zoomInicialRef = useRef(zoomInicial)
@@ -968,14 +979,16 @@ export function CoberturaDeliveryMap({
           ? 'Arraste uma área no mapa para reposicionar.'
           : ferramenta === 'apagar'
             ? 'Clique em uma área para excluir.'
-            : !centroPin
-              ? 'Clique no mapa para marcar a loja, até 1 km do endereço. Depois confirme no card à esquerda.'
+            : ajusteLivre
+              ? 'Mova o mapa e clique para marcar a loja. Confirme no card à esquerda.'
+              : !centroPin
+              ? 'Clique no mapa para marcar a loja. Depois confirme no card à esquerda.'
               : areaFormaEditandoId
               ? 'Arraste os vértices. Use Salvar forma no card à esquerda.'
               : pinPendente
-                ? 'Pin movido (máx. 1 km do endereço). Confirme no card à esquerda para atualizar os raios.'
+                ? 'Pin movido. Confirme no card à esquerda para atualizar os raios.'
                 : pinArrastavel
-                ? 'Clique no mapa ou arraste o pin até 1 km do endereço. Confirme no card para gravar.'
+                ? 'Clique no mapa ou arraste o pin. Confirme no card para gravar.'
                 : null
 
   return (
@@ -1074,13 +1087,24 @@ export function CoberturaDeliveryMap({
         }}
       >
         <MapFitCobertura
-          centro={centroRaios}
-          raios={raiosEnquadramento}
-          areas={areas}
-          rascunhoPaths={rascunhoPaths}
-          congelarVisao={modoDesenho || modoCirculo || Boolean(areaFormaEditandoId) || pinPendente}
+          centro={centroEnquadramento}
+          raios={
+            recentrarNoEndereco
+              ? [{ distanciaMaximaEmMetros: raioAjustePinMetros }]
+              : raiosEnquadramento
+          }
+          areas={recentrarNoEndereco ? [] : areas}
+          rascunhoPaths={recentrarNoEndereco ? null : rascunhoPaths}
+          congelarVisao={
+            modoDesenho ||
+            modoCirculo ||
+            Boolean(areaFormaEditandoId) ||
+            (pinPendente && !recentrarNoEndereco)
+          }
         />
-        {centroAjuste ? <MapRaioAjustePin centro={centroAjuste} /> : null}
+        {centroAjuste ? (
+          <MapRaioAjustePin centro={centroAjuste} raioMetros={raioAjustePinMetros} />
+        ) : null}
         {centroPin ? (
           <>
             <Marker
@@ -1107,9 +1131,11 @@ export function CoberturaDeliveryMap({
                 }}
               >
                 <p className="m-0 max-w-[14rem] pr-1 text-[13px] font-medium leading-snug text-gray-800">
-                  {pinPendente
-                    ? 'Confirme a localização no card à esquerda para atualizar os raios.'
-                    : 'Você está aqui? Clique no mapa ou arraste até 1 km do endereço.'}
+                  {ajusteLivre
+                    ? 'Mova o mapa e clique para marcar a loja. Depois confirme no card.'
+                    : pinPendente
+                      ? 'Confirme a localização no card à esquerda para atualizar os raios.'
+                      : 'Você está aqui? Clique no mapa ou arraste o pin até a loja.'}
                 </p>
               </InfoWindow>
             ) : null}

@@ -15,7 +15,11 @@ import { ProdutoNomeInput } from '@/src/presentation/components/features/produto
 import { MenuProdutoPauseControl } from '@/src/presentation/components/features/menus/MenuProdutoPauseControl'
 import { cn } from '@/src/shared/utils/cn'
 import { formatBRLFromMaskedInput } from '@/src/shared/utils/formatters'
-import { promocaoSnapshotVigente } from '@/src/domain/policies/menu/precoVigenteSnapshot'
+import { deveTravarPrecoNormal } from '@/src/domain/policies/menu/atualizarPrecoNormalSnapshot'
+import {
+  produtoTemPromocaoPreenchida,
+  promocaoSnapshotVigente,
+} from '@/src/domain/policies/menu/precoVigenteSnapshot'
 import {
   NOME_CATALOGO_LISTA_MAX_CHARS,
   truncarNomeCatalogoLista,
@@ -76,10 +80,13 @@ export interface CatalogProductRowProps {
   onRemove?: (id: string) => void
   /** Troca a imagem (cadastro base ou snapshot do cardápio) — abre o crop no pai. */
   onChangeImage?: (id: string, file: File) => void
+  onClearImage?: (id: string) => void
   /** Esconde preço e pause/status (ex.: categorias neste cardápio). */
   hidePauseAndPrice?: boolean
   /** Esconde o selo COD. */
   hideCodigo?: boolean
+  /** Nome em cinza quando a categoria está desativada neste cardápio. */
+  nomeInativo?: boolean
 }
 
 function CatalogProductRowInner({
@@ -104,8 +111,10 @@ function CatalogProductRowInner({
   onEdit,
   onRemove,
   onChangeImage,
+  onClearImage,
   hidePauseAndPrice = false,
   hideCodigo = false,
+  nomeInativo = false,
 }: CatalogProductRowProps) {
   const [imagemExpandida, setImagemExpandida] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -120,13 +129,13 @@ function CatalogProductRowInner({
   const podeEditarNome = Boolean(onNomeChange)
   const podeEditarValor = Boolean(onValorChange)
   const promoNum = Number(valorPromocional ?? 0)
-  const mostrarPrecoPromocional =
-    isMenu &&
-    promocaoSnapshotVigente({
-      valor,
-      valorPromocional,
-      promocaoAtiva,
-    })
+  const snapshotPreco = { valor, valorPromocional, promocaoAtiva }
+  const temPromocaoPreenchida = isMenu && produtoTemPromocaoPreenchida(valorPromocional)
+  const promocaoVigente = isMenu && promocaoSnapshotVigente(snapshotPreco)
+  const valorNormalBloqueadoPorPromocao = isMenu && deveTravarPrecoNormal(snapshotPreco)
+  /** Promo configurada mas pausada: ainda exibe o valor, em vermelho riscado. */
+  const promocaoPausadaNaLista = temPromocaoPreenchida && !promocaoVigente
+  const mostrarBadgePromocional = promocaoVigente || promocaoPausadaNaLista
 
   const renderPauseMenu = () =>
     hidePauseAndPrice ? null : (
@@ -248,6 +257,27 @@ function CatalogProductRowInner({
               decoding="async"
               className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
             />
+            {onClearImage && !isSavingImage ? (
+              <span
+                role="button"
+                tabIndex={0}
+                title="Remover imagem"
+                aria-label={`Remover imagem de ${nome}`}
+                onClick={event => {
+                  event.stopPropagation()
+                  onClearImage(id)
+                }}
+                onKeyDown={event => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return
+                  event.preventDefault()
+                  event.stopPropagation()
+                  onClearImage(id)
+                }}
+                className="absolute right-0.5 top-0.5 z-10 inline-flex h-5 w-5 items-center justify-center rounded bg-white/90 text-red-600 shadow-sm"
+              >
+                <MdDeleteOutline size={14} />
+              </span>
+            ) : null}
             <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
               {podeTrocarImagem ? (
                 <MdAddAPhoto className="text-white drop-shadow" size={22} />
@@ -291,6 +321,7 @@ function CatalogProductRowInner({
               'truncate text-sm font-normal tracking-wide text-primary-text md:text-base'
             )}
             title={nomeTruncado ? nome : undefined}
+            style={nomeInativo ? { color: '#9CA3AF' } : undefined}
           >
             {nomeExibicao}
           </span>
@@ -303,7 +334,7 @@ function CatalogProductRowInner({
               'flex min-w-0 flex-nowrap items-center',
               hideCodigo
                 ? 'justify-self-end md:justify-self-center'
-                : 'w-full justify-start md:w-auto md:justify-center'
+                : 'w-full justify-start md:justify-center'
             )}
           >
             {actionsSlot}
@@ -348,20 +379,39 @@ function CatalogProductRowInner({
                   'min-w-[calc(4.5rem+0.375rem+6rem)]'
                 )}
               >
-                {mostrarPrecoPromocional ? (
-                  <span
-                    className="inline-flex min-w-[4.5rem] items-center justify-center rounded-lg border border-emerald-600/40 bg-emerald-50 px-2 py-2 text-center text-xs font-semibold tabular-nums text-emerald-700 md:text-sm"
-                    title="Preço promocional"
+                {mostrarBadgePromocional ? (
+                  <Tooltip
+                    title={
+                      promocaoPausadaNaLista
+                        ? 'A promoção está pausada'
+                        : 'Preço promocional'
+                    }
+                    arrow
+                    placement="top"
                   >
-                    {formatBRLFromMaskedInput(promoNum)}
-                  </span>
+                    <span
+                      className={cn(
+                        'inline-flex min-w-[4.5rem] items-center justify-center rounded-lg border px-2 py-2 text-center text-xs font-semibold tabular-nums md:text-sm',
+                        promocaoPausadaNaLista
+                          ? 'border-red-300 bg-red-50 text-red-600 line-through decoration-red-600/80'
+                          : 'border-emerald-600/40 bg-emerald-50 text-emerald-700'
+                      )}
+                    >
+                      {formatBRLFromMaskedInput(promoNum)}
+                    </span>
+                  </Tooltip>
                 ) : null}
                 {podeEditarValor && onValorChange ? (
                   <ProdutoValorInput
                     valor={valor}
-                    disabled={isSavingValor}
+                    disabled={Boolean(isSavingValor) || valorNormalBloqueadoPorPromocao}
+                    title={
+                      valorNormalBloqueadoPorPromocao
+                        ? 'Pause ou remova a promoção para alterar o preço normal'
+                        : undefined
+                    }
                     className={
-                      mostrarPrecoPromocional
+                      promocaoVigente
                         ? 'text-secondary-text line-through decoration-primary/60'
                         : undefined
                     }
@@ -371,7 +421,7 @@ function CatalogProductRowInner({
                   <span
                     className={cn(
                       'inline-flex w-24 items-center justify-center rounded-lg border border-primary/50 bg-info p-2 text-center text-xs font-normal text-primary-text md:text-sm',
-                      mostrarPrecoPromocional &&
+                      promocaoVigente &&
                         'text-secondary-text line-through decoration-primary/60'
                     )}
                   >
@@ -448,8 +498,10 @@ function arePropsEqual(prev: CatalogProductRowProps, next: CatalogProductRowProp
     prev.onEdit === next.onEdit &&
     prev.onRemove === next.onRemove &&
     prev.onChangeImage === next.onChangeImage &&
+    prev.onClearImage === next.onClearImage &&
     prev.hidePauseAndPrice === next.hidePauseAndPrice &&
-    prev.hideCodigo === next.hideCodigo
+    prev.hideCodigo === next.hideCodigo &&
+    prev.nomeInativo === next.nomeInativo
   )
 }
 

@@ -28,7 +28,10 @@ import { urlImagemHttp } from '@/src/application/services/cadastroImagem'
 import {
   complementoImagemMedia,
   mensagemLegivelDeliveryMediaError,
+  uploadComplementoImagem,
 } from '@/src/infrastructure/api/deliveryMediaApi'
+import { removerImagemUseCase } from '@/src/presentation/hooks/media/criarImagemMediaUseCases'
+import { previewImagemEhLocal } from '@/src/presentation/utils/previewImagemLocal'
 
 /** Labels outlined em preto (MUI usa cinza por padrão) */
 const sxOutlinedLabelTextoEscuro = {
@@ -144,8 +147,10 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingComplemento, setIsLoadingComplemento] = useState(false)
   const [isUploadingImagem, setIsUploadingImagem] = useState(false)
+  const [removendoImagem, setRemovendoImagem] = useState(false)
   const [serverImagemUrl, setServerImagemUrl] = useState<string | null>(null)
   const [imagemPreviewUrl, setImagemPreviewUrl] = useState<string | null>(null)
+  const [imageId, setImageId] = useState<string | null>(null)
   const baselineSerializedRef = useRef<string>('')
   const { pedirConfirmacao: pedirPropagacao, dialog: dialogPropagacao } =
     usePropagarAlteracaoComplemento()
@@ -271,6 +276,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
           setAtivo(complemento.isAtivo())
 
           const deliveryImagemUrl = await complementoImagemMedia.resolverUma(complementoId, accessToken)
+          setImageId(complemento.getImageId())
           applyImagemUrl(deliveryImagemUrl ?? complemento.getImagemUrl() ?? null)
 
           window.setTimeout(() => {
@@ -317,7 +323,9 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
       const toastId = showToast.loading('Enviando imagem...')
 
       try {
-        const persistedUrl = await complementoImagemMedia.enviar(complementoId, file, token)
+        const confirmado = await uploadComplementoImagem(complementoId, file, token)
+        setImageId(confirmado.imageId)
+        const persistedUrl = await complementoImagemMedia.resolverUma(complementoId, token)
         applyImagemUrl(persistedUrl ?? preview)
         showToast.successLoading(toastId, 'Imagem enviada com sucesso!')
       } catch (error) {
@@ -339,6 +347,37 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
       return serverImagemUrl
     })
   }, [serverImagemUrl])
+
+  const handleRemoverImagem = useCallback(async () => {
+    const previewLocal = previewImagemEhLocal(imagemPreviewUrl, serverImagemUrl)
+    if (previewLocal) {
+      handleClearImagemPreview()
+      return
+    }
+    if (!imageId) {
+      showToast.error('Não foi possível identificar a imagem para remover.')
+      return
+    }
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+    if (!token) {
+      showToast.error('Token não encontrado')
+      return
+    }
+    setRemovendoImagem(true)
+    setIsUploadingImagem(true)
+    const toastId = showToast.loading('Removendo imagem...')
+    try {
+      await removerImagemUseCase().execute({ imageId, token })
+      setImageId(null)
+      applyImagemUrl(null)
+      showToast.successLoading(toastId, 'Imagem removida.')
+    } catch (error) {
+      showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+    } finally {
+      setRemovendoImagem(false)
+      setIsUploadingImagem(false)
+    }
+  }, [applyImagemUrl, handleClearImagemPreview, imageId, imagemPreviewUrl, serverImagemUrl])
 
   const persistComplemento = useCallback(async () => {
     const token = useAuthStore.getState().tenantAuth?.getAccessToken()
@@ -632,6 +671,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
                 label="Foto do complemento"
                 disabled={!isEditing}
                 busy={isUploadingImagem}
+                busyLabel={removendoImagem ? 'Removendo imagem…' : 'Enviando foto…'}
                 previewUrl={imagemPreviewUrl}
                 cropPreset={DELIVERY_COMPLEMENTO_CROP_PRESET}
                 helperText={
@@ -646,9 +686,11 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
                 }
                 onFileSelected={handleImagemUpload}
                 onClearPreview={
-                  imagemPreviewUrl?.startsWith('blob:') &&
-                  imagemPreviewUrl !== serverImagemUrl
-                    ? handleClearImagemPreview
+                  (imagemPreviewUrl?.startsWith('blob:') && imagemPreviewUrl !== serverImagemUrl) ||
+                  imageId
+                    ? () => {
+                        void handleRemoverImagem()
+                      }
                     : undefined
                 }
               />
