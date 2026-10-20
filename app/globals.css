@@ -364,7 +364,9 @@ h6 {
 
   .catalog-row-base-categoria {
     grid-template-areas: 'nome codigo acoes categ meta';
-    grid-template-columns: 25ch 4.75rem auto 12rem auto;
+    /* Ações: 7×2rem + 6×0.75rem (gap-3). Largura fixa para o cabeçalho
+       e as linhas caírem na mesma coluna; o espaço livre fica só no valor. */
+    grid-template-columns: 25ch 4.75rem 18.5rem 12rem minmax(0, 1fr);
   }
 
   .catalog-row-area-foto {

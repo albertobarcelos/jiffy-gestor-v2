@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { getEmpresaMe } from '@/src/infrastructure/api/empresaConfigApi'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { resolverTimezoneAgregacaoEmpresa } from '@/src/shared/utils/timezoneAgregacaoEmpresa'
@@ -59,16 +59,12 @@ export async function fetchEmpresaMeQueryData(
   token: string,
   expectedEmpresaId?: string | null
 ): Promise<EmpresaMeQueryData> {
-  const res = await fetchGestorApi('/api/empresas/me', {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
-  })
+  const res = await getEmpresaMe(token)
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(typeof body.error === 'string' ? body.error : `Erro ${res.status}`)
+    throw new Error(res.error)
   }
 
-  const data: Record<string, unknown> = await res.json()
+  const data = res.data
   const id = data.id != null ? String(data.id) : ''
   if (!id) {
     throw new Error('Resposta sem id da empresa')

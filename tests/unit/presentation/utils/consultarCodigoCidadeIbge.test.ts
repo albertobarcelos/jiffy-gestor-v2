@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { consultarCodigoCidadeIbge } from '@/src/presentation/utils/consultarCodigoCidadeIbge'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { fetchGestorApi } from '@/src/infrastructure/api/fetchGestorApi'
 
-vi.mock('@/src/presentation/utils/fetchGestorApi', () => ({
+vi.mock('@/src/infrastructure/api/fetchGestorApi', () => ({
   fetchGestorApi: vi.fn(),
 }))
 
@@ -27,7 +27,8 @@ describe('consultarCodigoCidadeIbge', () => {
 
     await expect(consultarCodigoCidadeIbge('Lucas do Rio Verde', 'MT')).resolves.toBe('5105259')
     expect(fetchGestorApiMock).toHaveBeenCalledWith(
-      '/api/v1/ibge/validar-cidade?cidade=Lucas%20do%20Rio%20Verde&uf=MT'
+      '/api/v1/ibge/validar-cidade?cidade=Lucas+do+Rio+Verde&uf=MT',
+      expect.objectContaining({ cache: 'no-store' })
     )
   })
 

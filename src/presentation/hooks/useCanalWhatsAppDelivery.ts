@@ -7,8 +7,14 @@ import {
   dispararEmpresaDeliveryAtualizada,
   EMPRESA_DELIVERY_ME_QUERY_KEY,
 } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
+import type { GestorConfigResult } from '@/src/infrastructure/api/gestorConfigRequest'
+import {
+  excluirCanalWhatsAppDelivery,
+  getCanalWhatsAppDelivery,
+  getCanalWhatsAppQrcodeDelivery,
+  getCanalWhatsAppStatusDelivery,
+  putCanalWhatsAppDelivery,
+} from '@/src/infrastructure/api/deliveryConfigApi'
 import {
   CanalWhatsAppIndisponivelError,
   isCanalWhatsAppIndisponivel,
@@ -27,8 +33,6 @@ import {
 export const CANAL_WHATSAPP_QUERY_KEY = ['delivery', 'canal-whatsapp'] as const
 export const CANAL_WHATSAPP_STATUS_QUERY_KEY = ['delivery', 'canal-whatsapp-status'] as const
 
-const BFF = '/api/delivery/empresas/me/canal-whatsapp'
-
 export class CanalWhatsAppHttpError extends Error {
   constructor(
     message: string,
@@ -39,32 +43,17 @@ export class CanalWhatsAppHttpError extends Error {
   }
 }
 
-async function lerCorpo(res: Response): Promise<unknown> {
-  if (res.status === 204) return null
-  return res.json().catch(() => ({}))
-}
-
-function erroDeResposta(res: Response, raw: unknown): Error {
-  if (isCanalWhatsAppIndisponivel(raw, res.status)) {
-    logFalhaCanalWhatsApp(`HTTP ${res.status}`, raw)
+function erroDeResultado(res: Extract<GestorConfigResult<unknown>, { ok: false }>): Error {
+  if (isCanalWhatsAppIndisponivel(res.data, res.status)) {
+    logFalhaCanalWhatsApp(`HTTP ${res.status}`, res.data)
     return new CanalWhatsAppIndisponivelError()
   }
-  const msg =
-    textoErroCorpoApi(raw) ||
-    (raw &&
-    typeof raw === 'object' &&
-    'error' in raw &&
-    typeof (raw as { error: unknown }).error === 'string'
-      ? (raw as { error: string }).error
-      : '') ||
-    `Erro HTTP ${res.status}`
-  return new CanalWhatsAppHttpError(msg, res.status)
+  return new CanalWhatsAppHttpError(res.error, res.status)
 }
 
-async function parseCanalOuThrow(res: Response): Promise<CanalWhatsAppDeliveryDTO> {
-  const raw = await lerCorpo(res)
-  if (!res.ok) throw erroDeResposta(res, raw)
-  const canal = normalizarCanalWhatsApp(raw)
+function canalOuThrow(res: GestorConfigResult<unknown>): CanalWhatsAppDeliveryDTO {
+  if (!res.ok) throw erroDeResultado(res)
+  const canal = normalizarCanalWhatsApp(res.data)
   if (!canal) throw new Error('Resposta inválida do canal WhatsApp.')
   return canal
 }
@@ -82,13 +71,10 @@ export function useCanalWhatsAppDelivery() {
   return useSecureTenantQuery<CanalWhatsAppDeliveryDTO | null>(
     CANAL_WHATSAPP_QUERY_KEY,
     async ({ token }) => {
-      const res = await fetchGestorApi(BFF, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res = await getCanalWhatsAppDelivery(token)
       if (res.status === 404) return null
-      const raw = await lerCorpo(res)
-      if (!res.ok) throw erroDeResposta(res, raw)
-      return normalizarCanalWhatsApp(raw)
+      if (!res.ok) throw erroDeResultado(res)
+      return normalizarCanalWhatsApp(res.data)
     },
     {
       staleTime: 1000 * 15,
@@ -109,13 +95,10 @@ export function useCanalWhatsAppStatus(options: {
   return useSecureTenantQuery<CanalWhatsAppDeliveryStatusDTO | null>(
     CANAL_WHATSAPP_STATUS_QUERY_KEY,
     async ({ token }) => {
-      const res = await fetchGestorApi(`${BFF}/status`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res = await getCanalWhatsAppStatusDelivery(token)
       if (res.status === 404) return null
-      const raw = await lerCorpo(res)
-      if (!res.ok) throw erroDeResposta(res, raw)
-      return normalizarStatusCanalWhatsApp(raw)
+      if (!res.ok) throw erroDeResultado(res)
+      return normalizarStatusCanalWhatsApp(res.data)
     },
     {
       enabled: options.enabled,
@@ -135,13 +118,7 @@ export function useSubstituirCanalWhatsApp() {
   const invalidate = useInvalidateTenantQueries()
 
   return useSecureTenantMutation<CanalWhatsAppDeliveryDTO, void>(
-    async ({ token }) => {
-      const res = await fetchGestorApi(BFF, {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      return parseCanalOuThrow(res)
-    },
+    async ({ token }) => canalOuThrow(await putCanalWhatsAppDelivery(token)),
     {
       onSuccess: async () => {
         await invalidarCanalEEmpresa(invalidate)
@@ -154,12 +131,7 @@ export function useRenovarQrCodeCanalWhatsApp() {
   const invalidate = useInvalidateTenantQueries()
 
   return useSecureTenantMutation<CanalWhatsAppDeliveryDTO, void>(
-    async ({ token }) => {
-      const res = await fetchGestorApi(`${BFF}/qrcode`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      return parseCanalOuThrow(res)
-    },
+    async ({ token }) => canalOuThrow(await getCanalWhatsAppQrcodeDelivery(token)),
     {
       onSuccess: async () => {
         await invalidate(CANAL_WHATSAPP_QUERY_KEY)
@@ -174,13 +146,9 @@ export function useRemoverCanalWhatsApp() {
 
   return useSecureTenantMutation<void, void>(
     async ({ token }) => {
-      const res = await fetchGestorApi(BFF, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (res.status === 204 || res.status === 404) return
-      const raw = await lerCorpo(res)
-      if (!res.ok) throw erroDeResposta(res, raw)
+      const res = await excluirCanalWhatsAppDelivery(token)
+      if (res.ok || res.status === 404) return
+      throw erroDeResultado(res)
     },
     {
       onSuccess: async () => {

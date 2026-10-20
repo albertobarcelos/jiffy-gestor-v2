@@ -3,10 +3,8 @@ import type { DeliveryPublicoProdutoViewModel } from '../types/deliveryPublicoVi
 
 function formatDescontoPct(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value) || value <= 0) return ''
-  const rounded = Math.round(value * 100) / 100
-  const label = Number.isInteger(rounded)
-    ? String(rounded)
-    : rounded.toFixed(2).replace(/\.?0+$/, '')
+  const rounded = Math.round((value + Number.EPSILON) * 10) / 10
+  const label = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)
   return `${label}% OFF`
 }
 

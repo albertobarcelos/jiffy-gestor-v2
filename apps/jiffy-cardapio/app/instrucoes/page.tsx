@@ -5,7 +5,7 @@
  */
 export default function CardapioInstrucoesPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
+    <div className="flex min-h-full items-center justify-center px-4">
       <div
         className="max-w-md w-full rounded-2xl shadow-xl p-8 text-center"
         style={{

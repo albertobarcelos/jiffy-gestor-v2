@@ -20,8 +20,11 @@ import {
   criarFormAgendaPadrao,
   formatarDiasGrupoCurto,
   formatarIntervaloGrupo,
+  formatarIntervaloGrupoComVirada,
   formAgendaParaRequest,
   intervaloAgendaEhValido,
+  intervaloCruzaMeiaNoite,
+  textoHintViradaMeiaNoite,
   type DiaAgendaFormState,
   type GrupoHorarioAgenda,
 } from '@/src/shared/utils/funcionamentoDelivery'
@@ -232,11 +235,22 @@ export function FuncionamentoDeliverySection({
                     <p className="mt-0.5 text-sm text-secondary-text">
                       {formatarIntervaloGrupo(grupo.abreEm, grupo.fechaEm)}
                     </p>
+                    {intervaloCruzaMeiaNoite(grupo.abreEm, grupo.fechaEm) ? (
+                      <p className="mt-0.5 text-[11px] text-secondary-text">
+                        {textoHintViradaMeiaNoite(
+                          grupo.dias.length === 1 ? grupo.dias[0] : null
+                        )}
+                      </p>
+                    ) : null}
                   </div>
                   <button
                     type="button"
                     disabled={salvando}
-                    aria-label={`Opções do horário ${formatarIntervaloGrupo(grupo.abreEm, grupo.fechaEm)}`}
+                    aria-label={`Opções do horário ${formatarIntervaloGrupoComVirada(
+                      grupo.abreEm,
+                      grupo.fechaEm,
+                      grupo.dias.length === 1 ? grupo.dias[0] : null
+                    )}`}
                     onClick={e => {
                       setMenuAnchor(e.currentTarget)
                       setMenuGrupo(grupo)

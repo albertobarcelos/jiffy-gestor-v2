@@ -10,6 +10,8 @@ interface GrupoProdutosMultiFilterProps {
   loading?: boolean
   value: string[]
   onChange: (grupoIds: string[]) => void
+  /** Categorias desativadas ficam cinza e continuam selecionáveis. */
+  destacarInativas?: boolean
 }
 
 function rotuloGruposSelecionados(selecionados: GrupoProduto[]): string | null {
@@ -18,12 +20,15 @@ function rotuloGruposSelecionados(selecionados: GrupoProduto[]): string | null {
   return `${selecionados.length} categorias selecionadas`
 }
 
+const COR_CATEGORIA_INATIVA = '#9CA3AF'
+
 export function GrupoProdutosMultiFilter({
   id,
   grupos,
   loading = false,
   value,
   onChange,
+  destacarInativas = false,
 }: GrupoProdutosMultiFilterProps) {
   const selecionados = grupos.filter(g => value.includes(g.getId()))
 
@@ -46,14 +51,26 @@ export function GrupoProdutosMultiFilter({
       renderTags={itens => {
         const texto = rotuloGruposSelecionados(itens)
         if (!texto) return null
-        return <span className="min-w-0 truncate text-sm text-primary-text">{texto}</span>
+        const inativaSelecionada =
+          destacarInativas && itens.length === 1 && !itens[0].isAtivo()
+        return (
+          <span
+            className="min-w-0 truncate text-sm text-primary-text"
+            style={inativaSelecionada ? { color: COR_CATEGORIA_INATIVA } : undefined}
+          >
+            {texto}
+          </span>
+        )
       }}
       renderOption={(props, grupo, { selected }) => {
         const { key, ...optionProps } = props
+        const inativa = destacarInativas && !grupo.isAtivo()
         return (
           <li key={key} {...optionProps}>
             <Checkbox size="small" checked={selected} sx={{ mr: 1, p: 0.25 }} />
-            {grupo.getNome()}
+            <span style={inativa ? { color: COR_CATEGORIA_INATIVA } : undefined}>
+              {grupo.getNome()}
+            </span>
           </li>
         )
       }}

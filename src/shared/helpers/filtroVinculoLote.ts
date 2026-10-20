@@ -28,11 +28,44 @@ export function uniaoIdsVinculosDosAlvos<TAlvo>(
 }
 
 /**
+ * Interseção dos IDs vinculados em todos os alvos selecionados
+ * (grupo presente em cada produto marcado).
+ * Alvo selecionado sem vínculos zera o resultado.
+ */
+export function intersecaoIdsVinculosDosAlvos<TAlvo>(
+  alvos: TAlvo[],
+  idsAlvosSelecionados: Set<string>,
+  getAlvoId: (alvo: TAlvo) => string,
+  getVinculoIds: (alvo: TAlvo) => string[]
+): Set<string> {
+  let intersecao: Set<string> | null = null
+
+  for (const alvo of alvos) {
+    if (!idsAlvosSelecionados.has(getAlvoId(alvo))) continue
+    const idsDeste = new Set(getVinculoIds(alvo))
+    if (intersecao === null) {
+      intersecao = idsDeste
+      continue
+    }
+    for (const id of intersecao) {
+      if (!idsDeste.has(id)) intersecao.delete(id)
+    }
+    if (intersecao.size === 0) return intersecao
+  }
+
+  return intersecao ?? new Set()
+}
+
+/**
  * Filtra o catálogo conforme o modo:
  * - sem alvos selecionados → lista completa (exploração)
- * - desvincular (remover) → só itens da união (já pertencem)
- * - vincular (adicionar) → só itens fora da união (ainda não pertencem)
+ * - desvincular (remover) → só itens do conjunto informado
+ * - vincular (adicionar) → só itens fora do conjunto informado
+ *
+ * O conjunto é a união ou a interseção, conforme o chamador.
+ * Vincular de impressoras e de grupos de complementos passa a interseção.
  */
+
 export function filtrarCatalogoPorModoVinculo<TItem>(
   catalogo: TItem[],
   getId: (item: TItem) => string,
