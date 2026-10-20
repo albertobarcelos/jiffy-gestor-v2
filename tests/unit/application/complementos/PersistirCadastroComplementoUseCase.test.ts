@@ -4,6 +4,7 @@ import { PersistirCadastroComplementoUseCase } from '@/src/application/use-cases
 
 function porta(overrides: Partial<ICadastroComplemento> = {}): ICadastroComplemento {
   return {
+    listar: vi.fn(),
     buscar: vi.fn(),
     criar: vi.fn(),
     atualizar: vi.fn(),
@@ -59,5 +60,31 @@ describe('PersistirCadastroComplementoUseCase', () => {
       'ID do complemento é obrigatório'
     )
     expect(buscar).not.toHaveBeenCalled()
+  })
+
+  it('lista cadastro com limite e sem item sem id', async () => {
+    const listar = vi.fn(async () => ({
+      items: [
+        { id: 'comp-1', nome: 'Bacon', valor: 4, ativo: true },
+        { nome: 'sem-id', valor: 1, ativo: true },
+      ],
+      count: 2,
+    }))
+    const useCase = new PersistirCadastroComplementoUseCase(porta({ listar }))
+
+    const resultado = await useCase.listar({
+      token: ' token ',
+      q: ' bac ',
+      ativo: true,
+      limit: 5000,
+      offset: -3,
+    })
+
+    expect(resultado.total).toBe(2)
+    expect(resultado.complementos.map(item => item.getId())).toEqual(['comp-1'])
+    expect(listar).toHaveBeenCalledWith(
+      { q: 'bac', ativo: true, limit: 2000, offset: 0 },
+      'token'
+    )
   })
 })

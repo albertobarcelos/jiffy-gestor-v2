@@ -6,9 +6,10 @@ import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenan
 import { Complemento } from '@/src/domain/entities/Complemento'
 import { hidratarComplemento } from '@/src/application/services/cadastroImagem'
 import { complementoImagemMedia } from '@/src/infrastructure/api/deliveryMediaApi'
-import { handleApiError, showToast } from '@/src/shared/utils/toast'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { showToast } from '@/src/shared/utils/toast'
+import { criarPersistirCadastroComplementoUseCase } from '@/src/presentation/hooks/complementos/criarPersistirCadastroComplementoUseCase'
 import { invalidarCatalogoVendaQueries } from '@/src/presentation/cache/catalogoVendaQueryCache'
+import type { DadosCadastroComplemento } from '@/src/application/ports/ICadastroComplemento'
 
 interface ComplementosQueryParams {
   q?: string
@@ -17,9 +18,8 @@ interface ComplementosQueryParams {
   offset?: number
 }
 
-interface ComplementosResponse {
-  items: any[]
-  count: number
+function hidratarLista(complementos: Complemento[]): Complemento[] {
+  return complementos.map(item => hidratarComplemento(complementoImagemMedia, item))
 }
 
 /**
@@ -30,38 +30,20 @@ export function useComplementosInfinite(params: Omit<ComplementosQueryParams, 'o
     ['complementos', 'infinite', params],
     async ({ token }, pageParam) => {
       const limit = params.limit || 10
-      const searchParams = new URLSearchParams()
-      if (params.q) searchParams.append('q', params.q)
-      if (params.ativo !== undefined && params.ativo !== null) {
-        searchParams.append('ativo', params.ativo.toString())
-      }
-      searchParams.append('limit', limit.toString())
-      searchParams.append('offset', String(pageParam))
-
-      const response = await fetchGestorApi(`/api/complementos?${searchParams.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+      const { complementos: brutos, total } = await criarPersistirCadastroComplementoUseCase().listar({
+        token,
+        q: params.q,
+        ativo: params.ativo,
+        limit,
+        offset: Number(pageParam) || 0,
       })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        const errorMessage = errorData.message || `Erro ${response.status}: ${response.statusText}`
-        throw new Error(errorMessage)
-      }
-
-      const data: ComplementosResponse = await response.json()
-
-      const complementos = (data.items || []).map((item: any) =>
-        hidratarComplemento(complementoImagemMedia, Complemento.fromJSON(item))
-      )
+      const complementos = hidratarLista(brutos)
       const hasMore = complementos.length === limit
-      const nextOffset = hasMore ? pageParam + complementos.length : null
+      const nextOffset = hasMore ? Number(pageParam) + complementos.length : null
 
       return {
         complementos,
-        count: data.count || 0,
+        count: total,
         nextOffset,
       }
     },
@@ -83,24 +65,13 @@ export function useComplementos(params: { ativo?: boolean; limit?: number } = {}
   return useSecureTenantQuery<Complemento[]>(
     ['complementos', 'simple', params.ativo, normalizedLimit],
     async ({ token }) => {
-      const queryParams = new URLSearchParams()
-      if (params.ativo !== undefined) queryParams.append('ativo', params.ativo.toString())
-      queryParams.append('limit', normalizedLimit.toString())
-      queryParams.append('offset', '0')
-
-      const response = await fetchGestorApi(`/api/complementos?${queryParams.toString()}`, {
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      const { complementos } = await criarPersistirCadastroComplementoUseCase().listar({
+        token,
+        ativo: params.ativo,
+        limit: normalizedLimit,
+        offset: 0,
       })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || 'Erro ao carregar complementos')
-      }
-
-      const data = await response.json()
-      return (data.items || []).map((item: any) =>
-        hidratarComplemento(complementoImagemMedia, Complemento.fromJSON(item))
-      )
+      return hidratarLista(complementos)
     },
     { staleTime: 1000 * 60 * 10 }
   )
@@ -114,17 +85,11 @@ export function useComplemento(id: string) {
   return useSecureTenantQuery<Complemento>(
     ['complemento', id],
     async ({ token }) => {
-      const response = await fetchGestorApi(`/api/complementos/${id}`, {
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      const complemento = await criarPersistirCadastroComplementoUseCase().buscar({
+        id,
+        token,
       })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || errorData.message || `Erro ao carregar complemento ${id}`)
-      }
-
-      const data = await response.json()
-      return hidratarComplemento(complementoImagemMedia, Complemento.fromJSON(data))
+      return hidratarComplemento(complementoImagemMedia, complemento)
     },
     { staleTime: 1000 * 60 * 5, enabled: !!id }
   )
@@ -138,26 +103,20 @@ export function useComplementoMutation() {
   const empresaId = useTenantEmpresaId()
 
   return useSecureTenantMutation(
-    async ({ token }, { complementoId, data, isUpdate }: { complementoId?: string; data: any; isUpdate: boolean }) => {
-      const url = isUpdate && complementoId ? `/api/complementos/${complementoId}` : '/api/complementos'
-      const method = isUpdate ? 'PUT' : 'POST'
-
-      const response = await fetchGestorApi(url, {
-        method,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        const errorMessage = errorData.message || `Erro ${response.status}: ${response.statusText}`
-        throw new Error(errorMessage)
-      }
-
-      return await response.json()
+    async (
+      { token },
+      {
+        complementoId,
+        data,
+        isUpdate,
+      }: { complementoId?: string; data: DadosCadastroComplemento; isUpdate: boolean }
+    ) => {
+      const cadastro = criarPersistirCadastroComplementoUseCase()
+      const salvo =
+        isUpdate && complementoId
+          ? await cadastro.atualizar({ token, id: complementoId, dados: data })
+          : await cadastro.criar({ token, dados: data })
+      return salvo.toJSON()
     },
     {
       onSuccess: (_, variables) => {
@@ -166,12 +125,10 @@ export function useComplementoMutation() {
           tipo: 'complemento',
           complementoId: variables.complementoId,
         })
-        showToast.success(variables.isUpdate ? 'Complemento atualizado com sucesso!' : 'Complemento criado com sucesso!')
+        showToast.success(
+          variables.isUpdate ? 'Complemento atualizado com sucesso!' : 'Complemento criado com sucesso!'
+        )
       },
     }
   )
 }
-
-
-
-
