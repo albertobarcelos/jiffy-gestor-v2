@@ -5,8 +5,8 @@ const nextConfig = {
   reactStrictMode: true,
   /** Imagem Docker / Railway usa `output: 'standalone'`. */
   output: 'standalone',
-  /** WebView do Flow usa 127.0.0.1; o Next anuncia localhost. */
-  allowedDevOrigins: ['127.0.0.1'],
+  /** WebView do Flow usa 127.0.0.1; celular na LAN usa o IP da máquina. */
+  allowedDevOrigins: ['127.0.0.1', '192.168.3.92', '192.168.3.93'],
   eslint: {
     ignoreDuringBuilds: false,
   },

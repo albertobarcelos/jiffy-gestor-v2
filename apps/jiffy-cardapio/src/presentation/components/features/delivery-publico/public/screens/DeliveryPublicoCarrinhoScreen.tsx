@@ -1073,6 +1073,7 @@ export function DeliveryPublicoCarrinhoScreen({
 
         {checkoutStep === 'sucesso' && pedidoConfirmado ? (
           <DeliveryCheckoutSucessoModal
+            slug={slug}
             nomeCliente={pedidoConfirmado.nome}
             tipoEntrega={pedidoConfirmado.tipoEntrega}
             modoTempo={pedidoConfirmado.modoTempo}

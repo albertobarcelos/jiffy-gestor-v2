@@ -84,13 +84,13 @@ describe('empresaDeliveryPendencias', () => {
       resolverAcaoPendencia(EMPRESA_DELIVERY_PENDENCIA_TYPES.CANAL_WHATSAPP_NAO_CONECTADO)
     ).toEqual({
       label: 'Conectar WhatsApp',
-      href: '/config/delivery/notificacoes',
+      href: '/config/delivery/design?secao=notificacoes',
     })
     expect(
       resolverAcaoPendencia(EMPRESA_DELIVERY_PENDENCIA_TYPES.CARDAPIO_DELIVERY_NAO_CONFIGURADO)
     ).toEqual({
       label: 'Selecionar cardápio',
-      href: '/config/delivery/nome-cardapio',
+      href: '/config/delivery/design?secao=nome-cardapio',
     })
     expect(resolverAcaoPendencia('TIPO_DESCONHECIDO')).toBeNull()
   })

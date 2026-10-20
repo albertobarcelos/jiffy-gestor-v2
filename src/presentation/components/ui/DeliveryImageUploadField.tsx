@@ -141,14 +141,14 @@ export function DeliveryImageUploadField({
       className={cn(
         'space-y-1',
         hasCrop && 'flex w-full flex-col',
-        hasCrop && !isWideCrop && 'items-center'
+        hasCrop && !isWideCrop && 'items-start'
       )}
     >
       {label ? (
         <label
           className={cn(
             'block text-sm font-medium text-gray-700',
-            hasCrop && !isWideCrop && 'w-full text-center',
+            hasCrop && !isWideCrop && 'w-full text-left',
             isWideCrop && 'w-full'
           )}
         >
@@ -290,9 +290,9 @@ export function DeliveryImageUploadField({
           className={cn(
             'text-xs text-neutral-500',
             busy && 'font-medium text-primary',
-            hasCrop && 'w-full text-center',
-            hasCrop && isCropSquare && 'max-w-[280px]',
-            hasCrop && !isCropSquare && 'max-w-[360px]'
+            hasCrop && isWideCrop && 'w-full text-center max-w-[360px]',
+            hasCrop && !isWideCrop && 'self-start text-left',
+            hasCrop && isCropSquare && 'max-w-[280px]'
           )}
         >
           {hint}

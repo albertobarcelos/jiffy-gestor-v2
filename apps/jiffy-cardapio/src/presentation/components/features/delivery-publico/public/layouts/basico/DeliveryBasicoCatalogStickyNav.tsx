@@ -74,6 +74,12 @@ export function DeliveryBasicoCatalogStickyNav({
         ? candidate
         : null
     const containingRect = fixedContainingBlock?.getBoundingClientRect()
+    const borderTop = fixedContainingBlock
+      ? Number.parseFloat(getComputedStyle(fixedContainingBlock).borderTopWidth) || 0
+      : 0
+    const borderLeft = fixedContainingBlock
+      ? Number.parseFloat(getComputedStyle(fixedContainingBlock).borderLeftWidth) || 0
+      : 0
 
     const portTop = scrollRect?.top ?? 0
     const portLeft = columnRect?.left ?? scrollRect?.left ?? navRect.left
@@ -81,9 +87,13 @@ export function DeliveryBasicoCatalogStickyNav({
 
     const next: PinMetrics = {
       height,
-      // Com transform no preview, `fixed` é relativo ao shell — converter coords.
-      top: Math.round(containingRect ? portTop - containingRect.top : portTop),
-      left: Math.round(containingRect ? portLeft - containingRect.left : portLeft),
+      // Com transform no preview, `fixed` é relativo à padding-box do shell.
+      top: Math.round(
+        containingRect ? portTop - containingRect.top - borderTop : portTop
+      ),
+      left: Math.round(
+        containingRect ? portLeft - containingRect.left - borderLeft : portLeft
+      ),
       width: Math.round(portWidth),
     }
 

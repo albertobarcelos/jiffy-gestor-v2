@@ -242,8 +242,8 @@ export function DeliveryCheckoutRevisaoModal({
   const IconePagamento = obterIconeMeioPagamento(primeiroMeioNome)
   const observacaoTrim = observacaoPedido.trim()
   const cpfTrim = cpfNotaFiscal.replace(/\D/g, '')
-  const cpfObrigatorioIncompleto =
-    (exigeCpfVenda || desejaNotaFiscal) && cpfTrim.length !== 11
+  const cpfObrigatorio = exigeCpfVenda || desejaNotaFiscal
+  const cpfObrigatorioIncompleto = cpfObrigatorio && cpfTrim.length !== 11
   const pagamentosGate = validarPagamentosPedidoPublico(
     pagamentos.map(p => ({ meioPagamentoId: p.meioPagamentoId, valor: p.valor })),
     totalExibicao
