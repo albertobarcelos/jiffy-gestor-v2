@@ -247,15 +247,18 @@ export function MenuProdutosLote({ menuId }: MenuProdutosLoteProps) {
       const origemEhPrincipal =
         syncCadastroComMenuPrincipalAtivo() && ehMenuPrincipal(menuId, principalId)
 
-      const destinos = await pedirConfirmacao({
-        origem: 'menu',
-        produtoId: primeiroId,
-        menuIdAtual: menuId,
-        fonteMenus: 'empresa',
-      })
+      const destinos =
+        (await pedirConfirmacao({
+          origem: 'menu',
+          produtoId: primeiroId,
+          menuIdAtual: menuId,
+          fonteMenus: 'empresa',
+        })) ??
+        (origemEhPrincipal ? { aplicarNoCadastroBase: true, menuIds: [] } : null)
 
-      const espelharCadastro = origemEhPrincipal || Boolean(destinos?.aplicarNoCadastroBase)
-      if (espelharCadastro) {
+      if (!destinos) return
+
+      if (destinos.aplicarNoCadastroBase) {
         for (const item of update) {
           const { produtoId, ...rest } = item
           const snapshot: SnapshotProdutoPropagavel = { ...rest }
@@ -267,7 +270,7 @@ export function MenuProdutosLote({ menuId }: MenuProdutosLoteProps) {
         }
       }
 
-      if (!destinos || destinos.menuIds.length === 0) return
+      if (destinos.menuIds.length === 0) return
 
       for (const alvoMenuId of destinos.menuIds) {
         try {

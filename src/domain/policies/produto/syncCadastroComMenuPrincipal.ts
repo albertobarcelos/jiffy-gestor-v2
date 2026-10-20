@@ -41,8 +41,9 @@ export function idMenuPrincipalDeLista(
 ): string | null {
   const comTipoPrincipal = menus.find(menu => menu.tipo === 'principal' && menu.id)
   if (comTipoPrincipal?.id) return comTipoPrincipal.id
-  const primeiro = menus.find(menu => Boolean(menu.id))
-  return primeiro?.id ?? null
+  const comId = menus.filter(menu => Boolean(menu.id))
+  if (comId.length === 1) return comId[0].id
+  return null
 }
 
 export function ehMenuPrincipal(

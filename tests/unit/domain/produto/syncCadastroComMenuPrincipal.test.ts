@@ -21,7 +21,7 @@ const DELIVERY = 'menu-delivery'
 const EXTRA = 'menu-extra'
 
 describe('syncCadastroComMenuPrincipal', () => {
-  it('identifica o menu de tipo principal e, sem tipo, usa o primeiro da lista', () => {
+  it('identifica o menu de tipo principal e não chuta quando há vários sem tipo', () => {
     expect(
       idMenuPrincipalDeLista([
         { id: DELIVERY, tipo: 'custom' },
@@ -33,7 +33,7 @@ describe('syncCadastroComMenuPrincipal', () => {
         { id: DELIVERY },
         { id: EXTRA },
       ])
-    ).toBe(DELIVERY)
+    ).toBeNull()
     expect(idMenuPrincipalDeLista([{ id: PRINCIPAL }])).toBe(PRINCIPAL)
     expect(idMenuPrincipalDeLista([])).toBeNull()
   })
