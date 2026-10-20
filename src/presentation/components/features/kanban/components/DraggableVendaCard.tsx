@@ -17,22 +17,29 @@ function podeArrastarVendaNaColuna(venda: VendaUnificadaDTO, column: KanbanColum
 function DraggableVendaCardAtivo({
   venda,
   children,
+  disabled,
 }: {
   venda: VendaUnificadaDTO
   children: ReactNode
+  disabled: boolean
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `venda-${venda.id}`,
     data: { venda },
+    disabled,
   })
 
   return (
     <div
       ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      className={`cursor-grab touch-none select-none active:cursor-grabbing ${isDragging ? 'opacity-40' : ''}`.trim()}
-      style={{ touchAction: 'none' }}
+      {...(disabled ? {} : listeners)}
+      {...(disabled ? {} : attributes)}
+      className={
+        disabled
+          ? undefined
+          : `cursor-grab touch-none select-none active:cursor-grabbing ${isDragging ? 'opacity-40' : ''}`.trim()
+      }
+      style={disabled ? undefined : { touchAction: 'none' }}
     >
       {children}
     </div>
@@ -54,9 +61,15 @@ export function DraggableVendaCard({
   children: ReactNode
   dragDisabled?: boolean
 }) {
-  if (dragDisabled || !podeArrastarVendaNaColuna(venda, column)) {
+  if (!podeArrastarVendaNaColuna(venda, column)) {
     return <>{children}</>
   }
 
-  return <DraggableVendaCardAtivo venda={venda}>{children}</DraggableVendaCardAtivo>
+  // O mesmo invólucro permanece quando o arraste é pausado (painel aberto).
+  // Trocar para um fragmento recria o card e solta a âncora do popover, que cai no canto da tela.
+  return (
+    <DraggableVendaCardAtivo venda={venda} disabled={dragDisabled}>
+      {children}
+    </DraggableVendaCardAtivo>
+  )
 }

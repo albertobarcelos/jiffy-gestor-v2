@@ -132,6 +132,18 @@ export function PedidoKanbanQuickViewConteudo({
           dataCriacao={dados.dataCriacao}
           detalhesEntrega={dados.detalhesEntrega}
         />
+        {dados.avisoNotificacaoWhatsApp ? (
+          <p
+            className={cn(
+              'px-1 text-center text-[11px] leading-tight',
+              dados.avisoNotificacaoWhatsApp.includes('Notificação enviada com sucesso')
+                ? 'font-medium text-green-700'
+                : 'font-medium text-amber-700'
+            )}
+          >
+            {dados.avisoNotificacaoWhatsApp}
+          </p>
+        ) : null}
         <Separador />
 
         <LinhaCompacta label="Entregador:" value={dados.nomeEntregador} className="text-secondary pt-2" />

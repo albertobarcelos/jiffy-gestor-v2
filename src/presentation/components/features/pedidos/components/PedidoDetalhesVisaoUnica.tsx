@@ -197,6 +197,7 @@ export function PedidoDetalhesVisaoUnica() {
     tipoPagamento,
     linhasPagamento: linhasPagamento.map(linha => linha.texto),
     observacaoPedido: observacao || null,
+    avisoNotificacaoWhatsApp: null,
   }
 
   const handleWhatsappCliente = () => {
