@@ -183,8 +183,6 @@ export function EmpresaTab({ mostrarStatusFuso = false }: { mostrarStatusFuso?: 
   const invalidateQueries = useInvalidateTenantQueries()
   /** Endereço persistido — usado para saber se o save precisa geocodificar de novo. */
   const enderecoSalvoRef = useRef<EnderecoEmpresaGeocodeInput | null>(null)
-  /** True se o pin atual ainda corresponde ao formulário carregado. */
-  const pinAlinhadoAoFormularioRef = useRef(true)
 
   const [logoDragActive, setLogoDragActive] = useState(false)
   /** Arquivo escolhido localmente; só é enviado ao API ao clicar em Salvar. */
@@ -379,7 +377,6 @@ export function EmpresaTab({ mostrarStatusFuso = false }: { mostrarStatusFuso?: 
             complemento: maiusculasPt(endereco?.complemento || '') || undefined,
           }
           enderecoSalvoRef.current = camposEnderecoSalvo
-          pinAlinhadoAoFormularioRef.current = true
           if (endereco) {
             setCep(camposEnderecoSalvo.cep || '')
             setRua(camposEnderecoSalvo.rua)
@@ -699,12 +696,14 @@ export function EmpresaTab({ mostrarStatusFuso = false }: { mostrarStatusFuso?: 
           enderecoSalvo: enderecoSalvoRef.current,
           pinAtual: enderecoLocalizacao,
           providerEnderecoId,
-          pinAlinhadoAoFormulario: pinAlinhadoAoFormularioRef.current,
+          pinEscolhidoNestaEdicao: false,
         })
 
         let pinParaSalvar = enderecoLocalizacao
         let providerParaSalvar = providerEnderecoId
         let pinFoiAtualizado = false
+        let enviarLocalizacao = true
+        let avisoGeocode: string | null = null
         if (resolucaoPin.acao === 'manter') {
           pinParaSalvar = resolucaoPin.point
           providerParaSalvar = resolucaoPin.providerEnderecoId
@@ -721,16 +720,21 @@ export function EmpresaTab({ mostrarStatusFuso = false }: { mostrarStatusFuso?: 
               pinFoiAtualizado = true
               setEnderecoLocalizacao(geocode.enderecoLocalizacao)
               setProviderEnderecoId(geocode.providerEnderecoId)
-              pinAlinhadoAoFormularioRef.current = true
             }
-          } catch {
-            // Pin é da cobertura. Falha no mapa não impede gravar o endereço da empresa.
+          } catch (error) {
+            enviarLocalizacao = false
+            avisoGeocode =
+              error instanceof Error
+                ? error.message
+                : 'Não foi possível localizar o novo endereço.'
           }
         }
 
-        const geoPatch = montarPatchEnderecoGeolocalizacao(pinParaSalvar, providerParaSalvar)
-        if (geoPatch) {
-          Object.assign(endereco, geoPatch)
+        if (enviarLocalizacao) {
+          const geoPatch = montarPatchEnderecoGeolocalizacao(pinParaSalvar, providerParaSalvar)
+          if (geoPatch) {
+            Object.assign(endereco, geoPatch)
+          }
         }
 
         // Adiciona endereco ao body apenas se houver pelo menos um campo
@@ -767,11 +771,17 @@ export function EmpresaTab({ mostrarStatusFuso = false }: { mostrarStatusFuso?: 
         await invalidateQueries(['empresa', 'endereco-geo'])
         await invalidateQueries(['empresas', 'me'])
         dispararEmpresaDeliveryAtualizada()
-        showToast.success(
-          pinFoiAtualizado
-            ? 'Empresa atualizada. A localização da loja foi movida para o novo endereço.'
-            : 'Empresa atualizada com sucesso!'
-        )
+        if (avisoGeocode) {
+          showToast.error(
+            `Empresa atualizada, mas a localização não foi atualizada. ${avisoGeocode}`
+          )
+        } else {
+          showToast.success(
+            pinFoiAtualizado
+              ? 'Empresa atualizada. A localização da loja foi movida para o novo endereço.'
+              : 'Empresa atualizada com sucesso!'
+          )
+        }
       } catch (error) {
         console.error('Erro ao salvar empresa:', error)
         showToast.error('Erro ao salvar empresa')
@@ -1111,7 +1121,6 @@ export function EmpresaTab({ mostrarStatusFuso = false }: { mostrarStatusFuso?: 
                   label="CEP"
                   value={cep}
                   onChange={e => {
-                    pinAlinhadoAoFormularioRef.current = false
                     setCep(maiusculasPt(e.target.value))
                   }}
                   disabled={!isEditing}
@@ -1123,7 +1132,6 @@ export function EmpresaTab({ mostrarStatusFuso = false }: { mostrarStatusFuso?: 
                     label="Rua"
                     value={rua}
                     onChange={e => {
-                      pinAlinhadoAoFormularioRef.current = false
                       setRua(maiusculasPt(e.target.value))
                     }}
                     disabled={!isEditing}
@@ -1139,7 +1147,6 @@ export function EmpresaTab({ mostrarStatusFuso = false }: { mostrarStatusFuso?: 
                   label="Número"
                   value={numero}
                   onChange={e => {
-                    pinAlinhadoAoFormularioRef.current = false
                     setNumero(maiusculasPt(e.target.value))
                   }}
                   disabled={!isEditing}
@@ -1158,7 +1165,6 @@ export function EmpresaTab({ mostrarStatusFuso = false }: { mostrarStatusFuso?: 
                   label="Bairro"
                   value={bairro}
                   onChange={e => {
-                    pinAlinhadoAoFormularioRef.current = false
                     setBairro(maiusculasPt(e.target.value))
                   }}
                   disabled={!isEditing}
@@ -1174,7 +1180,6 @@ export function EmpresaTab({ mostrarStatusFuso = false }: { mostrarStatusFuso?: 
                   label="Estado"
                   value={estado}
                   onChange={async e => {
-                    pinAlinhadoAoFormularioRef.current = false
                     const novoEstado = e.target.value
                     const cidadeAnterior = cidade
 
@@ -1215,7 +1220,6 @@ export function EmpresaTab({ mostrarStatusFuso = false }: { mostrarStatusFuso?: 
                 <CidadeAutocomplete
                   value={cidade}
                   onChange={novaCidade => {
-                    pinAlinhadoAoFormularioRef.current = false
                     setCidade(maiusculasPt(novaCidade))
                     if (!novaCidade) {
                       setCodigoCidadeIbge(null)
@@ -1230,7 +1234,6 @@ export function EmpresaTab({ mostrarStatusFuso = false }: { mostrarStatusFuso?: 
                   useNativeInput={false}
                   sx={sxEntradaEmpresa}
                   onCidadeSelecionada={(nomeCidade, codigoIbge) => {
-                    pinAlinhadoAoFormularioRef.current = false
                     setCodigoCidadeIbge(codigoIbge)
                     ultimaCidadeBuscada.current = nomeCidade
                     setCidadeValida(true)

@@ -45,8 +45,13 @@ import {
 import {
   enderecoEmpresaGeocodeMinimo,
   geocodificarEnderecoEmpresaViaGoogle,
+  raioAjustePinPorPrecisao,
+  textoAproximacaoPinEmpresa,
 } from '@/src/shared/utils/geolocalizacaoEmpresa'
-import type { GeocodeEmpresaResult } from '@/src/shared/utils/geolocalizacaoEmpresa'
+import type {
+  GeocodeEmpresaResult,
+  PrecisaoGeocodeEmpresa,
+} from '@/src/shared/utils/geolocalizacaoEmpresa'
 import { pontosGeoIguais, type GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import {
   latLngPathsToGeoJsonPolygon,
@@ -62,7 +67,6 @@ import {
   limitarPontoAoRaio,
   pinDentroDoRaioPermitido,
   pinEmpresaDeveSeguirNovoEndereco,
-  RAIO_AJUSTE_PIN_METROS,
 } from '@/src/shared/utils/ajustePinEmpresa'
 import type {
   AcoesDesenhoCobertura,
@@ -295,6 +299,9 @@ export function CoberturaDeliveryTab() {
   const [pinRascunho, setPinRascunho] = useState<GeoJsonPoint | null>(null)
   const [pinSnapEpoch, setPinSnapEpoch] = useState(0)
   const [centroEnderecoGeo, setCentroEnderecoGeo] = useState<GeoJsonPoint | null>(null)
+  const [erroGeocodeEndereco, setErroGeocodeEndereco] = useState<string | null>(null)
+  const [precisaoGeocode, setPrecisaoGeocode] = useState<PrecisaoGeocodeEmpresa | null>(null)
+  const [geocodeTentativa, setGeocodeTentativa] = useState(0)
   const geocodeResultadoRef = useRef<GeocodeEmpresaResult | null>(null)
   const geocodeAssinaturaRef = useRef('')
   const [mapaIndisponivel, setMapaIndisponivel] = useState(mapaGoogleAuthFalhou)
@@ -326,11 +333,14 @@ export function CoberturaDeliveryTab() {
   const pinPendente = Boolean(pinRascunho && !pontosGeoIguais(pinRascunho, origemGeo))
   const salvandoPin = atualizarOrigemMutation.isPending && !confirmandoSetup
   const pinParaConfirmar = pinRascunho ?? centroEnderecoGeo ?? origemGeo
-  const centroAjustePin = centroEnderecoGeo ?? origemGeo
+  const centroAjustePin = centroEnderecoGeo
+  const raioAjustePin = precisaoGeocode ? raioAjustePinPorPrecisao(precisaoGeocode) : null
+  const ajusteLivre = Boolean(erroGeocodeEndereco && !centroEnderecoGeo)
+  const avisoAproximacao = precisaoGeocode ? textoAproximacaoPinEmpresa(precisaoGeocode) : null
   const pinSalvoForaDoRaio = Boolean(
     centroEnderecoGeo &&
       origemGeo &&
-      !pinDentroDoRaioPermitido(centroEnderecoGeo, origemGeo)
+      !pinDentroDoRaioPermitido(centroEnderecoGeo, origemGeo, raioAjustePin ?? undefined)
   )
   const enderecoPreenchido = enderecoEmpresaGeocodeMinimo(
     enderecoEmpresa ?? { rua: '', numero: '' }
@@ -442,6 +452,8 @@ export function CoberturaDeliveryTab() {
   useEffect(() => {
     if (!enderecoEmpresa || !enderecoEmpresaGeocodeMinimo(enderecoEmpresa)) {
       setCentroEnderecoGeo(null)
+      setErroGeocodeEndereco(null)
+      setPrecisaoGeocode(null)
       geocodeResultadoRef.current = null
       geocodeAssinaturaRef.current = ''
       if (!origemGeo) setPinRascunho(null)
@@ -457,6 +469,8 @@ export function CoberturaDeliveryTab() {
         if (cancelado) return
         geocodeAssinaturaRef.current = enderecoAssinatura
         geocodeResultadoRef.current = resultado
+        setErroGeocodeEndereco(null)
+        setPrecisaoGeocode(resultado.precisao)
         setCentroEnderecoGeo(resultado.enderecoLocalizacao)
         if (
           !origemGeo ||
@@ -471,7 +485,6 @@ export function CoberturaDeliveryTab() {
         }
       } catch (error) {
         if (cancelado) return
-        geocodeAssinaturaRef.current = enderecoAssinatura
         if (isFalhaServicoMapaGoogle(error)) {
           setMapaIndisponivel(true)
           avisarMapaIndisponivelCliente('cobertura geocode', error)
@@ -479,13 +492,19 @@ export function CoberturaDeliveryTab() {
         }
         geocodeResultadoRef.current = null
         setCentroEnderecoGeo(null)
+        setPrecisaoGeocode(null)
+        setErroGeocodeEndereco(
+          error instanceof Error
+            ? error.message
+            : 'Não foi possível localizar o endereço da empresa.'
+        )
         if (!origemGeo) setPinRascunho(null)
       }
     })()
     return () => {
       cancelado = true
     }
-  }, [enderecoAssinatura, enderecoEmpresa, mapaIndisponivel, origemGeo])
+  }, [enderecoAssinatura, enderecoEmpresa, geocodeTentativa, mapaIndisponivel, origemGeo])
 
   useEffect(() => {
     if (!centroEnderecoGeo) return
@@ -502,8 +521,20 @@ export function CoberturaDeliveryTab() {
     return () => window.removeEventListener('jiffy:empresa-me-updated', onEmpresaAtualizada)
   }, [geoQuery.refetch])
 
+  const tentarGeocodeDeNovo = useCallback(() => {
+    geocodeAssinaturaRef.current = ''
+    setErroGeocodeEndereco(null)
+    setGeocodeTentativa(tentativa => tentativa + 1)
+  }, [])
+
   const alertas = useMemo(() => {
-    const items: { titulo: string; descricao: string; href?: string; label?: string }[] = []
+    const items: {
+      titulo: string
+      descricao: string
+      href?: string
+      label?: string
+      onAcao?: () => void
+    }[] = []
     if (!empresaDelivery) {
       items.push({
         titulo: 'Delivery não configurado',
@@ -519,6 +550,15 @@ export function CoberturaDeliveryTab() {
         descricao: MENSAGEM_MAPA_INDISPONIVEL_SUPORTE,
       })
     }
+    if (empresaDelivery && erroGeocodeEndereco && !mapaIndisponivel) {
+      items.push({
+        titulo: 'Não foi possível localizar o endereço',
+        descricao:
+          'Não encontramos esse endereço. Mova o mapa e clique para marcar a loja. Depois salve a localização.',
+        label: 'Buscar de novo',
+        onAcao: tentarGeocodeDeNovo,
+      })
+    }
     if (
       empresaDelivery &&
       !mapaIndisponivel &&
@@ -530,7 +570,7 @@ export function CoberturaDeliveryTab() {
       items.push({
         titulo: 'Marque a loja no mapa',
         descricao:
-          'Clique no mapa para marcar a loja, até 1 km do endereço. Depois confirme a loja e o alcance no card.',
+          'Clique no mapa para marcar a loja. Depois confirme a loja e o alcance no card.',
       })
     }
     if (
@@ -541,7 +581,7 @@ export function CoberturaDeliveryTab() {
       items.push({
         titulo: 'Pin fora do endereço',
         descricao:
-          'O pin está a mais de 1 km do endereço da empresa. Recentre no endereço atual e salve a localização.',
+          'O pin está fora do raio permitido do ponto encontrado. Recentre no endereço atual e salve a localização.',
       })
     }
     if (
@@ -562,6 +602,7 @@ export function CoberturaDeliveryTab() {
   }, [
     empresaDelivery,
     enderecoPreenchido,
+    erroGeocodeEndereco,
     geoConfigurada,
     geoQuery.isPending,
     mapaIndisponivel,
@@ -572,6 +613,7 @@ export function CoberturaDeliveryTab() {
     areasQuery.isPending,
     setupInicial,
     temCoberturaAtiva,
+    tentarGeocodeDeNovo,
   ])
 
   const limparEdicaoForma = useCallback(() => {
@@ -732,20 +774,26 @@ export function CoberturaDeliveryTab() {
   const handlePinMovido = useCallback(
     (point: GeoJsonPoint) => {
       setPainelRecolhido(false)
-      const centro = centroEnderecoGeo ?? origemGeo
-      if (!centro) {
+      if (!centroEnderecoGeo || raioAjustePin == null) {
+        if (!erroGeocodeEndereco && origemGeo) {
+          showToast.error('Aguarde a localização do endereço para mover o pin.')
+          return
+        }
         setPinRascunho(point)
         setPinSnapEpoch(n => n + 1)
         return
       }
-      const { ponto, limitado } = limitarPontoAoRaio(centro, point, RAIO_AJUSTE_PIN_METROS)
+      const { ponto, limitado } = limitarPontoAoRaio(centroEnderecoGeo, point, raioAjustePin)
       if (limitado) {
-        showToast.error('O pin só pode ser ajustado até 1 km do endereço da empresa.')
+        const km = raioAjustePin / 1000
+        showToast.error(
+          `O pin só pode ser ajustado até ${km} km do ponto encontrado para o endereço.`
+        )
       }
       setPinRascunho(ponto)
       setPinSnapEpoch(n => n + 1)
     },
-    [centroEnderecoGeo, origemGeo]
+    [centroEnderecoGeo, erroGeocodeEndereco, origemGeo, raioAjustePin]
   )
 
   const handleCancelarPinRascunho = useCallback(() => {
@@ -755,9 +803,17 @@ export function CoberturaDeliveryTab() {
 
   const handleSalvarLocalizacaoPin = useCallback(async () => {
     if (!pinRascunho) return
-    const centro = centroEnderecoGeo ?? origemGeo
-    if (centro && !pinDentroDoRaioPermitido(centro, pinRascunho)) {
-      showToast.error('O pin só pode ser salvo até 1 km do endereço da empresa.')
+    if (!centroEnderecoGeo && !erroGeocodeEndereco) {
+      showToast.error('Aguarde a localização do endereço.')
+      return
+    }
+    if (
+      centroEnderecoGeo &&
+      raioAjustePin != null &&
+      !pinDentroDoRaioPermitido(centroEnderecoGeo, pinRascunho, raioAjustePin)
+    ) {
+      const km = raioAjustePin / 1000
+      showToast.error(`O pin só pode ser salvo até ${km} km do ponto encontrado para o endereço.`)
       return
     }
     try {
@@ -768,7 +824,14 @@ export function CoberturaDeliveryTab() {
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Não foi possível salvar a localização.')
     }
-  }, [atualizarOrigemMutation, centroEnderecoGeo, geoQuery, origemGeo, pinRascunho])
+  }, [
+    atualizarOrigemMutation,
+    centroEnderecoGeo,
+    erroGeocodeEndereco,
+    geoQuery,
+    pinRascunho,
+    raioAjustePin,
+  ])
 
   const handleToggleRaioAtivo = useCallback((raioId: string, ativo: boolean) => {
     setAtivosDraft(prev => ({ ...prev, [raioId]: ativo }))
@@ -1022,12 +1085,24 @@ export function CoberturaDeliveryTab() {
     }
     const ponto = pinRascunho ?? centroEnderecoGeo ?? origemGeo
     if (!ponto) {
-      showToast.error('Marque a loja no mapa, até 1 km do endereço, e confirme.')
+      showToast.error(
+        erroGeocodeEndereco
+          ? 'Mova o mapa e clique para marcar a loja, depois confirme.'
+          : 'Marque a loja no mapa e confirme.'
+      )
       return
     }
-    const centro = centroEnderecoGeo ?? origemGeo
-    if (centro && !pinDentroDoRaioPermitido(centro, ponto)) {
-      showToast.error('O pin só pode ser salvo até 1 km do endereço da empresa.')
+    if (!centroEnderecoGeo && !erroGeocodeEndereco) {
+      showToast.error('Aguarde a localização do endereço.')
+      return
+    }
+    if (
+      centroEnderecoGeo &&
+      raioAjustePin != null &&
+      !pinDentroDoRaioPermitido(centroEnderecoGeo, ponto, raioAjustePin)
+    ) {
+      const km = raioAjustePin / 1000
+      showToast.error(`O pin só pode ser salvo até ${km} km do ponto encontrado para o endereço.`)
       return
     }
     const km = parsed.km
@@ -1081,7 +1156,9 @@ export function CoberturaDeliveryTab() {
     atualizarOrigemMutation,
     centroEnderecoGeo,
     criarRaiosLoteMutation,
+    erroGeocodeEndereco,
     excluirRaiosLoteMutation,
+    raioAjustePin,
     geoQuery,
     origemGeo,
     pinRascunho,
@@ -1198,6 +1275,8 @@ export function CoberturaDeliveryTab() {
                     pinRascunho={pinRascunho}
                     pinSnapEpoch={pinSnapEpoch}
                     centroAjustePin={centroAjustePin}
+                    raioAjustePinMetros={raioAjustePin ?? undefined}
+                    ajusteLivre={ajusteLivre}
                     onPinMovido={handlePinMovido}
                     onDesenhoEstadoChange={handleDesenhoEstadoChange}
                     onAcoesDesenhoProntas={handleAcoesDesenhoProntas}
@@ -1297,11 +1376,17 @@ export function CoberturaDeliveryTab() {
               </div>
             ) : pinPendente ? (
               <div className="mx-3 mt-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5">
-                <p className="text-sm font-semibold text-primary-text">Pin movido</p>
+                <p className="text-sm font-semibold text-primary-text">
+                  {avisoAproximacao ? 'Localização aproximada' : 'Pin movido'}
+                </p>
                 <p className="mt-0.5 text-xs text-secondary-text">
-                  {pinSalvoForaDoRaio
-                    ? 'O endereço da empresa mudou. Salve para mover o pin e recentrar os raios no novo local.'
-                    : 'Salve para recentrar os raios a partir do novo ponto. Até lá, a cobertura continua no endereço gravado.'}
+                  {avisoAproximacao
+                    ? avisoAproximacao
+                    : pinSalvoForaDoRaio
+                      ? 'O endereço da empresa mudou. Salve para mover o pin e recentrar os raios no novo local.'
+                      : ajusteLivre
+                        ? 'Marque a loja no mapa e salve. Até lá, os raios continuam no ponto antigo.'
+                        : 'Salve para recentrar os raios a partir do novo ponto. Até lá, a cobertura continua no endereço gravado.'}
                 </p>
                 <div className="mt-2.5 flex gap-1.5">
                   {pinSalvoForaDoRaio ? null : (
@@ -1345,6 +1430,14 @@ export function CoberturaDeliveryTab() {
                         >
                           {alerta.label}
                         </Link>
+                      ) : alerta.onAcao && alerta.label ? (
+                        <button
+                          type="button"
+                          onClick={alerta.onAcao}
+                          className="mt-1 inline-block text-xs font-semibold text-secondary underline-offset-2 hover:underline"
+                        >
+                          {alerta.label}
+                        </button>
                       ) : null}
                     </div>
                   </section>
