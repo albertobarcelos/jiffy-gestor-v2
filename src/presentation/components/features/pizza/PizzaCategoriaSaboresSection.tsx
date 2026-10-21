@@ -106,6 +106,8 @@ export function PizzaCategoriaSaboresSection({
             id={sabor.id}
             nome={sabor.nome}
             valor={0}
+            hideCodigo
+            centerActions
             valorSomenteLeitura
             valorExibicao={formatarPrecoAPartirDe(resumo?.precoMinimo)}
             ativo={sabor.ativo}

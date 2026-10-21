@@ -42,11 +42,13 @@ export function catalogRowGridClass(opts: {
   hideCodigo: boolean
   hasActions: boolean
   hasCategoria: boolean
+  centerActions?: boolean
 }): string {
   if (opts.isMenu && opts.hideCodigo) {
-    return opts.hasActions
-      ? 'catalog-row-menu-hidecodigo-actions'
-      : 'catalog-row-menu-hidecodigo'
+    if (!opts.hasActions) return 'catalog-row-menu-hidecodigo'
+    return opts.centerActions
+      ? 'catalog-row-menu-hidecodigo-actions-centered'
+      : 'catalog-row-menu-hidecodigo-actions'
   }
   if (opts.isMenu) {
     return 'catalog-row-menu'
@@ -89,6 +91,8 @@ export interface CatalogProductRowProps {
   hidePauseAndPrice?: boolean
   /** Esconde o selo COD. */
   hideCodigo?: boolean
+  /** Centraliza as ações no espaço entre o nome e os metadados. */
+  centerActions?: boolean
 }
 
 function CatalogProductRowInner({
@@ -117,6 +121,7 @@ function CatalogProductRowInner({
   onChangeImage,
   hidePauseAndPrice = false,
   hideCodigo = false,
+  centerActions = false,
 }: CatalogProductRowProps) {
   const [imagemExpandida, setImagemExpandida] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -229,6 +234,7 @@ function CatalogProductRowInner({
             hideCodigo,
             hasActions: Boolean(actionsSlot),
             hasCategoria: Boolean(categoriaSlot),
+            centerActions,
           })
         )}
       >
@@ -312,7 +318,9 @@ function CatalogProductRowInner({
             className={cn(
               AREA_ACOES,
               'flex min-w-0 flex-nowrap items-center',
-              hideCodigo
+              centerActions
+                ? 'w-full justify-start md:w-full md:justify-start'
+                : hideCodigo
                 ? 'justify-self-end md:justify-self-center'
                 : 'w-full justify-start md:w-auto md:justify-center'
             )}
@@ -499,7 +507,8 @@ function arePropsEqual(prev: CatalogProductRowProps, next: CatalogProductRowProp
     prev.onRemove === next.onRemove &&
     prev.onChangeImage === next.onChangeImage &&
     prev.hidePauseAndPrice === next.hidePauseAndPrice &&
-    prev.hideCodigo === next.hideCodigo
+    prev.hideCodigo === next.hideCodigo &&
+    prev.centerActions === next.centerActions
   )
 }
 

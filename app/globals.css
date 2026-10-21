@@ -307,6 +307,12 @@ h6 {
       'foto acoes side';
     grid-template-columns: auto minmax(0, 1fr) auto;
   }
+  .catalog-row-menu-hidecodigo-actions-centered {
+    grid-template-areas:
+      'foto nome side'
+      'foto acoes side';
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
 
   .catalog-row-base {
     grid-template-areas:
@@ -355,6 +361,11 @@ h6 {
   .catalog-row-menu-hidecodigo-actions {
     grid-template-areas: 'foto nome acoes meta';
     grid-template-columns: auto minmax(0, 1fr) auto auto;
+  }
+
+  .catalog-row-menu-hidecodigo-actions-centered {
+    grid-template-areas: 'foto nome acoes meta';
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto;
   }
 
   .catalog-row-base {
