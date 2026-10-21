@@ -144,12 +144,15 @@ export function usePropagarAlteracaoComplemento(): {
           return next
         })
       }}
-      onToggleTodos={marcado => {
-        const atual = pedidoRef.current
-        if (!atual) return
-        setSelecionados(
-          marcado ? new Set(atual.usos.map(uso => chaveUsoComplemento(uso))) : new Set()
-        )
+      onToggleTodos={(chaves, marcado) => {
+        setSelecionados(prev => {
+          const next = new Set(prev)
+          for (const chave of chaves) {
+            if (marcado) next.add(chave)
+            else next.delete(chave)
+          }
+          return next
+        })
       }}
       onDismiss={() => fechar({ tipo: 'cancelado' })}
     />

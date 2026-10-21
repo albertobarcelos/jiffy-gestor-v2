@@ -6,6 +6,7 @@ import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side
 import { ComplementoGruposTab } from './ComplementoGruposTab'
 import { ComplementoOndeUsadoTab } from './ComplementoOndeUsadoTab'
 import { NovoComplemento, type NovoComplementoHandle } from './NovoComplemento'
+import { MENU_WIDE_PANEL_CLASS } from '@/src/presentation/components/features/menus/menuPanelConstants'
 
 const COMPLEMENTO_TABS_FORM_ID = 'complemento-tabs-modal-form'
 
@@ -101,7 +102,11 @@ export function ComplementosTabsModal({
         zIndex={zIndex}
         scrollableBody={false}
         footerVariant="bar"
-        panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,45vw)]"
+        panelClassName={
+          state.tab === 'onde-usado'
+            ? MENU_WIDE_PANEL_CLASS
+            : 'w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,45vw)]'
+        }
         footerActions={
           abaCadastro
             ? {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { MdSearch } from 'react-icons/md'
+import { MdArrowDownward, MdArrowUpward, MdSearch, MdUnfoldMore } from 'react-icons/md'
 import type { ComplementoUsoNoMenu } from '@/src/domain/complemento/tipos'
 import type { VinculoComplementoOverride } from '@/src/domain/repositories/IComplementoOverrideRepository'
 import { criarPropagarAlteracaoComplementoUseCase } from '@/src/presentation/hooks/complementos/criarPropagarAlteracaoComplementoUseCase'
@@ -10,17 +10,14 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
+import {
+  ordenarUsosComplemento,
+  type ColunaOrdenacaoUsoComplemento,
+  type DirecaoOrdenacaoUsoComplemento,
+} from '@/src/presentation/components/features/complementos/ordenacaoUsosComplemento'
 
 interface ComplementoOndeUsadoTabProps {
   complementoId: string
-}
-
-type UsoAgrupadoPorProduto = {
-  menuProdutoId: string
-  menu: ComplementoUsoNoMenu['menu']
-  produto: ComplementoUsoNoMenu['produto']
-  grupoProduto: ComplementoUsoNoMenu['grupoProduto']
-  usos: ComplementoUsoNoMenu[]
 }
 
 function formatarMoeda(valor: number): string {
@@ -66,42 +63,14 @@ function aplicarVinculosLocais(
   })
 }
 
-function agruparUsosPorProduto(usos: ComplementoUsoNoMenu[]): UsoAgrupadoPorProduto[] {
-  const mapa = new Map<string, UsoAgrupadoPorProduto>()
-
-  for (const uso of usos) {
-    const existente = mapa.get(uso.menuProdutoId)
-    if (existente) {
-      existente.usos.push(uso)
-      continue
-    }
-    mapa.set(uso.menuProdutoId, {
-      menuProdutoId: uso.menuProdutoId,
-      menu: uso.menu,
-      produto: uso.produto,
-      grupoProduto: uso.grupoProduto,
-      usos: [uso],
-    })
-  }
-
-  return Array.from(mapa.values())
-    .map(grupo => ({
-      ...grupo,
-      usos: [...grupo.usos].sort((a, b) =>
-        a.grupoComplementos.nome.localeCompare(b.grupoComplementos.nome, 'pt-BR')
-      ),
-    }))
-    .sort((a, b) => {
-      const porProduto = a.produto.nome.localeCompare(b.produto.nome, 'pt-BR')
-      if (porProduto !== 0) return porProduto
-      return a.menu.nome.localeCompare(b.menu.nome, 'pt-BR')
-    })
-}
-
 export function ComplementoOndeUsadoTab({ complementoId }: ComplementoOndeUsadoTabProps) {
   const [usos, setUsos] = useState<ComplementoUsoNoMenu[]>([])
   const [valores, setValores] = useState<Record<string, string>>({})
   const [busca, setBusca] = useState('')
+  const [ordenacao, setOrdenacao] = useState<{
+    coluna: ColunaOrdenacaoUsoComplemento
+    direcao: DirecaoOrdenacaoUsoComplemento
+  }>({ coluna: 'produto', direcao: 'asc' })
   const [isLoading, setIsLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [salvando, setSalvando] = useState<Record<string, boolean>>({})
@@ -144,14 +113,34 @@ export function ComplementoOndeUsadoTab({ complementoId }: ComplementoOndeUsadoT
     const termo = busca.trim().toLowerCase()
     if (!termo) return usos
     return usos.filter(uso => {
-      const texto = [uso.menu.nome, uso.produto.nome, uso.grupoComplementos.nome, uso.grupoProduto.nome]
-        .join(' ')
-        .toLowerCase()
+      const texto = [uso.menu.nome, uso.produto.nome, uso.grupoComplementos.nome].join(' ').toLowerCase()
       return texto.includes(termo)
     })
   }, [busca, usos])
 
-  const agrupados = useMemo(() => agruparUsosPorProduto(filtrados), [filtrados])
+  const usosOrdenados = useMemo(
+    () => ordenarUsosComplemento(filtrados, ordenacao.coluna, ordenacao.direcao),
+    [filtrados, ordenacao]
+  )
+
+  const alternarOrdenacao = (coluna: ColunaOrdenacaoUsoComplemento) => {
+    setOrdenacao(atual => ({
+      coluna,
+      direcao: atual.coluna === coluna && atual.direcao === 'asc' ? 'desc' : 'asc',
+    }))
+  }
+
+  const iconeOrdenacao = (coluna: ColunaOrdenacaoUsoComplemento) => {
+    if (ordenacao.coluna !== coluna) return <MdUnfoldMore size={16} aria-hidden />
+    return ordenacao.direcao === 'asc' ? (
+      <MdArrowUpward size={14} aria-hidden />
+    ) : (
+      <MdArrowDownward size={14} aria-hidden />
+    )
+  }
+
+  const rotuloDirecaoOrdenacao = (coluna: ColunaOrdenacaoUsoComplemento) =>
+    ordenacao.coluna === coluna && ordenacao.direcao === 'asc' ? 'decrescente' : 'crescente'
 
   const gravarValor = useCallback(
     async (uso: ComplementoUsoNoMenu) => {
@@ -300,30 +289,88 @@ export function ComplementoOndeUsadoTab({ complementoId }: ComplementoOndeUsadoT
         <p className="py-10 text-center text-sm text-secondary-text">
           Este complemento ainda não aparece em nenhum cardápio.
         </p>
-      ) : agrupados.length === 0 ? (
+      ) : usosOrdenados.length === 0 ? (
         <p className="py-10 text-center text-sm text-secondary-text">Nenhum uso encontrado para a busca.</p>
       ) : (
-        <div className="min-h-0 flex-1 divide-y divide-gray-100 overflow-y-auto rounded-lg border border-gray-100 bg-white">
-          {agrupados.map(grupo => (
-            <div key={grupo.menuProdutoId} className="px-3 py-1.5">
-              <div className="min-w-0 leading-tight">
-                <p className="truncate text-sm font-semibold text-primary-text">{grupo.produto.nome}</p>
-                <p className="truncate text-xs text-secondary-text">
-                  {grupo.menu.nome}
-                  {grupo.grupoProduto.nome ? ` · ${grupo.grupoProduto.nome}` : ''}
-                </p>
-              </div>
-              <div className="mt-1 space-y-0.5">
-                {grupo.usos.map(uso => {
-                  const chave = chaveUso(uso)
-                  return (
-                    <div
-                      key={chave}
-                      className="grid items-center gap-2 sm:grid-cols-[minmax(0,1fr)_7.5rem_auto]"
-                    >
-                      <p className="min-w-0 truncate text-sm leading-tight text-primary-text">
-                        {uso.grupoComplementos.nome}
+        <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-gray-100 bg-white">
+          <table className="w-full min-w-[760px] table-fixed border-collapse text-left">
+            <thead className="sticky top-0 z-10 bg-gray-50">
+              <tr className="border-b border-gray-200">
+                <th
+                  scope="col"
+                  aria-sort={ordenacao.coluna === 'produto' ? (ordenacao.direcao === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  className="w-[24%] px-3 py-2 text-xs font-semibold text-primary-text"
+                >
+                  <button
+                    type="button"
+                    onClick={() => alternarOrdenacao('produto')}
+                    aria-label={`Ordenar por Produto em ordem ${rotuloDirecaoOrdenacao('produto')}`}
+                    className="inline-flex items-center gap-1 text-left"
+                  >
+                    Produto {iconeOrdenacao('produto')}
+                  </button>
+                </th>
+                <th
+                  scope="col"
+                  aria-sort={ordenacao.coluna === 'menu' ? (ordenacao.direcao === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  className="w-[23%] px-3 py-2 text-xs font-semibold text-primary-text"
+                >
+                  <button
+                    type="button"
+                    onClick={() => alternarOrdenacao('menu')}
+                    aria-label={`Ordenar por Cardápio em ordem ${rotuloDirecaoOrdenacao('menu')}`}
+                    className="inline-flex items-center gap-1 text-left"
+                  >
+                    Cardápio {iconeOrdenacao('menu')}
+                  </button>
+                </th>
+                <th
+                  scope="col"
+                  aria-sort={ordenacao.coluna === 'grupo' ? (ordenacao.direcao === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  className="w-[30%] px-3 py-2 text-xs font-semibold text-primary-text"
+                >
+                  <button
+                    type="button"
+                    onClick={() => alternarOrdenacao('grupo')}
+                    aria-label={`Ordenar por Grupo de complemento em ordem ${rotuloDirecaoOrdenacao('grupo')}`}
+                    className="inline-flex items-center gap-1 text-left"
+                  >
+                    Grupo de complemento {iconeOrdenacao('grupo')}
+                  </button>
+                </th>
+                <th scope="col" className="w-[15%] px-3 py-2 text-right text-xs font-semibold text-primary-text">
+                  Valor
+                </th>
+                <th scope="col" className="w-[8%] px-3 py-2 text-right text-xs font-semibold text-primary-text">
+                  Status
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {usosOrdenados.map((uso, index) => {
+                const chave = chaveUso(uso)
+                return (
+                  <tr
+                    key={chave}
+                    className={`border-b border-gray-100 last:border-b-0 ${
+                      index % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'
+                    }`}
+                  >
+                    <td className="truncate px-3 py-2 text-sm text-primary-text" title={uso.produto.nome}>
+                      {uso.produto.nome}
+                    </td>
+                    <td className="px-3 py-2">
+                      <p className="truncate text-sm text-secondary-text" title={uso.menu.nome}>
+                        {uso.menu.nome}
                       </p>
+                    </td>
+                    <td
+                      className="truncate px-3 py-2 text-sm text-primary-text"
+                      title={uso.grupoComplementos.nome}
+                    >
+                      {uso.grupoComplementos.nome}
+                    </td>
+                    <td className="px-3 py-2 text-right">
                       <input
                         type="text"
                         value={valores[chave] ?? formatarMoeda(uso.complementoConfig.valor)}
@@ -340,8 +387,10 @@ export function ComplementoOndeUsadoTab({ complementoId }: ComplementoOndeUsadoT
                         }}
                         disabled={salvando[chave]}
                         aria-label={`Valor em ${uso.produto.nome} · ${uso.grupoComplementos.nome}`}
-                        className="w-full rounded border border-gray-200 px-2 py-0.5 text-center text-xs text-primary-text focus:border-primary focus:outline-none disabled:opacity-50"
+                        className="w-full rounded border border-gray-200 px-2 py-1 text-right text-xs text-primary-text focus:border-primary focus:outline-none disabled:opacity-50"
                       />
+                    </td>
+                    <td className="px-3 py-2 text-right">
                       <JiffyIconSwitch
                         size="xs"
                         checked={uso.complementoConfig.ativo}
@@ -353,12 +402,12 @@ export function ComplementoOndeUsadoTab({ complementoId }: ComplementoOndeUsadoT
                             : `Ativar em ${uso.produto.nome} · ${uso.grupoComplementos.nome}`,
                         }}
                       />
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       )}
       {dialogPropagacao}
