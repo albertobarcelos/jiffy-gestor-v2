@@ -12,7 +12,10 @@ import {
   reordenarComplementoNoMenuApi,
   reordenarGrupoComplementoNoMenuApi,
 } from '@/src/infrastructure/api/complementoConfigApi'
-import { criarPropagarAlteracaoComplementoUseCase } from '@/src/presentation/hooks/complementos/criarPropagarAlteracaoComplementoUseCase'
+import {
+  gravarOverridesComplementoGestorUseCase,
+  buscarComplementoCompletoGestorUseCase,
+} from '@/src/infrastructure/composition/complementoUseCases'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 
 async function tokenOuErro(): Promise<string> {
@@ -32,7 +35,7 @@ export async function buscarGrupoImpactoLote(grupoId: string): Promise<GrupoImpa
 }
 
 export async function buscarComplementoCompleto(complementoId: string): Promise<ComplementoCompleto> {
-  return criarPropagarAlteracaoComplementoUseCase().buscarCompleto({
+  return buscarComplementoCompletoGestorUseCase.execute({
     complementoId,
     token: await tokenOuErro(),
   })
@@ -42,7 +45,7 @@ export async function gravarOverridesComplemento(input: {
   vinculos?: VinculoComplementoOverride[]
   grupos?: ImpactoComplementoNoGrupo[]
 }): Promise<ResultadoOverridesComplemento> {
-  return criarPropagarAlteracaoComplementoUseCase().aplicarOverrides({
+  return gravarOverridesComplementoGestorUseCase.execute({
     token: await tokenOuErro(),
     vinculos: input.vinculos,
     grupos: input.grupos,
