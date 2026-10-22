@@ -11,7 +11,6 @@ import type {
  */
 export interface IPropagacaoComplemento {
   buscarCompleto(complementoId: string, token: string): Promise<ComplementoCompleto>
-  gravarVinculos(vinculos: VinculoComplementoOverride[], token: string): Promise<void>
   gravarOverrides(
     input: {
       vinculos?: VinculoComplementoOverride[]

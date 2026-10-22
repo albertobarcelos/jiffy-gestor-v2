@@ -43,9 +43,5 @@ export const propagacaoComplementoApi: IPropagacaoComplemento = {
     return completo
   },
 
-  async gravarVinculos(vinculos, token) {
-    await patchOverrides({ vinculos }, token)
-  },
-
   gravarOverrides: patchOverrides,
 }

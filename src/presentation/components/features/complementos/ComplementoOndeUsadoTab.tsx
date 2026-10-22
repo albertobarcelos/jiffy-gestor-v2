@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { MdArrowDownward, MdArrowUpward, MdSearch, MdUnfoldMore } from 'react-icons/md'
 import type { ComplementoUsoNoMenu } from '@/src/domain/complemento/tipos'
 import type { VinculoComplementoOverride } from '@/src/domain/repositories/IComplementoOverrideRepository'
-import { criarPropagarAlteracaoComplementoUseCase } from '@/src/presentation/hooks/complementos/criarPropagarAlteracaoComplementoUseCase'
+import { buscarComplementoCompletoGestorUseCase } from '@/src/infrastructure/composition/complementoUseCases'
 import { usePropagarAlteracaoComplemento } from '@/src/presentation/hooks/complementos/usePropagarAlteracaoComplemento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
@@ -88,7 +88,7 @@ export function ComplementoOndeUsadoTab({ complementoId }: ComplementoOndeUsadoT
       if (!token) {
         throw new Error('Token não encontrado. Faça login novamente.')
       }
-      const completo = await criarPropagarAlteracaoComplementoUseCase().buscarCompleto({
+      const completo = await buscarComplementoCompletoGestorUseCase.execute({
         complementoId,
         token,
       })
@@ -298,7 +298,13 @@ export function ComplementoOndeUsadoTab({ complementoId }: ComplementoOndeUsadoT
               <tr className="border-b border-gray-200">
                 <th
                   scope="col"
-                  aria-sort={ordenacao.coluna === 'produto' ? (ordenacao.direcao === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  aria-sort={
+                    ordenacao.coluna === 'produto'
+                      ? ordenacao.direcao === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
                   className="w-[24%] px-3 py-2 text-xs font-semibold text-primary-text"
                 >
                   <button
@@ -312,7 +318,13 @@ export function ComplementoOndeUsadoTab({ complementoId }: ComplementoOndeUsadoT
                 </th>
                 <th
                   scope="col"
-                  aria-sort={ordenacao.coluna === 'menu' ? (ordenacao.direcao === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  aria-sort={
+                    ordenacao.coluna === 'menu'
+                      ? ordenacao.direcao === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
                   className="w-[23%] px-3 py-2 text-xs font-semibold text-primary-text"
                 >
                   <button
@@ -326,7 +338,13 @@ export function ComplementoOndeUsadoTab({ complementoId }: ComplementoOndeUsadoT
                 </th>
                 <th
                   scope="col"
-                  aria-sort={ordenacao.coluna === 'grupo' ? (ordenacao.direcao === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  aria-sort={
+                    ordenacao.coluna === 'grupo'
+                      ? ordenacao.direcao === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
                   className="w-[30%] px-3 py-2 text-xs font-semibold text-primary-text"
                 >
                   <button

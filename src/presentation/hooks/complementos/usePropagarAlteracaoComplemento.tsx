@@ -10,9 +10,12 @@ import {
   type OrigemUsoComplemento,
 } from '@/src/domain/policies/complemento/propagarAlteracaoComplemento'
 import { PropagarAlteracaoComplementoDialog } from '@/src/presentation/components/features/complementos/PropagarAlteracaoComplementoDialog'
-import { criarPropagarAlteracaoComplementoUseCase } from '@/src/presentation/hooks/complementos/criarPropagarAlteracaoComplementoUseCase'
+import {
+  gravarOverridesComplementoGestorUseCase,
+  listarUsosParaPropagarComplementoUseCase,
+} from '@/src/infrastructure/composition/complementoUseCases'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { showToast } from '@/src/shared/utils/toast'
+import { handleApiError, showToast } from '@/src/shared/utils/toast'
 
 export type DecisaoPropagacaoComplemento =
   | { tipo: 'cancelado' }
@@ -61,24 +64,24 @@ export function usePropagarAlteracaoComplemento(): {
       origem?: OrigemUsoComplemento
       alteracao: AlteracaoComplementoPropagavel
     }): Promise<DecisaoPropagacaoComplemento> => {
-      if (pedidoRef.current) return { tipo: 'so-origem' }
+      if (pedidoRef.current) return { tipo: 'cancelado' }
 
       const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
-        showToast.error('Não foi possível listar os cardápios. A alteração fica só neste local.')
-        return { tipo: 'so-origem' }
+        showToast.error('Não foi possível listar os cardápios. Faça login novamente.')
+        return { tipo: 'cancelado' }
       }
 
       let usos: ComplementoUsoNoMenu[] = []
       try {
-        usos = await criarPropagarAlteracaoComplementoUseCase().listarUsosParaPropagar({
+        usos = await listarUsosParaPropagarComplementoUseCase.execute({
           complementoId: opts.complementoId,
           token,
           origem: opts.origem,
         })
-      } catch {
-        showToast.error('Não foi possível listar os cardápios. A alteração fica só neste local.')
-        return { tipo: 'so-origem' }
+      } catch (error) {
+        showToast.error(`Não foi possível listar os cardápios: ${handleApiError(error)}`)
+        return { tipo: 'cancelado' }
       }
 
       if (usos.length === 0) return { tipo: 'so-origem' }
@@ -104,7 +107,7 @@ export function usePropagarAlteracaoComplemento(): {
     if (!token) {
       throw new Error('Token não encontrado. Faça login novamente.')
     }
-    await criarPropagarAlteracaoComplementoUseCase().aplicarVinculos({ token, vinculos })
+    await gravarOverridesComplementoGestorUseCase.execute({ token, vinculos })
   }, [])
 
   const confirmarEscolha = useCallback(() => {

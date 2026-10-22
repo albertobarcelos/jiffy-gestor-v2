@@ -14,7 +14,12 @@ import { Checkbox } from '@/src/presentation/components/ui/checkbox'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { cn } from '@/src/shared/utils/cn'
 import { MENU_WIDE_PANEL_CLASS } from '@/src/presentation/components/features/menus/menuPanelConstants'
-import { MdSearch, MdSyncAlt } from 'react-icons/md'
+import {
+  ordenarUsosComplemento,
+  type ColunaOrdenacaoUsoComplemento,
+  type DirecaoOrdenacaoUsoComplemento,
+} from '@/src/presentation/components/features/complementos/ordenacaoUsosComplemento'
+import { MdArrowDownward, MdArrowUpward, MdSearch, MdSyncAlt, MdUnfoldMore } from 'react-icons/md'
 
 type Passo = 'perguntar' | 'escolher'
 
@@ -64,19 +69,13 @@ export function PropagarAlteracaoComplementoDialog({
   const perguntando = passo === 'perguntar'
   const resumo = textoAlteracao(alteracao)
   const [busca, setBusca] = useState('')
+  const [ordenacao, setOrdenacao] = useState<{
+    coluna: ColunaOrdenacaoUsoComplemento
+    direcao: DirecaoOrdenacaoUsoComplemento
+  }>({ coluna: 'produto', direcao: 'asc' })
   const usosOrdenados = useMemo(
-    () =>
-      [...usos].sort((a, b) => {
-        const porProduto = a.produto.nome.localeCompare(b.produto.nome, 'pt-BR')
-        if (porProduto !== 0) return porProduto
-        const porMenu = a.menu.nome.localeCompare(b.menu.nome, 'pt-BR')
-        if (porMenu !== 0) return porMenu
-        return a.grupoComplementos.nome.localeCompare(
-          b.grupoComplementos.nome,
-          'pt-BR'
-        )
-      }),
-    [usos]
+    () => ordenarUsosComplemento(usos, ordenacao.coluna, ordenacao.direcao),
+    [usos, ordenacao]
   )
   const usosFiltrados = useMemo(() => {
     const termo = busca.trim().toLowerCase()
@@ -90,6 +89,22 @@ export function PropagarAlteracaoComplementoDialog({
   const chavesFiltradas = usosFiltrados.map(chaveUsoComplemento)
   const selecionadosFiltrados = chavesFiltradas.filter(chave => selecionados.has(chave)).length
   const todosMarcados = chavesFiltradas.length > 0 && selecionadosFiltrados === chavesFiltradas.length
+  const alternarOrdenacao = (coluna: ColunaOrdenacaoUsoComplemento) => {
+    setOrdenacao(atual => ({
+      coluna,
+      direcao: atual.coluna === coluna && atual.direcao === 'asc' ? 'desc' : 'asc',
+    }))
+  }
+  const iconeOrdenacao = (coluna: ColunaOrdenacaoUsoComplemento) => {
+    if (ordenacao.coluna !== coluna) return <MdUnfoldMore size={16} aria-hidden />
+    return ordenacao.direcao === 'asc' ? (
+      <MdArrowUpward size={14} aria-hidden />
+    ) : (
+      <MdArrowDownward size={14} aria-hidden />
+    )
+  }
+  const rotuloDirecaoOrdenacao = (coluna: ColunaOrdenacaoUsoComplemento) =>
+    ordenacao.coluna === coluna && ordenacao.direcao === 'asc' ? 'decrescente' : 'crescente'
 
   const footerActions = useMemo((): JiffySidePanelFooterActions => {
     if (perguntando) {
@@ -170,7 +185,17 @@ export function PropagarAlteracaoComplementoDialog({
               <table className="w-full min-w-[760px] table-fixed border-collapse text-left">
                 <thead className="sticky top-0 z-10 bg-gray-50">
                   <tr className="border-b border-gray-200">
-                    <th scope="col" className="w-[24%] px-3 py-2 text-xs font-semibold text-primary-text">
+                    <th
+                      scope="col"
+                      aria-sort={
+                        ordenacao.coluna === 'produto'
+                          ? ordenacao.direcao === 'asc'
+                            ? 'ascending'
+                            : 'descending'
+                          : 'none'
+                      }
+                      className="w-[24%] px-3 py-2 text-xs font-semibold text-primary-text"
+                    >
                       <div className="flex items-center gap-2">
                         <Checkbox
                           size="small"
@@ -179,14 +204,55 @@ export function PropagarAlteracaoComplementoDialog({
                           onChange={event => onToggleTodos(chavesFiltradas, event.target.checked)}
                           inputProps={{ 'aria-label': 'Marcar todos os usos filtrados' }}
                         />
-                        Produto
+                        <button
+                          type="button"
+                          onClick={() => alternarOrdenacao('produto')}
+                          aria-label={`Ordenar por Produto em ordem ${rotuloDirecaoOrdenacao('produto')}`}
+                          className="inline-flex items-center gap-1 text-left"
+                        >
+                          Produto {iconeOrdenacao('produto')}
+                        </button>
                       </div>
                     </th>
-                    <th scope="col" className="w-[23%] px-3 py-2 text-xs font-semibold text-primary-text">
-                      Cardápio
+                    <th
+                      scope="col"
+                      aria-sort={
+                        ordenacao.coluna === 'menu'
+                          ? ordenacao.direcao === 'asc'
+                            ? 'ascending'
+                            : 'descending'
+                          : 'none'
+                      }
+                      className="w-[23%] px-3 py-2 text-xs font-semibold text-primary-text"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => alternarOrdenacao('menu')}
+                        aria-label={`Ordenar por Cardápio em ordem ${rotuloDirecaoOrdenacao('menu')}`}
+                        className="inline-flex items-center gap-1 text-left"
+                      >
+                        Cardápio {iconeOrdenacao('menu')}
+                      </button>
                     </th>
-                    <th scope="col" className="w-[30%] px-3 py-2 text-xs font-semibold text-primary-text">
-                      Grupo de complemento
+                    <th
+                      scope="col"
+                      aria-sort={
+                        ordenacao.coluna === 'grupo'
+                          ? ordenacao.direcao === 'asc'
+                            ? 'ascending'
+                            : 'descending'
+                          : 'none'
+                      }
+                      className="w-[30%] px-3 py-2 text-xs font-semibold text-primary-text"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => alternarOrdenacao('grupo')}
+                        aria-label={`Ordenar por Grupo de complemento em ordem ${rotuloDirecaoOrdenacao('grupo')}`}
+                        className="inline-flex items-center gap-1 text-left"
+                      >
+                        Grupo de complemento {iconeOrdenacao('grupo')}
+                      </button>
                     </th>
                     <th scope="col" className="w-[15%] px-3 py-2 text-right text-xs font-semibold text-primary-text">
                       Valor
