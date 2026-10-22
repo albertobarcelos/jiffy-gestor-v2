@@ -13,6 +13,7 @@ import { montarPedidoPublico } from '@/src/application/mappers/MontarPedidoPubli
 import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
 import type { DeliveryCarrinhoItem } from '@/src/presentation/components/features/delivery-publico/shared/stores/deliveryCarrinhoStore'
 import { aplicarPatchFormCheckout } from '@/src/presentation/components/features/delivery-publico/shared/hooks/checkout/formHelpers'
+import { filtrarMeiosPagamentoPorTipoEntrega } from '@/src/domain/policies/FiltrarMeiosPagamentoPorTipoEntrega'
 
 const itemCarrinho: DeliveryCarrinhoItem = {
   id: 'i1',
@@ -359,5 +360,43 @@ describe('aplicarPatchFormCheckout', () => {
     const next = aplicarPatchFormCheckout(comPagamento, 'observacaoPedido', 'Sem cebola')
     expect(next.pagamentos).toEqual([{ meioPagamentoId: 'pix', valor: 30 }])
     expect(next.observacaoPedido).toBe('Sem cebola')
+  })
+
+  it('limpa pagamentos tanto na troca de entrega para retirada quanto no sentido inverso', () => {
+    const pagamento = [{ meioPagamentoId: 'pix', valor: 30 }]
+    const entregaParaRetirada = aplicarPatchFormCheckout(
+      formBase({ tipoEntrega: 'entrega', pagamentos: pagamento }),
+      'tipoEntrega',
+      'retirada'
+    )
+    const retiradaParaEntrega = aplicarPatchFormCheckout(
+      formBase({ tipoEntrega: 'retirada', pagamentos: pagamento }),
+      'tipoEntrega',
+      'entrega'
+    )
+
+    expect(entregaParaRetirada.pagamentos).toEqual([])
+    expect(retiradaParaEntrega.pagamentos).toEqual([])
+  })
+})
+
+describe('filtrarMeiosPagamentoPorTipoEntrega', () => {
+  const meios = [
+    { id: 'ambos', ativoEntregaDelivery: true, ativoRetiradaDelivery: true },
+    { id: 'entrega', ativoEntregaDelivery: true, ativoRetiradaDelivery: false },
+    { id: 'retirada', ativoEntregaDelivery: false, ativoRetiradaDelivery: true },
+  ]
+
+  it('mantém apenas meios habilitados para entrega', () => {
+    expect(filtrarMeiosPagamentoPorTipoEntrega(meios, 'entrega').map(meio => meio.id)).toEqual([
+      'ambos',
+      'entrega',
+    ])
+  })
+
+  it('mantém apenas meios habilitados para retirada', () => {
+    expect(
+      filtrarMeiosPagamentoPorTipoEntrega(meios, 'retirada').map(meio => meio.id)
+    ).toEqual(['ambos', 'retirada'])
   })
 })

@@ -23,6 +23,12 @@ export async function GET(request: NextRequest) {
     const q = searchParams.get('q') || ''
     const ativoParam = searchParams.get('ativo')
     const ativo = ativoParam !== null ? ativoParam === 'true' : null
+    const ativoEntregaParam = searchParams.get('ativoEntregaDelivery')
+    const ativoEntregaDelivery =
+      ativoEntregaParam !== null ? ativoEntregaParam === 'true' : null
+    const ativoRetiradaParam = searchParams.get('ativoRetiradaDelivery')
+    const ativoRetiradaDelivery =
+      ativoRetiradaParam !== null ? ativoRetiradaParam === 'true' : null
     const ativoDeliveryParam = searchParams.get('ativoDelivery')
     const ativoDelivery = ativoDeliveryParam !== null ? ativoDeliveryParam === 'true' : null
 
@@ -34,6 +40,8 @@ export async function GET(request: NextRequest) {
       offset,
       q,
       ativo,
+      ativoEntregaDelivery,
+      ativoRetiradaDelivery,
       ativoDelivery,
     })
 
@@ -99,4 +107,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

@@ -16,7 +16,8 @@ export class MeioPagamento {
     private readonly ativo: boolean,
     private readonly parcelavel: boolean,
     private readonly tipoParcelamento: TipoParcelamento | null,
-    private readonly isDeliveryFlag: boolean
+    private readonly ativoEntregaDelivery: boolean,
+    private readonly ativoRetiradaDelivery: boolean
   ) {}
 
   static create(
@@ -27,7 +28,8 @@ export class MeioPagamento {
     ativo: boolean,
     isParcelavel: boolean,
     tipoParcelamento: TipoParcelamento | null,
-    isDelivery = false
+    ativoEntregaDelivery = false,
+    ativoRetiradaDelivery = true
   ): MeioPagamento {
     if (!id || !nome) {
       throw new Error('ID e nome são obrigatórios')
@@ -41,7 +43,8 @@ export class MeioPagamento {
       ativo,
       isParcelavel,
       tipoParcelamento,
-      isDelivery
+      ativoEntregaDelivery,
+      ativoRetiradaDelivery
     )
   }
 
@@ -62,7 +65,15 @@ export class MeioPagamento {
       parseBooleanFlag(data.ativo),
       parseBooleanFlag(data.isParcelavel),
       tipoParcelamento,
-      parseBooleanFlag(data.ativoDelivery ?? data.isDelivery)
+      parseBooleanFlag(
+        data.ativoEntregaDelivery ?? data.ativoDelivery ?? data.isDelivery
+      ),
+      parseBooleanFlag(
+        data.ativoRetiradaDelivery ??
+          data.ativoEntregaDelivery ??
+          data.ativoDelivery ??
+          data.isDelivery
+      )
     )
   }
 
@@ -79,7 +90,15 @@ export class MeioPagamento {
   }
 
   isDelivery(): boolean {
-    return this.isDeliveryFlag
+    return this.ativoEntregaDelivery
+  }
+
+  isEntregaDelivery(): boolean {
+    return this.ativoEntregaDelivery
+  }
+
+  isRetiradaDelivery(): boolean {
+    return this.ativoRetiradaDelivery
   }
 
   getFormaPagamentoFiscal(): string {
@@ -103,7 +122,9 @@ export class MeioPagamento {
       id: this.id,
       nome: this.nome,
       tefAtivo: this.tefAtivo,
-      ativoDelivery: this.isDeliveryFlag,
+      ativoEntregaDelivery: this.ativoEntregaDelivery,
+      ativoRetiradaDelivery: this.ativoRetiradaDelivery,
+      ativoDelivery: this.ativoEntregaDelivery,
       formaPagamentoFiscal: this.formaPagamentoFiscal,
       ativo: this.ativo,
       isParcelavel: this.parcelavel,

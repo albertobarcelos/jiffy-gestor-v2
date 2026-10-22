@@ -10,6 +10,7 @@ import {
   mergeProdutoComSnapshotMenu,
   mesclarGrupoComplementoMenuComCadastro,
 } from '@/src/application/mappers/MenuProdutoCatalogMapper'
+import { deveEnviarValorUnitarioAlterado } from '@/src/domain/services/pedido/deveEnviarValorUnitarioAlterado'
 import type { MenuProduto } from '@/src/shared/types/menus'
 
 function snapshotMenu(over: Partial<MenuProduto> = {}): MenuProduto {
@@ -63,6 +64,76 @@ describe('MenuProdutoCatalogMapper — complementos do produto do menu', () => {
     expect(grupos[0]?.complementos).toEqual([])
     expect(produto.abreComplementosAtivo()).toBe(true)
     expect(gruposComplementosPrecisamHidratacao(grupos)).toBe(true)
+  })
+
+  describe('MenuProdutoCatalogMapper — preço promocional do menu', () => {
+    it('usa o preço promocional vigente no produto do catálogo do pedido', () => {
+      const produto = menuProdutoToProduto(
+        snapshotMenu({
+          valor: 25,
+          valorPromocional: 18.5,
+          promocaoAtiva: true,
+        })
+      )
+
+      expect(produto.getValor()).toBe(18.5)
+    })
+
+    it('usa o preço promocional vigente ao mesclar snapshot com cadastro', () => {
+      const produto = mergeProdutoComSnapshotMenu(
+        produtoCadastroComComplementos(),
+        snapshotMenu({
+          valor: 25,
+          valorPromocional: 18.5,
+          promocaoAtiva: true,
+        })
+      )
+
+      expect(produto.getValor()).toBe(18.5)
+    })
+
+    it.each([
+      { valorPromocional: 18.5, promocaoAtiva: false },
+      { valorPromocional: 0, promocaoAtiva: true },
+      { valorPromocional: -1, promocaoAtiva: true },
+    ])('mantém o preço normal quando a promoção não é vigente: %#', promo => {
+      const produto = menuProdutoToProduto(snapshotMenu({ valor: 25, ...promo }))
+      expect(produto.getValor()).toBe(25)
+    })
+
+    it.each([30, 1, 0.5])(
+      'espelha o backend usando qualquer preço promocional positivo ativo (%s)',
+      valorPromocional => {
+        const produto = menuProdutoToProduto(
+          snapshotMenu({ valor: 25, valorPromocional, promocaoAtiva: true })
+        )
+
+        expect(produto.getValor()).toBe(valorPromocional)
+      }
+    )
+
+    it('considera o promocional como preço de catálogo, não como override manual', () => {
+      const produto = menuProdutoToProduto(
+        snapshotMenu({
+          valor: 25,
+          valorPromocional: 18.5,
+          promocaoAtiva: true,
+          permiteAlterarPreco: true,
+        })
+      )
+
+      expect(
+        deveEnviarValorUnitarioAlterado({
+          produtoId: produto.getId(),
+          nome: produto.getNome(),
+          quantidade: 1,
+          valorUnitario: produto.getValor(),
+          valorCatalogo: produto.getValor(),
+          permiteAlterarPreco: produto.permiteAlterarPrecoAtivo(),
+          complementos: [],
+        })
+      ).toBe(false)
+    })
   })
 
   it('não usa os complementos do cadastro base no merge', () => {

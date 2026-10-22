@@ -11,6 +11,9 @@ import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 interface MeiosPagamentoQueryParams {
   q?: string
   ativo?: boolean | null
+  ativoEntregaDelivery?: boolean | null
+  ativoRetiradaDelivery?: boolean | null
+  /** @deprecated Use ativoEntregaDelivery. */
   ativoDelivery?: boolean | null
   limit?: number
   offset?: number
@@ -37,8 +40,12 @@ export function useMeiosPagamentoInfinite(params: Omit<MeiosPagamentoQueryParams
       if (params.ativo !== undefined && params.ativo !== null) {
         searchParams.append('ativo', params.ativo.toString())
       }
-      if (params.ativoDelivery !== undefined && params.ativoDelivery !== null) {
-        searchParams.append('ativoDelivery', params.ativoDelivery.toString())
+      const ativoEntregaDelivery = params.ativoEntregaDelivery ?? params.ativoDelivery
+      if (ativoEntregaDelivery !== undefined && ativoEntregaDelivery !== null) {
+        searchParams.append('ativoEntregaDelivery', ativoEntregaDelivery.toString())
+      }
+      if (params.ativoRetiradaDelivery !== undefined && params.ativoRetiradaDelivery !== null) {
+        searchParams.append('ativoRetiradaDelivery', params.ativoRetiradaDelivery.toString())
       }
       searchParams.append('limit', limit.toString())
       searchParams.append('offset', String(pageParam))
@@ -143,8 +150,6 @@ export function useMeioPagamentoMutation() {
     }
   )
 }
-
-
 
 
 

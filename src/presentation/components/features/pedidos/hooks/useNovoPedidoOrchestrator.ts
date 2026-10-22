@@ -38,6 +38,7 @@ import { useCarregarVenda } from './data/useCarregarVenda'
 import { useEntregadoresQuery } from './data/useEntregadoresQuery'
 import { useTaxasEntregaQuery } from './data/useTaxasEntregaQuery'
 import { useNovoPedidoDelivery } from './useNovoPedidoDelivery'
+import { resolverFiltroMeiosPagamentoNovoPedido } from '@/src/domain/policies/pedido/MeiosPagamentoNovoPedidoPolicy'
 import { useNovoPedidoPagamentos } from './useNovoPedidoPagamentos'
 import {
   useNovoPedidoResetOnExit,
@@ -421,6 +422,11 @@ export function useNovoPedidoOrchestrator({
     setMoradaEntregaSelecionada,
     setTaxaEntregaId,
     setTipoAtendimentoDelivery,
+    tipoAtendimentoDelivery,
+    setPagamentos,
+    setMeioPagamentoId,
+    setValorRecebido,
+    pedidoExistente: Boolean(vendaId || modoVisualizacao),
     getAccessToken: () => useAuthStore.getState().tenantAuth?.getAccessToken(),
   })
 
@@ -462,8 +468,13 @@ export function useNovoPedidoOrchestrator({
     isFetching: isFetchingMeiosPagamento,
   } = useMeiosPagamentoInfinite({
     limit: 100,
-    // POS filtra por ativo; delivery filtra só por ativoDelivery (independente do POS).
-    ...(pedidoDeliveryGestor ? { ativoDelivery: true } : { ativo: true }),
+    // O detalhe pode chegar depois da primeira renderização; sem o tipo, não restringe a lista.
+    ...resolverFiltroMeiosPagamentoNovoPedido({
+      pedidoDeliveryGestor,
+      pedidoComRetirada,
+      pedidoExistente: Boolean(vendaId || modoVisualizacao),
+      tipoEntregaPedidoExistente: detalhesPedidoMeta?.tipoEntrega,
+    }),
     // Step 3 usa meios de pagamento; em visualizacao/edicao pode ser usado para resolver nomes.
     enabled: open && (currentStep >= 3 || modoVisualizacao || !!vendaId),
     refetchOnWindowFocus: false,

@@ -7,8 +7,10 @@ import type { MoradaTelefone } from '@/src/domain/types/moradaEntrega'
 import type { ClientesTabsModalState } from '@/src/presentation/components/features/clientes/ClientesTabsModal'
 import type {
   NovoPedidoClienteEntregaVinculado,
+  PagamentoSelecionado,
   TipoAtendimentoDelivery,
 } from '../../types'
+import { deveLimparPagamentosAoTrocarTipo } from '@/src/domain/policies/pedido/MeiosPagamentoNovoPedidoPolicy'
 
 export interface UseNovoPedidoClienteParams {
   tipoInicioPedido: 'balcao' | 'delivery'
@@ -23,6 +25,11 @@ export interface UseNovoPedidoClienteParams {
   setMoradaEntregaSelecionada: React.Dispatch<React.SetStateAction<MoradaTelefone | null>>
   setTaxaEntregaId: React.Dispatch<React.SetStateAction<string>>
   setTipoAtendimentoDelivery: React.Dispatch<React.SetStateAction<TipoAtendimentoDelivery>>
+  tipoAtendimentoDelivery: TipoAtendimentoDelivery
+  setPagamentos: React.Dispatch<React.SetStateAction<PagamentoSelecionado[]>>
+  setMeioPagamentoId: React.Dispatch<React.SetStateAction<string>>
+  setValorRecebido: React.Dispatch<React.SetStateAction<string>>
+  pedidoExistente: boolean
   getAccessToken: () => string | undefined
 }
 
@@ -37,6 +44,11 @@ export function useNovoPedidoCliente({
   setMoradaEntregaSelecionada,
   setTaxaEntregaId,
   setTipoAtendimentoDelivery,
+  tipoAtendimentoDelivery,
+  setPagamentos,
+  setMeioPagamentoId,
+  setValorRecebido,
+  pedidoExistente,
   getAccessToken,
 }: UseNovoPedidoClienteParams) {
   const [clienteTabsModalEntregaState, setClienteTabsModalEntregaState] =
@@ -82,13 +94,33 @@ export function useNovoPedidoCliente({
 
   const handleTipoAtendimentoDeliveryChange = useCallback(
     (tipo: TipoAtendimentoDelivery) => {
+      const limparPagamentos = deveLimparPagamentosAoTrocarTipo({
+        tipoAtual: tipoAtendimentoDelivery,
+        tipoNovo: tipo,
+        pedidoExistente,
+      })
+      if (tipo === tipoAtendimentoDelivery) return
       setTipoAtendimentoDelivery(tipo)
+      if (limparPagamentos) {
+        setPagamentos([])
+        setMeioPagamentoId('')
+        setValorRecebido('')
+      }
       if (tipo === 'retirada') {
         setTaxaEntregaId('')
         setMoradaEntregaSelecionada(null)
       }
     },
-    [setTipoAtendimentoDelivery, setTaxaEntregaId, setMoradaEntregaSelecionada]
+    [
+      tipoAtendimentoDelivery,
+      setTipoAtendimentoDelivery,
+      pedidoExistente,
+      setPagamentos,
+      setMeioPagamentoId,
+      setValorRecebido,
+      setTaxaEntregaId,
+      setMoradaEntregaSelecionada,
+    ]
   )
 
   const handleAbrirEdicaoClienteEntrega = useCallback(() => {

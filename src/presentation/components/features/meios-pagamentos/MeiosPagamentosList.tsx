@@ -57,7 +57,8 @@ function clonarMeioPagamento(
   item: MeioPagamento,
   patch: {
     tefAtivo?: boolean
-    isDelivery?: boolean
+    ativoEntregaDelivery?: boolean
+    ativoRetiradaDelivery?: boolean
     ativo?: boolean
     parcelavel?: boolean
     tipoParcelamento?: TipoParcelamento | null
@@ -71,7 +72,8 @@ function clonarMeioPagamento(
     patch.ativo ?? item.isAtivo(),
     patch.parcelavel ?? item.isParcelavel(),
     patch.tipoParcelamento !== undefined ? patch.tipoParcelamento : item.getTipoParcelamento(),
-    patch.isDelivery ?? item.isDelivery()
+    patch.ativoEntregaDelivery ?? item.isEntregaDelivery(),
+    patch.ativoRetiradaDelivery ?? item.isRetiradaDelivery()
   )
 }
 
@@ -86,7 +88,8 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Todos')
   const [totalMeiosPagamento, setTotalMeiosPagamento] = useState(0)
   const [updatingTefAtivo, setUpdatingTefAtivo] = useState<Record<string, boolean>>({})
-  const [updatingIsDelivery, setUpdatingIsDelivery] = useState<Record<string, boolean>>({})
+  const [updatingEntregaDelivery, setUpdatingEntregaDelivery] = useState<Record<string, boolean>>({})
+  const [updatingRetiradaDelivery, setUpdatingRetiradaDelivery] = useState<Record<string, boolean>>({})
   const [updatingParcelavel, setUpdatingParcelavel] = useState<Record<string, boolean>>({})
   const [updatingTipoParcelamento, setUpdatingTipoParcelamento] = useState<Record<string, boolean>>({})
   const [updatingAtivo, setUpdatingAtivo] = useState<Record<string, boolean>>({})
@@ -439,21 +442,32 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
     [ loadMeiosPagamento, onReload]
   )
 
-  const handleToggleIsDelivery = useCallback(
-    async (meioPagamento: MeioPagamento, novoStatus: boolean) => {
+  const handleToggleDeliveryChannel = useCallback(
+    async (
+      meioPagamento: MeioPagamento,
+      channel: 'ativoEntregaDelivery' | 'ativoRetiradaDelivery',
+      novoStatus: boolean
+    ) => {
       const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         return
       }
 
       const meioPagamentoId = meioPagamento.getId()
-      const previousIsDelivery = meioPagamento.isDelivery()
+      const previousStatus =
+        channel === 'ativoEntregaDelivery'
+          ? meioPagamento.isEntregaDelivery()
+          : meioPagamento.isRetiradaDelivery()
+      const setUpdating =
+        channel === 'ativoEntregaDelivery'
+          ? setUpdatingEntregaDelivery
+          : setUpdatingRetiradaDelivery
 
-      setUpdatingIsDelivery((prev) => ({ ...prev, [meioPagamentoId]: true }))
+      setUpdating((prev) => ({ ...prev, [meioPagamentoId]: true }))
       setMeiosPagamento((prev) =>
         prev.map((item) => {
           if (item.getId() === meioPagamentoId) {
-            return clonarMeioPagamento(item, { isDelivery: novoStatus })
+            return clonarMeioPagamento(item, { [channel]: novoStatus })
           }
           return item
         })
@@ -466,29 +480,37 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ ativoDelivery: novoStatus }),
+          body: JSON.stringify({ [channel]: novoStatus }),
         })
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.message || errorData.error || 'Erro ao atualizar Delivery')
+          throw new Error(
+            errorData.message ||
+              errorData.error ||
+              `Erro ao atualizar ${channel === 'ativoEntregaDelivery' ? 'entrega' : 'retirada'}`
+          )
         }
 
         await loadMeiosPagamento()
         onReload?.()
       } catch (error) {
-        console.error('Erro ao atualizar Delivery:', error)
-        showToast.error(error instanceof Error ? error.message : 'Erro ao atualizar Delivery')
+        console.error(`Erro ao atualizar ${channel}:`, error)
+        showToast.error(
+          error instanceof Error
+            ? error.message
+            : `Erro ao atualizar ${channel === 'ativoEntregaDelivery' ? 'entrega' : 'retirada'}`
+        )
         setMeiosPagamento((prev) =>
           prev.map((item) => {
             if (item.getId() === meioPagamentoId) {
-              return clonarMeioPagamento(item, { isDelivery: previousIsDelivery })
+              return clonarMeioPagamento(item, { [channel]: previousStatus })
             }
             return item
           })
         )
       } finally {
-        setUpdatingIsDelivery((prev) => {
+        setUpdating((prev) => {
           const { [meioPagamentoId]: _, ...rest } = prev
           return rest
         })
@@ -785,11 +807,6 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
           </div>
           <div
             className={`flex-[1] text-center font-semibold leading-tight text-primary-text md:flex-[2] ${textCell}`}
-          >
-            Delivery
-          </div>
-          <div
-            className={`flex-[1] text-center font-semibold leading-tight text-primary-text md:flex-[2] ${textCell}`}
             title="Permite Parcela"
           >
             {isCompact ? 'Parcela' : 'Permite Parcela'}
@@ -804,6 +821,16 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
             className={`flex-[1] text-center font-semibold leading-tight text-primary-text md:flex-[2] ${textCell}`}
           >
             TEF
+          </div>
+          <div
+            className={`flex-[1] text-center font-semibold leading-tight text-primary-text md:flex-[2] ${textCell}`}
+          >
+            Entrega
+          </div>
+          <div
+            className={`flex-[1] text-center font-semibold leading-tight text-primary-text md:flex-[2] ${textCell}`}
+          >
+            Retirada
           </div>
           <div
             className={`flex-[1] text-right font-semibold leading-tight text-primary-text md:flex-[2] ${textCell}`}
@@ -887,29 +914,6 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
                 onMouseDown={e => e.stopPropagation()}
                 onTouchStart={e => e.stopPropagation()}
               >
-                <JiffyIconSwitch
-                  checked={meioPagamento.isDelivery()}
-                  onChange={e => {
-                    e.stopPropagation()
-                    handleToggleIsDelivery(meioPagamento, e.target.checked)
-                  }}
-                  disabled={!!updatingIsDelivery[meioPagamento.getId()]}
-                  size={switchSize}
-                  className="justify-center gap-0 px-0 py-0"
-                  inputProps={{
-                    'aria-label': `Delivery — ${meioPagamento.getNome()}`,
-                    title: meioPagamento.isDelivery()
-                      ? 'Disponível no delivery'
-                      : 'Não disponível no delivery',
-                  }}
-                />
-              </div>
-              <div
-                className="flex flex-[1] justify-center md:flex-[2]"
-                onClick={e => e.stopPropagation()}
-                onMouseDown={e => e.stopPropagation()}
-                onTouchStart={e => e.stopPropagation()}
-              >
                 {isFormaFiscalCartaoCredito(meioPagamento.getFormaPagamentoFiscal()) ? (
                   <JiffyIconSwitch
                     checked={meioPagamento.isParcelavel()}
@@ -983,6 +987,60 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
                   inputProps={{
                     'aria-label': `TEF — ${meioPagamento.getNome()}`,
                     title: meioPagamento.isTefAtivo() ? 'TEF Ativo' : 'TEF Inativo',
+                  }}
+                />
+              </div>
+              <div
+                className="flex flex-[1] justify-center md:flex-[2]"
+                onClick={e => e.stopPropagation()}
+                onMouseDown={e => e.stopPropagation()}
+                onTouchStart={e => e.stopPropagation()}
+              >
+                <JiffyIconSwitch
+                  checked={meioPagamento.isEntregaDelivery()}
+                  onChange={e => {
+                    e.stopPropagation()
+                    handleToggleDeliveryChannel(
+                      meioPagamento,
+                      'ativoEntregaDelivery',
+                      e.target.checked
+                    )
+                  }}
+                  disabled={!!updatingEntregaDelivery[meioPagamento.getId()]}
+                  size={switchSize}
+                  className="justify-center gap-0 px-0 py-0"
+                  inputProps={{
+                    'aria-label': `Entrega — ${meioPagamento.getNome()}`,
+                    title: meioPagamento.isEntregaDelivery()
+                      ? 'Disponível para entrega'
+                      : 'Não disponível para entrega',
+                  }}
+                />
+              </div>
+              <div
+                className="flex flex-[1] justify-center md:flex-[2]"
+                onClick={e => e.stopPropagation()}
+                onMouseDown={e => e.stopPropagation()}
+                onTouchStart={e => e.stopPropagation()}
+              >
+                <JiffyIconSwitch
+                  checked={meioPagamento.isRetiradaDelivery()}
+                  onChange={e => {
+                    e.stopPropagation()
+                    handleToggleDeliveryChannel(
+                      meioPagamento,
+                      'ativoRetiradaDelivery',
+                      e.target.checked
+                    )
+                  }}
+                  disabled={!!updatingRetiradaDelivery[meioPagamento.getId()]}
+                  size={switchSize}
+                  className="justify-center gap-0 px-0 py-0"
+                  inputProps={{
+                    'aria-label': `Retirada — ${meioPagamento.getNome()}`,
+                    title: meioPagamento.isRetiradaDelivery()
+                      ? 'Disponível para retirada'
+                      : 'Não disponível para retirada',
                   }}
                 />
               </div>
@@ -1070,5 +1128,3 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
     </div>
   )
 }
-
-
