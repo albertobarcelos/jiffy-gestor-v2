@@ -15,10 +15,13 @@ export const AtualizarMeioPagamentoSchema = z.object({
   ativo: z.boolean().optional(),
   isParcelavel: z.boolean().optional(),
   tipoParcelamento: TipoParcelamentoSchema.optional(),
-}).transform(({ ativoDelivery, ativoEntregaDelivery, ...data }) => ({
+}).transform(({ ativoDelivery, ativoEntregaDelivery, ativoRetiradaDelivery, ...data }) => ({
   ...data,
-  ...(ativoEntregaDelivery !== undefined || ativoDelivery !== undefined
+  ...(ativoDelivery !== undefined || ativoEntregaDelivery !== undefined
     ? { ativoEntregaDelivery: ativoEntregaDelivery ?? ativoDelivery }
+    : {}),
+  ...(ativoDelivery !== undefined || ativoRetiradaDelivery !== undefined
+    ? { ativoRetiradaDelivery: ativoRetiradaDelivery ?? ativoDelivery }
     : {}),
 }))
 

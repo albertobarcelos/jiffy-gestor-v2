@@ -9,7 +9,7 @@ export const CriarMeioPagamentoSchema = z.object({
   nome: z.string().min(1, 'Nome é obrigatório'),
   tefAtivo: z.boolean().optional().default(true),
   ativoEntregaDelivery: z.boolean().optional(),
-  ativoRetiradaDelivery: z.boolean().optional().default(true),
+  ativoRetiradaDelivery: z.boolean().optional(),
   /** @deprecated Use ativoEntregaDelivery. */
   ativoDelivery: z.boolean().optional(),
   formaPagamentoFiscal: z.string().optional().default('Dinheiro'),
@@ -19,6 +19,7 @@ export const CriarMeioPagamentoSchema = z.object({
 }).transform(({ ativoDelivery, ativoEntregaDelivery, ...data }) => ({
   ...data,
   ativoEntregaDelivery: ativoEntregaDelivery ?? ativoDelivery ?? false,
+  ativoRetiradaDelivery: data.ativoRetiradaDelivery ?? ativoDelivery ?? true,
 }))
 
 export type CriarMeioPagamentoDTO = z.infer<typeof CriarMeioPagamentoSchema>
