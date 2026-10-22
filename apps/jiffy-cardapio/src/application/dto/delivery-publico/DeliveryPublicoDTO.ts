@@ -133,6 +133,8 @@ export type GetCatalogoPublicoResponseDTO = {
 export type MeioPagamentoPublicoDTO = {
   id: string
   nome: string
+  ativoEntregaDelivery: boolean
+  ativoRetiradaDelivery: boolean
   formaPagamentoFiscal: string
   formaPagamentoFiscalLabel: string
   isParcelavel: boolean

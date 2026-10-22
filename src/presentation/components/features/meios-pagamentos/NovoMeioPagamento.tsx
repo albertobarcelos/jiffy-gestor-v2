@@ -97,7 +97,7 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
   const [nome, setNome] = useState('')
   const [tefAtivo, setTefAtivo] = useState(true)
   const [ativoEntregaDelivery, setAtivoEntregaDelivery] = useState(false)
-  const [ativoRetiradaDelivery, setAtivoRetiradaDelivery] = useState(true)
+  const [ativoRetiradaDelivery, setAtivoRetiradaDelivery] = useState(false)
   const [formaPagamentoFiscal, setFormaPagamentoFiscal] = useState('dinheiro')
   const [isParcelavel, setIsParcelavel] = useState(false)
   const [tipoParcelamento, setTipoParcelamento] = useState<TipoParcelamento>('jurosCliente')
@@ -191,7 +191,7 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
       setNome('')
       setTefAtivo(true)
       setAtivoEntregaDelivery(false)
-      setAtivoRetiradaDelivery(true)
+      setAtivoRetiradaDelivery(false)
       setFormaPagamentoFiscal('dinheiro')
       setIsParcelavel(false)
       setTipoParcelamento('jurosCliente')
@@ -456,7 +456,7 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
                 <JiffyIconSwitch
                   checked={ativoEntregaDelivery}
                   onChange={(e) => setAtivoEntregaDelivery(e.target.checked)}
-                  label="Entrega Delivery"
+                  label="Entrega"
                   size="sm"
                   className="gap-3"
                   inputProps={{ 'aria-label': 'Disponível para entrega no delivery' }}
@@ -464,7 +464,7 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
                 <JiffyIconSwitch
                   checked={ativoRetiradaDelivery}
                   onChange={(e) => setAtivoRetiradaDelivery(e.target.checked)}
-                  label="Retirada Delivery"
+                  label="Retirada"
                   size="sm"
                   className="gap-3"
                   inputProps={{ 'aria-label': 'Disponível para retirada no delivery' }}

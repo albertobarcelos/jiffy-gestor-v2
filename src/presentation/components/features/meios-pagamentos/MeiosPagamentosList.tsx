@@ -807,16 +807,6 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
           </div>
           <div
             className={`flex-[1] text-center font-semibold leading-tight text-primary-text md:flex-[2] ${textCell}`}
-          >
-            Entrega Delivery
-          </div>
-          <div
-            className={`flex-[1] text-center font-semibold leading-tight text-primary-text md:flex-[2] ${textCell}`}
-          >
-            Retirada Delivery
-          </div>
-          <div
-            className={`flex-[1] text-center font-semibold leading-tight text-primary-text md:flex-[2] ${textCell}`}
             title="Permite Parcela"
           >
             {isCompact ? 'Parcela' : 'Permite Parcela'}
@@ -831,6 +821,16 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
             className={`flex-[1] text-center font-semibold leading-tight text-primary-text md:flex-[2] ${textCell}`}
           >
             TEF
+          </div>
+          <div
+            className={`flex-[1] text-center font-semibold leading-tight text-primary-text md:flex-[2] ${textCell}`}
+          >
+            Entrega
+          </div>
+          <div
+            className={`flex-[1] text-center font-semibold leading-tight text-primary-text md:flex-[2] ${textCell}`}
+          >
+            Retirada
           </div>
           <div
             className={`flex-[1] text-right font-semibold leading-tight text-primary-text md:flex-[2] ${textCell}`}
@@ -914,60 +914,6 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
                 onMouseDown={e => e.stopPropagation()}
                 onTouchStart={e => e.stopPropagation()}
               >
-                <JiffyIconSwitch
-                  checked={meioPagamento.isEntregaDelivery()}
-                  onChange={e => {
-                    e.stopPropagation()
-                    handleToggleDeliveryChannel(
-                      meioPagamento,
-                      'ativoEntregaDelivery',
-                      e.target.checked
-                    )
-                  }}
-                  disabled={!!updatingEntregaDelivery[meioPagamento.getId()]}
-                  size={switchSize}
-                  className="justify-center gap-0 px-0 py-0"
-                  inputProps={{
-                    'aria-label': `Entrega Delivery — ${meioPagamento.getNome()}`,
-                    title: meioPagamento.isEntregaDelivery()
-                      ? 'Disponível para entrega'
-                      : 'Não disponível para entrega',
-                  }}
-                />
-              </div>
-              <div
-                className="flex flex-[1] justify-center md:flex-[2]"
-                onClick={e => e.stopPropagation()}
-                onMouseDown={e => e.stopPropagation()}
-                onTouchStart={e => e.stopPropagation()}
-              >
-                <JiffyIconSwitch
-                  checked={meioPagamento.isRetiradaDelivery()}
-                  onChange={e => {
-                    e.stopPropagation()
-                    handleToggleDeliveryChannel(
-                      meioPagamento,
-                      'ativoRetiradaDelivery',
-                      e.target.checked
-                    )
-                  }}
-                  disabled={!!updatingRetiradaDelivery[meioPagamento.getId()]}
-                  size={switchSize}
-                  className="justify-center gap-0 px-0 py-0"
-                  inputProps={{
-                    'aria-label': `Retirada Delivery — ${meioPagamento.getNome()}`,
-                    title: meioPagamento.isRetiradaDelivery()
-                      ? 'Disponível para retirada'
-                      : 'Não disponível para retirada',
-                  }}
-                />
-              </div>
-              <div
-                className="flex flex-[1] justify-center md:flex-[2]"
-                onClick={e => e.stopPropagation()}
-                onMouseDown={e => e.stopPropagation()}
-                onTouchStart={e => e.stopPropagation()}
-              >
                 {isFormaFiscalCartaoCredito(meioPagamento.getFormaPagamentoFiscal()) ? (
                   <JiffyIconSwitch
                     checked={meioPagamento.isParcelavel()}
@@ -1041,6 +987,60 @@ export function MeiosPagamentosList({ onReload, layoutDeliveryHub = false }: Mei
                   inputProps={{
                     'aria-label': `TEF — ${meioPagamento.getNome()}`,
                     title: meioPagamento.isTefAtivo() ? 'TEF Ativo' : 'TEF Inativo',
+                  }}
+                />
+              </div>
+              <div
+                className="flex flex-[1] justify-center md:flex-[2]"
+                onClick={e => e.stopPropagation()}
+                onMouseDown={e => e.stopPropagation()}
+                onTouchStart={e => e.stopPropagation()}
+              >
+                <JiffyIconSwitch
+                  checked={meioPagamento.isEntregaDelivery()}
+                  onChange={e => {
+                    e.stopPropagation()
+                    handleToggleDeliveryChannel(
+                      meioPagamento,
+                      'ativoEntregaDelivery',
+                      e.target.checked
+                    )
+                  }}
+                  disabled={!!updatingEntregaDelivery[meioPagamento.getId()]}
+                  size={switchSize}
+                  className="justify-center gap-0 px-0 py-0"
+                  inputProps={{
+                    'aria-label': `Entrega — ${meioPagamento.getNome()}`,
+                    title: meioPagamento.isEntregaDelivery()
+                      ? 'Disponível para entrega'
+                      : 'Não disponível para entrega',
+                  }}
+                />
+              </div>
+              <div
+                className="flex flex-[1] justify-center md:flex-[2]"
+                onClick={e => e.stopPropagation()}
+                onMouseDown={e => e.stopPropagation()}
+                onTouchStart={e => e.stopPropagation()}
+              >
+                <JiffyIconSwitch
+                  checked={meioPagamento.isRetiradaDelivery()}
+                  onChange={e => {
+                    e.stopPropagation()
+                    handleToggleDeliveryChannel(
+                      meioPagamento,
+                      'ativoRetiradaDelivery',
+                      e.target.checked
+                    )
+                  }}
+                  disabled={!!updatingRetiradaDelivery[meioPagamento.getId()]}
+                  size={switchSize}
+                  className="justify-center gap-0 px-0 py-0"
+                  inputProps={{
+                    'aria-label': `Retirada — ${meioPagamento.getNome()}`,
+                    title: meioPagamento.isRetiradaDelivery()
+                      ? 'Disponível para retirada'
+                      : 'Não disponível para retirada',
                   }}
                 />
               </div>
