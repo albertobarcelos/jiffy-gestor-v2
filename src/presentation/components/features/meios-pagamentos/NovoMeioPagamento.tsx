@@ -96,7 +96,8 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
   // Estados do formulário
   const [nome, setNome] = useState('')
   const [tefAtivo, setTefAtivo] = useState(true)
-  const [isDelivery, setIsDelivery] = useState(false)
+  const [ativoEntregaDelivery, setAtivoEntregaDelivery] = useState(false)
+  const [ativoRetiradaDelivery, setAtivoRetiradaDelivery] = useState(true)
   const [formaPagamentoFiscal, setFormaPagamentoFiscal] = useState('dinheiro')
   const [isParcelavel, setIsParcelavel] = useState(false)
   const [tipoParcelamento, setTipoParcelamento] = useState<TipoParcelamento>('jurosCliente')
@@ -114,13 +115,23 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
     return JSON.stringify({
       nome: (nome || '').trim(),
       tefAtivo,
-      isDelivery,
+      ativoEntregaDelivery,
+      ativoRetiradaDelivery,
       formaPagamentoFiscal: (formaPagamentoFiscal || '').toLowerCase(),
       isParcelavel,
       tipoParcelamento,
       ativo,
     })
-  }, [nome, tefAtivo, isDelivery, formaPagamentoFiscal, isParcelavel, tipoParcelamento, ativo])
+  }, [
+    nome,
+    tefAtivo,
+    ativoEntregaDelivery,
+    ativoRetiradaDelivery,
+    formaPagamentoFiscal,
+    isParcelavel,
+    tipoParcelamento,
+    ativo,
+  ])
 
   const baselineSerializedRef = useRef('')
 
@@ -179,7 +190,8 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
       hasLoadedMeioPagamentoRef.current = false
       setNome('')
       setTefAtivo(true)
-      setIsDelivery(false)
+      setAtivoEntregaDelivery(false)
+      setAtivoRetiradaDelivery(true)
       setFormaPagamentoFiscal('dinheiro')
       setIsParcelavel(false)
       setTipoParcelamento('jurosCliente')
@@ -210,7 +222,8 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
 
           setNome(maiusculasPt(meioPagamento.getNome() || ''))
           setTefAtivo(meioPagamento.isTefAtivo())
-          setIsDelivery(meioPagamento.isDelivery())
+          setAtivoEntregaDelivery(meioPagamento.isEntregaDelivery())
+          setAtivoRetiradaDelivery(meioPagamento.isRetiradaDelivery())
           // Garantir que o valor está em lowercase para corresponder às opções do select
           const formaFiscal = meioPagamento.getFormaPagamentoFiscal().toLowerCase()
           setFormaPagamentoFiscal(formaFiscal)
@@ -263,7 +276,8 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
       const body: Record<string, unknown> = {
         nome,
         tefAtivo,
-        ativoDelivery: isDelivery,
+        ativoEntregaDelivery,
+        ativoRetiradaDelivery,
         // Garantir que o valor está em lowercase antes de enviar
         formaPagamentoFiscal: formaPagamentoFiscal.toLowerCase(),
         isParcelavel: parcelavelDisponivel ? isParcelavel : false,
@@ -440,12 +454,20 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
                   inputProps={{ 'aria-label': 'TEF Ativo' }}
                 />
                 <JiffyIconSwitch
-                  checked={isDelivery}
-                  onChange={(e) => setIsDelivery(e.target.checked)}
-                  label="Delivery"
+                  checked={ativoEntregaDelivery}
+                  onChange={(e) => setAtivoEntregaDelivery(e.target.checked)}
+                  label="Entrega Delivery"
                   size="sm"
                   className="gap-3"
-                  inputProps={{ 'aria-label': 'Disponível no delivery' }}
+                  inputProps={{ 'aria-label': 'Disponível para entrega no delivery' }}
+                />
+                <JiffyIconSwitch
+                  checked={ativoRetiradaDelivery}
+                  onChange={(e) => setAtivoRetiradaDelivery(e.target.checked)}
+                  label="Retirada Delivery"
+                  size="sm"
+                  className="gap-3"
+                  inputProps={{ 'aria-label': 'Disponível para retirada no delivery' }}
                 />
                 {parcelavelDisponivel ? (
                   <JiffyIconSwitch

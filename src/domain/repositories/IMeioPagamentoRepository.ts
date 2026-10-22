@@ -5,6 +5,9 @@ export interface BuscarMeiosPagamentosParams {
   offset: number
   q?: string
   ativo?: boolean | null
+  ativoEntregaDelivery?: boolean | null
+  ativoRetiradaDelivery?: boolean | null
+  /** @deprecated Use ativoEntregaDelivery. */
   ativoDelivery?: boolean | null
 }
 
@@ -13,7 +16,8 @@ export type TipoParcelamento = 'jurosVendedor' | 'jurosCliente'
 export interface CriarMeioPagamentoDTO {
   nome: string
   tefAtivo?: boolean
-  ativoDelivery?: boolean
+  ativoEntregaDelivery?: boolean
+  ativoRetiradaDelivery?: boolean
   formaPagamentoFiscal?: string
   ativo?: boolean
   isParcelavel?: boolean
@@ -23,7 +27,8 @@ export interface CriarMeioPagamentoDTO {
 export interface AtualizarMeioPagamentoDTO {
   nome?: string
   tefAtivo?: boolean
-  ativoDelivery?: boolean
+  ativoEntregaDelivery?: boolean
+  ativoRetiradaDelivery?: boolean
   formaPagamentoFiscal?: string
   ativo?: boolean
   isParcelavel?: boolean
@@ -43,4 +48,3 @@ export interface IMeioPagamentoRepository {
   atualizarMeioPagamento(id: string, data: AtualizarMeioPagamentoDTO): Promise<MeioPagamento>
   deletarMeioPagamento(id: string): Promise<void>
 }
-

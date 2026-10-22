@@ -24,7 +24,15 @@ export class MeioPagamentoRepository implements IMeioPagamentoRepository {
     total: number
   }> {
     try {
-      const { limit, offset, q = '', ativo, ativoDelivery } = params
+      const {
+        limit,
+        offset,
+        q = '',
+        ativo,
+        ativoEntregaDelivery,
+        ativoRetiradaDelivery,
+        ativoDelivery,
+      } = params
 
       let url = `/api/v1/pagamento/meios-pagamento?limit=${limit}&offset=${offset}`
       if (q) {
@@ -33,8 +41,12 @@ export class MeioPagamentoRepository implements IMeioPagamentoRepository {
       if (ativo !== null && ativo !== undefined) {
         url += `&ativo=${ativo}`
       }
-      if (ativoDelivery !== null && ativoDelivery !== undefined) {
-        url += `&ativoDelivery=${ativoDelivery}`
+      const entregaFilter = ativoEntregaDelivery ?? ativoDelivery
+      if (entregaFilter !== null && entregaFilter !== undefined) {
+        url += `&ativoEntregaDelivery=${entregaFilter}`
+      }
+      if (ativoRetiradaDelivery !== null && ativoRetiradaDelivery !== undefined) {
+        url += `&ativoRetiradaDelivery=${ativoRetiradaDelivery}`
       }
 
       const response = await this.apiClient.request<{
@@ -106,7 +118,8 @@ export class MeioPagamentoRepository implements IMeioPagamentoRepository {
       const body: Record<string, unknown> = {
         nome: data.nome,
         tefAtivo: data.tefAtivo !== undefined ? data.tefAtivo : true,
-        ativoDelivery: data.ativoDelivery !== undefined ? data.ativoDelivery : false,
+        ativoEntregaDelivery: data.ativoEntregaDelivery ?? false,
+        ativoRetiradaDelivery: data.ativoRetiradaDelivery ?? true,
         formaPagamentoFiscal: data.formaPagamentoFiscal || 'Dinheiro',
         ativo: data.ativo !== undefined ? data.ativo : true,
         isParcelavel: data.isParcelavel !== undefined ? data.isParcelavel : false,
@@ -149,7 +162,12 @@ export class MeioPagamentoRepository implements IMeioPagamentoRepository {
 
       if (data.nome) requestBody.nome = data.nome
       if (data.tefAtivo !== undefined) requestBody.tefAtivo = data.tefAtivo
-      if (data.ativoDelivery !== undefined) requestBody.ativoDelivery = data.ativoDelivery
+      if (data.ativoEntregaDelivery !== undefined) {
+        requestBody.ativoEntregaDelivery = data.ativoEntregaDelivery
+      }
+      if (data.ativoRetiradaDelivery !== undefined) {
+        requestBody.ativoRetiradaDelivery = data.ativoRetiradaDelivery
+      }
       if (data.formaPagamentoFiscal !== undefined) requestBody.formaPagamentoFiscal = data.formaPagamentoFiscal
       if (data.ativo !== undefined) requestBody.ativo = data.ativo
       if (data.isParcelavel !== undefined) requestBody.isParcelavel = data.isParcelavel
@@ -208,4 +226,3 @@ export class MeioPagamentoRepository implements IMeioPagamentoRepository {
     }
   }
 }
-
