@@ -25,6 +25,7 @@ import { PizzaCategoriaDetalhesTab } from './PizzaCategoriaDetalhesTab'
 import { PizzaTamanhoCards } from './PizzaTamanhoCards'
 import { PizzaMassaBordaTable } from './PizzaMassaBordaTable'
 import { PizzaCategoriaMenusPanel } from './PizzaCategoriaMenusPanel'
+import { PizzaCategoriaAdicionaisTab } from './PizzaCategoriaAdicionaisTab'
 
 interface PizzaCategoriaTabsModalProps {
   open: boolean
@@ -168,7 +169,7 @@ export function PizzaCategoriaTabsModal({
   }, [])
 
   const footerActions = useMemo((): JiffySidePanelFooterActions => {
-    if (tab === 'cardapios') {
+    if (tab === 'cardapios' || tab === 'adicionais') {
       return {
         showCancel: true,
         cancelLabel: 'Fechar',
@@ -220,10 +221,6 @@ export function PizzaCategoriaTabsModal({
                     draft={draft}
                     onChange={next => setDraft({ ...draft, ...next })}
                   />
-                  <p className="px-4 pb-4 text-xs text-secondary-text md:px-6">
-                    A regra meio a meio só pode ser alterada quando o backend expuser PATCH de
-                    configuração.
-                  </p>
                 </>
               ) : null}
               {tab === 'tamanhos' ? (
@@ -255,6 +252,12 @@ export function PizzaCategoriaTabsModal({
                 <PizzaCategoriaMenusPanel
                   categoriaId={categoriaId}
                   categoriaNome={draft.nome}
+                />
+              ) : null}
+              {tab === 'adicionais' && categoriaId ? (
+                <PizzaCategoriaAdicionaisTab
+                  categoriaId={categoriaId}
+                  tamanhos={draft.tamanhos}
                 />
               ) : null}
             </>

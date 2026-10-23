@@ -8,9 +8,12 @@ import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalida
 import type {
   CategoriaPizza,
   CategoriaPizzaCompletoResponse,
+  ComplementoPizza,
+  CreateComplementoPizzaInput,
   CreateCategoriaPizzaCompletoInput,
   CreateSaborPizzaInput,
   PizzaTamanho,
+  ReplaceComplementoPizzaPrecosInput,
   SaborPizza,
   SaborPizzaSummary,
   UpdateSaborPizzaInput,
@@ -116,6 +119,98 @@ export function usePizzaTamanhos(categoriaPizzaId: string | undefined, enabled =
       return { items: (data.items ?? []) as PizzaTamanho[], count: data.count ?? 0 }
     },
     { enabled: Boolean(categoriaPizzaId) && enabled, staleTime: 1000 * 60 * 2 }
+  )
+}
+
+export function usePizzaComplementos(categoriaPizzaId: string | undefined, enabled = true) {
+  return useSecureTenantQuery<ComplementoPizza[]>(
+    ['pizza', 'complementos', categoriaPizzaId],
+    async ({ token }) => {
+      const query = new URLSearchParams({ categoriaPizzaId: categoriaPizzaId! })
+      const response = await fetchGestorApi(
+        `/api/cardapio/pizza/complementos?${query.toString()}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      if (!response.ok) await parseError(response, 'Erro ao carregar adicionais da pizza')
+      const data = await response.json()
+      return data.data as ComplementoPizza[]
+    },
+    { enabled: Boolean(categoriaPizzaId) && enabled, staleTime: 1000 * 60 * 2 }
+  )
+}
+
+export function useVincularPizzaComplementoMutation() {
+  const invalidate = useInvalidateTenantQueries()
+
+  return useSecureTenantMutation<ComplementoPizza, CreateComplementoPizzaInput>(
+    async ({ token }, input) => {
+      const response = await fetchGestorApi('/api/cardapio/pizza/complementos', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(input),
+      })
+      if (!response.ok) await parseError(response, 'Erro ao vincular adicional à categoria')
+      const data = await response.json()
+      return data.data as ComplementoPizza
+    },
+    {
+      onSuccess: async (_data, variables) => {
+        await invalidate(['pizza', 'complementos', variables.categoriaPizzaId])
+      },
+    }
+  )
+}
+
+export function useAtualizarPrecosPizzaComplementoMutation() {
+  const invalidate = useInvalidateTenantQueries()
+
+  return useSecureTenantMutation<
+    ComplementoPizza,
+    { id: string; categoriaPizzaId: string; input: ReplaceComplementoPizzaPrecosInput }
+  >(
+    async ({ token }, { id, input }) => {
+      const response = await fetchGestorApi(
+        `/api/cardapio/pizza/complementos/${id}/precos`,
+        {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(input),
+        }
+      )
+      if (!response.ok) await parseError(response, 'Erro ao atualizar preços do adicional')
+      const data = await response.json()
+      return data.data as ComplementoPizza
+    },
+    {
+      onSuccess: async (_data, variables) => {
+        await invalidate(['pizza', 'complementos', variables.categoriaPizzaId])
+      },
+    }
+  )
+}
+
+export function useDesvincularPizzaComplementoMutation() {
+  const invalidate = useInvalidateTenantQueries()
+
+  return useSecureTenantMutation<void, { id: string; categoriaPizzaId: string }>(
+    async ({ token }, { id }) => {
+      const response = await fetchGestorApi(`/api/cardapio/pizza/complementos/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok) await parseError(response, 'Erro ao desvincular adicional da categoria')
+    },
+    {
+      onSuccess: async (_data, variables) => {
+        await invalidate(['pizza', 'complementos', variables.categoriaPizzaId])
+      },
+    }
   )
 }
 

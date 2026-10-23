@@ -98,6 +98,44 @@ export const updateCategoriaPizzaSchema = z
     imagemUrl: z.string().url().nullable().optional(),
     corHex: z.string().optional(),
     iconName: z.string().optional(),
+    regraPrecoMultiplosSabores: regraPrecoMultiplosSaboresSchema.optional(),
+  })
+  .strict()
+
+const pizzaComplementoPrecoInputSchema = z.object({
+  pizzaTamanhoId: z.string().min(1),
+  valor: z.number().min(0),
+})
+
+const precosPizzaComplementoInputSchema = z
+  .array(pizzaComplementoPrecoInputSchema)
+  .min(1)
+  .superRefine((precos, context) => {
+    const ids = new Set<string>()
+    precos.forEach((preco, index) => {
+      if (ids.has(preco.pizzaTamanhoId)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Não é permitido repetir o tamanho nos preços do adicional',
+          path: [index, 'pizzaTamanhoId'],
+        })
+      }
+      ids.add(preco.pizzaTamanhoId)
+    })
+  })
+
+export const createPizzaComplementoSchema = z
+  .object({
+    categoriaPizzaId: z.string().min(1),
+    complementoId: z.string().min(1),
+    ativo: z.boolean().optional(),
+    precos: precosPizzaComplementoInputSchema,
+  })
+  .strict()
+
+export const replacePizzaComplementoPrecosSchema = z
+  .object({
+    precos: precosPizzaComplementoInputSchema,
   })
   .strict()
 

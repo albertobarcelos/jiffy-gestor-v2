@@ -3,14 +3,18 @@ import type { IPizzaRepository } from '@/src/domain/repositories/IPizzaRepositor
 import type {
   CategoriaPizza,
   CategoriaPizzaCompletoResponse,
+  ComplementoPizza,
+  CreateComplementoPizzaInput,
   CreateCategoriaPizzaCompletoInput,
   CreateCategoriaPizzaInput,
   CreateSaborPizzaInput,
   PizzaPaginatedResponse,
   PizzaPaginationParams,
   PizzaTamanho,
+  ReplaceComplementoPizzaPrecosInput,
   SaborPizza,
   SaborPizzaSummary,
+  UpdateCategoriaPizzaInput,
   UpdateSaborPizzaInput,
 } from '@/src/shared/types/pizza'
 
@@ -97,7 +101,7 @@ export class PizzaRepository implements IPizzaRepository {
     return data
   }
 
-  async atualizarCategoria(id: string, input: Partial<CreateCategoriaPizzaInput>) {
+  async atualizarCategoria(id: string, input: UpdateCategoriaPizzaInput) {
     const { data } = await this.apiClient.request<CategoriaPizza>(`${BASE}/categorias/${id}`, {
       method: 'PATCH',
       headers: this.authHeaders(true),
@@ -314,6 +318,46 @@ export class PizzaRepository implements IPizzaRepository {
 
   async excluirGrupoMassas(id: string) {
     await this.apiClient.request(`${BASE}/grupo-massas/${id}`, {
+      method: 'DELETE',
+      headers: this.authHeaders(),
+    })
+  }
+
+  async listarComplementosPizza(categoriaPizzaId: string) {
+    const query = new URLSearchParams({ categoriaPizzaId })
+    const { data } = await this.apiClient.request<ComplementoPizza[]>(
+      `${BASE}/complementos?${query.toString()}`,
+      { headers: this.authHeaders() }
+    )
+    return data
+  }
+
+  async criarComplementoPizza(input: CreateComplementoPizzaInput) {
+    const { data } = await this.apiClient.request<ComplementoPizza>(`${BASE}/complementos`, {
+      method: 'POST',
+      headers: this.authHeaders(true),
+      body: JSON.stringify(input),
+    })
+    return data
+  }
+
+  async substituirPrecosComplementoPizza(
+    id: string,
+    input: ReplaceComplementoPizzaPrecosInput
+  ) {
+    const { data } = await this.apiClient.request<ComplementoPizza>(
+      `${BASE}/complementos/${id}/precos`,
+      {
+        method: 'PUT',
+        headers: this.authHeaders(true),
+        body: JSON.stringify(input),
+      }
+    )
+    return data
+  }
+
+  async desvincularComplementoPizza(id: string) {
+    await this.apiClient.request(`${BASE}/complementos/${id}`, {
       method: 'DELETE',
       headers: this.authHeaders(),
     })

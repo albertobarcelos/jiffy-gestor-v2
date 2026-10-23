@@ -1,6 +1,7 @@
 import { ApiError } from '@/src/infrastructure/api/apiClient'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import type { PizzaTamanho } from '@/src/shared/types/pizza'
+import { buildUpdateCategoriaPizzaInput } from '@/src/presentation/utils/pizza/pizzaEditMappers'
 import type {
   PizzaLinhaComplementoEditDraft,
   PizzaCategoriaEditDraft,
@@ -76,12 +77,12 @@ export async function salvarPizzaCategoriaEdicao(
     throw new Error('Informe ao menos um tamanho ativo')
   }
 
-  await requestJson(token, `/api/cardapio/pizza/categorias/${draft.categoriaId}`, 'PATCH', {
-    nome: draft.nome.trim(),
-    corHex: draft.corHex,
-    iconName: draft.iconName,
-    ativo: draft.ativo,
-  })
+  await requestJson(
+    token,
+    `/api/cardapio/pizza/categorias/${draft.categoriaId}`,
+    'PATCH',
+    buildUpdateCategoriaPizzaInput(draft)
+  )
 
   for (const tamanhoId of draft.tamanhosRemovidosIds) {
     await requestJson(token, `/api/cardapio/pizza/tamanhos/${tamanhoId}`, 'DELETE')

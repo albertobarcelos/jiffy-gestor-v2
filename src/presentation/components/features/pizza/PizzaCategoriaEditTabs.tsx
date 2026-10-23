@@ -3,13 +3,14 @@
 import { cn } from '@/src/shared/utils/cn'
 import type { PizzaSetupTabId } from './PizzaSetupTabs'
 
-export type PizzaCategoriaEditTabId = PizzaSetupTabId | 'cardapios'
+export type PizzaCategoriaEditTabId = PizzaSetupTabId | 'cardapios' | 'adicionais'
 
 const TABS: Array<{ id: PizzaCategoriaEditTabId; label: string }> = [
   { id: 'detalhes', label: 'Detalhes' },
   { id: 'tamanhos', label: 'Tamanhos' },
   { id: 'massas', label: 'Massas' },
   { id: 'bordas', label: 'Bordas' },
+  { id: 'adicionais', label: 'Adicionais' },
   { id: 'cardapios', label: 'Cardápios' },
 ]
 

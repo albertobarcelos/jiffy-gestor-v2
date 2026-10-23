@@ -3,6 +3,7 @@ import type {
   GrupoBordasPizza,
   GrupoMassasPizza,
   PizzaTamanho,
+  UpdateCategoriaPizzaInput,
 } from '@/src/shared/types/pizza'
 import {
   createLocalId,
@@ -89,13 +90,25 @@ export function buildEditDraftFromLoaded(params: {
     corHex: categoria.corHex,
     iconName: categoria.iconName,
     ativo: categoria.ativo,
-    regraPrecoMultiplosSabores: 'proporcional',
+    regraPrecoMultiplosSabores: categoria.regraPrecoMultiplosSabores ?? 'proporcional',
     tamanhos: tamanhos.map(mapTamanhoToEditDraft),
     massas: grupoMassas?.massas?.map(mapMassaToEditDraft) ?? [],
     bordas: grupoBordas?.bordas?.map(mapBordaToEditDraft) ?? [],
     tamanhosRemovidosIds: [],
     massasRemovidasIds: [],
     bordasRemovidasIds: [],
+  }
+}
+
+export function buildUpdateCategoriaPizzaInput(
+  draft: PizzaCategoriaEditDraft
+): UpdateCategoriaPizzaInput {
+  return {
+    nome: draft.nome.trim(),
+    corHex: draft.corHex,
+    iconName: draft.iconName,
+    ativo: draft.ativo,
+    regraPrecoMultiplosSabores: draft.regraPrecoMultiplosSabores,
   }
 }
 

@@ -1,12 +1,15 @@
 import type {
   CategoriaPizza,
   CategoriaPizzaCompletoResponse,
+  ComplementoPizza,
+  CreateComplementoPizzaInput,
   CreateCategoriaPizzaCompletoInput,
   CreateCategoriaPizzaInput,
   CreateSaborPizzaInput,
   PizzaPaginatedResponse,
   PizzaPaginationParams,
   PizzaTamanho,
+  ReplaceComplementoPizzaPrecosInput,
   SaborPizza,
   SaborPizzaSummary,
   UpdateSaborPizzaInput,
@@ -67,4 +70,12 @@ export interface IPizzaRepository {
   criarGrupoMassas(input: unknown): Promise<unknown>
   atualizarGrupoMassas(id: string, input: unknown): Promise<unknown>
   excluirGrupoMassas(id: string): Promise<void>
+
+  listarComplementosPizza(categoriaPizzaId: string): Promise<ComplementoPizza[]>
+  criarComplementoPizza(input: CreateComplementoPizzaInput): Promise<ComplementoPizza>
+  substituirPrecosComplementoPizza(
+    id: string,
+    input: ReplaceComplementoPizzaPrecosInput
+  ): Promise<ComplementoPizza>
+  desvincularComplementoPizza(id: string): Promise<void>
 }

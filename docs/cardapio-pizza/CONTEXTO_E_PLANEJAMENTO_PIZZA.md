@@ -1,6 +1,6 @@
 # Cardápio de Pizza — Contexto, API e Planejamento (Gestor v2)
 
-> **Status:** documento de descoberta e planejamento — **sem implementação** nesta fase.  
+> **Status:** planejamento original do fluxo pizza; ver a seção 11 para o estado implementado e próximos passos.
 > **Backend de referência:** `jiffy-backend` (`/api/v1/cardapio/pizza/*`)  
 > **Frontend alvo:** `jiffy-gestor-v2`  
 > **Arquitetura:** seguir [docs/arquitetura-jiffy](../arquitetura-jiffy/5.presentation/0.COMECE_POR_AQUI.md) e [BOAS_PRATICAS](../arquitetura-jiffy/1.boas-praticas/BOAS_PRATICAS.md)
@@ -15,7 +15,7 @@ Montar um fluxo completo no gestor para **cadastrar e manter cardápios de pizza
 2. ao modelo mental do **iFood** (categoria pizza → tamanhos → sabores → massas/bordas);
 3. aos padrões visuais e de UX já usados em **produto preparado** (`ProdutoNovoWizard`, `MenuEditor`, `JiffySidePanelModal`).
 
-Hoje, em `EscolherTipoProdutoModal`, a opção **Pizza** aparece como **“Em breve”** (`disponivel: false`). Este documento prepara a implementação futura.
+O fluxo base de pizza já está disponível no gestor. Este documento registra decisões e referências do desenho original; a seção 11 atualiza o estado da configuração de adicionais e o que ainda falta para integrar as vendas.
 
 ---
 
@@ -533,11 +533,12 @@ O vídeo também mostra fluxos de **Combo 2 Pizzas** e **grupos de complementos*
 
 | Área | Situação |
 |------|----------|
-| `EscolherTipoProdutoModal` | Opção pizza **desabilitada** (“Em breve”) |
-| Menus / produtos | Filtro `tipo: pizza` em catálogo de menu — backend de menu já distingue produto pizza |
-| BFF pizza | **Não existe** — nenhuma rota `/api/.../pizza` no gestor |
-| Repositório cliente | **Não existe** `PizzaBffRepository` |
-| Telas pizza | **Nenhuma** |
+| `EscolherTipoProdutoModal` | Fluxo de pizza disponível |
+| Menus / produtos | Catálogo de menu distingue produtos pizza |
+| BFF pizza | Implementado para as operações existentes de categorias, tamanhos, sabores, grupos e adicionais |
+| Acesso ao backend | `PizzaRepository` + `IPizzaRepository`; hooks de consulta e mutação em `usePizza` |
+| Telas pizza | Hub, criação/edição de categorias e cadastro/edição de sabores |
+| Adicionais da pizza | Aba de configuração na edição da categoria; persiste vínculo e preços por tamanho |
 
 **Padrões visuais a reutilizar:**
 
@@ -661,6 +662,7 @@ Para quem prefere **todas** as abas num único lugar após criação (alternativ
 | Sabores | Lista + modal |
 | Massas | Tabela massas |
 | Bordas | Tabela bordas |
+| Adicionais | Complementos globais com preço por tamanho |
 | Cardápios | V2 — vínculo menu |
 
 > **Decisão:** `PizzaCategoriaSetupPanel` (criação) e `PizzaCategoriaTabsModal` (edição) podem compartilhar os mesmos subcomponentes (`PizzaTamanhoCards`, `PizzaMassaBordaTable`, `PizzaCategoriaSaboresSection`).
@@ -678,7 +680,7 @@ Para quem prefere **todas** as abas num único lugar após criação (alternativ
 
 ---
 
-## 7. Matriz de implementação por fases
+## 7. Matriz original de implementação por fases (referência histórica)
 
 ### Fase 0 — Fundação (BFF + tipos)
 
@@ -758,14 +760,35 @@ Para quem prefere **todas** as abas num único lugar após criação (alternativ
 
 ---
 
-## 10. Próximo passo (quando for implementar)
+## 10. Próximos passos
 
-1. Validar com produto: fluxo **categoria primeiro, sabores depois** (seção 11.1).
-2. Validar wireframes das abas Tamanhos (cards) e Massas/Bordas (tabela).
-3. Abrir issue backend para **PATCH GrupoPizzaConfig**.
-4. Iniciar **Fase 0** (BFF) → **Fase 1** (`PizzaCategoriaSetupPanel` + `PizzaSaborModal`).
-5. Tour guiado fica registrado como **V2** — não estimar na v1.
+O planejamento original das fases acima é uma referência histórica. Para os próximos itens de adicionais de pizza, consulte a seção 11.
 
 ---
 
 *Documento atualizado em 27/08/2026 — inclui análise dos prints iFood (vídeo passo a passo) e revisão do fluxo UX.*
+
+---
+
+## 11. Estado da implementação de adicionais da pizza
+
+### Configuração no gestor — implementada
+
+A aba **Adicionais** de `PizzaCategoriaTabsModal` reutiliza o cadastro global de `ComplementoProduto`; não cria um segundo cadastro para pizzas. A associação com a categoria e os preços são específicos de pizza, com disponibilidade definida para cada tamanho ativo que tenha preço configurado.
+
+| Operação | Rota BFF do gestor | Endpoint do backend |
+|----------|--------------------|---------------------|
+| Listar adicionais associados à categoria | `GET /api/cardapio/pizza/complementos?categoriaPizzaId=...` | `GET /api/v1/cardapio/pizza/complementos?categoriaPizzaId=...` |
+| Vincular complemento existente e preços | `POST /api/cardapio/pizza/complementos` | `POST /api/v1/cardapio/pizza/complementos` |
+| Substituir preços por tamanho | `PUT /api/cardapio/pizza/complementos/:id/precos` | `PUT /api/v1/cardapio/pizza/complementos/:id/precos` |
+| Desvincular da categoria | `DELETE /api/cardapio/pizza/complementos/:id` | `DELETE /api/v1/cardapio/pizza/complementos/:id` |
+
+O `id` usado para substituir preços ou desvincular é o identificador do vínculo de complemento com a categoria. Desvincular não exclui o complemento global. As mutações usam os hooks multi-tenant e invalidam a consulta dos adicionais da categoria.
+
+Cada preço tem o formato `{ pizzaTamanhoId, valor }`. A configuração exige ao menos um tamanho para criar ou substituir a lista; a ausência de preço para um tamanho específico significa que o adicional fica indisponível nesse tamanho. O tipo de impacto vem do cadastro global: `nenhum` persiste valor `0` e pode ser selecionado como adicional gratuito; `aumenta` e `diminui` persistem um valor não negativo por tamanho, e o tipo determina se esse valor será somado ou subtraído na venda. Para `aumenta`/`diminui`, os campos começam com o valor-base global como sugestão, mas ficam persistidos como valores explícitos de pizza.
+
+### Vendas — ainda não integradas
+
+Ainda falta adaptar a seleção, o cálculo e a persistência dos adicionais nas vendas de PDV/terminal, delivery público e pedidos do gestor. A configuração de catálogo, por si só, não altera esses canais. Na venda, a aplicação do sinal deverá respeitar o `tipoImpactoPreco` atual do complemento global e o valor configurado para o tamanho; `nenhum` permanece selecionável, mas não altera o total.
+
+Antes de implementar as vendas, definir e testar o contrato operacional de adicionais lançados em pizza (snapshot do nome, tipo de impacto e valor aplicado, quantidade, total, sincronização e impressão). A regra funcional alinhada até aqui é cobrar o adicional uma vez por pizza, conforme o tamanho, inclusive em pizza com múltiplos sabores. Tamanho sem preço configurado fica indisponível; o valor zero com tipo `nenhum` é diferente disso e representa um adicional gratuito disponível.

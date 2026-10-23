@@ -25,6 +25,7 @@ export interface CategoriaPizza {
   ordem: number
   corHex: string
   iconName: string
+  regraPrecoMultiplosSabores: RegraPrecoMultiplosSabores
   ativoDelivery: boolean
   ativoLocal: boolean
   ativo: boolean
@@ -75,7 +76,7 @@ export interface SaborPizzaSummary {
   id: string
   nome: string
   descricao: string | null
-  imagemUrl: string | null
+  imagemUrl?: string | null
   ativo: boolean
   ordem: number
   categoriaPizzaId: string
@@ -129,6 +130,46 @@ export interface CreateCategoriaPizzaInput {
   imagemUrl?: string | null
   corHex?: string
   iconName?: string
+}
+
+export interface UpdateCategoriaPizzaInput {
+  nome?: string
+  ativo?: boolean | null
+  imagemUrl?: string | null
+  corHex?: string
+  iconName?: string
+  regraPrecoMultiplosSabores?: RegraPrecoMultiplosSabores
+}
+
+export interface PrecoComplementoPizza {
+  pizzaTamanhoId: string
+  valor: number
+}
+
+export interface ComplementoPizza {
+  id: string
+  categoriaPizzaId: string
+  complementoId: string
+  nome: string
+  descricao: string | null
+  tipoImpactoPreco: TipoImpactoPreco
+  valor: number
+  imagemUrl?: string | null
+  ativo: boolean
+  precos: PrecoComplementoPizza[]
+  dataCriacao: string
+  dataAtualizacao: string
+}
+
+export interface CreateComplementoPizzaInput {
+  categoriaPizzaId: string
+  complementoId: string
+  ativo?: boolean
+  precos: PrecoComplementoPizza[]
+}
+
+export interface ReplaceComplementoPizzaPrecosInput {
+  precos: PrecoComplementoPizza[]
 }
 
 export interface CreateCategoriaPizzaCompletoInput {
