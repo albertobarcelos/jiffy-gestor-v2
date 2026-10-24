@@ -8,6 +8,7 @@ import {
   type DeliveryCupomLargura,
   type DeliveryCupomModeloFonteConfig,
   type DeliveryCupomModoPapel,
+  type DeliveryCupomSimboloPedido,
   type DeliveryCupomTemplateConfig,
 } from '@/src/shared/types/deliveryCupomTemplate'
 
@@ -45,6 +46,10 @@ function densidade(v: unknown): DeliveryCupomDensidade {
 
 function modoPapel(v: unknown): DeliveryCupomModoPapel {
   return v === 'grafico' ? 'grafico' : 'texto'
+}
+
+function simboloPedido(v: unknown): DeliveryCupomSimboloPedido {
+  return v === 'codigo_barras' ? 'codigo_barras' : 'qrcode'
 }
 
 function tamanhoOuPadrao(v: unknown, fallback: number | null): number | null {
@@ -102,6 +107,7 @@ export function parseDeliveryCupomTemplate(data: Record<string, unknown>): Deliv
 
   return {
     modoPapel: modoPapel(o.modoPapel),
+    simboloPedido: simboloPedido(o.simboloPedido),
     larguraMm: largura(o.larguraMm),
     margemLateralMm: num(o.margemLateralMm, d.margemLateralMm, 0, DELIVERY_CUPOM_MARGEM_LATERAL_MAX_MM),
     densidade: densidade(o.densidade),

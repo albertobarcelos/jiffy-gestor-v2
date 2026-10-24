@@ -128,6 +128,7 @@ describe('mapTicketToPrintDocument', () => {
       false
     )
     expect(doc.content.some(b => b.type === 'qrcode' && b.data.includes('wa.me'))).toBe(true)
+    expect(doc.content.some(b => b.type === 'qrcode' && b.data === 'PABC123')).toBe(false)
     expect(doc.content.some(b => b.type === 'text' && (b.text ?? '').startsWith('Data:'))).toBe(
       true
     )

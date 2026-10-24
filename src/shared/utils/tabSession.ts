@@ -11,6 +11,7 @@ import {
   stripEmpresaSlugFromSearch,
   stripGestaoEmpresaSlugFromPath,
 } from '@/src/shared/utils/gestaoRoutes'
+import { generateUuid } from '@/src/shared/utils/generateUuid'
 import { limparMenusCardapioSessao } from '@/src/shared/utils/menuCardapioSessao'
 
 /**
@@ -48,7 +49,7 @@ export function prepareTabSession(
   empresaNome: string,
   empresaId: string
 ): string {
-  const pendingId = crypto.randomUUID()
+  const pendingId = generateUuid()
   const empParam = buildEmpresaUrlParam(empresaNome, empresaId)
 
   const key = `jiffy:pending-session:${pendingId}`

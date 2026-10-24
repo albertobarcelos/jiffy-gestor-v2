@@ -401,3 +401,65 @@ body.jiffy-mapa-google-indisponivel .dismissButton,
 body.jiffy-mapa-google-indisponivel .gm-err-container {
   display: none !important;
 }
+
+@keyframes jiffy-scan-line {
+  0%,
+  100% {
+    top: 12%;
+    opacity: 0.35;
+  }
+  50% {
+    top: 82%;
+    opacity: 1;
+  }
+}
+
+.jiffy-scan-line {
+  animation: jiffy-scan-line 1.35s ease-in-out infinite;
+}
+
+/**
+ * Login do app do entregador: fonte estática.
+ * General Sans variável e Segoe UI Variable (system-ui no Windows 11)
+ * colapsam o avanço das letras — "Entrar" vira "Entrerrtrar".
+ */
+.expedicao-app-login {
+  transform: translateZ(0);
+  isolation: isolate;
+  transition: transform 320ms ease-out, opacity 320ms ease-out;
+}
+
+.expedicao-app-login.expedicao-app-login-sair {
+  transform: translateX(100%);
+  opacity: 0;
+}
+
+@keyframes expedicao-slide-direita {
+  from {
+    transform: translateX(18%);
+    opacity: 0.35;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.expedicao-slide-direita {
+  animation: expedicao-slide-direita 280ms ease-out;
+}
+
+.expedicao-app-login,
+.expedicao-app-login button,
+.expedicao-app-login input,
+.expedicao-app-login a,
+.expedicao-app-login p,
+.expedicao-app-login h1,
+.expedicao-app-login label {
+  font-family: Arial, Helvetica, sans-serif;
+  font-optical-sizing: none;
+  font-variation-settings: normal;
+  letter-spacing: 0.06em;
+  word-spacing: 0.04em;
+  -webkit-font-smoothing: auto;
+}

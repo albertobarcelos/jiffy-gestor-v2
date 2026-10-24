@@ -30,4 +30,12 @@ describe('impressaoDeliveryDedupe', () => {
     marcarImpressaoDeliveryRecente('  ', 3_000_000)
     expect(jaImprimiuDeliveryRecentemente('  ', 3_000_000)).toBe(false)
   })
+
+  it('não mistura cupom de preparo com cupom de expedição', () => {
+    const now = 4_000_000
+    marcarImpressaoDeliveryRecente('venda-3', now, 'comando')
+    expect(jaImprimiuDeliveryRecentemente('venda-3', now, 'expedicao')).toBe(false)
+    marcarImpressaoDeliveryRecente('venda-3', now, 'expedicao')
+    expect(jaImprimiuDeliveryRecentemente('venda-3', now, 'expedicao')).toBe(true)
+  })
 })

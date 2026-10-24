@@ -17,6 +17,12 @@ describe('AutorizarRotaNaSuperficieUseCase', () => {
     expect(r.permitido).toBe(false)
   })
 
+  it('permite /expedicao na bancada', () => {
+    const ctx = criarContextoAcessoSuperficie({ somentePedidos: true })
+    expect(useCase.execute({ pathModulo: '/expedicao', contexto: ctx }).permitido).toBe(true)
+    expect(useCase.execute({ pathModulo: '/e', contexto: ctx }).permitido).toBe(true)
+  })
+
   it('permite /pedidos ao operador exclusivo', () => {
     const ctx = criarContextoAcessoSuperficie({ somentePedidos: true })
     const r = useCase.execute({ pathModulo: '/pedidos', contexto: ctx })

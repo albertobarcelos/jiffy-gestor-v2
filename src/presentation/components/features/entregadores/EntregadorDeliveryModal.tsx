@@ -1,7 +1,7 @@
 'use client'
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
-import { MdPerson } from 'react-icons/md'
+import { MdPerson, MdQrCode2 } from 'react-icons/md'
 import {
   JiffySidePanelModal,
   type JiffySidePanelFooterActions,
@@ -15,6 +15,10 @@ import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { formatarTelefoneBr } from '@/src/shared/utils/telefoneBr'
 import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
+import {
+  normalizarSenhaEntregadorDelivery,
+  senhaEntregadorDeliveryValida,
+} from '@/src/application/delivery/senhaEntregadorDelivery'
 
 const ENTREGADOR_FORM_ID = 'entregador-delivery-form'
 
@@ -37,12 +41,14 @@ interface EntregadorDeliveryModalProps {
   entregadorId: string | null
   onClose: () => void
   onSalvo: () => void
+  onAbrirPwaQr?: () => void
 }
 
 interface EntregadorFormState {
   nome: string
   telefone: string
   cpf: string
+  senha: string
   ativo: boolean
 }
 
@@ -50,6 +56,7 @@ const EMPTY_FORM: EntregadorFormState = {
   nome: '',
   telefone: '',
   cpf: '',
+  senha: '',
   ativo: true,
 }
 
@@ -86,13 +93,17 @@ export function EntregadorDeliveryModal({
   entregadorId,
   onClose,
   onSalvo,
+  onAbrirPwaQr,
 }: EntregadorDeliveryModalProps) {
   const [form, setForm] = useState<EntregadorFormState>(EMPTY_FORM)
   const [carregando, setCarregando] = useState(false)
   const [salvando, setSalvando] = useState(false)
 
   const isEdicao = Boolean(entregadorId)
-  const canSubmit = Boolean(form.nome.trim()) && !carregando
+  const senhaOk = isEdicao
+    ? form.senha.length === 0 || senhaEntregadorDeliveryValida(form.senha)
+    : senhaEntregadorDeliveryValida(form.senha)
+  const canSubmit = Boolean(form.nome.trim()) && senhaOk && !carregando
 
   useEffect(() => {
     if (!open) {
@@ -142,6 +153,7 @@ export function EntregadorDeliveryModal({
           nome: data.nome != null ? String(data.nome) : '',
           telefone: telefoneRaw ? formatarTelefoneBr(telefoneRaw) : '',
           cpf: cpfRaw ? formatCPF(cpfRaw) : '',
+          senha: '',
           ativo: typeof data.ativo === 'boolean' ? data.ativo : true,
         })
       } catch (error) {
@@ -179,11 +191,24 @@ export function EntregadorDeliveryModal({
     }
 
     const telefoneDigits = somenteDigitos(form.telefone)
+    const senhaDigits = normalizarSenhaEntregadorDelivery(form.senha)
+    if (!isEdicao && !senhaEntregadorDeliveryValida(senhaDigits)) {
+      showToast.error('Informe a senha de 4 dígitos.')
+      return
+    }
+    if (isEdicao && senhaDigits && !senhaEntregadorDeliveryValida(senhaDigits)) {
+      showToast.error('A senha deve ter 4 dígitos.')
+      return
+    }
+
     const payload: Record<string, unknown> = {
       nome,
       telefone: telefoneDigits || null,
       cpf: cpfDigits || null,
       ativo: form.ativo,
+    }
+    if (senhaEntregadorDeliveryValida(senhaDigits)) {
+      payload.senha = senhaDigits
     }
 
     setSalvando(true)
@@ -256,6 +281,16 @@ export function EntregadorDeliveryModal({
                 <div className="flex items-center gap-3">
                   <h2 className="text-xl font-semibold text-primary">Dados do Entregador</h2>
                   <div className="flex-1 border-t border-primary/40" aria-hidden />
+                  {onAbrirPwaQr ? (
+                    <button
+                      type="button"
+                      aria-label="Mostrar QR Code do app do entregador"
+                      onClick={onAbrirPwaQr}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-primary/30 text-primary transition-colors hover:bg-primary/10"
+                    >
+                      <MdQrCode2 className="h-5 w-5" />
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
@@ -329,6 +364,38 @@ export function EntregadorDeliveryModal({
                     }
                     placeholder="000.000.000-00"
                     inputProps={{ maxLength: 14 }}
+                    fullWidth
+                    size="small"
+                    disabled={salvando}
+                    InputLabelProps={INPUT_LABEL_PROPS}
+                    sx={INPUT_SX}
+                  />
+                  <Input
+                    label={
+                      isEdicao
+                        ? 'Nova senha do app (4 dígitos, opcional)'
+                        : 'Senha do app (4 dígitos)'
+                    }
+                    helperText={
+                      isEdicao
+                        ? 'Deixe em branco para manter a senha atual. Ou use o cadeado na lista.'
+                        : 'Obrigatória no cadastro. É a senha do app do entregador.'
+                    }
+                    value={form.senha}
+                    onChange={e =>
+                      setForm(prev => ({
+                        ...prev,
+                        senha: normalizarSenhaEntregadorDelivery(e.target.value),
+                      }))
+                    }
+                    placeholder="0000"
+                    type="password"
+                    inputProps={{
+                      maxLength: 4,
+                      inputMode: 'numeric',
+                      autoComplete: 'new-password',
+                    }}
+                    required={!isEdicao}
                     fullWidth
                     size="small"
                     disabled={salvando}

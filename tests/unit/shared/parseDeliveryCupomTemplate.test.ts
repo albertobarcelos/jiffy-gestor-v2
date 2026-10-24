@@ -42,4 +42,13 @@ describe('parseDeliveryCupomTemplate', () => {
     })
     expect(parsed.modoPapel).toBe('grafico')
   })
+
+  it('lê QR ou código de barras do pedido', () => {
+    expect(parseDeliveryCupomTemplate({ cupomDeliveryTemplate: {} }).simboloPedido).toBe('qrcode')
+    expect(
+      parseDeliveryCupomTemplate({
+        cupomDeliveryTemplate: { simboloPedido: 'codigo_barras' },
+      }).simboloPedido
+    ).toBe('codigo_barras')
+  })
 })

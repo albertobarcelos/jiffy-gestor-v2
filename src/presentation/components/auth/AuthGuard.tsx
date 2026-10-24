@@ -8,6 +8,7 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { buildAuthFromAccessToken, isEmailSessaoPlaceholder } from '@/src/shared/utils/buildAuthFromAccessToken'
 import { getTabTenantToken } from '@/src/shared/utils/tabSession'
 import { fetchTenantRefreshAccessToken } from '@/src/shared/utils/fetchTenantRefreshAccessToken'
+import { empresaIdRefreshExpedicaoApp } from '@/src/presentation/expedicao/app/sessao/empresaIdRefreshExpedicaoApp'
 import { syncTenantAccessTokenClient } from '@/src/presentation/utils/syncTenantAccessTokenClient'
 import { restoreIdentityFromCookie } from '@/src/presentation/utils/restoreIdentityFromCookie'
 import { ensureHubBearerToken } from '@/src/presentation/utils/ensureHubBearerToken'
@@ -27,6 +28,13 @@ import {
   isRotaKioskPedidos,
   isRotaPedidos,
 } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
+import { pathLoginExpedicao, pathEscolherEmpresaExpedicao } from '@/src/presentation/expedicao/sessao/pathsExpedicao'
+import {
+  isRotaExpedicao,
+  isRotaExpedicaoKiosk,
+  isSuperficieExpedicaoApp,
+  sinalExpedicaoNesteBrowser,
+} from '@/src/presentation/expedicao/sessao/sinalExpedicao'
 import { stripGestaoEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
 
 /** Tempo máximo de espera para o refresh de token antes de encerrar a sessão da empresa. */
@@ -81,6 +89,43 @@ const PUBLIC_PREFIXES = [
 function isPublicPath(p: string | null): boolean {
   if (!p) return false
   return PUBLIC_PREFIXES.some(r => p === r || p.startsWith(`${r}/`))
+}
+
+function searchNesteBrowser(): string {
+  return typeof window !== 'undefined' ? window.location.search : ''
+}
+
+function isSuperficieKiosk(pathname: string | null): boolean {
+  const search = searchNesteBrowser()
+  return (
+    isRotaKioskPedidos(pathname ?? '', search) ||
+    isRotaExpedicaoKiosk(pathname, search) ||
+    isRotaExpedicao(pathname)
+  )
+}
+
+function superficieExpedicaoAtual(): 'app' | 'bancada' {
+  if (typeof window === 'undefined') return 'bancada'
+  return isSuperficieExpedicaoApp({
+    pathname: window.location.pathname,
+    search: window.location.search,
+  })
+    ? 'app'
+    : 'bancada'
+}
+
+function irParaLoginDaSuperficieAtual(modo: 'replace' | 'assign' = 'replace'): void {
+  if (sinalExpedicaoNesteBrowser() || isRotaExpedicao(typeof window !== 'undefined' ? window.location.pathname : '')) {
+    const dest = pathLoginExpedicao(superficieExpedicaoAtual())
+    if (estaNaMesmaRotaLocal(dest)) return
+    if (modo === 'assign') {
+      window.location.assign(dest)
+      return
+    }
+    window.location.replace(dest)
+    return
+  }
+  irParaLoginDaSessaoAtual(modo)
 }
 
 function isHubPath(p: string | null): boolean {
@@ -191,7 +236,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     } catch (error) {
       console.error('AuthGuard: erro ao encerrar sessão antes do login:', error)
     }
-    irParaLoginDaSessaoAtual('assign')
+    irParaLoginDaSuperficieAtual('assign')
   }, [logout, logoutTenant])
 
   /**
@@ -218,11 +263,14 @@ export function AuthGuard({ children }: AuthGuardProps) {
     void fetch('/api/auth/logout-hub', { method: 'POST', credentials: 'include' }).catch(() => {
       /* noop */
     })
-    irParaLoginDaSessaoAtual('assign')
+    irParaLoginDaSuperficieAtual('assign')
   }, [])
 
   const redirectToHub = useCallback(() => {
-    const dest = urlHubDaSessaoAtual()
+    const dest =
+      sinalExpedicaoNesteBrowser() || isRotaExpedicao(pathname)
+        ? pathEscolherEmpresaExpedicao(superficieExpedicaoAtual())
+        : urlHubDaSessaoAtual()
     if (estaNaMesmaRotaLocal(dest)) {
       redirectingRef.current = false
       setAllowed(true)
@@ -233,16 +281,11 @@ export function AuthGuard({ children }: AuthGuardProps) {
     }
     redirectingRef.current = true
     window.location.replace(dest)
-  }, [])
+  }, [pathname])
 
   useLayoutEffect(() => {
     if (isPublicPath(pathname)) return
-    if (
-      isRotaKioskPedidos(
-        pathname ?? '',
-        typeof window !== 'undefined' ? window.location.search : ''
-      )
-    ) {
+    if (isSuperficieKiosk(pathname)) {
       if (!useAuthStore.getState().isTabVerified) {
         useAuthStore.getState().setTabVerified(true)
       }
@@ -261,13 +304,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     const isHub = isHubPath(pathname)
 
     /** Flow: quadro e lista sem tenant. Não esperar persist — senão o login fica no robot até F5. */
-    if (
-      !isHub &&
-      isRotaKioskPedidos(
-        pathname ?? '',
-        typeof window !== 'undefined' ? window.location.search : ''
-      )
-    ) {
+    if (!isHub && isSuperficieKiosk(pathname)) {
       if (!isTabVerified) {
         useAuthStore.getState().setTabVerified(true)
       }
@@ -284,7 +321,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     // não tentar refresh ou redirect — TabSessionBootstrap reestabelece se necessário.
     if (!isHub && !isTabVerified) {
       if (!isTenantSessionAlive() && !identityHubStillValid()) {
-        irParaLoginDaSessaoAtual()
+        irParaLoginDaSuperficieAtual()
       }
       return
     }
@@ -388,7 +425,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
         const timeoutPromise = new Promise<null>(resolve => {
           timeoutHandle = window.setTimeout(() => resolve(null), REFRESH_TIMEOUT_MS)
         })
-        const refreshed = await Promise.race([fetchTenantRefreshAccessToken(), timeoutPromise])
+        const refreshed = await Promise.race([
+          fetchTenantRefreshAccessToken(empresaIdRefreshExpedicaoApp()),
+          timeoutPromise,
+        ])
         window.clearTimeout(timeoutHandle)
 
         if (cancelled) {
@@ -486,7 +526,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
           const timeoutPromise = new Promise<null>(resolve => {
             timeoutHandle = window.setTimeout(() => resolve(null), REFRESH_TIMEOUT_MS)
           })
-          const refreshed = await Promise.race([fetchTenantRefreshAccessToken(), timeoutPromise])
+          const refreshed = await Promise.race([
+            fetchTenantRefreshAccessToken(empresaIdRefreshExpedicaoApp()),
+            timeoutPromise,
+          ])
           window.clearTimeout(timeoutHandle)
           if (refreshed) {
             try {

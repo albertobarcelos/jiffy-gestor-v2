@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MdDelete, MdSearch } from 'react-icons/md'
+import { MdDelete, MdLock, MdQrCode2, MdSearch } from 'react-icons/md'
 import { Tooltip as MuiTooltip } from '@mui/material'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
@@ -20,6 +20,8 @@ import {
   DialogTitle,
 } from '@/src/presentation/components/ui/dialog'
 import { EntregadorDeliveryModal } from './EntregadorDeliveryModal'
+import { EntregadorSenhaDialog } from './EntregadorSenhaDialog'
+import { EntregadorPwaQrDialog } from './EntregadorPwaQrDialog'
 
 export interface EntregadorDeliveryResumo {
   id: string
@@ -96,6 +98,9 @@ export function EntregadoresList() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deletingNome, setDeletingNome] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [senhaEntregadorId, setSenhaEntregadorId] = useState<string | null>(null)
+  const [senhaEntregadorNome, setSenhaEntregadorNome] = useState<string | null>(null)
+  const [pwaQrAberto, setPwaQrAberto] = useState(false)
 
   const searchTextRef = useRef('')
   const filterStatusRef = useRef(filterStatus)
@@ -203,6 +208,20 @@ export function EntregadoresList() {
     void loadEntregadores()
   }
 
+  const abrirSenha = (entregador: EntregadorDeliveryResumo) => {
+    setSenhaEntregadorId(entregador.id)
+    setSenhaEntregadorNome(entregador.nome?.trim() || null)
+  }
+
+  const fecharSenha = () => {
+    setSenhaEntregadorId(null)
+    setSenhaEntregadorNome(null)
+  }
+
+  const handleSenhaSalva = () => {
+    fecharSenha()
+  }
+
   const solicitarExclusao = (entregador: EntregadorDeliveryResumo) => {
     setDeletingId(entregador.id)
     setDeletingNome(entregador.nome?.trim() || null)
@@ -251,14 +270,26 @@ export function EntregadoresList() {
               Total {entregadores.length} de {total}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={abrirCriar}
-            className="flex h-8 items-center gap-2 rounded-lg bg-primary px-2 text-sm font-semibold text-info transition-colors hover:bg-primary/90 md:px-[30px]"
-          >
-            Novo
-            <span className="text-lg">+</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <MuiTooltip title="QR Code do app (PWA)" placement="bottom" slotProps={TOOLTIP_SLOT_PROPS}>
+              <button
+                type="button"
+                aria-label="Mostrar QR Code do app do entregador"
+                onClick={() => setPwaQrAberto(true)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-primary/30 bg-info text-primary transition-colors hover:bg-primary/10"
+              >
+                <MdQrCode2 className="h-5 w-5" />
+              </button>
+            </MuiTooltip>
+            <button
+              type="button"
+              onClick={abrirCriar}
+              className="flex h-8 items-center gap-2 rounded-lg bg-primary px-2 text-sm font-semibold text-info transition-colors hover:bg-primary/90 md:px-[30px]"
+            >
+              Novo
+              <span className="text-lg">+</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -305,8 +336,9 @@ export function EntregadoresList() {
           <div className="flex-[2] text-xs font-semibold text-primary-text md:text-sm">
             Telefone
           </div>
-          <div className="flex w-16 shrink-0 justify-end text-xs font-semibold text-primary-text md:text-sm">
-            Remover
+          <div className="flex w-28 shrink-0 justify-end gap-3 text-xs font-semibold text-primary-text md:text-sm">
+            <span className="w-7 text-center">Senha</span>
+            <span className="w-7 text-center">Remover</span>
           </div>
         </div>
       </div>
@@ -345,11 +377,21 @@ export function EntregadoresList() {
                 {telefoneListaExibicao(entregador.telefone)}
               </div>
               <div
-                className="flex w-16 shrink-0 justify-end"
+                className="flex w-28 shrink-0 justify-end gap-3"
                 onClick={e => e.stopPropagation()}
                 onMouseDown={e => e.stopPropagation()}
                 onTouchStart={e => e.stopPropagation()}
               >
+                <MuiTooltip title="Cadastrar ou alterar senha" placement="bottom" slotProps={TOOLTIP_SLOT_PROPS}>
+                  <button
+                    type="button"
+                    aria-label="Cadastrar ou alterar senha"
+                    onClick={() => abrirSenha(entregador)}
+                    className="flex h-7 w-7 items-center justify-center rounded transition-colors hover:bg-primary/10"
+                  >
+                    <MdLock className="h-4 w-4 text-primary" />
+                  </button>
+                </MuiTooltip>
                 <MuiTooltip title="Remover entregador" placement="bottom" slotProps={TOOLTIP_SLOT_PROPS}>
                   <button
                     type="button"
@@ -378,6 +420,17 @@ export function EntregadoresList() {
         entregadorId={editingId}
         onClose={fecharModal}
         onSalvo={handleSalvo}
+        onAbrirPwaQr={() => setPwaQrAberto(true)}
+      />
+
+      <EntregadorPwaQrDialog open={pwaQrAberto} onClose={() => setPwaQrAberto(false)} />
+
+      <EntregadorSenhaDialog
+        open={Boolean(senhaEntregadorId)}
+        entregadorId={senhaEntregadorId}
+        entregadorNome={senhaEntregadorNome}
+        onClose={fecharSenha}
+        onSalvo={handleSenhaSalva}
       />
 
       <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>

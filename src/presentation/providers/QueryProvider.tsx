@@ -1,7 +1,6 @@
 'use client'
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { ReactNode, useState } from 'react'
 import { TenantQueryCrossTabSync } from '@/src/presentation/cache/TenantQueryCrossTabSync'
 
@@ -54,12 +53,6 @@ export function QueryProvider({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <TenantQueryCrossTabSync />
       {children}
-      {/* Fora do fluxo: evita o host dos Devtools aumentar scrollHeight do body (faixa branca abaixo das telas full-viewport). */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="pointer-events-none fixed bottom-0 right-0 z-[2147483000] h-0 w-0 overflow-visible [&>*]:pointer-events-auto">
-          <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />
-        </div>
-      )}
     </QueryClientProvider>
   )
 }

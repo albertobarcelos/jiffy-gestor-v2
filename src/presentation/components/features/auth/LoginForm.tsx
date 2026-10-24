@@ -1,10 +1,23 @@
-﻿'use client'
+'use client'
 
-import { useState, FormEvent, useEffect } from 'react'
+import { useState, FormEvent, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { loginViaApiRoute } from '@/src/presentation/components/features/auth/utils/loginViaApiRoute'
+import { lerCredenciaisLoginForm } from '@/src/presentation/components/features/auth/utils/lerCredenciaisLoginForm'
+import { deslizarSaidaLoginApp } from '@/src/presentation/components/features/auth/utils/deslizarSaidaLoginApp'
+
+function SpinnerLogin({ claro }: { claro?: boolean }) {
+  return (
+    <span
+      className={`inline-block h-5 w-5 animate-spin rounded-full border-2 ${
+        claro ? 'border-white border-t-transparent' : 'border-secondary border-t-transparent'
+      }`}
+      aria-hidden
+    />
+  )
+}
 import { extrairEmailLoginQuery } from '@/src/presentation/components/features/auth/utils/emailFromLoginQuery'
 import { decodeInvitePayloadFromLoginSearch } from '@/src/presentation/components/features/auth/utils/inviteLoginPayload'
 import { AuthEnvelopeIcon, AuthLockIcon } from '@/src/presentation/components/features/auth/components/auth-input-icons'
@@ -15,17 +28,24 @@ import { fetchAccessTokenEscolherEmpresa } from '@/src/presentation/utils/escolh
 import { entrarEmpresaGestorNaAba } from '@/src/presentation/gestor-pedidos/sessao/entrarEmpresaGestorNaAba'
 import { lerSinalGestorDoBrowser, pathEscolherEmpresaKiosk } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
 import { planearDestinoAposLogin } from '@/src/presentation/gestor-pedidos/sessao/planearDestinoAposLogin'
+import { entrarEmpresaExpedicaoNaAba } from '@/src/presentation/expedicao/sessao/entrarEmpresaExpedicaoNaAba'
+import { planearDestinoAposLoginExpedicao } from '@/src/presentation/expedicao/sessao/planearDestinoAposLoginExpedicao'
+import { isSinalExpedicaoAppSearch, isSinalExpedicaoSearch } from '@/src/presentation/expedicao/sessao/sinalExpedicao'
+import { lerUltimaEmpresaApp } from '@/src/presentation/expedicao/app/sessao/ultimaEmpresaAppStorage'
 import { lerUltimaEmpresaKiosk } from '@/src/presentation/gestor-pedidos/kiosk/ultimaEmpresaKiosk'
 import { estaNoAppJiffyFlow } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 import { gravarEmpresasLoginFlow } from '@/src/presentation/gestor-pedidos/kiosk/empresasLoginFlow'
 import { clearTabSession } from '@/src/shared/utils/tabSession'
 
+type VarianteLogin = 'gestor' | 'app'
+
 /**
  * Componente de formulário de login
  */
-export function LoginForm() {
+export function LoginForm({ variante = 'gestor' }: { variante?: VarianteLogin }) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const app = variante === 'app'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -33,8 +53,11 @@ export function LoginForm() {
   const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false)
   const [resendLoading, setResendLoading] = useState(false)
   const [resendMessage, setResendMessage] = useState<string | null>(null)
+  const [enviando, setEnviando] = useState(false)
+  const enviandoRef = useRef(false)
 
   const { loginWithHubEmpresas, setLoading, setError, isLoading } = useAuthStore()
+  const ocupado = enviando || isLoading
 
   useEffect(() => {
     lerSinalGestorDoBrowser()
@@ -64,19 +87,25 @@ export function LoginForm() {
     }
   }, [searchParams])
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    e.stopPropagation()
+    if (enviandoRef.current) return
+
+    const formEl = e.currentTarget
+    const credenciais = lerCredenciaisLoginForm(formEl, { email, password })
+    setEmail(credenciais.email)
+    setPassword(credenciais.password)
     setErrors({})
     setError(null)
     setNeedsEmailConfirmation(false)
     setResendMessage(null)
 
-    // Validação básica
     const newErrors: { email?: string; password?: string } = {}
-    if (!email.trim()) {
+    if (!credenciais.email) {
       newErrors.email = 'Email é obrigatório'
     }
-    if (!password) {
+    if (!credenciais.password) {
       newErrors.password = 'Senha é obrigatória'
     }
 
@@ -85,10 +114,18 @@ export function LoginForm() {
       return
     }
 
-    try {
-      setLoading(true)
+    enviandoRef.current = true
+    setEnviando(true)
+    setLoading(true)
 
-      const resultado = await loginViaApiRoute(email.trim(), password)
+    const soltar = () => {
+      enviandoRef.current = false
+      setEnviando(false)
+      setLoading(false)
+    }
+
+    try {
+      const resultado = await loginViaApiRoute(credenciais.email, credenciais.password)
 
       if (!resultado.ok) {
         if (resultado.needsEmailConfirmation) {
@@ -99,6 +136,43 @@ export function LoginForm() {
 
       loginWithHubEmpresas(resultado.auth, resultado.empresas)
       gravarEmpresasLoginFlow(resultado.empresas)
+      if (app) await deslizarSaidaLoginApp(formEl)
+
+      if (isSinalExpedicaoSearch(window.location.search)) {
+        const superficie = isSinalExpedicaoAppSearch(window.location.search) ? 'app' : 'bancada'
+        const ultimaApp = superficie === 'app' ? lerUltimaEmpresaApp() : null
+        const userId = resultado.auth.getUser().getId()
+        const destinoExpedicao = planearDestinoAposLoginExpedicao({
+          empresas: resultado.empresas,
+          superficie,
+          ultimaEmpresaId:
+            ultimaApp && (!ultimaApp.userId || ultimaApp.userId === userId)
+              ? ultimaApp.empresaId
+              : null,
+        })
+        if (destinoExpedicao.tipo === 'expedicao') {
+          const token = await fetchAccessTokenEscolherEmpresa(
+            destinoExpedicao.empresa.id,
+            resultado.auth.getAccessToken()
+          )
+          window.location.assign(
+            entrarEmpresaExpedicaoNaAba({
+              accessToken: token,
+              empresaNome: destinoExpedicao.empresa.nomeFantasia,
+              empresaId: destinoExpedicao.empresa.id,
+              superficie: destinoExpedicao.superficie,
+              usuario: resultado.auth.getUser(),
+            })
+          )
+          return
+        }
+        clearTabSession()
+        await new Promise<void>(resolve => {
+          window.setTimeout(resolve, 0)
+        })
+        window.location.assign(destinoExpedicao.path)
+        return
+      }
 
       const destino = planearDestinoAposLogin({
         empresas: resultado.empresas,
@@ -141,8 +215,7 @@ export function LoginForm() {
       const message = error instanceof Error ? error.message : 'Erro ao fazer login'
       setError(message)
       setErrors({ email: message })
-    } finally {
-      setLoading(false)
+      soltar()
     }
   }
 
@@ -169,6 +242,107 @@ export function LoginForm() {
     }
   }
 
+  if (app) {
+    return (
+      <form noValidate onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="mb-1.5 block text-sm font-semibold text-zinc-700" htmlFor="login-app-email">
+            E-mail
+          </label>
+          <input
+            id="login-app-email"
+            name="email"
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            onInput={e => setEmail(e.currentTarget.value)}
+            placeholder="seu@email.com"
+            readOnly={ocupado}
+            autoComplete="email"
+            inputMode="email"
+            className={cn(
+              'h-12 w-full rounded-xl bg-white px-4 text-base text-zinc-900 ring-1 ring-black/[0.08] outline-none placeholder:text-zinc-400 focus:ring-2 focus:ring-secondary',
+              errors.email ? 'ring-red-400' : '',
+              ocupado ? 'opacity-70' : ''
+            )}
+          />
+          {errors.email ? <p className="mt-1.5 text-sm text-red-600">{errors.email}</p> : null}
+          {needsEmailConfirmation ? (
+            <div className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-950">
+              <p className="mb-2">Confirme seu e-mail para continuar.</p>
+              <button
+                type="button"
+                onClick={() => void handleResendConfirmation()}
+                disabled={resendLoading || !email.trim()}
+                className="h-10 w-full rounded-xl bg-amber-700 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {resendLoading ? 'Enviando…' : 'Reenviar e-mail'}
+              </button>
+              {resendMessage ? <p className="mt-2 text-xs">{resendMessage}</p> : null}
+            </div>
+          ) : null}
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-sm font-semibold text-zinc-700" htmlFor="login-app-senha">
+            Senha
+          </label>
+          <div className="relative">
+            <input
+              id="login-app-senha"
+              name="password"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              onInput={e => setPassword(e.currentTarget.value)}
+              placeholder="Senha da loja"
+              readOnly={ocupado}
+              autoComplete="current-password"
+              className={cn(
+                'h-12 w-full rounded-xl bg-white px-4 pr-12 text-base text-zinc-900 ring-1 ring-black/[0.08] outline-none placeholder:text-zinc-400 focus:ring-2 focus:ring-secondary',
+                errors.password ? 'ring-red-400' : '',
+                ocupado ? 'opacity-70' : ''
+              )}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              disabled={ocupado}
+              className="absolute inset-y-0 right-0 px-3 text-sm font-semibold text-zinc-500"
+            >
+              {showPassword ? 'Ocultar' : 'Ver'}
+            </button>
+          </div>
+          {errors.password ? <p className="mt-1.5 text-sm text-red-600">{errors.password}</p> : null}
+        </div>
+
+        <button
+          type="submit"
+          disabled={ocupado}
+          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-secondary text-base font-semibold text-white disabled:opacity-70"
+        >
+          {ocupado ? (
+            <>
+              <SpinnerLogin claro />
+              Entrando…
+            </>
+          ) : (
+            'Entrar'
+          )}
+        </button>
+
+        <p className="pt-1 text-center">
+          <Link
+            href="/esqueci-senha?expedicao&app"
+            className="text-sm font-semibold text-secondary"
+          >
+            Esqueceu a senha?
+          </Link>
+        </p>
+      </form>
+    )
+  }
+
   return (
     <form
       onSubmit={handleSubmit}
@@ -182,18 +356,19 @@ export function LoginForm() {
             <AuthEnvelopeIcon className={authFluid.iconSvg} />
           </div>
           <input
+            name="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="seu@email.com"
-            disabled={isLoading}
+            disabled={ocupado}
             autoComplete="email"
             className={cn(
               authFluid.shell,
               authFluid.textAndPy,
               authFluid.padIconField,
               errors.email ? 'border-error' : '',
-              isLoading ? 'cursor-not-allowed opacity-50' : ''
+              ocupado ? 'cursor-not-allowed opacity-50' : ''
             )}
           />
         </div>
@@ -224,18 +399,19 @@ export function LoginForm() {
             <AuthLockIcon className={authFluid.iconSvg} />
           </div>
           <input
+            name="password"
             type={showPassword ? 'text' : 'password'}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
-            disabled={isLoading}
+            disabled={ocupado}
             autoComplete="current-password"
             className={cn(
               authFluid.shell,
               authFluid.textAndPy,
               authFluid.padPwdField,
               errors.password ? 'border-error' : '',
-              isLoading ? 'cursor-not-allowed opacity-50' : ''
+              ocupado ? 'cursor-not-allowed opacity-50' : ''
             )}
           />
           <button
@@ -244,9 +420,9 @@ export function LoginForm() {
             className={cn(
               authFluid.eyeBtn,
               'hover:text-gray-700',
-              isLoading && 'cursor-not-allowed opacity-50'
+              ocupado && 'cursor-not-allowed opacity-50'
             )}
-            disabled={isLoading}
+            disabled={ocupado}
           >
             {showPassword ? (
               <svg
@@ -293,13 +469,13 @@ export function LoginForm() {
       {/* Botão Acessar - roxo vibrante */}
       <button
         type="submit"
-        disabled={isLoading}
+        disabled={ocupado}
         className="w-full py-2 px-4 bg-[var(--color-secondary)] hover:bg-[var(--color-alternate)] text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         style={{
           backgroundColor: 'var(--color-secondary)',
         }}
       >
-        {isLoading ? (
+        {ocupado ? (
           <>
             <svg
               className="animate-spin h-5 w-5 text-white"
