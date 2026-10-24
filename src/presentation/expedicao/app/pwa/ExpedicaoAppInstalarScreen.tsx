@@ -11,14 +11,14 @@ export function ExpedicaoAppInstalarScreen() {
       <div className="px-6 pb-8 pt-[max(2.25rem,env(safe-area-inset-top))]">
         <div className="flex items-center gap-3">
           <Image
-            src="/images/jiffy-favicon.png"
+            src="/images/expedicao/logo_app.png"
             alt=""
             width={44}
             height={44}
             className="h-11 w-11 rounded-2xl bg-white shadow-sm"
             priority
           />
-          <p className="text-lg font-semibold">Jiffy</p>
+          <p className="text-lg font-semibold">JiffyGO</p>
         </div>
         <h1 className="mt-8 text-[1.75rem] font-semibold leading-tight">
           Instale o app para continuar
@@ -33,7 +33,7 @@ export function ExpedicaoAppInstalarScreen() {
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-5">
             <p className="text-base font-semibold text-emerald-900">App instalado</p>
             <p className="mt-2 text-sm leading-6 text-emerald-800">
-              Feche esta aba e toque no ícone <strong>Entregador</strong> na tela
+              Feche esta aba e toque no ícone <strong>JiffyGO</strong> na tela
               inicial. O login acontece lá.
             </p>
           </div>

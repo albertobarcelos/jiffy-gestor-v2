@@ -11,7 +11,7 @@ export function LoginHeading() {
     return (
       <>
         <h1 className="mb-4 text-center font-heading text-2xl font-semibold text-primary-text">
-          App do entregador
+          JiffyGO
         </h1>
         <p className="mb-8 text-center text-base font-semibold text-secondary">
           Entre com a conta da loja para ver seus pedidos

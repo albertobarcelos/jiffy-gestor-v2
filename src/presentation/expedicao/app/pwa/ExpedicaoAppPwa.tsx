@@ -22,13 +22,13 @@ export function ExpedicaoAppPwa() {
 
     const apple = document.createElement('link')
     apple.rel = 'apple-touch-icon'
-    apple.href = '/images/jiffy-favicon.png'
+    apple.href = '/images/expedicao/logo_app.png'
     document.head.appendChild(apple)
 
     const metas = [
       ['theme-color', '#5b21b6'],
       ['apple-mobile-web-app-capable', 'yes'],
-      ['apple-mobile-web-app-title', 'Entregador'],
+      ['apple-mobile-web-app-title', 'JiffyGO'],
       ['mobile-web-app-capable', 'yes'],
     ].map(([name, content]) => {
       const meta = document.createElement('meta')

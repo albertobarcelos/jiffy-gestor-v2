@@ -6,12 +6,16 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: 'Jiffy Entregador',
+  title: 'JiffyGO',
   description: 'Pedidos, rota e comissão do entregador Jiffy.',
   manifest: '/expedicao-app/manifest.webmanifest',
+  icons: {
+    icon: '/images/expedicao/logo_app.png',
+    apple: '/images/expedicao/logo_app.png',
+  },
   appleWebApp: {
     capable: true,
-    title: 'Entregador',
+    title: 'JiffyGO',
     statusBarStyle: 'default',
   },
 }
