@@ -29,14 +29,19 @@ async function doFetch(empresaId: string | null): Promise<string | null> {
 }
 
 /** Chamadas simultâneas da mesma empresa partilham a mesma promise. */
-export function fetchTenantRefreshAccessToken(): Promise<string | null> {
-  const empresaId = (() => {
-    try {
-      return getTabEmpresaId()
-    } catch {
-      return null
-    }
-  })()
+export function fetchTenantRefreshAccessToken(
+  empresaIdOverride?: string | null
+): Promise<string | null> {
+  const empresaId =
+    typeof empresaIdOverride === 'string' && empresaIdOverride.trim()
+      ? empresaIdOverride.trim()
+      : (() => {
+          try {
+            return getTabEmpresaId()
+          } catch {
+            return null
+          }
+        })()
 
   if (inFlight && inFlightEmpresaId === empresaId) {
     return inFlight

@@ -46,6 +46,8 @@ export const NON_ERP_ROUTE_PREFIXES = [
   '/hub',
   '/convites-gestor',
   '/notas-fiscais',
+  '/expedicao',
+  '/e',
 ] as const
 
 export function isErpPathname(pathname: string | null): boolean {

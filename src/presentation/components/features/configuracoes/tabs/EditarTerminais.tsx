@@ -14,6 +14,7 @@ import { Input } from '@/src/presentation/components/ui/input'
 import { UppercaseLocaleInput } from '@/src/presentation/components/ui/UppercaseLocaleInput'
 import { Button } from '@/src/presentation/components/ui/button'
 import { showToast } from '@/src/shared/utils/toast'
+import { generateUuid } from '@/src/shared/utils/generateUuid'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { MdClose, MdPhone, MdPrint } from 'react-icons/md'
 import { MenuItem, CircularProgress, Box } from '@mui/material'
@@ -493,7 +494,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
 
     try {
       if (isCreate) {
-        const newId = crypto.randomUUID()
+        const newId = generateUuid()
         const createResponse = await criarTerminal(token, {
             id: newId,
             nome: nomeTerminal.trim(),

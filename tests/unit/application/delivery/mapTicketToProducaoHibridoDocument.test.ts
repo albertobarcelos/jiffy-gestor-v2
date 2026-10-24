@@ -65,6 +65,7 @@ describe('mapTicketToProducaoHibridoDocument', () => {
     )
     expect(doc.content[idxResumo - 1]).toEqual({ type: 'feed', lines: 2 })
     expect(doc.content.at(-2)).toEqual({ type: 'feed', lines: 4 })
+    expect(doc.content.some(b => b.type === 'qrcode')).toBe(false)
     expect(doc.content.at(-1)?.type).toBe('cut')
     const textosDoc = textos(doc)
     const idxItem = textosDoc.indexOf('  2x X-BURGER')
@@ -78,6 +79,35 @@ describe('mapTicketToProducaoHibridoDocument', () => {
     expect(doc.content.some(b => b.type === 'text' && b.text.includes('Atend: Carlos') && b.align === 'center')).toBe(
       true
     )
+  })
+
+  it('imprime QR quando o template pede qrcode', () => {
+    const doc = mapTicketToProducaoHibridoDocument(root, ticket, {
+      simboloPedido: 'qrcode',
+    })
+    expect(doc.content.some(b => b.type === 'qrcode' && b.data === 'P1842' && b.moduleSize === 8)).toBe(
+      true
+    )
+  })
+
+  it('imprime Code 128 quando o template pede código de barras', () => {
+    const doc = mapTicketToProducaoHibridoDocument(root, ticket, {
+      simboloPedido: 'codigo_barras',
+      desenharCodigoBarras: payload => `png-${payload}`,
+    })
+    expect(doc.content.some(b => b.type === 'qrcode')).toBe(false)
+    expect(doc.content.some(b => b.type === 'image' && b.data === 'png-P1842' && b.align === 'center')).toBe(
+      true
+    )
+  })
+
+  it('não imprime QR nem barras quando o template pede nenhum', () => {
+    const doc = mapTicketToProducaoHibridoDocument(root, ticket, {
+      simboloPedido: 'nenhum',
+      desenharCodigoBarras: payload => `png-${payload}`,
+    })
+    expect(doc.content.some(b => b.type === 'qrcode')).toBe(false)
+    expect(doc.content.some(b => b.type === 'image' && String(b.data).startsWith('png-'))).toBe(false)
   })
 
   it('não inclui preço, pagamento, logo nem slogan', () => {
