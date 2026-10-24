@@ -40,4 +40,29 @@ describe('planearDestinoAposLoginExpedicao', () => {
       path: '/expedicao/empresas?expedicao&app',
     })
   })
+
+  it('no app reabre a última loja se ainda estiver na lista', () => {
+    const a = ativa('a')
+    const b = ativa('b')
+    expect(
+      planearDestinoAposLoginExpedicao({
+        empresas: [a, b],
+        superficie: 'app',
+        ultimaEmpresaId: 'b',
+      })
+    ).toEqual({ tipo: 'expedicao', empresa: b, superficie: 'app' })
+  })
+
+  it('no app ignora última loja que saiu da lista', () => {
+    expect(
+      planearDestinoAposLoginExpedicao({
+        empresas: [ativa('a'), ativa('b')],
+        superficie: 'app',
+        ultimaEmpresaId: 'z',
+      })
+    ).toEqual({
+      tipo: 'escolher-empresa',
+      path: '/expedicao/empresas?expedicao&app',
+    })
+  })
 })

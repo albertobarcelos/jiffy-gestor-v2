@@ -15,6 +15,16 @@ import {
   lerEntregadorApp,
   limparEntregadorApp,
 } from '@/src/presentation/expedicao/app/sessao/entregadorAppStorage'
+import {
+  executarRestaurarSessaoEmpresaApp,
+  lerDecisaoRestaurarSessaoEmpresaApp,
+} from '@/src/presentation/expedicao/app/sessao/restaurarSessaoEmpresaApp'
+import {
+  gravarUltimaEmpresaApp,
+  lerUltimaEmpresaApp,
+  limparUltimaEmpresaApp,
+} from '@/src/presentation/expedicao/app/sessao/ultimaEmpresaAppStorage'
+import { buildEmpresaUrlParam, getEmpresaSlugParam } from '@/src/shared/utils/tabSession'
 import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapshot'
 import { fetchAccessTokenEscolherEmpresa } from '@/src/presentation/utils/escolherEmpresaApi'
 import { ensureHubBearerToken } from '@/src/presentation/utils/ensureHubBearerToken'
@@ -27,6 +37,7 @@ export function useSessaoEntregadorApp() {
   const [autenticando, setAutenticando] = useState(false)
   const [trocandoLojaId, setTrocandoLojaId] = useState<string | null>(null)
   const [saindoLoja, setSaindoLoja] = useState(false)
+  const [restaurandoEmpresa, setRestaurandoEmpresa] = useState(true)
 
   const isRehydrated = useAuthStore(s => s.isRehydrated)
   const hubEmpresas = useAuthStore(s => s.hubEmpresas)
@@ -42,20 +53,49 @@ export function useSessaoEntregadorApp() {
 
   useEffect(() => {
     if (!isRehydrated) return
-    const tenant = useAuthStore.getState().tenantAuth
-    const identity = useAuthStore.getState().identityAuth
-    if (tenant && !tenant.isExpired()) return
-    if (identity && !identity.isExpired()) {
-      window.location.replace(pathEscolherEmpresaExpedicao('app'))
-      return
+    let cancelado = false
+    void (async () => {
+      try {
+        const decisao = lerDecisaoRestaurarSessaoEmpresaApp()
+        if (decisao.tipo === 'ja-ativa') return
+        if (decisao.tipo === 'restaurar') {
+          const ok = await executarRestaurarSessaoEmpresaApp(decisao.ultima)
+          if (ok || cancelado) return
+        }
+        if (cancelado) return
+        const identity = useAuthStore.getState().identityAuth
+        if (decisao.tipo === 'escolher' || (identity && !identity.isExpired())) {
+          window.location.replace(pathEscolherEmpresaExpedicao('app'))
+          return
+        }
+        window.location.replace(pathLoginExpedicao('app'))
+      } finally {
+        if (!cancelado) setRestaurandoEmpresa(false)
+      }
+    })()
+    return () => {
+      cancelado = true
     }
-    window.location.replace(pathLoginExpedicao('app'))
   }, [isRehydrated])
 
   useEffect(() => {
     if (!empresa?.id) return
     setEntregador(lerEntregadorApp(empresa.id))
   }, [empresa?.id])
+
+  useEffect(() => {
+    if (!tenantValido || !empresa?.id || !usuario) return
+    const persistida = lerUltimaEmpresaApp()
+    if (persistida?.empresaId === empresa.id && persistida.userId === usuario.getId()) return
+    gravarUltimaEmpresaApp({
+      userId: usuario.getId(),
+      empresaId: empresa.id,
+      empresaNome: empresa.nomeExibicao,
+      empParam: getEmpresaSlugParam() || buildEmpresaUrlParam(empresa.nomeExibicao, empresa.id),
+      userEmail: usuario.getEmail(),
+      userName: usuario.getName(),
+    })
+  }, [empresa, tenantValido, usuario])
 
   const confirmarSenha = useCallback(
     async (digits: string) => {
@@ -92,6 +132,7 @@ export function useSessaoEntregadorApp() {
     if (saindoLoja) return
     setSaindoLoja(true)
     limparEntregadorApp(empresa?.id)
+    limparUltimaEmpresaApp()
     void logoutHub()
       .catch(() => undefined)
       .finally(() => {
@@ -123,7 +164,10 @@ export function useSessaoEntregadorApp() {
   )
 
   const aguardandoBootstrap =
-    !isRehydrated || !tenantValido || (carregandoEmpresa && !empresa && !erroEmpresa)
+    !isRehydrated ||
+    restaurandoEmpresa ||
+    !tenantValido ||
+    (carregandoEmpresa && !empresa && !erroEmpresa)
 
   return {
     senha,

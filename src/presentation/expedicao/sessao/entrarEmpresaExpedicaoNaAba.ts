@@ -1,5 +1,6 @@
 import type { User } from '@/src/domain/entities/User'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { gravarUltimaEmpresaApp } from '@/src/presentation/expedicao/app/sessao/ultimaEmpresaAppStorage'
 import {
   buildAuthFromAccessToken,
   isEmailSessaoPlaceholder,
@@ -31,6 +32,17 @@ export function entrarEmpresaExpedicaoNaAba(input: {
   })
   useAuthStore.getState().setTenantAuth(auth)
   useAuthStore.getState().setTabVerified(true)
+
+  if ((input.superficie ?? 'bancada') === 'app') {
+    gravarUltimaEmpresaApp({
+      userId: prev.getId(),
+      empresaId: input.empresaId,
+      empresaNome: input.empresaNome,
+      empParam,
+      userEmail: prev.getEmail(),
+      userName: prev.getName(),
+    })
+  }
 
   return pathExpedicaoDaSuperficie(input.superficie ?? 'bancada', empParam)
 }

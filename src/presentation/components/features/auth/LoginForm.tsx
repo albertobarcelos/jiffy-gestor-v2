@@ -31,6 +31,7 @@ import { planearDestinoAposLogin } from '@/src/presentation/gestor-pedidos/sessa
 import { entrarEmpresaExpedicaoNaAba } from '@/src/presentation/expedicao/sessao/entrarEmpresaExpedicaoNaAba'
 import { planearDestinoAposLoginExpedicao } from '@/src/presentation/expedicao/sessao/planearDestinoAposLoginExpedicao'
 import { isSinalExpedicaoAppSearch, isSinalExpedicaoSearch } from '@/src/presentation/expedicao/sessao/sinalExpedicao'
+import { lerUltimaEmpresaApp } from '@/src/presentation/expedicao/app/sessao/ultimaEmpresaAppStorage'
 import { lerUltimaEmpresaKiosk } from '@/src/presentation/gestor-pedidos/kiosk/ultimaEmpresaKiosk'
 import { estaNoAppJiffyFlow } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 import { gravarEmpresasLoginFlow } from '@/src/presentation/gestor-pedidos/kiosk/empresasLoginFlow'
@@ -139,9 +140,15 @@ export function LoginForm({ variante = 'gestor' }: { variante?: VarianteLogin })
 
       if (isSinalExpedicaoSearch(window.location.search)) {
         const superficie = isSinalExpedicaoAppSearch(window.location.search) ? 'app' : 'bancada'
+        const ultimaApp = superficie === 'app' ? lerUltimaEmpresaApp() : null
+        const userId = resultado.auth.getUser().getId()
         const destinoExpedicao = planearDestinoAposLoginExpedicao({
           empresas: resultado.empresas,
           superficie,
+          ultimaEmpresaId:
+            ultimaApp && (!ultimaApp.userId || ultimaApp.userId === userId)
+              ? ultimaApp.empresaId
+              : null,
         })
         if (destinoExpedicao.tipo === 'expedicao') {
           const token = await fetchAccessTokenEscolherEmpresa(

@@ -8,6 +8,7 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { buildAuthFromAccessToken, isEmailSessaoPlaceholder } from '@/src/shared/utils/buildAuthFromAccessToken'
 import { getTabTenantToken } from '@/src/shared/utils/tabSession'
 import { fetchTenantRefreshAccessToken } from '@/src/shared/utils/fetchTenantRefreshAccessToken'
+import { empresaIdRefreshExpedicaoApp } from '@/src/presentation/expedicao/app/sessao/empresaIdRefreshExpedicaoApp'
 import { syncTenantAccessTokenClient } from '@/src/presentation/utils/syncTenantAccessTokenClient'
 import { restoreIdentityFromCookie } from '@/src/presentation/utils/restoreIdentityFromCookie'
 import { ensureHubBearerToken } from '@/src/presentation/utils/ensureHubBearerToken'
@@ -424,7 +425,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
         const timeoutPromise = new Promise<null>(resolve => {
           timeoutHandle = window.setTimeout(() => resolve(null), REFRESH_TIMEOUT_MS)
         })
-        const refreshed = await Promise.race([fetchTenantRefreshAccessToken(), timeoutPromise])
+        const refreshed = await Promise.race([
+          fetchTenantRefreshAccessToken(empresaIdRefreshExpedicaoApp()),
+          timeoutPromise,
+        ])
         window.clearTimeout(timeoutHandle)
 
         if (cancelled) {
@@ -522,7 +526,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
           const timeoutPromise = new Promise<null>(resolve => {
             timeoutHandle = window.setTimeout(() => resolve(null), REFRESH_TIMEOUT_MS)
           })
-          const refreshed = await Promise.race([fetchTenantRefreshAccessToken(), timeoutPromise])
+          const refreshed = await Promise.race([
+            fetchTenantRefreshAccessToken(empresaIdRefreshExpedicaoApp()),
+            timeoutPromise,
+          ])
           window.clearTimeout(timeoutHandle)
           if (refreshed) {
             try {
