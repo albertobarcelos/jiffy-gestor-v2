@@ -65,8 +65,8 @@ export function EntregadorPwaQrDialog({ open, onClose }: EntregadorPwaQrDialogPr
           <DialogTitle>Instalar o app do entregador</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-secondary-text">
-          O motoboy aponta a câmera, abre o link e toca em Adicionar à tela inicial. A
-          sessão da loja ele faz uma vez no celular.
+          O QR abre uma tela pedindo para instalar o app. O login só continua depois,
+          no ícone da tela inicial. O celular não instala sozinho — precisa de um toque.
         </p>
         <div className="mt-4 flex flex-col items-center gap-3">
           {src ? (

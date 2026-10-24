@@ -27,6 +27,8 @@ import { useComissaoEntregadorApp } from '@/src/presentation/expedicao/app/hooks
 import { usePedidosEntregadorApp } from '@/src/presentation/expedicao/app/hooks/usePedidosEntregadorApp'
 import { useRodadaEntregadorApp } from '@/src/presentation/expedicao/app/hooks/useRodadaEntregadorApp'
 import { usePwaInstallPrompt } from '@/src/presentation/expedicao/app/pwa/usePwaInstallPrompt'
+import { ExpedicaoAppInstalarScreen } from '@/src/presentation/expedicao/app/pwa/ExpedicaoAppInstalarScreen'
+import { deveMostrarPortaoInstalacaoPwa } from '@/src/application/expedicao/app/portaoInstalacaoPwaEntregador'
 
 const VERSAO_APP = '0.1.0'
 
@@ -159,6 +161,15 @@ export function ExpedicaoAppMotoboy() {
     },
     [atualizarPrefs, prefs]
   )
+
+  if (
+    deveMostrarPortaoInstalacaoPwa({
+      ehCelular: pwa.ehCelular,
+      standalone: pwa.standalone,
+    })
+  ) {
+    return <ExpedicaoAppInstalarScreen />
+  }
 
   if (sessao.aguardandoBootstrap) {
     return (
