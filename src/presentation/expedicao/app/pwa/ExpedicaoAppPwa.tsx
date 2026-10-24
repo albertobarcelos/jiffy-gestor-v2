@@ -25,6 +25,19 @@ export function ExpedicaoAppPwa() {
     apple.href = '/images/jiffy-favicon.png'
     document.head.appendChild(apple)
 
+    const metas = [
+      ['theme-color', '#5b21b6'],
+      ['apple-mobile-web-app-capable', 'yes'],
+      ['apple-mobile-web-app-title', 'Entregador'],
+      ['mobile-web-app-capable', 'yes'],
+    ].map(([name, content]) => {
+      const meta = document.createElement('meta')
+      meta.name = name
+      meta.content = content
+      document.head.appendChild(meta)
+      return meta
+    })
+
     if ('serviceWorker' in navigator) {
       void navigator.serviceWorker.register(SW_HREF).catch(() => undefined)
     }
@@ -32,6 +45,7 @@ export function ExpedicaoAppPwa() {
     return () => {
       link.remove()
       apple.remove()
+      metas.forEach(meta => meta.remove())
     }
   }, [])
 

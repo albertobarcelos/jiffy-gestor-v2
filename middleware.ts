@@ -91,11 +91,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  if (
-    pathname === EXPEDICAO_APP_PATH_CURTO ||
-    pathname.startsWith(`${EXPEDICAO_APP_PATH_CURTO}/`) ||
-    (isHostEntregadorApp(request.headers.get('host')) && pathname === '/')
-  ) {
+  if (isHostEntregadorApp(request.headers.get('host')) && pathname === '/') {
     const tokenCurto =
       request.cookies.get(AUTH_COOKIE_TENANT)?.value ||
       request.cookies.get(AUTH_COOKIE_IDENTITY)?.value ||

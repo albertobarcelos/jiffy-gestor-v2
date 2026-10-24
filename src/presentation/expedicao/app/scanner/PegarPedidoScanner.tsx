@@ -15,6 +15,7 @@ import {
   cameraDisponivelNesteContexto,
   mensagemErroCameraExpedicao,
 } from '@/src/application/expedicao/app/mensagemCameraExpedicao'
+import { constraintsLanternaApp } from '@/src/application/expedicao/app/constraintsLanternaApp'
 import {
   prepararSomLeituraExpedicao,
   tocarSomLeituraExpedicao,
@@ -139,7 +140,7 @@ export function PegarPedidoScanner({ aberto, ocupado, onFechar, onCodigo }: Pega
       typeof track.getCapabilities === 'function' ? track.getCapabilities() : {}
     ) as MediaTrackCapabilities & { torch?: boolean }
     if (!caps.torch) return false
-    await track.applyConstraints({ advanced: [{ torch: ligar }] } as MediaTrackConstraints)
+    await track.applyConstraints(constraintsLanternaApp(ligar))
     return true
   }, [])
 

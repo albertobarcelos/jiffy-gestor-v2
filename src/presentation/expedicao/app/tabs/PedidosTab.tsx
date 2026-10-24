@@ -28,7 +28,6 @@ export function PedidosTab(props: {
   onAtualizar: () => Promise<void>
 }) {
   const entregasHoje = props.hoje?.quantidade ?? 0
-  const hojePronto = props.hoje != null
   const listaVazia = !props.carregando && !props.erro && props.pedidos.length === 0
   const puxar = usePuxarParaAtualizar(props.onAtualizar, !props.carregando)
 
@@ -45,7 +44,7 @@ export function PedidosTab(props: {
         </div>
         <div className="flex shrink-0 flex-col items-end">
           <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Hoje</p>
-          {hojePronto ? (
+          {props.hoje ? (
             <>
               <p className="text-[22px] font-extrabold tracking-tight text-emerald-600">
                 {formatarMoedaApp(props.hoje.totalTaxas)}

@@ -26,6 +26,7 @@ import { useSessaoEntregadorApp } from '@/src/presentation/expedicao/app/hooks/u
 import { useComissaoEntregadorApp } from '@/src/presentation/expedicao/app/hooks/useComissaoEntregadorApp'
 import { usePedidosEntregadorApp } from '@/src/presentation/expedicao/app/hooks/usePedidosEntregadorApp'
 import { useRodadaEntregadorApp } from '@/src/presentation/expedicao/app/hooks/useRodadaEntregadorApp'
+import { usePwaInstallPrompt } from '@/src/presentation/expedicao/app/pwa/usePwaInstallPrompt'
 
 const VERSAO_APP = '0.1.0'
 
@@ -34,6 +35,7 @@ export function ExpedicaoAppMotoboy() {
   const [prefs, setPrefs] = useState<PrefsAppEntregador>(lerPrefsAppEntregador)
   const [pedindoAviso, setPedindoAviso] = useState(false)
   const [compartilhandoLogs, setCompartilhandoLogs] = useState(false)
+  const pwa = usePwaInstallPrompt()
 
   const sessao = useSessaoEntregadorApp()
   const entregadorId = sessao.entregador?.id ?? null
@@ -339,6 +341,9 @@ export function ExpedicaoAppMotoboy() {
               lojaId={sessao.empresa?.id ?? '—'}
               onCompartilharLogs={() => void compartilharLogs()}
               compartilhandoLogs={compartilhandoLogs}
+              pwaInstalado={pwa.instalado}
+              pwaPodeInstalar={pwa.podeInstalar}
+              onInstalarPwa={() => void pwa.instalar()}
             />
           ) : null}
         </div>

@@ -10,6 +10,9 @@ export function ConfigTab(props: {
   lojaId: string
   onCompartilharLogs: () => void
   compartilhandoLogs?: boolean
+  pwaInstalado?: boolean
+  pwaPodeInstalar?: boolean
+  onInstalarPwa?: () => void
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -48,6 +51,26 @@ export function ConfigTab(props: {
                 ? 'Desativar avisos'
                 : 'Ativar avisos'}
           </button>
+        </section>
+
+        <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/[0.04]">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+            Tela inicial
+          </p>
+          <p className="mt-2 text-sm leading-5 text-zinc-500">
+            {props.pwaInstalado
+              ? 'Este aparelho já abriu o app pela tela inicial.'
+              : 'No Chrome, use Adicionar à tela inicial. O atalho abre direto no /e.'}
+          </p>
+          {props.pwaPodeInstalar && props.onInstalarPwa ? (
+            <button
+              type="button"
+              onClick={props.onInstalarPwa}
+              className="mt-3 text-sm font-semibold text-secondary"
+            >
+              Instalar na tela inicial
+            </button>
+          ) : null}
         </section>
 
         <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/[0.04]">
