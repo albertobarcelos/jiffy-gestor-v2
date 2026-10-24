@@ -364,6 +364,7 @@ export type ModeloProducao80mm = {
   observacaoPedido: string | null
   resumo: string
   rodape: string[]
+  codigoBarras: string | null
 }
 
 export type OrigemModeloProducao80mm = {
@@ -458,5 +459,6 @@ export function montarModeloProducao80mm(origem: OrigemModeloProducao80mm): Mode
       versao: origem.versao,
       codigoTerminal: origem.codigoTerminal,
     }),
+    codigoBarras: codigo ? `P${codigo}` : null,
   }
 }

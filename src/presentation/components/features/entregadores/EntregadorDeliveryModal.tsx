@@ -43,6 +43,7 @@ interface EntregadorFormState {
   nome: string
   telefone: string
   cpf: string
+  senha: string
   ativo: boolean
 }
 
@@ -50,6 +51,7 @@ const EMPTY_FORM: EntregadorFormState = {
   nome: '',
   telefone: '',
   cpf: '',
+  senha: '',
   ativo: true,
 }
 
@@ -92,7 +94,8 @@ export function EntregadorDeliveryModal({
   const [salvando, setSalvando] = useState(false)
 
   const isEdicao = Boolean(entregadorId)
-  const canSubmit = Boolean(form.nome.trim()) && !carregando
+  const senhaOk = isEdicao ? form.senha.length === 0 || form.senha.length === 4 : form.senha.length === 4
+  const canSubmit = Boolean(form.nome.trim()) && senhaOk && !carregando
 
   useEffect(() => {
     if (!open) {
@@ -142,6 +145,7 @@ export function EntregadorDeliveryModal({
           nome: data.nome != null ? String(data.nome) : '',
           telefone: telefoneRaw ? formatarTelefoneBr(telefoneRaw) : '',
           cpf: cpfRaw ? formatCPF(cpfRaw) : '',
+          senha: '',
           ativo: typeof data.ativo === 'boolean' ? data.ativo : true,
         })
       } catch (error) {
@@ -179,11 +183,24 @@ export function EntregadorDeliveryModal({
     }
 
     const telefoneDigits = somenteDigitos(form.telefone)
+    const senhaDigits = somenteDigitos(form.senha, 4)
+    if (!isEdicao && senhaDigits.length !== 4) {
+      showToast.error('Informe a senha de 4 dígitos.')
+      return
+    }
+    if (isEdicao && senhaDigits && senhaDigits.length !== 4) {
+      showToast.error('A senha deve ter 4 dígitos.')
+      return
+    }
+
     const payload: Record<string, unknown> = {
       nome,
       telefone: telefoneDigits || null,
       cpf: cpfDigits || null,
       ativo: form.ativo,
+    }
+    if (senhaDigits.length === 4) {
+      payload.senha = senhaDigits
     }
 
     setSalvando(true)
@@ -329,6 +346,29 @@ export function EntregadorDeliveryModal({
                     }
                     placeholder="000.000.000-00"
                     inputProps={{ maxLength: 14 }}
+                    fullWidth
+                    size="small"
+                    disabled={salvando}
+                    InputLabelProps={INPUT_LABEL_PROPS}
+                    sx={INPUT_SX}
+                  />
+                  <Input
+                    label={isEdicao ? 'Nova senha de expedição (4 dígitos)' : 'Senha de expedição'}
+                    value={form.senha}
+                    onChange={e =>
+                      setForm(prev => ({
+                        ...prev,
+                        senha: somenteDigitos(e.target.value, 4),
+                      }))
+                    }
+                    placeholder="0000"
+                    type="password"
+                    inputProps={{
+                      maxLength: 4,
+                      inputMode: 'numeric',
+                      autoComplete: 'new-password',
+                    }}
+                    required={!isEdicao}
                     fullWidth
                     size="small"
                     disabled={salvando}

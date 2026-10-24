@@ -18,9 +18,12 @@ import {
   linhasResumoPagamentoCupom,
 } from '@/src/application/delivery/textoPagamentoCupomDelivery'
 import {
+  barcodePedidoHtmlSize,
   fonteEmpresaEscPosA11Px,
   fonteProdutoEscPosA22Px,
+  qrPedidoHtmlSizePx,
 } from '@/src/application/delivery/cupomPrintLayout'
+import { renderCode128Svg } from '@/src/application/expedicao/renderCode128Svg'
 import {
   cupomMostraQrWhatsappCliente,
   detalheLinhasItemPedido,
@@ -436,6 +439,7 @@ function renderProducao(
     }
     <div class="prod-resumo">${escapeHtml(modelo.resumo)}</div>
     ${modelo.rodape.map(linha => `<div class="prod-rodape">${escapeHtml(linha)}</div>`).join('')}
+    ${renderSimboloPedidoPayload(modelo.codigoBarras, template)}
   </div>`
 }
 
@@ -468,6 +472,39 @@ function renderWhatsappQr(telefone: string): string {
     ${renderQrSvg(url, 96)}
     <div>Scaneie e fale com o cliente via WhatsApp</div>
   </div>`
+}
+
+function renderQrPedidoPayload(payload: string, larguraMm: number): string {
+  const sizePx = qrPedidoHtmlSizePx(larguraMm)
+  return `<div class="pedido-qr">
+    ${renderQrSvg(payload, sizePx)}
+    <div>${escapeHtml(payload)}</div>
+  </div>`
+}
+
+function renderCodigoBarrasPedidoPayload(
+  payload: string,
+  larguraMm: number
+): string {
+  const { widthPx, heightPx } = barcodePedidoHtmlSize(larguraMm)
+  const svg = renderCode128Svg(payload, widthPx, heightPx)
+  if (!svg) return ''
+  return `<div class="pedido-barcode">
+    ${svg}
+    <div>${escapeHtml(payload)}</div>
+  </div>`
+}
+
+function renderSimboloPedidoPayload(
+  payload: string | null | undefined,
+  template: DeliveryCupomTemplateConfig
+): string {
+  const dados = String(payload ?? '').trim()
+  if (!dados) return ''
+  if (template.simboloPedido === 'codigo_barras') {
+    return renderCodigoBarrasPedidoPayload(dados, template.larguraMm)
+  }
+  return renderQrPedidoPayload(dados, template.larguraMm)
 }
 
 function renderResumoExpedicao(root: VendaGestorTicketsResponse, ticket: VendaGestorTicket): string {
@@ -595,6 +632,8 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
   const methodMt = template.densidade === 'compacto' ? 1 : 4
   const qrGapTop = template.densidade === 'espacoso' ? 10 : 8
   const qrGapBottom = template.densidade === 'compacto' ? 1 : template.densidade === 'espacoso' ? 3 : 2
+  const qrPedidoPx = qrPedidoHtmlSizePx(template.larguraMm)
+  const barcodePedido = barcodePedidoHtmlSize(template.larguraMm)
   const separatorAfterQr = Math.max(1, Math.ceil(separatorPy / 2))
   const lineHeight = lineHeightPorDensidade(template.densidade)
   const fonteBase = template.tamanhoFonteBase
@@ -675,6 +714,10 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
   .whatsapp-qr + .separator { margin-top:${separatorAfterQr}px; }
   .whatsapp-qr img, .whatsapp-qr svg { display:block; width:96px; height:96px; flex:0 0 auto; image-rendering:pixelated; image-rendering:crisp-edges; }
   .whatsapp-qr div { max-width:130px; text-align:left; }
+  .pedido-qr { margin:8px 0 4px; display:flex; flex-direction:column; align-items:center; gap:4px; font-size:10px; font-weight:700; letter-spacing:.04em; }
+  .pedido-qr img, .pedido-qr svg { display:block; width:${qrPedidoPx}px; height:${qrPedidoPx}px; image-rendering:pixelated; image-rendering:crisp-edges; }
+  .pedido-barcode { margin:8px 0 4px; display:flex; flex-direction:column; align-items:center; gap:4px; font-size:10px; font-weight:700; letter-spacing:.04em; }
+  .pedido-barcode svg { display:block; width:${barcodePedido.widthPx}px; height:${barcodePedido.heightPx}px; image-rendering:pixelated; image-rendering:crisp-edges; }
   .separator { width:100%; margin:${separatorPy}px 0; padding:0; border:0; line-height:0; }
   .separator img { display:block; width:100%; height:auto; image-rendering:pixelated; image-rendering:crisp-edges; }
   .items-title { margin:${padding}px 0 ${template.densidade === 'compacto' ? 1 : 3}px; font-weight:${pesoItens}; font-size:${fonteItens}px; }

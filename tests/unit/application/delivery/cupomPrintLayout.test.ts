@@ -4,6 +4,10 @@ import {
   fonteEmpresaEscPosA11Px,
   printSizeFromFontePx,
   qrModuleSizeForWidth,
+  barcodePedidoHtmlSize,
+  barcodePedidoRasterSize,
+  qrPedidoHtmlSizePx,
+  qrPedidoModuleSizeForWidth,
   sectionFeedLines,
   telefoneWhatsappE164,
 } from '@/src/application/delivery/cupomPrintLayout'
@@ -35,5 +39,10 @@ describe('cupomPrintLayout', () => {
   it('monta E.164 para WhatsApp', () => {
     expect(telefoneWhatsappE164('65999998888')).toBe('5565999998888')
     expect(qrModuleSizeForWidth(58)).toBe(3)
+    expect(qrPedidoModuleSizeForWidth(58)).toBe(6)
+    expect(qrPedidoModuleSizeForWidth(80)).toBe(8)
+    expect(qrPedidoHtmlSizePx(80)).toBe(220)
+    expect(barcodePedidoHtmlSize(80)).toEqual({ widthPx: 260, heightPx: 56 })
+    expect(barcodePedidoRasterSize(80)).toEqual({ widthPx: 520, heightPx: 80 })
   })
 })

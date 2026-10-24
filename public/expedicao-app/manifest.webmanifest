@@ -1,0 +1,19 @@
+{
+  "name": "Jiffy Entregador",
+  "short_name": "Entregador",
+  "description": "Pedidos, rota e comissão do entregador Jiffy.",
+  "start_url": "/e",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f6f8",
+  "theme_color": "#5b21b6",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/images/jiffy-favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

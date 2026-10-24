@@ -3,6 +3,19 @@ import { buildGestaoPath, parseEmpresaSlugFromPath } from '@/src/shared/utils/ge
 import { getEmpresaSlugParam } from '@/src/shared/utils/tabSession'
 import { PEDIDOS_PATH, PEDIDOS_WHATSAPP_PATH, QUERY_GESTOR } from '../constantes'
 import { estaNoAppJiffyFlow, isSinalKioskGestorPedidos } from '../kiosk/isKioskGestorPedidos'
+import {
+  isRotaExpedicaoApp,
+  isSuperficieExpedicaoApp,
+} from '@/src/application/expedicao/app/detectarSuperficieExpedicao'
+import { pathEscolherEmpresaExpedicao, pathLoginExpedicao } from '@/src/presentation/expedicao/sessao/pathsExpedicao'
+
+function superficieExpedicaoDoBrowser(search?: string): 'app' | 'bancada' | null {
+  if (typeof window === 'undefined') return null
+  const pathname = window.location.pathname
+  const query = search ?? window.location.search
+  if (!isSuperficieExpedicaoApp({ pathname, search: query })) return null
+  return isRotaExpedicaoApp(pathname) ? 'app' : 'bancada'
+}
 
 export function lerSinalGestorDoBrowser(): { hasTauri: boolean; search: string } {
   if (typeof window === 'undefined') {
@@ -18,6 +31,8 @@ export function pathLoginComSinalGestor(sinal: {
   hasTauri: boolean
   search?: string
 }): string {
+  const expedicao = superficieExpedicaoDoBrowser(sinal.search)
+  if (expedicao) return pathLoginExpedicao(expedicao)
   return isSinalKioskGestorPedidos(sinal) ? `/login?${QUERY_GESTOR}` : '/login'
 }
 
@@ -25,6 +40,8 @@ export function pathHubComSinalGestor(sinal: {
   hasTauri: boolean
   search?: string
 }): string {
+  const expedicao = superficieExpedicaoDoBrowser(sinal.search)
+  if (expedicao) return pathEscolherEmpresaExpedicao(expedicao)
   /** Windows / `?gestor`: nunca Minhas Empresas. */
   return isSinalKioskGestorPedidos(sinal) ? pathEscolherEmpresaKiosk() : HUB_PATH
 }

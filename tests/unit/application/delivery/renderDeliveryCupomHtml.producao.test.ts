@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { renderDeliveryCupomHtml } from '@/src/application/delivery/renderDeliveryCupomHtml'
+import { DEFAULT_DELIVERY_CUPOM_TEMPLATE } from '@/src/shared/types/deliveryCupomTemplate'
 import type { VendaGestorTicket, VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
 
 const root: VendaGestorTicketsResponse = {
@@ -47,6 +48,9 @@ describe('renderDeliveryCupomHtml via de produção', () => {
     expect(html).not.toContain('ITENS DO PEDIDO')
     expect(html).not.toContain('Data Prevista:')
     expect(html).not.toContain('Feito com carinho')
+    expect(html).toContain('pedido-qr')
+    expect(html).toContain('width:220px')
+    expect(html).toContain('PABC123')
     expect(html).toContain('.prod-80 .prod-extra + .prod-extra { margin-top:8px; }')
     expect(html).toContain('.prod-80 .prod-extra[data-grupo="neutro"] + .prod-extra[data-grupo="acao"]')
     expect(html).toContain('EscPosFontA')
@@ -58,6 +62,17 @@ describe('renderDeliveryCupomHtml via de produção', () => {
     expect(html.indexOf('OBSERVACAO DO PEDIDO')).toBeLessThan(html.indexOf('Atend: Carlos'))
     expect(html).toContain('prod-resumo')
     expect(html).toMatch(/Cozinha \| .*Atend: Carlos/)
+  })
+
+  it('via de produção usa Code 128 quando o template pede código de barras', () => {
+    const html = renderDeliveryCupomHtml({
+      root,
+      ticket: ticketProducao,
+      template: { ...DEFAULT_DELIVERY_CUPOM_TEMPLATE, simboloPedido: 'codigo_barras' },
+    })
+    expect(html).toContain('pedido-barcode')
+    expect(html).toContain('PABC123')
+    expect(html).not.toContain('class="pedido-qr"')
   })
 
   it('via de expedição usa produto no tamanho do cupom, com preço na mesma linha', () => {
@@ -109,6 +124,7 @@ describe('renderDeliveryCupomHtml via de produção', () => {
     expect(html).toMatch(/40,00/)
     expect(html).toContain('text-overflow:ellipsis')
     expect(html).not.toContain('2 X X-Bacon')
+    expect(html).not.toContain('class="pedido-qr"')
   })
 
   it('retirada não renderiza QR de WhatsApp na expedição', () => {
