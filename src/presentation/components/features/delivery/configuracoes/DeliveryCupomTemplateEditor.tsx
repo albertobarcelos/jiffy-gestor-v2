@@ -526,7 +526,7 @@ export function DeliveryCupomTemplateEditor({
               <DeliverySimboloPedidoInfoTooltip />
             </div>
             <DeliverySimboloPedidoToggle
-              value={value.simboloPedido ?? 'qrcode'}
+              value={value.simboloPedido ?? 'nenhum'}
               disabled={disabled}
               onChange={next => onChange(update(value, 'simboloPedido', next))}
             />

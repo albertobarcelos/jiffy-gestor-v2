@@ -65,8 +65,8 @@ export function EntregadorPwaQrDialog({ open, onClose }: EntregadorPwaQrDialogPr
           <DialogTitle>Instalar o app do entregador</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-secondary-text">
-          O QR abre uma tela pedindo para instalar o app. O login só continua depois,
-          no ícone da tela inicial. O celular não instala sozinho — precisa de um toque.
+          O QR abre https://entregador.jiffy.run e pede para instalar o JiffyGO.
+          O login só continua no ícone da tela inicial. O celular não instala sozinho.
         </p>
         <div className="mt-4 flex flex-col items-center gap-3">
           {src ? (

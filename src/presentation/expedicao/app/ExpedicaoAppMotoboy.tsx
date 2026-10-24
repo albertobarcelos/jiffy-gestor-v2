@@ -162,21 +162,21 @@ export function ExpedicaoAppMotoboy() {
     [atualizarPrefs, prefs]
   )
 
+  if (!pwa.pronto || sessao.aguardandoBootstrap) {
+    return (
+      <div className="flex h-dvh items-center justify-center bg-[#f4f6f8]">
+        <JiffyLoading text="Abrindo o app…" />
+      </div>
+    )
+  }
+
   if (
     deveMostrarPortaoInstalacaoPwa({
       ehCelular: pwa.ehCelular,
       standalone: pwa.standalone,
     })
   ) {
-    return <ExpedicaoAppInstalarScreen />
-  }
-
-  if (sessao.aguardandoBootstrap) {
-    return (
-      <div className="flex h-dvh items-center justify-center bg-[#f4f6f8]">
-        <JiffyLoading text="Abrindo o app…" />
-      </div>
-    )
+    return <ExpedicaoAppInstalarScreen pwa={pwa} />
   }
 
   const overlaySaindo = sessao.saindoLoja ? (
@@ -194,7 +194,7 @@ export function ExpedicaoAppMotoboy() {
           erro={sessao.erroSenha}
           ocupado={sessao.autenticando}
           titulo="Sua senha"
-          subtitulo="Digite os 4 dígitos para ver seus pedidos e comissões. Teste local: 1234"
+          subtitulo="Digite os 4 dígitos para ver seus pedidos e comissões."
           onDigito={digito => {
             sessao.setErroSenha(null)
             sessao.setSenha(prev => {

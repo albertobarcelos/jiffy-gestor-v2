@@ -6,11 +6,18 @@ import { LoginForm } from '@/src/presentation/components/features/auth/LoginForm
 import { LoginHeading } from '@/src/presentation/components/features/auth/LoginHeading'
 import { LoginInviteRedirect } from '@/src/presentation/components/features/auth/LoginInviteRedirect'
 import { ExpedicaoAppLoginScreen } from '@/src/presentation/expedicao/app/login/ExpedicaoAppLoginScreen'
-import { isSinalExpedicaoAppSearch } from '@/src/presentation/expedicao/sessao/sinalExpedicao'
+import { isSuperficieExpedicaoApp } from '@/src/presentation/expedicao/sessao/sinalExpedicao'
 
 export function LoginPageGate() {
   const search = useSearchParams()
-  if (isSinalExpedicaoAppSearch(search.toString())) {
+  const host = typeof window !== 'undefined' ? window.location.host : ''
+  if (
+    isSuperficieExpedicaoApp({
+      pathname: '/login',
+      search: search.toString(),
+      host,
+    })
+  ) {
     return <ExpedicaoAppLoginScreen />
   }
 

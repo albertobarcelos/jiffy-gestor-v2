@@ -60,6 +60,11 @@ describe('localAgentClient', () => {
     expect(msg).not.toContain('agent.exe')
     expect(msg).not.toContain('127.0.0.1')
     expect(msg).not.toContain('38471')
+    expect(
+      mensagemJiffyPrintIndisponivel(
+        'https://jiffy-gestor-git-feat-expedicao-60a9c7-albertobarcelos-projects.vercel.app'
+      )
+    ).toContain('localhost:5552')
     expect(urlInstaladorJiffyPrint()).toBe(DEFAULT_JIFFY_PRINT_SETUP_URL)
     expect(DEFAULT_JIFFY_PRINT_SETUP_URL).toContain('JiffyPrint-setup.exe')
     expect(nomeFicheiroInstaladorJiffyPrint()).toBe('JiffyPrint-setup.exe')

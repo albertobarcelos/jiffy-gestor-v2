@@ -499,6 +499,7 @@ function renderSimboloPedidoPayload(
   payload: string | null | undefined,
   template: DeliveryCupomTemplateConfig
 ): string {
+  if (template.simboloPedido === 'nenhum') return ''
   const dados = String(payload ?? '').trim()
   if (!dados) return ''
   if (template.simboloPedido === 'codigo_barras') {

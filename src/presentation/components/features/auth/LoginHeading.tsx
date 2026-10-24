@@ -1,11 +1,15 @@
 'use client'
 
 import { useSearchParams } from 'next/navigation'
-import { isSinalExpedicaoAppSearch } from '@/src/presentation/expedicao/sessao/sinalExpedicao'
+import { isSuperficieExpedicaoApp } from '@/src/presentation/expedicao/sessao/sinalExpedicao'
 
 export function LoginHeading() {
   const search = useSearchParams()
-  const appEntregador = isSinalExpedicaoAppSearch(search.toString())
+  const appEntregador = isSuperficieExpedicaoApp({
+    pathname: '/login',
+    search: search.toString(),
+    host: typeof window !== 'undefined' ? window.location.host : '',
+  })
 
   if (appEntregador) {
     return (

@@ -25,10 +25,10 @@ import {
   TOKEN_USER_AGENT_FREDY,
   TOKEN_USER_AGENT_JIFFY_FLOW,
 } from '@/src/presentation/gestor-pedidos/constantes'
-import { QUERY_EXPEDICAO } from '@/src/presentation/expedicao/constantes'
 import {
   EXPEDICAO_APP_PATH,
   EXPEDICAO_APP_PATH_CURTO,
+  QUERY_EXPEDICAO,
   QUERY_EXPEDICAO_APP,
 } from '@/src/application/expedicao/app/constantesSuperficie'
 import { isHostEntregadorApp } from '@/src/application/expedicao/app/detectarSuperficieExpedicao'

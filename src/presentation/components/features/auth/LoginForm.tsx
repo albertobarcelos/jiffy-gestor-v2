@@ -319,7 +319,7 @@ export function LoginForm({ variante = 'gestor' }: { variante?: VarianteLogin })
         <button
           type="submit"
           disabled={ocupado}
-          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-secondary text-base font-semibold text-white disabled:opacity-70"
+          className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-secondary text-base font-semibold text-white disabled:opacity-70"
         >
           {ocupado ? (
             <>
@@ -331,7 +331,7 @@ export function LoginForm({ variante = 'gestor' }: { variante?: VarianteLogin })
           )}
         </button>
 
-        <p className="pt-1 text-center">
+        <p className="pt-2 text-center">
           <Link
             href="/esqueci-senha?expedicao&app"
             className="text-sm font-semibold text-secondary"

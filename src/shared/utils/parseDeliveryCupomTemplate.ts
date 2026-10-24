@@ -49,7 +49,10 @@ function modoPapel(v: unknown): DeliveryCupomModoPapel {
 }
 
 function simboloPedido(v: unknown): DeliveryCupomSimboloPedido {
-  return v === 'codigo_barras' ? 'codigo_barras' : 'qrcode'
+  if (v === 'qrcode') return 'qrcode'
+  if (v === 'codigo_barras') return 'codigo_barras'
+  // Ausente ou inválido → nenhum (produção nunca teve QR por padrão).
+  return 'nenhum'
 }
 
 function tamanhoOuPadrao(v: unknown, fallback: number | null): number | null {

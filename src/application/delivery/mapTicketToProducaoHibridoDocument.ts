@@ -84,6 +84,7 @@ function pushSimboloPedido(
   simboloPedido: DeliveryCupomSimboloPedido,
   desenharCodigoBarras?: DesenharCodigoBarrasPedido
 ): void {
+  if (simboloPedido === 'nenhum') return
   if (simboloPedido === 'codigo_barras') {
     const png = desenharCodigoBarras?.(payload)
     if (png) {
@@ -105,7 +106,7 @@ export function modeloToProducaoHibridoContent(
   desenharPilula?: DesenharPilulaProducao,
   desenharSeparador?: DesenharSeparadorProducao,
   desenharMolduraIdentidade?: DesenharMolduraIdentidade,
-  simboloPedido: DeliveryCupomSimboloPedido = 'qrcode',
+  simboloPedido: DeliveryCupomSimboloPedido = 'nenhum',
   desenharCodigoBarras?: DesenharCodigoBarrasPedido
 ): PrintContentBlock[] {
   const content: PrintContentBlock[] = []
@@ -197,7 +198,9 @@ export function mapTicketToProducaoHibridoDocument(
       options?.desenharPilula,
       options?.desenharSeparador,
       options?.desenharMolduraIdentidade,
-      options?.simboloPedido === 'codigo_barras' ? 'codigo_barras' : 'qrcode',
+      options?.simboloPedido === 'qrcode' || options?.simboloPedido === 'codigo_barras'
+        ? options.simboloPedido
+        : 'nenhum',
       options?.desenharCodigoBarras
     ),
   }

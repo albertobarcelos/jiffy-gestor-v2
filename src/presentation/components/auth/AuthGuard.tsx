@@ -32,7 +32,7 @@ import { pathLoginExpedicao, pathEscolherEmpresaExpedicao } from '@/src/presenta
 import {
   isRotaExpedicao,
   isRotaExpedicaoKiosk,
-  isSuperficieExpedicaoApp,
+  resolverSuperficieExpedicao,
   sinalExpedicaoNesteBrowser,
 } from '@/src/presentation/expedicao/sessao/sinalExpedicao'
 import { stripGestaoEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
@@ -106,12 +106,13 @@ function isSuperficieKiosk(pathname: string | null): boolean {
 
 function superficieExpedicaoAtual(): 'app' | 'bancada' {
   if (typeof window === 'undefined') return 'bancada'
-  return isSuperficieExpedicaoApp({
-    pathname: window.location.pathname,
-    search: window.location.search,
-  })
-    ? 'app'
-    : 'bancada'
+  return (
+    resolverSuperficieExpedicao({
+      pathname: window.location.pathname,
+      search: window.location.search,
+      host: window.location.host,
+    }) ?? 'bancada'
+  )
 }
 
 function irParaLoginDaSuperficieAtual(modo: 'replace' | 'assign' = 'replace'): void {

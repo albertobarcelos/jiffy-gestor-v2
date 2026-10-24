@@ -1,29 +1,28 @@
 'use client'
 
 import Image from 'next/image'
-import { usePwaInstallPrompt } from '@/src/presentation/expedicao/app/pwa/usePwaInstallPrompt'
+import type { PwaInstallPrompt } from '@/src/presentation/expedicao/app/pwa/usePwaInstallPrompt'
 
-export function ExpedicaoAppInstalarScreen() {
-  const pwa = usePwaInstallPrompt()
+type ExpedicaoAppInstalarScreenProps = {
+  pwa: Pick<PwaInstallPrompt, 'podeInstalar' | 'acabouDeInstalar' | 'instalar'>
+}
 
+export function ExpedicaoAppInstalarScreen({ pwa }: ExpedicaoAppInstalarScreenProps) {
   return (
     <div className="flex h-dvh flex-col bg-secondary text-white">
-      <div className="px-6 pb-8 pt-[max(2.25rem,env(safe-area-inset-top))]">
-        <div className="flex items-center gap-3">
-          <Image
-            src="/images/expedicao/logo_app.png"
-            alt=""
-            width={44}
-            height={44}
-            className="h-11 w-11 rounded-2xl bg-white shadow-sm"
-            priority
-          />
-          <p className="text-lg font-semibold">JiffyGO</p>
-        </div>
-        <h1 className="mt-8 text-[1.75rem] font-semibold leading-tight">
+      <div className="px-6 pb-10 pt-[max(2.25rem,env(safe-area-inset-top))]">
+        <Image
+          src="/images/expedicao/logo_app.png"
+          alt="JiffyGO"
+          width={96}
+          height={96}
+          className="h-24 w-24 rounded-[1.5rem] bg-white shadow-sm"
+          priority
+        />
+        <h1 className="mt-6 text-[1.75rem] font-semibold leading-tight">
           Instale o app para continuar
         </h1>
-        <p className="mt-3 max-w-[22rem] text-[15px] leading-6 text-white/85">
+        <p className="mt-2 max-w-[22rem] text-[15px] leading-6 text-white/85">
           O QR só abre o navegador. O login e os pedidos ficam no ícone da tela
           inicial — o celular não instala sozinho.
         </p>
@@ -43,7 +42,7 @@ export function ExpedicaoAppInstalarScreen() {
               <button
                 type="button"
                 onClick={() => void pwa.instalar()}
-                className="w-full rounded-2xl bg-violet-700 px-4 py-3.5 text-base font-semibold text-white"
+                className="inline-flex h-14 w-full items-center justify-center rounded-2xl bg-violet-700 text-base font-semibold text-white"
               >
                 Instalar app
               </button>

@@ -22,7 +22,7 @@ export function ExpedicaoTecladoSenha({
   erro,
   ocupado,
   titulo = 'Quem está retirando?',
-  subtitulo = 'Digite a senha de 4 dígitos ou bipa o crachá. Teste local: 1234',
+  subtitulo = 'Digite a senha de 4 dígitos ou bipa o crachá.',
   rodape,
   onDigito,
   onApagar,
@@ -37,15 +37,19 @@ export function ExpedicaoTecladoSenha({
         <p className="mt-2 text-base text-secondary-text">{subtitulo}</p>
       </div>
 
-      <div className="flex gap-3" aria-label="Senha do entregador">
+      <div
+        className="flex gap-3"
+        aria-label={`Senha, ${senha.length} de 4 dígitos`}
+      >
         {Array.from({ length: 4 }).map((_, i) => (
           <div
             key={i}
+            aria-hidden
             className={`flex h-16 w-14 items-center justify-center rounded-xl border-2 border-primary/30 bg-primary-bg text-3xl font-semibold text-primary-text md:h-20 md:w-16 ${
               ocupado ? 'animate-pulse' : ''
             }`}
           >
-            {senha[i] ?? ''}
+            {senha[i] ? '*' : ''}
           </div>
         ))}
       </div>

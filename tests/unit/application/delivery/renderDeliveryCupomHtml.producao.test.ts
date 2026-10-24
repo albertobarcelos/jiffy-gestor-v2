@@ -48,9 +48,8 @@ describe('renderDeliveryCupomHtml via de produção', () => {
     expect(html).not.toContain('ITENS DO PEDIDO')
     expect(html).not.toContain('Data Prevista:')
     expect(html).not.toContain('Feito com carinho')
-    expect(html).toContain('pedido-qr')
-    expect(html).toContain('width:220px')
-    expect(html).toContain('PABC123')
+    expect(html).not.toContain('class="pedido-qr"')
+    expect(html).not.toContain('class="pedido-barcode"')
     expect(html).toContain('.prod-80 .prod-extra + .prod-extra { margin-top:8px; }')
     expect(html).toContain('.prod-80 .prod-extra[data-grupo="neutro"] + .prod-extra[data-grupo="acao"]')
     expect(html).toContain('EscPosFontA')
@@ -64,6 +63,18 @@ describe('renderDeliveryCupomHtml via de produção', () => {
     expect(html).toMatch(/Cozinha \| .*Atend: Carlos/)
   })
 
+  it('via de produção usa QR quando o template pede qrcode', () => {
+    const html = renderDeliveryCupomHtml({
+      root,
+      ticket: ticketProducao,
+      template: { ...DEFAULT_DELIVERY_CUPOM_TEMPLATE, simboloPedido: 'qrcode' },
+    })
+    expect(html).toContain('class="pedido-qr"')
+    expect(html).toContain('width:220px')
+    expect(html).toContain('PABC123')
+    expect(html).not.toContain('class="pedido-barcode"')
+  })
+
   it('via de produção usa Code 128 quando o template pede código de barras', () => {
     const html = renderDeliveryCupomHtml({
       root,
@@ -73,6 +84,16 @@ describe('renderDeliveryCupomHtml via de produção', () => {
     expect(html).toContain('pedido-barcode')
     expect(html).toContain('PABC123')
     expect(html).not.toContain('class="pedido-qr"')
+  })
+
+  it('via de produção omite símbolo quando o template pede nenhum', () => {
+    const html = renderDeliveryCupomHtml({
+      root,
+      ticket: ticketProducao,
+      template: { ...DEFAULT_DELIVERY_CUPOM_TEMPLATE, simboloPedido: 'nenhum' },
+    })
+    expect(html).not.toContain('class="pedido-qr"')
+    expect(html).not.toContain('class="pedido-barcode"')
   })
 
   it('via de expedição usa produto no tamanho do cupom, com preço na mesma linha', () => {

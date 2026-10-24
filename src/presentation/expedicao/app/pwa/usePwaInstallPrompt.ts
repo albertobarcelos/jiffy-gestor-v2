@@ -19,14 +19,30 @@ function lerStandalone(): boolean {
   })
 }
 
-export function usePwaInstallPrompt() {
+export type PwaInstallPrompt = {
+  /** false no SSR e no 1º paint — só true depois do mount (evita hydration mismatch). */
+  pronto: boolean
+  standalone: boolean
+  ehCelular: boolean
+  acabouDeInstalar: boolean
+  instalado: boolean
+  podeInstalar: boolean
+  instalar: () => Promise<void>
+}
+
+export function usePwaInstallPrompt(): PwaInstallPrompt {
   const [evento, setEvento] = useState<BeforeInstallPromptEvent | null>(null)
-  const [standalone, setStandalone] = useState(lerStandalone)
+  const [standalone, setStandalone] = useState(false)
+  const [ehCelular, setEhCelular] = useState(false)
+  const [pronto, setPronto] = useState(false)
   const [acabouDeInstalar, setAcabouDeInstalar] = useState(false)
 
   useEffect(() => {
-    setStandalone(lerStandalone())
-    if (lerStandalone()) return
+    const jaStandalone = lerStandalone()
+    setStandalone(jaStandalone)
+    setEhCelular(ehCelularPwaEntregador(navigator.userAgent))
+    setPronto(true)
+    if (jaStandalone) return
 
     const onPrompt = (event: Event) => {
       event.preventDefault()
@@ -45,8 +61,9 @@ export function usePwaInstallPrompt() {
   }, [])
 
   return {
+    pronto,
     standalone,
-    ehCelular: typeof navigator === 'undefined' ? false : ehCelularPwaEntregador(navigator.userAgent),
+    ehCelular,
     acabouDeInstalar,
     instalado: standalone || acabouDeInstalar,
     podeInstalar: Boolean(evento),

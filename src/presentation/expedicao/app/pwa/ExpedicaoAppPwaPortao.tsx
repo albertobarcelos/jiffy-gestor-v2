@@ -8,6 +8,17 @@ import { usePwaInstallPrompt } from '@/src/presentation/expedicao/app/pwa/usePwa
 
 export function ExpedicaoAppPwaPortao({ children }: { children: ReactNode }) {
   const pwa = usePwaInstallPrompt()
+
+  // SSR + 1º paint iguais: sem ler navigator no render (hydration).
+  if (!pwa.pronto) {
+    return (
+      <>
+        <ExpedicaoAppPwa />
+        <div className="h-dvh bg-secondary" aria-busy="true" aria-label="Carregando" />
+      </>
+    )
+  }
+
   const portao = deveMostrarPortaoInstalacaoPwa({
     ehCelular: pwa.ehCelular,
     standalone: pwa.standalone,
@@ -16,7 +27,7 @@ export function ExpedicaoAppPwaPortao({ children }: { children: ReactNode }) {
   return (
     <>
       <ExpedicaoAppPwa />
-      {portao ? <ExpedicaoAppInstalarScreen /> : children}
+      {portao ? <ExpedicaoAppInstalarScreen pwa={pwa} /> : children}
     </>
   )
 }
