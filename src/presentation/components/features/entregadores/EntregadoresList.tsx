@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MdDelete, MdLock, MdSearch } from 'react-icons/md'
+import { MdDelete, MdLock, MdQrCode2, MdSearch } from 'react-icons/md'
 import { Tooltip as MuiTooltip } from '@mui/material'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
@@ -21,6 +21,7 @@ import {
 } from '@/src/presentation/components/ui/dialog'
 import { EntregadorDeliveryModal } from './EntregadorDeliveryModal'
 import { EntregadorSenhaDialog } from './EntregadorSenhaDialog'
+import { EntregadorPwaQrDialog } from './EntregadorPwaQrDialog'
 
 export interface EntregadorDeliveryResumo {
   id: string
@@ -99,6 +100,7 @@ export function EntregadoresList() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [senhaEntregadorId, setSenhaEntregadorId] = useState<string | null>(null)
   const [senhaEntregadorNome, setSenhaEntregadorNome] = useState<string | null>(null)
+  const [pwaQrAberto, setPwaQrAberto] = useState(false)
 
   const searchTextRef = useRef('')
   const filterStatusRef = useRef(filterStatus)
@@ -268,14 +270,26 @@ export function EntregadoresList() {
               Total {entregadores.length} de {total}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={abrirCriar}
-            className="flex h-8 items-center gap-2 rounded-lg bg-primary px-2 text-sm font-semibold text-info transition-colors hover:bg-primary/90 md:px-[30px]"
-          >
-            Novo
-            <span className="text-lg">+</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <MuiTooltip title="QR Code do app (PWA)" placement="bottom" slotProps={TOOLTIP_SLOT_PROPS}>
+              <button
+                type="button"
+                aria-label="Mostrar QR Code do app do entregador"
+                onClick={() => setPwaQrAberto(true)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-primary/30 bg-info text-primary transition-colors hover:bg-primary/10"
+              >
+                <MdQrCode2 className="h-5 w-5" />
+              </button>
+            </MuiTooltip>
+            <button
+              type="button"
+              onClick={abrirCriar}
+              className="flex h-8 items-center gap-2 rounded-lg bg-primary px-2 text-sm font-semibold text-info transition-colors hover:bg-primary/90 md:px-[30px]"
+            >
+              Novo
+              <span className="text-lg">+</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -406,7 +420,10 @@ export function EntregadoresList() {
         entregadorId={editingId}
         onClose={fecharModal}
         onSalvo={handleSalvo}
+        onAbrirPwaQr={() => setPwaQrAberto(true)}
       />
+
+      <EntregadorPwaQrDialog open={pwaQrAberto} onClose={() => setPwaQrAberto(false)} />
 
       <EntregadorSenhaDialog
         open={Boolean(senhaEntregadorId)}

@@ -1,7 +1,7 @@
 'use client'
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
-import { MdPerson } from 'react-icons/md'
+import { MdPerson, MdQrCode2 } from 'react-icons/md'
 import {
   JiffySidePanelModal,
   type JiffySidePanelFooterActions,
@@ -41,6 +41,7 @@ interface EntregadorDeliveryModalProps {
   entregadorId: string | null
   onClose: () => void
   onSalvo: () => void
+  onAbrirPwaQr?: () => void
 }
 
 interface EntregadorFormState {
@@ -92,6 +93,7 @@ export function EntregadorDeliveryModal({
   entregadorId,
   onClose,
   onSalvo,
+  onAbrirPwaQr,
 }: EntregadorDeliveryModalProps) {
   const [form, setForm] = useState<EntregadorFormState>(EMPTY_FORM)
   const [carregando, setCarregando] = useState(false)
@@ -279,6 +281,16 @@ export function EntregadorDeliveryModal({
                 <div className="flex items-center gap-3">
                   <h2 className="text-xl font-semibold text-primary">Dados do Entregador</h2>
                   <div className="flex-1 border-t border-primary/40" aria-hidden />
+                  {onAbrirPwaQr ? (
+                    <button
+                      type="button"
+                      aria-label="Mostrar QR Code do app do entregador"
+                      onClick={onAbrirPwaQr}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-primary/30 text-primary transition-colors hover:bg-primary/10"
+                    >
+                      <MdQrCode2 className="h-5 w-5" />
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
