@@ -15,6 +15,10 @@ import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { formatarTelefoneBr } from '@/src/shared/utils/telefoneBr'
 import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
+import {
+  normalizarSenhaEntregadorDelivery,
+  senhaEntregadorDeliveryValida,
+} from '@/src/application/delivery/senhaEntregadorDelivery'
 
 const ENTREGADOR_FORM_ID = 'entregador-delivery-form'
 
@@ -94,7 +98,9 @@ export function EntregadorDeliveryModal({
   const [salvando, setSalvando] = useState(false)
 
   const isEdicao = Boolean(entregadorId)
-  const senhaOk = isEdicao ? form.senha.length === 0 || form.senha.length === 4 : form.senha.length === 4
+  const senhaOk = isEdicao
+    ? form.senha.length === 0 || senhaEntregadorDeliveryValida(form.senha)
+    : senhaEntregadorDeliveryValida(form.senha)
   const canSubmit = Boolean(form.nome.trim()) && senhaOk && !carregando
 
   useEffect(() => {
@@ -183,12 +189,12 @@ export function EntregadorDeliveryModal({
     }
 
     const telefoneDigits = somenteDigitos(form.telefone)
-    const senhaDigits = somenteDigitos(form.senha, 4)
-    if (!isEdicao && senhaDigits.length !== 4) {
+    const senhaDigits = normalizarSenhaEntregadorDelivery(form.senha)
+    if (!isEdicao && !senhaEntregadorDeliveryValida(senhaDigits)) {
       showToast.error('Informe a senha de 4 dígitos.')
       return
     }
-    if (isEdicao && senhaDigits && senhaDigits.length !== 4) {
+    if (isEdicao && senhaDigits && !senhaEntregadorDeliveryValida(senhaDigits)) {
       showToast.error('A senha deve ter 4 dígitos.')
       return
     }
@@ -199,7 +205,7 @@ export function EntregadorDeliveryModal({
       cpf: cpfDigits || null,
       ativo: form.ativo,
     }
-    if (senhaDigits.length === 4) {
+    if (senhaEntregadorDeliveryValida(senhaDigits)) {
       payload.senha = senhaDigits
     }
 
@@ -353,12 +359,21 @@ export function EntregadorDeliveryModal({
                     sx={INPUT_SX}
                   />
                   <Input
-                    label={isEdicao ? 'Nova senha de expedição (4 dígitos)' : 'Senha de expedição'}
+                    label={
+                      isEdicao
+                        ? 'Nova senha do app (4 dígitos, opcional)'
+                        : 'Senha do app (4 dígitos)'
+                    }
+                    helperText={
+                      isEdicao
+                        ? 'Deixe em branco para manter a senha atual. Ou use o cadeado na lista.'
+                        : 'Obrigatória no cadastro. É a senha do app do entregador.'
+                    }
                     value={form.senha}
                     onChange={e =>
                       setForm(prev => ({
                         ...prev,
-                        senha: somenteDigitos(e.target.value, 4),
+                        senha: normalizarSenhaEntregadorDelivery(e.target.value),
                       }))
                     }
                     placeholder="0000"
