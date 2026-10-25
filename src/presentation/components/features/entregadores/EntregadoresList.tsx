@@ -29,6 +29,9 @@ export interface EntregadorDeliveryResumo {
   telefone?: string | null
 }
 
+const LISTA_GRADE =
+  'grid w-full min-w-0 grid-cols-[minmax(0,1fr)_2.75rem_2.75rem] items-center gap-x-2 md:grid-cols-[minmax(0,1.4fr)_minmax(8rem,1fr)_3.5rem_5.25rem] md:gap-x-2.5'
+
 const TOOLTIP_SLOT_PROPS = {
   tooltip: {
     sx: {
@@ -259,18 +262,18 @@ export function EntregadoresList() {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-w-0 w-full flex-col">
       <div className="flex-shrink-0 px-1 pb-1 pt-1 md:px-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold text-primary md:text-xl">
+        <div className="flex min-w-0 items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-primary md:text-xl">
               Entregadores Cadastrados
             </p>
             <p className="text-sm font-medium text-tertiary md:text-[22px]">
               Total {entregadores.length} de {total}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <MuiTooltip title="QR Code do app (PWA)" placement="bottom" slotProps={TOOLTIP_SLOT_PROPS}>
               <button
                 type="button"
@@ -293,10 +296,10 @@ export function EntregadoresList() {
         </div>
       </div>
 
-      <div className="flex flex-shrink-0 gap-3 px-1 py-1 md:px-[20px]">
-        <div className="flex-1 border-t-2 border-primary/70">
+      <div className="flex min-w-0 flex-shrink-0 gap-3 px-1 py-1 md:px-[20px]">
+        <div className="min-w-0 flex-1 border-t-2 border-primary/70">
           <div className="mt-2 flex flex-wrap items-start gap-3">
-            <div className="relative h-8 min-w-[180px] max-w-[360px] flex-1">
+            <div className="relative h-8 min-w-0 max-w-[360px] flex-1 basis-[180px]">
               <MdSearch
                 className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
                 size={18}
@@ -310,7 +313,7 @@ export function EntregadoresList() {
                 className="h-full w-full rounded-lg border border-gray-200 bg-info pl-11 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
               />
             </div>
-            <div className="mt-0 flex w-full items-center gap-2 sm:w-[160px]">
+            <div className="mt-0 flex w-full min-w-0 items-center gap-2 sm:w-[160px] sm:shrink-0">
               <label className="block text-xs font-semibold text-secondary-text">Status</label>
               <select
                 value={filterStatus}
@@ -328,24 +331,26 @@ export function EntregadoresList() {
         </div>
       </div>
 
-      <div className="mt-0 flex-shrink-0 px-1 md:px-[20px]">
-        <div className="flex h-10 items-center gap-[10px] rounded-lg bg-custom-2 px-4">
-          <div className="flex-[2] text-xs font-semibold text-primary-text md:text-sm">
+      <div className="mt-0 min-w-0 flex-shrink-0 px-1 md:px-[20px]">
+        <div className={`${LISTA_GRADE} h-10 rounded-lg bg-custom-2 px-2 md:px-4`}>
+          <div className="min-w-0 text-xs font-semibold text-primary-text md:text-sm">
             Nome
           </div>
-          <div className="flex-[2] text-xs font-semibold text-primary-text md:text-sm">
+          <div className="hidden min-w-0 text-xs font-semibold text-primary-text md:block md:text-sm">
             Telefone
           </div>
-          <div className="flex w-28 shrink-0 justify-end gap-3 text-xs font-semibold text-primary-text md:text-sm">
-            <span className="w-7 text-center">Senha</span>
-            <span className="w-7 text-center">Remover</span>
+          <div className="text-center text-[10px] font-semibold leading-tight text-primary-text md:text-sm">
+            <span className="hidden whitespace-nowrap md:inline">Senha</span>
+          </div>
+          <div className="text-center text-[10px] font-semibold leading-tight text-primary-text md:text-sm">
+            <span className="hidden whitespace-nowrap md:inline">Remover</span>
           </div>
         </div>
       </div>
 
       <div
         ref={scrollContainerRef}
-        className="mt-1 flex-1 overflow-y-auto px-1 scrollbar-hide md:px-[20px]"
+        className="mt-1 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-1 scrollbar-hide md:px-[20px]"
         style={{ maxHeight: 'calc(100vh - 300px)' }}
       >
         {(isLoading || !hasLoadedInitialRef.current) && entregadores.length === 0 && (
@@ -368,30 +373,37 @@ export function EntregadoresList() {
             <div
               key={entregador.id}
               onClick={() => abrirEditar(entregador.id)}
-              className={`${bgClass} mb-1 flex cursor-pointer items-center rounded-lg py-2 hover:bg-secondary-bg/15 md:px-4`}
+              className={`${LISTA_GRADE} ${bgClass} mb-1 cursor-pointer rounded-lg px-2 py-2 hover:bg-secondary-bg/15 md:px-4`}
             >
-              <div className="flex-[2] flex items-center text-xs font-normal text-primary-text md:text-sm">
-                <span>{entregador.nome?.trim() || '-'}</span>
+              <div className="min-w-0 truncate text-xs font-normal text-primary-text md:text-sm">
+                {entregador.nome?.trim() || '-'}
               </div>
-              <div className="flex-[2] text-xs text-secondary-text md:text-sm">
+              <div className="hidden min-w-0 truncate text-xs text-secondary-text md:block md:text-sm">
                 {telefoneListaExibicao(entregador.telefone)}
               </div>
               <div
-                className="flex w-28 shrink-0 justify-end gap-3"
+                className="flex justify-center"
                 onClick={e => e.stopPropagation()}
                 onMouseDown={e => e.stopPropagation()}
                 onTouchStart={e => e.stopPropagation()}
               >
-                <MuiTooltip title="Cadastrar ou alterar senha" placement="bottom" slotProps={TOOLTIP_SLOT_PROPS}>
+                <MuiTooltip title="Alterar senha do app" placement="bottom" slotProps={TOOLTIP_SLOT_PROPS}>
                   <button
                     type="button"
-                    aria-label="Cadastrar ou alterar senha"
+                    aria-label="Alterar senha do app"
                     onClick={() => abrirSenha(entregador)}
                     className="flex h-7 w-7 items-center justify-center rounded transition-colors hover:bg-primary/10"
                   >
                     <MdLock className="h-4 w-4 text-primary" />
                   </button>
                 </MuiTooltip>
+              </div>
+              <div
+                className="flex justify-center"
+                onClick={e => e.stopPropagation()}
+                onMouseDown={e => e.stopPropagation()}
+                onTouchStart={e => e.stopPropagation()}
+              >
                 <MuiTooltip title="Remover entregador" placement="bottom" slotProps={TOOLTIP_SLOT_PROPS}>
                   <button
                     type="button"

@@ -19,6 +19,9 @@ import {
   normalizarSenhaEntregadorDelivery,
   senhaEntregadorDeliveryValida,
 } from '@/src/application/delivery/senhaEntregadorDelivery'
+import { entregadorPossuiSenhaApp } from '@/src/application/delivery/entregadorPossuiSenhaApp'
+import { EntregadorSenhaDialog } from './EntregadorSenhaDialog'
+import { EntregadorSenhaAppStatus } from './EntregadorSenhaAppStatus'
 
 const ENTREGADOR_FORM_ID = 'entregador-delivery-form'
 
@@ -98,21 +101,24 @@ export function EntregadorDeliveryModal({
   const [form, setForm] = useState<EntregadorFormState>(EMPTY_FORM)
   const [carregando, setCarregando] = useState(false)
   const [salvando, setSalvando] = useState(false)
+  const [possuiSenhaApp, setPossuiSenhaApp] = useState(true)
+  const [senhaDialogAberto, setSenhaDialogAberto] = useState(false)
 
   const isEdicao = Boolean(entregadorId)
-  const senhaOk = isEdicao
-    ? form.senha.length === 0 || senhaEntregadorDeliveryValida(form.senha)
-    : senhaEntregadorDeliveryValida(form.senha)
+  const senhaOk = isEdicao || senhaEntregadorDeliveryValida(form.senha)
   const canSubmit = Boolean(form.nome.trim()) && senhaOk && !carregando
 
   useEffect(() => {
     if (!open) {
       setForm(EMPTY_FORM)
+      setPossuiSenhaApp(true)
+      setSenhaDialogAberto(false)
       return
     }
 
     if (!entregadorId) {
       setForm(EMPTY_FORM)
+      setPossuiSenhaApp(false)
       return
     }
 
@@ -156,6 +162,7 @@ export function EntregadorDeliveryModal({
           senha: '',
           ativo: typeof data.ativo === 'boolean' ? data.ativo : true,
         })
+        setPossuiSenhaApp(entregadorPossuiSenhaApp(data) ?? true)
       } catch (error) {
         if (!cancelado) {
           showToast.error(error instanceof Error ? error.message : 'Erro ao carregar entregador')
@@ -196,10 +203,6 @@ export function EntregadorDeliveryModal({
       showToast.error('Informe a senha de 4 dígitos.')
       return
     }
-    if (isEdicao && senhaDigits && !senhaEntregadorDeliveryValida(senhaDigits)) {
-      showToast.error('A senha deve ter 4 dígitos.')
-      return
-    }
 
     const payload: Record<string, unknown> = {
       nome,
@@ -207,7 +210,7 @@ export function EntregadorDeliveryModal({
       cpf: cpfDigits || null,
       ativo: form.ativo,
     }
-    if (senhaEntregadorDeliveryValida(senhaDigits)) {
+    if (!isEdicao) {
       payload.senha = senhaDigits
     }
 
@@ -260,6 +263,7 @@ export function EntregadorDeliveryModal({
   const title = isEdicao ? 'Editar Entregador' : 'Novo Entregador'
 
   return (
+    <>
     <JiffySidePanelModal
       open={open}
       onClose={onClose}
@@ -370,38 +374,38 @@ export function EntregadorDeliveryModal({
                     InputLabelProps={INPUT_LABEL_PROPS}
                     sx={INPUT_SX}
                   />
-                  <Input
-                    label={
-                      isEdicao
-                        ? 'Nova senha do app (4 dígitos, opcional)'
-                        : 'Senha do app (4 dígitos)'
-                    }
-                    helperText={
-                      isEdicao
-                        ? 'Deixe em branco para manter a senha atual. Ou use o cadeado na lista.'
-                        : 'Obrigatória no cadastro. É a senha do app do entregador.'
-                    }
-                    value={form.senha}
-                    onChange={e =>
-                      setForm(prev => ({
-                        ...prev,
-                        senha: normalizarSenhaEntregadorDelivery(e.target.value),
-                      }))
-                    }
-                    placeholder="0000"
-                    type="password"
-                    inputProps={{
-                      maxLength: 4,
-                      inputMode: 'numeric',
-                      autoComplete: 'new-password',
-                    }}
-                    required={!isEdicao}
-                    fullWidth
-                    size="small"
-                    disabled={salvando}
-                    InputLabelProps={INPUT_LABEL_PROPS}
-                    sx={INPUT_SX}
-                  />
+                  {isEdicao ? (
+                    <EntregadorSenhaAppStatus
+                      cadastrada={possuiSenhaApp}
+                      disabled={salvando}
+                      onAlterar={() => setSenhaDialogAberto(true)}
+                    />
+                  ) : (
+                    <Input
+                      label="Senha do app (4 dígitos)"
+                      helperText="Obrigatória no cadastro. É a senha do app do entregador."
+                      value={form.senha}
+                      onChange={e =>
+                        setForm(prev => ({
+                          ...prev,
+                          senha: normalizarSenhaEntregadorDelivery(e.target.value),
+                        }))
+                      }
+                      placeholder="0000"
+                      type="password"
+                      inputProps={{
+                        maxLength: 4,
+                        inputMode: 'numeric',
+                        autoComplete: 'new-password',
+                      }}
+                      required
+                      fullWidth
+                      size="small"
+                      disabled={salvando}
+                      InputLabelProps={INPUT_LABEL_PROPS}
+                      sx={INPUT_SX}
+                    />
+                  )}
                 </div>
               </div>
             </form>
@@ -409,5 +413,17 @@ export function EntregadorDeliveryModal({
         )}
       </div>
     </JiffySidePanelModal>
+    <EntregadorSenhaDialog
+      open={senhaDialogAberto}
+      entregadorId={entregadorId}
+      entregadorNome={form.nome.trim() || null}
+      cadastrada={possuiSenhaApp}
+      onClose={() => setSenhaDialogAberto(false)}
+      onSalvo={() => {
+        setPossuiSenhaApp(true)
+        setSenhaDialogAberto(false)
+      }}
+    />
+    </>
   )
 }
