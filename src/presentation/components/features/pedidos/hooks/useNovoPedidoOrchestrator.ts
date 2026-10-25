@@ -38,7 +38,7 @@ import { useCarregarVenda } from './data/useCarregarVenda'
 import { useEntregadoresQuery } from './data/useEntregadoresQuery'
 import { useTaxasEntregaQuery } from './data/useTaxasEntregaQuery'
 import { useNovoPedidoDelivery } from './useNovoPedidoDelivery'
-import { resolverFiltroMeiosPagamentoNovoPedido } from '@/src/application/meios-pagamentos/resolverFiltroMeiosPagamentoNovoPedido'
+import { meioVisivelNoPedidoManual } from '@/src/application/meios-pagamentos/resolverFiltroMeiosPagamentoNovoPedido'
 import { useNovoPedidoPagamentos } from './useNovoPedidoPagamentos'
 import {
   useNovoPedidoResetOnExit,
@@ -468,7 +468,6 @@ export function useNovoPedidoOrchestrator({
     isFetching: isFetchingMeiosPagamento,
   } = useMeiosPagamentoInfinite({
     limit: 100,
-    ...resolverFiltroMeiosPagamentoNovoPedido(),
     // Step 3 usa meios de pagamento; em visualizacao/edicao pode ser usado para resolver nomes.
     enabled: open && (currentStep >= 3 || modoVisualizacao || !!vendaId),
     refetchOnWindowFocus: false,
@@ -477,7 +476,7 @@ export function useNovoPedidoOrchestrator({
   const meiosPagamento = useMemo(() => {
     if (!meiosPagamentoData?.pages) return []
     const lista = meiosPagamentoData.pages.flatMap(page => page.meiosPagamento || [])
-    return ordenarMeiosPagamentoPadrao(lista)
+    return ordenarMeiosPagamentoPadrao(lista.filter(meioVisivelNoPedidoManual))
   }, [meiosPagamentoData])
 
   const { entregadores, entregadoresQuery } = useEntregadoresQuery({
