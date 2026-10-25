@@ -30,9 +30,60 @@ describe('MeioPagamento.fromJSON ativoDelivery', () => {
     expect(MeioPagamento.fromJSON({ ...base, isDelivery: true }).isDelivery()).toBe(true)
   })
 
-  it('toJSON inclui ativoDelivery', () => {
+  it('toJSON.ativoDelivery segue isDelivery', () => {
     expect(MeioPagamento.fromJSON({ ...base, ativoDelivery: true }).toJSON().ativoDelivery).toBe(
       true
     )
+  })
+
+  it('mantém entrega e retirada como flags independentes', () => {
+    const meio = MeioPagamento.fromJSON({
+      ...base,
+      ativoEntregaDelivery: true,
+      ativoRetiradaDelivery: false,
+    })
+
+    expect(meio.isEntregaDelivery()).toBe(true)
+    expect(meio.isRetiradaDelivery()).toBe(false)
+    expect(meio.disponivelParaTipoEntrega('entrega')).toBe(true)
+    expect(meio.disponivelParaTipoEntrega('retirada')).toBe(false)
+    expect(meio.toJSON()).toMatchObject({
+      ativoEntregaDelivery: true,
+      ativoRetiradaDelivery: false,
+    })
+  })
+
+  it('usa a flag legada nas duas modalidades, sem substituir retirada explícita', () => {
+    const meio = MeioPagamento.fromJSON({
+      ...base,
+      ativoDelivery: true,
+      ativoRetiradaDelivery: false,
+    })
+
+    expect(meio.isEntregaDelivery()).toBe(true)
+    expect(meio.isRetiradaDelivery()).toBe(false)
+  })
+
+  it('não copia entrega para retirada quando só a flag nova veio', () => {
+    const meio = MeioPagamento.fromJSON({
+      ...base,
+      ativoEntregaDelivery: true,
+    })
+
+    expect(meio.isEntregaDelivery()).toBe(true)
+    expect(meio.isRetiradaDelivery()).toBe(false)
+  })
+
+  it('isDelivery é verdadeiro se qualquer canal delivery estiver ligado', () => {
+    const soRetirada = MeioPagamento.fromJSON({
+      ...base,
+      ativoEntregaDelivery: false,
+      ativoRetiradaDelivery: true,
+    })
+
+    expect(soRetirada.isDelivery()).toBe(true)
+    expect(soRetirada.disponivelParaTipoEntrega('retirada')).toBe(true)
+    expect(soRetirada.disponivelParaTipoEntrega('entrega')).toBe(false)
+    expect(soRetirada.toJSON().ativoDelivery).toBe(true)
   })
 })

@@ -49,6 +49,8 @@ function meioPagamentoExibicao(nome: string, index: number): MeioPagamentoPublic
   return {
     id,
     nome,
+    ativoEntregaDelivery: false,
+    ativoRetiradaDelivery: false,
     formaPagamentoFiscal: '',
     formaPagamentoFiscalLabel: '',
     isParcelavel: false,

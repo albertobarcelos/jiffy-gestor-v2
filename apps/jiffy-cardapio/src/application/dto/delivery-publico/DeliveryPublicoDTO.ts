@@ -133,6 +133,12 @@ export type GetCatalogoPublicoResponseDTO = {
 export type MeioPagamentoPublicoDTO = {
   id: string
   nome: string
+  ativoEntregaDelivery: boolean
+  ativoRetiradaDelivery: boolean
+  /** @deprecated Use ativoEntregaDelivery / ativoRetiradaDelivery. */
+  ativoDelivery?: boolean
+  /** @deprecated Use ativoEntregaDelivery / ativoRetiradaDelivery. */
+  isDelivery?: boolean
   formaPagamentoFiscal: string
   formaPagamentoFiscalLabel: string
   isParcelavel: boolean

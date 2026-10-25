@@ -1,3 +1,5 @@
+import { resolverFlagsCanalDelivery } from '@/src/domain/policies/pagamento/resolverFlagsCanalDelivery'
+
 export type TipoParcelamento = 'jurosVendedor' | 'jurosCliente'
 
 function parseBooleanFlag(value: unknown): boolean {
@@ -16,7 +18,8 @@ export class MeioPagamento {
     private readonly ativo: boolean,
     private readonly parcelavel: boolean,
     private readonly tipoParcelamento: TipoParcelamento | null,
-    private readonly isDeliveryFlag: boolean
+    private readonly ativoEntregaDelivery: boolean,
+    private readonly ativoRetiradaDelivery: boolean
   ) {}
 
   static create(
@@ -27,7 +30,8 @@ export class MeioPagamento {
     ativo: boolean,
     isParcelavel: boolean,
     tipoParcelamento: TipoParcelamento | null,
-    isDelivery = false
+    ativoEntregaDelivery = false,
+    ativoRetiradaDelivery = false
   ): MeioPagamento {
     if (!id || !nome) {
       throw new Error('ID e nome são obrigatórios')
@@ -41,7 +45,8 @@ export class MeioPagamento {
       ativo,
       isParcelavel,
       tipoParcelamento,
-      isDelivery
+      ativoEntregaDelivery,
+      ativoRetiradaDelivery
     )
   }
 
@@ -54,6 +59,7 @@ export class MeioPagamento {
       tipoParcelamento = 'jurosVendedor'
     }
 
+    const canais = resolverFlagsCanalDelivery(data)
     return MeioPagamento.create(
       data.id?.toString() || '',
       data.nome?.toString() || '',
@@ -62,7 +68,8 @@ export class MeioPagamento {
       parseBooleanFlag(data.ativo),
       parseBooleanFlag(data.isParcelavel),
       tipoParcelamento,
-      parseBooleanFlag(data.ativoDelivery ?? data.isDelivery)
+      canais.ativoEntregaDelivery,
+      canais.ativoRetiradaDelivery
     )
   }
 
@@ -79,7 +86,19 @@ export class MeioPagamento {
   }
 
   isDelivery(): boolean {
-    return this.isDeliveryFlag
+    return this.ativoEntregaDelivery || this.ativoRetiradaDelivery
+  }
+
+  isEntregaDelivery(): boolean {
+    return this.ativoEntregaDelivery
+  }
+
+  isRetiradaDelivery(): boolean {
+    return this.ativoRetiradaDelivery
+  }
+
+  disponivelParaTipoEntrega(tipo: 'entrega' | 'retirada'): boolean {
+    return tipo === 'entrega' ? this.ativoEntregaDelivery : this.ativoRetiradaDelivery
   }
 
   getFormaPagamentoFiscal(): string {
@@ -103,7 +122,9 @@ export class MeioPagamento {
       id: this.id,
       nome: this.nome,
       tefAtivo: this.tefAtivo,
-      ativoDelivery: this.isDeliveryFlag,
+      ativoEntregaDelivery: this.ativoEntregaDelivery,
+      ativoRetiradaDelivery: this.ativoRetiradaDelivery,
+      ativoDelivery: this.ativoEntregaDelivery || this.ativoRetiradaDelivery,
       formaPagamentoFiscal: this.formaPagamentoFiscal,
       ativo: this.ativo,
       isParcelavel: this.parcelavel,
