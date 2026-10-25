@@ -1,6 +1,7 @@
 'use client'
 
-import { MdArrowBack, MdNavigation, MdWhatsapp } from 'react-icons/md'
+import Image from 'next/image'
+import { MdArrowBack, MdWhatsapp } from 'react-icons/md'
 import type { PedidoResumoAppEntregador } from '@/src/presentation/expedicao/app/api/expedicaoAppApi'
 import { formatarMoedaApp } from '@/src/presentation/expedicao/app/format'
 import { AppSpinner } from '@/src/presentation/expedicao/app/shell/AppSpinner'
@@ -22,6 +23,8 @@ export function PedidoDetalheScreen(props: {
   })
   const whats = hrefWhatsAppApp(props.pedido.telefone)
   const numero = props.pedido.numeroVenda ?? props.pedido.codigoVenda
+  const codigoLetras =
+    props.pedido.numeroVenda && props.pedido.codigoVenda ? props.pedido.codigoVenda : null
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-zinc-50">
@@ -30,15 +33,20 @@ export function PedidoDetalheScreen(props: {
           <MdArrowBack className="h-6 w-6" />
         </button>
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">#{numero}</p>
-          <h1 className="truncate text-lg font-semibold text-zinc-900">{props.pedido.clienteNome}</h1>
+          <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span className="text-xl font-extrabold tracking-tight text-zinc-900">#{numero}</span>
+            {codigoLetras ? (
+              <span className="text-sm font-semibold tracking-wide text-zinc-600">{codigoLetras}</span>
+            ) : null}
+          </p>
+          <h1 className="mt-0.5 truncate text-lg font-semibold text-zinc-900">{props.pedido.clienteNome}</h1>
         </div>
       </header>
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
         <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/[0.04]">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Entrega</p>
-          <p className="mt-2 text-sm text-zinc-700">
+          <p className="mt-2 text-sm font-semibold leading-5 text-zinc-900">
             {props.pedido.enderecoNavegacao ||
               props.pedido.endereco ||
               props.pedido.bairro ||
@@ -54,10 +62,16 @@ export function PedidoDetalheScreen(props: {
                   href={waze}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-[#33CCFF] text-sm font-semibold text-white"
+                  aria-label="Abrir no Waze"
+                  className="inline-flex h-10 items-center justify-center rounded-xl bg-[#33CCFF]"
                 >
-                  <MdNavigation className="h-4 w-4" aria-hidden />
-                  Waze
+                  <Image
+                    src="/images/expedicao/waze_logo.webp"
+                    alt=""
+                    width={120}
+                    height={40}
+                    className="h-9 w-auto"
+                  />
                 </a>
               ) : null}
               {whats ? (
@@ -130,7 +144,7 @@ export function PedidoDetalheScreen(props: {
             onClick={props.onPedirConfirmacao}
             className="h-12 w-full rounded-xl bg-secondary text-sm font-semibold text-white disabled:opacity-60"
           >
-            {props.pedido.faltaPagar > 0 ? 'Recebi e confirmar' : 'Confirmar entrega'}
+            Entrega feita
           </button>
         </footer>
       ) : null}

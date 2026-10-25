@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import {
   rotuloPeriodoComissao,
   type PeriodoComissaoEntregador,
@@ -28,20 +29,25 @@ export function ComissoesTab(props: {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <header className="flex items-start justify-between gap-3 px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
-        <div className="min-w-0">
+      <header className="flex items-start justify-between gap-3 px-5 pb-2 pt-[max(1rem,env(safe-area-inset-top))]">
+        <div className="min-w-0 flex-1 pt-1">
           <div className="flex items-center gap-2">
             <h1 className="text-[28px] font-semibold tracking-tight text-zinc-900">Comissões</h1>
             {props.carregando ? <AppSpinner className="h-5 w-5" /> : null}
           </div>
           <p className="mt-0.5 text-sm font-medium capitalize text-zinc-600">{rotuloDia}</p>
+          <p className="mt-2 truncate text-sm font-bold text-zinc-900" title={props.loja}>
+            {props.loja}
+          </p>
         </div>
-        <p
-          className="max-w-[10rem] truncate pt-2 text-right text-sm font-bold text-zinc-900"
-          title={props.loja}
-        >
-          {props.loja}
-        </p>
+        <Image
+          src="/images/expedicao/comissao.png"
+          alt=""
+          width={220}
+          height={220}
+          className="h-[9.5rem] w-[9.5rem] shrink-0 object-contain object-right"
+          priority
+        />
       </header>
 
       <div className="px-4">
