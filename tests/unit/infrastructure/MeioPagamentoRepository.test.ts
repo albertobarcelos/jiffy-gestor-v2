@@ -28,6 +28,25 @@ describe('MeioPagamentoRepository', () => {
     )
   })
 
+  it('lista entrega com a flag nova e o legado na URL', async () => {
+    const request = vi.fn().mockResolvedValue({
+      data: { items: [], count: 0 },
+    })
+    const repo = repoComRequest(request)
+
+    await repo.buscarMeiosPagamentos({
+      limit: 100,
+      offset: 0,
+      ativoEntregaDelivery: true,
+      ativoDelivery: true,
+    })
+
+    expect(request).toHaveBeenCalledWith(
+      '/api/v1/pagamento/meios-pagamento?limit=100&offset=0&ativoEntregaDelivery=true&ativoDelivery=true',
+      expect.objectContaining({ method: 'GET' })
+    )
+  })
+
   it('cria sem ligar retirada por omissão', async () => {
     const request = vi.fn().mockResolvedValue({
       data: { id: 'mp-1', nome: 'PIX' },

@@ -4,6 +4,8 @@ export type FiltroListagemMeiosNovoPedido = {
   ativo?: true
   ativoEntregaDelivery?: true
   ativoRetiradaDelivery?: true
+  /** Transição: API antiga ainda filtra por este campo. */
+  ativoDelivery?: true
 }
 
 type ResolverFiltroMeiosPagamentoNovoPedidoParams = {
@@ -33,7 +35,7 @@ export function resolverFiltroMeiosPagamentoNovoPedido({
       ? 'retirada'
       : 'entrega'
 
-  if (tipo === 'entrega') return { ativoEntregaDelivery: true }
-  if (tipo === 'retirada') return { ativoRetiradaDelivery: true }
+  if (tipo === 'entrega') return { ativoEntregaDelivery: true, ativoDelivery: true }
+  if (tipo === 'retirada') return { ativoRetiradaDelivery: true, ativoDelivery: true }
   return {}
 }

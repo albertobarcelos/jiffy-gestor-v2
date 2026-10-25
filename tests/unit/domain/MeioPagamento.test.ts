@@ -30,7 +30,7 @@ describe('MeioPagamento.fromJSON ativoDelivery', () => {
     expect(MeioPagamento.fromJSON({ ...base, isDelivery: true }).isDelivery()).toBe(true)
   })
 
-  it('toJSON inclui ativoDelivery legado só da entrega', () => {
+  it('toJSON.ativoDelivery segue isDelivery', () => {
     expect(MeioPagamento.fromJSON({ ...base, ativoDelivery: true }).toJSON().ativoDelivery).toBe(
       true
     )

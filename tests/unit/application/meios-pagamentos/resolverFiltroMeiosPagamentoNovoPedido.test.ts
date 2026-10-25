@@ -19,7 +19,7 @@ describe('resolverFiltroMeiosPagamentoNovoPedido', () => {
         pedidoComRetirada: false,
         pedidoExistente: false,
       })
-    ).toEqual({ ativoEntregaDelivery: true })
+    ).toEqual({ ativoEntregaDelivery: true, ativoDelivery: true })
 
     expect(
       resolverFiltroMeiosPagamentoNovoPedido({
@@ -27,7 +27,7 @@ describe('resolverFiltroMeiosPagamentoNovoPedido', () => {
         pedidoComRetirada: true,
         pedidoExistente: false,
       })
-    ).toEqual({ ativoRetiradaDelivery: true })
+    ).toEqual({ ativoRetiradaDelivery: true, ativoDelivery: true })
   })
 
   it('usa a flag específica do tipo ao carregar pedido existente', () => {
@@ -38,7 +38,7 @@ describe('resolverFiltroMeiosPagamentoNovoPedido', () => {
         pedidoExistente: true,
         tipoEntregaPedidoExistente: 'entrega',
       })
-    ).toEqual({ ativoEntregaDelivery: true })
+    ).toEqual({ ativoEntregaDelivery: true, ativoDelivery: true })
 
     expect(
       resolverFiltroMeiosPagamentoNovoPedido({
@@ -47,7 +47,7 @@ describe('resolverFiltroMeiosPagamentoNovoPedido', () => {
         pedidoExistente: true,
         tipoEntregaPedidoExistente: 'retirada',
       })
-    ).toEqual({ ativoRetiradaDelivery: true })
+    ).toEqual({ ativoRetiradaDelivery: true, ativoDelivery: true })
   })
 
   it('não restringe meios até carregar o tipo do pedido existente', () => {

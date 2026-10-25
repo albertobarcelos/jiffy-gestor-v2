@@ -37,19 +37,34 @@ describe('montarQueryListagemMeiosPagamento', () => {
       limit: 100,
       offset: 0,
       ativoEntregaDelivery: true,
+      ativoDelivery: true,
     })
     expect(query.get('ativoEntregaDelivery')).toBe('true')
+    expect(query.get('ativoDelivery')).toBe('true')
     expect(query.get('ativoRetiradaDelivery')).toBeNull()
   })
 
-  it('ativoDelivery legado preenche só a entrega', () => {
+  it('ativoDelivery legado preenche só a entrega e segue na URL', () => {
     const query = montarQueryListagemMeiosPagamento({
       limit: 10,
       offset: 0,
       ativoDelivery: true,
     })
     expect(query.get('ativoEntregaDelivery')).toBe('true')
+    expect(query.get('ativoDelivery')).toBe('true')
     expect(query.get('ativoRetiradaDelivery')).toBeNull()
+  })
+
+  it('retirada com legado não inventa filtro de entrega', () => {
+    const query = montarQueryListagemMeiosPagamento({
+      limit: 10,
+      offset: 0,
+      ativoRetiradaDelivery: true,
+      ativoDelivery: true,
+    })
+    expect(query.get('ativoEntregaDelivery')).toBeNull()
+    expect(query.get('ativoRetiradaDelivery')).toBe('true')
+    expect(query.get('ativoDelivery')).toBe('true')
   })
 
   it('flag nova de entrega ganha do legado', () => {
@@ -62,5 +77,6 @@ describe('montarQueryListagemMeiosPagamento', () => {
     })
     expect(query.get('ativoEntregaDelivery')).toBe('false')
     expect(query.get('ativoRetiradaDelivery')).toBe('true')
+    expect(query.get('ativoDelivery')).toBe('true')
   })
 })

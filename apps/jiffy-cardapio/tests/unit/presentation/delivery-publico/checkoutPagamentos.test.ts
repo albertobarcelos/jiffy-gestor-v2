@@ -407,4 +407,20 @@ describe('filtrarMeiosPagamentoPorTipoEntrega', () => {
       filtrarMeiosPagamentoPorTipoEntrega(meios, 'retirada').map(meio => meio.id)
     ).toEqual(['ambos', 'retirada'])
   })
+
+  it('payload só com ativoDelivery legado vale nos dois canais', () => {
+    const legado = [{ id: 'pix', ativoDelivery: true }]
+    expect(filtrarMeiosPagamentoPorTipoEntrega(legado, 'entrega').map(meio => meio.id)).toEqual([
+      'pix',
+    ])
+    expect(filtrarMeiosPagamentoPorTipoEntrega(legado, 'retirada').map(meio => meio.id)).toEqual([
+      'pix',
+    ])
+  })
+
+  it('sem flag nenhuma o meio não aparece', () => {
+    const semFlag = [{ id: 'pix' }]
+    expect(filtrarMeiosPagamentoPorTipoEntrega(semFlag, 'entrega')).toEqual([])
+    expect(filtrarMeiosPagamentoPorTipoEntrega(semFlag, 'retirada')).toEqual([])
+  })
 })
