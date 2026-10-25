@@ -44,10 +44,10 @@ describe('DTOs locais de meios de pagamento', () => {
     })
   })
 
-  it('mantém o default de retirada para entradas sem campos de Delivery', () => {
+  it('sem flag de Delivery os dois canais nascem desligados', () => {
     expect(CriarMeioPagamentoSchema.parse({ nome: 'PIX' })).toMatchObject({
       ativoEntregaDelivery: false,
-      ativoRetiradaDelivery: true,
+      ativoRetiradaDelivery: false,
     })
   })
 

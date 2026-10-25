@@ -10,7 +10,7 @@ import type {
   PagamentoSelecionado,
   TipoAtendimentoDelivery,
 } from '../../types'
-import { deveLimparPagamentosAoTrocarTipo } from '@/src/domain/policies/pedido/MeiosPagamentoNovoPedidoPolicy'
+import { resolverEfeitoTrocaTipoAtendimento } from '@/src/application/meios-pagamentos/resolverEfeitoTrocaTipoAtendimento'
 
 export interface UseNovoPedidoClienteParams {
   tipoInicioPedido: 'balcao' | 'delivery'
@@ -94,19 +94,19 @@ export function useNovoPedidoCliente({
 
   const handleTipoAtendimentoDeliveryChange = useCallback(
     (tipo: TipoAtendimentoDelivery) => {
-      const limparPagamentos = deveLimparPagamentosAoTrocarTipo({
+      const efeito = resolverEfeitoTrocaTipoAtendimento({
         tipoAtual: tipoAtendimentoDelivery,
         tipoNovo: tipo,
         pedidoExistente,
       })
-      if (tipo === tipoAtendimentoDelivery) return
+      if (!efeito.trocou) return
       setTipoAtendimentoDelivery(tipo)
-      if (limparPagamentos) {
+      if (efeito.limparPagamentos) {
         setPagamentos([])
         setMeioPagamentoId('')
         setValorRecebido('')
       }
-      if (tipo === 'retirada') {
+      if (efeito.limparEnderecoTaxa) {
         setTaxaEntregaId('')
         setMoradaEntregaSelecionada(null)
       }

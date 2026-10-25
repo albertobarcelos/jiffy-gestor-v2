@@ -4,6 +4,7 @@ import { MeioPagamentoRepository } from '@/src/infrastructure/database/repositor
 import { BuscarMeiosPagamentosUseCase } from '@/src/application/use-cases/meios-pagamentos/BuscarMeiosPagamentosUseCase'
 import { CriarMeioPagamentoUseCase } from '@/src/application/use-cases/meios-pagamentos/CriarMeioPagamentoUseCase'
 import { CriarMeioPagamentoSchema } from '@/src/application/dto/CriarMeioPagamentoDTO'
+import { parseFiltroListagemMeiosPagamento } from '@/src/application/meios-pagamentos/listagemMeiosPagamentoQuery'
 
 /**
  * GET /api/meios-pagamentos
@@ -18,32 +19,12 @@ export async function GET(request: NextRequest) {
     const { tokenInfo } = validation
 
     const { searchParams } = new URL(request.url)
-    const limit = parseInt(searchParams.get('limit') || '10', 10)
-    const offset = parseInt(searchParams.get('offset') || '0', 10)
-    const q = searchParams.get('q') || ''
-    const ativoParam = searchParams.get('ativo')
-    const ativo = ativoParam !== null ? ativoParam === 'true' : null
-    const ativoEntregaParam = searchParams.get('ativoEntregaDelivery')
-    const ativoEntregaDelivery =
-      ativoEntregaParam !== null ? ativoEntregaParam === 'true' : null
-    const ativoRetiradaParam = searchParams.get('ativoRetiradaDelivery')
-    const ativoRetiradaDelivery =
-      ativoRetiradaParam !== null ? ativoRetiradaParam === 'true' : null
-    const ativoDeliveryParam = searchParams.get('ativoDelivery')
-    const ativoDelivery = ativoDeliveryParam !== null ? ativoDeliveryParam === 'true' : null
+    const filtro = parseFiltroListagemMeiosPagamento(searchParams)
 
     const repository = new MeioPagamentoRepository(undefined, tokenInfo.token)
     const useCase = new BuscarMeiosPagamentosUseCase(repository)
 
-    const result = await useCase.execute({
-      limit,
-      offset,
-      q,
-      ativo,
-      ativoEntregaDelivery,
-      ativoRetiradaDelivery,
-      ativoDelivery,
-    })
+    const result = await useCase.execute(filtro)
 
     return NextResponse.json({
       items: result.meiosPagamento.map((m) => m.toJSON()),

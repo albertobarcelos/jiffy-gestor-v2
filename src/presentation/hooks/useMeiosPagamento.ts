@@ -7,6 +7,7 @@ import { MeioPagamento } from '@/src/domain/entities/MeioPagamento'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { montarQueryListagemMeiosPagamento } from '@/src/application/meios-pagamentos/listagemMeiosPagamentoQuery'
 
 interface MeiosPagamentoQueryParams {
   q?: string
@@ -35,20 +36,15 @@ export function useMeiosPagamentoInfinite(params: Omit<MeiosPagamentoQueryParams
     ['meios-pagamentos', 'infinite', params],
     async ({ token }, pageParam) => {
       const limit = params.limit || 10
-      const searchParams = new URLSearchParams()
-      if (params.q) searchParams.append('q', params.q)
-      if (params.ativo !== undefined && params.ativo !== null) {
-        searchParams.append('ativo', params.ativo.toString())
-      }
-      const ativoEntregaDelivery = params.ativoEntregaDelivery ?? params.ativoDelivery
-      if (ativoEntregaDelivery !== undefined && ativoEntregaDelivery !== null) {
-        searchParams.append('ativoEntregaDelivery', ativoEntregaDelivery.toString())
-      }
-      if (params.ativoRetiradaDelivery !== undefined && params.ativoRetiradaDelivery !== null) {
-        searchParams.append('ativoRetiradaDelivery', params.ativoRetiradaDelivery.toString())
-      }
-      searchParams.append('limit', limit.toString())
-      searchParams.append('offset', String(pageParam))
+      const searchParams = montarQueryListagemMeiosPagamento({
+        q: params.q,
+        ativo: params.ativo,
+        ativoEntregaDelivery: params.ativoEntregaDelivery,
+        ativoRetiradaDelivery: params.ativoRetiradaDelivery,
+        ativoDelivery: params.ativoDelivery,
+        limit,
+        offset: Number(pageParam),
+      })
 
       const response = await fetchGestorApi(`/api/meios-pagamentos?${searchParams.toString()}`, {
         headers: {

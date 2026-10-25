@@ -19,7 +19,7 @@ export const CriarMeioPagamentoSchema = z.object({
 }).transform(({ ativoDelivery, ativoEntregaDelivery, ...data }) => ({
   ...data,
   ativoEntregaDelivery: ativoEntregaDelivery ?? ativoDelivery ?? false,
-  ativoRetiradaDelivery: data.ativoRetiradaDelivery ?? ativoDelivery ?? true,
+  ativoRetiradaDelivery: data.ativoRetiradaDelivery ?? ativoDelivery ?? false,
 }))
 
 export type CriarMeioPagamentoDTO = z.infer<typeof CriarMeioPagamentoSchema>

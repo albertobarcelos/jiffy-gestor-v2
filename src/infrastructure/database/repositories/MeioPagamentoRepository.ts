@@ -1,6 +1,8 @@
 import { IMeioPagamentoRepository, BuscarMeiosPagamentosParams, CriarMeioPagamentoDTO, AtualizarMeioPagamentoDTO } from '@/src/domain/repositories/IMeioPagamentoRepository'
 import { MeioPagamento } from '@/src/domain/entities/MeioPagamento'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
+import { montarQueryListagemMeiosPagamento } from '@/src/application/meios-pagamentos/listagemMeiosPagamentoQuery'
+import { montarCorpoCriarMeioPagamento } from '@/src/application/meios-pagamentos/montarCorpoCriarMeioPagamento'
 
 /**
  * Implementação do repositório de meios de pagamento
@@ -24,30 +26,10 @@ export class MeioPagamentoRepository implements IMeioPagamentoRepository {
     total: number
   }> {
     try {
-      const {
-        limit,
-        offset,
-        q = '',
-        ativo,
-        ativoEntregaDelivery,
-        ativoRetiradaDelivery,
-        ativoDelivery,
-      } = params
-
-      let url = `/api/v1/pagamento/meios-pagamento?limit=${limit}&offset=${offset}`
-      if (q) {
-        url += `&q=${encodeURIComponent(q)}`
-      }
-      if (ativo !== null && ativo !== undefined) {
-        url += `&ativo=${ativo}`
-      }
-      const entregaFilter = ativoEntregaDelivery ?? ativoDelivery
-      if (entregaFilter !== null && entregaFilter !== undefined) {
-        url += `&ativoEntregaDelivery=${entregaFilter}`
-      }
-      if (ativoRetiradaDelivery !== null && ativoRetiradaDelivery !== undefined) {
-        url += `&ativoRetiradaDelivery=${ativoRetiradaDelivery}`
-      }
+      const url = `/api/v1/pagamento/meios-pagamento?${montarQueryListagemMeiosPagamento({
+        ...params,
+        q: params.q ?? '',
+      }).toString()}`
 
       const response = await this.apiClient.request<{
         items: any[]
@@ -115,19 +97,7 @@ export class MeioPagamentoRepository implements IMeioPagamentoRepository {
 
   async criarMeioPagamento(data: CriarMeioPagamentoDTO): Promise<MeioPagamento> {
     try {
-      const body: Record<string, unknown> = {
-        nome: data.nome,
-        tefAtivo: data.tefAtivo !== undefined ? data.tefAtivo : true,
-        ativoEntregaDelivery: data.ativoEntregaDelivery ?? false,
-        ativoRetiradaDelivery: data.ativoRetiradaDelivery ?? true,
-        formaPagamentoFiscal: data.formaPagamentoFiscal || 'Dinheiro',
-        ativo: data.ativo !== undefined ? data.ativo : true,
-        isParcelavel: data.isParcelavel !== undefined ? data.isParcelavel : false,
-      }
-
-      if (data.tipoParcelamento) {
-        body.tipoParcelamento = data.tipoParcelamento
-      }
+      const body = montarCorpoCriarMeioPagamento(data)
 
       const response = await this.apiClient.request<any>(
         `/api/v1/pagamento/meios-pagamento`,

@@ -5,6 +5,7 @@ type MeioPagamentoComDisponibilidadeDelivery = {
   ativoRetiradaDelivery: boolean
 }
 
+/** Mesma regra de `MeioPagamento.disponivelParaTipoEntrega` no Gestor. */
 export function meioDisponivelParaTipoEntrega(
   meio: MeioPagamentoComDisponibilidadeDelivery,
   tipoEntrega: DeliveryTipoEntrega

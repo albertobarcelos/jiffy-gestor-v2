@@ -29,7 +29,7 @@ export class MeioPagamento {
     isParcelavel: boolean,
     tipoParcelamento: TipoParcelamento | null,
     ativoEntregaDelivery = false,
-    ativoRetiradaDelivery = true
+    ativoRetiradaDelivery = false
   ): MeioPagamento {
     if (!id || !nome) {
       throw new Error('ID e nome são obrigatórios')
@@ -121,7 +121,7 @@ export class MeioPagamento {
       tefAtivo: this.tefAtivo,
       ativoEntregaDelivery: this.ativoEntregaDelivery,
       ativoRetiradaDelivery: this.ativoRetiradaDelivery,
-      ativoDelivery: this.ativoEntregaDelivery,
+      ativoDelivery: this.ativoEntregaDelivery || this.ativoRetiradaDelivery,
       formaPagamentoFiscal: this.formaPagamentoFiscal,
       ativo: this.ativo,
       isParcelavel: this.parcelavel,

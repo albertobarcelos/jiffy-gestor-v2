@@ -84,5 +84,6 @@ describe('MeioPagamento.fromJSON ativoDelivery', () => {
     expect(soRetirada.isDelivery()).toBe(true)
     expect(soRetirada.disponivelParaTipoEntrega('retirada')).toBe(true)
     expect(soRetirada.disponivelParaTipoEntrega('entrega')).toBe(false)
+    expect(soRetirada.toJSON().ativoDelivery).toBe(true)
   })
 })
