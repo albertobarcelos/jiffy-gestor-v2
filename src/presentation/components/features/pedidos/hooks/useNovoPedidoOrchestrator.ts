@@ -1,8 +1,7 @@
 'use client'
 
 import { useMemo, useRef, useCallback, useEffect, useState } from 'react'
-import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
-import { ordenarMeiosPagamentoPadrao } from '@/src/shared/utils/corFormaPagamentoFiscal'
+import { useMeiosPagamentoPedidoManual } from './data/useMeiosPagamentoPedidoManual'
 import {
   useCreatePedidoDelivery,
   useCreateVendaGestor,
@@ -38,7 +37,6 @@ import { useCarregarVenda } from './data/useCarregarVenda'
 import { useEntregadoresQuery } from './data/useEntregadoresQuery'
 import { useTaxasEntregaQuery } from './data/useTaxasEntregaQuery'
 import { useNovoPedidoDelivery } from './useNovoPedidoDelivery'
-import { meioVisivelNoPedidoManual } from '@/src/application/meios-pagamentos/resolverFiltroMeiosPagamentoNovoPedido'
 import { useNovoPedidoPagamentos } from './useNovoPedidoPagamentos'
 import {
   useNovoPedidoResetOnExit,
@@ -461,23 +459,11 @@ export function useNovoPedidoOrchestrator({
     chaveRascunho,
   ])
 
-  // Buscar meios de pagamento
   const {
-    data: meiosPagamentoData,
+    meiosPagamento,
     isPending: isPendingMeiosPagamento,
     isFetching: isFetchingMeiosPagamento,
-  } = useMeiosPagamentoInfinite({
-    limit: 100,
-    // Step 3 usa meios de pagamento; em visualizacao/edicao pode ser usado para resolver nomes.
-    enabled: open && (currentStep >= 3 || modoVisualizacao || !!vendaId),
-    refetchOnWindowFocus: false,
-  })
-
-  const meiosPagamento = useMemo(() => {
-    if (!meiosPagamentoData?.pages) return []
-    const lista = meiosPagamentoData.pages.flatMap(page => page.meiosPagamento || [])
-    return ordenarMeiosPagamentoPadrao(lista.filter(meioVisivelNoPedidoManual))
-  }, [meiosPagamentoData])
+  } = useMeiosPagamentoPedidoManual(open && (currentStep >= 3 || modoVisualizacao || !!vendaId))
 
   const { entregadores, entregadoresQuery } = useEntregadoresQuery({
     enabled: open && (pedidoComEntrega || Boolean(modoVisualizacao)),
@@ -626,7 +612,7 @@ export function useNovoPedidoOrchestrator({
 
   /** Primeira carga ou fetch sem cache ainda — evita área vazia sem feedback */
   const mostrarLoadingFormasPagamento =
-    isPendingMeiosPagamento || (isFetchingMeiosPagamento && meiosPagamentoData === undefined)
+    isPendingMeiosPagamento || (isFetchingMeiosPagamento && meiosPagamento.length === 0)
 
   // Refs estáveis: evitam que `carregarVendaExistente` mude quando queries atualizam ao focar a aba
   const meiosPagamentoRef = useRef(meiosPagamento)

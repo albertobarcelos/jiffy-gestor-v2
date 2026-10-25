@@ -59,6 +59,10 @@ const nextConfig = {
         __dirname,
         '../../src/domain/policies/menu/precoVigenteSnapshot.ts'
       ),
+      '@jiffy/resolver-flags-canal-delivery': path.resolve(
+        __dirname,
+        '../../src/domain/policies/pagamento/resolverFlagsCanalDelivery.ts'
+      ),
     }
 
     config.resolve.modules = [

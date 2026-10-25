@@ -1,28 +1,11 @@
 import type { DeliveryTipoEntrega } from '../types/entrega'
+import {
+  resolverFlagsCanalDelivery,
+  type MeioPagamentoCanalDeliveryInput,
+} from '@jiffy/resolver-flags-canal-delivery'
 
-/** Payload público ou legado (`ativoDelivery` / `isDelivery`). */
-export type MeioPagamentoCanalDeliveryInput = {
-  ativoEntregaDelivery?: unknown
-  ativoRetiradaDelivery?: unknown
-  ativoDelivery?: unknown
-  isDelivery?: unknown
-}
-
-function parseBooleanFlag(value: unknown): boolean {
-  return value === true || value === 'true' || value === 1 || value === '1'
-}
-
-/** Mesma hidratação de `MeioPagamento.fromJSON` no Gestor. */
-export function resolverFlagsCanalDelivery(meio: MeioPagamentoCanalDeliveryInput): {
-  ativoEntregaDelivery: boolean
-  ativoRetiradaDelivery: boolean
-} {
-  const legado = meio.ativoDelivery ?? meio.isDelivery
-  return {
-    ativoEntregaDelivery: parseBooleanFlag(meio.ativoEntregaDelivery ?? legado),
-    ativoRetiradaDelivery: parseBooleanFlag(meio.ativoRetiradaDelivery ?? legado),
-  }
-}
+export type { MeioPagamentoCanalDeliveryInput }
+export { resolverFlagsCanalDelivery }
 
 /** Mesma regra de `MeioPagamento.disponivelParaTipoEntrega` no Gestor. */
 export function meioDisponivelParaTipoEntrega(

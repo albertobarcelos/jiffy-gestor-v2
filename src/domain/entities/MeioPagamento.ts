@@ -1,3 +1,5 @@
+import { resolverFlagsCanalDelivery } from '@/src/domain/policies/pagamento/resolverFlagsCanalDelivery'
+
 export type TipoParcelamento = 'jurosVendedor' | 'jurosCliente'
 
 function parseBooleanFlag(value: unknown): boolean {
@@ -57,6 +59,7 @@ export class MeioPagamento {
       tipoParcelamento = 'jurosVendedor'
     }
 
+    const canais = resolverFlagsCanalDelivery(data)
     return MeioPagamento.create(
       data.id?.toString() || '',
       data.nome?.toString() || '',
@@ -65,8 +68,8 @@ export class MeioPagamento {
       parseBooleanFlag(data.ativo),
       parseBooleanFlag(data.isParcelavel),
       tipoParcelamento,
-      parseBooleanFlag(data.ativoEntregaDelivery ?? data.ativoDelivery ?? data.isDelivery),
-      parseBooleanFlag(data.ativoRetiradaDelivery ?? data.ativoDelivery ?? data.isDelivery)
+      canais.ativoEntregaDelivery,
+      canais.ativoRetiradaDelivery
     )
   }
 

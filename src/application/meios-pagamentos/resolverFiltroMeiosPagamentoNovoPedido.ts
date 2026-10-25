@@ -8,3 +8,21 @@ import type { MeioPagamento } from '@/src/domain/entities/MeioPagamento'
 export function meioVisivelNoPedidoManual(meio: MeioPagamento): boolean {
   return meio.isDelivery()
 }
+
+export function coletarMeiosDasPaginas(
+  pages?: Array<{ meiosPagamento?: MeioPagamento[] }>
+): MeioPagamento[] {
+  return (pages ?? []).flatMap(page => page.meiosPagamento ?? [])
+}
+
+/** União por id. POS-only (as duas flags off) não entra. */
+export function unirMeiosPedidoManual(...listas: MeioPagamento[][]): MeioPagamento[] {
+  const porId = new Map<string, MeioPagamento>()
+  for (const lista of listas) {
+    for (const meio of lista) {
+      if (!meioVisivelNoPedidoManual(meio)) continue
+      porId.set(meio.getId(), meio)
+    }
+  }
+  return [...porId.values()]
+}

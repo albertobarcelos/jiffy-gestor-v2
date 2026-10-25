@@ -26,6 +26,10 @@ export default defineConfig({
         __dirname,
         '../../src/shared/utils/funcionamentoDeliveryCore.ts'
       ),
+      '@jiffy/resolver-flags-canal-delivery': path.resolve(
+        __dirname,
+        '../../src/domain/policies/pagamento/resolverFlagsCanalDelivery.ts'
+      ),
     },
   },
 })
