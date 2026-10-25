@@ -22,6 +22,7 @@ type EntregadorSenhaDialogProps = {
   open: boolean
   entregadorId: string | null
   entregadorNome: string | null
+  cadastrada?: boolean
   onClose: () => void
   onSalvo: () => void
 }
@@ -44,6 +45,7 @@ export function EntregadorSenhaDialog({
   open,
   entregadorId,
   entregadorNome,
+  cadastrada = true,
   onClose,
   onSalvo,
 }: EntregadorSenhaDialogProps) {
@@ -94,7 +96,7 @@ export function EntregadorSenhaDialog({
       if (!res.ok) {
         throw new Error(await mensagemErroHttp(res))
       }
-      showToast.success('Senha de expedição atualizada.')
+      showToast.success(cadastrada ? 'Senha do app atualizada.' : 'Senha do app cadastrada.')
       onSalvo()
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Erro ao alterar a senha')
@@ -104,15 +106,25 @@ export function EntregadorSenhaDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={aberto => !aberto && onClose()}>
+    <Dialog
+      open={open}
+      onOpenChange={aberto => !aberto && onClose()}
+      sx={{ zIndex: 2100 }}
+    >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Alterar senha de expedição</DialogTitle>
+          <DialogTitle>
+            {cadastrada ? 'Alterar senha do app' : 'Cadastrar senha do app'}
+          </DialogTitle>
         </DialogHeader>
         <p className="text-sm text-secondary-text">
-          {entregadorNome
-            ? `Defina a senha de 4 dígitos de ${entregadorNome} para o app do entregador.`
-            : 'Defina a senha de 4 dígitos para o app do entregador.'}
+          {cadastrada
+            ? entregadorNome
+              ? `A senha atual de ${entregadorNome} não é exibida. Informe a nova senha de 4 dígitos.`
+              : 'A senha atual não é exibida. Informe a nova senha de 4 dígitos.'
+            : entregadorNome
+              ? `Defina a senha de 4 dígitos de ${entregadorNome} para o app do entregador.`
+              : 'Defina a senha de 4 dígitos para o app do entregador.'}
         </p>
         <form onSubmit={e => void salvar(e)} className="mt-3 space-y-3">
           <Input
