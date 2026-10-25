@@ -436,9 +436,19 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
   }, [])
 
   const handleActionsReload = useCallback(async () => {
-    await refetch()
+    const resultado = await refetch()
+    const complementosAtualizados = resultado.data?.pages.flatMap(page => page.complementos)
+    if (complementosAtualizados) {
+      setValorInputs(prev => {
+        const next = { ...prev }
+        for (const complemento of complementosAtualizados) {
+          next[complemento.getId()] = formatValorFromNumber(complemento.getValor())
+        }
+        return next
+      })
+    }
     onReload?.()
-  }, [refetch, onReload])
+  }, [refetch, onReload, formatValorFromNumber])
 
   const clearValorDebounceTimer = useCallback((complementoId: string) => {
     const timer = valorDebounceTimersRef.current.get(complementoId)
@@ -535,8 +545,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
             )
           }
         }
-        await refetch()
-        onReload?.()
+        await handleActionsReload()
       } catch (err: unknown) {
         console.error('Erro ao atualizar valor do complemento:', err)
         const message = err instanceof Error ? err.message : 'Erro ao atualizar valor do complemento'
@@ -561,8 +570,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
       clearValorDebounceTimer,
       pedirPropagacao,
       aplicarPropagacao,
-      refetch,
-      onReload,
+      handleActionsReload,
     ]
   )
 

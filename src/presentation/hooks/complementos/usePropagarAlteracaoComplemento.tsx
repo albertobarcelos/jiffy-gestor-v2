@@ -10,9 +10,13 @@ import {
   type OrigemUsoComplemento,
 } from '@/src/domain/policies/complemento/propagarAlteracaoComplemento'
 import { PropagarAlteracaoComplementoDialog } from '@/src/presentation/components/features/complementos/PropagarAlteracaoComplementoDialog'
-import { criarPropagarAlteracaoComplementoUseCase } from '@/src/presentation/hooks/complementos/criarPropagarAlteracaoComplementoUseCase'
+import {
+  gravarOverridesComplementoGestorUseCase,
+  listarUsosParaPropagarComplementoUseCase,
+} from '@/src/infrastructure/composition/complementoUseCases'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { showToast } from '@/src/shared/utils/toast'
+import { resolverDecisaoPreDialogoPropagacao } from '@/src/application/complementos/resolverDecisaoPreDialogoPropagacao'
+import { handleApiError, showToast } from '@/src/shared/utils/toast'
 
 export type DecisaoPropagacaoComplemento =
   | { tipo: 'cancelado' }
@@ -61,27 +65,51 @@ export function usePropagarAlteracaoComplemento(): {
       origem?: OrigemUsoComplemento
       alteracao: AlteracaoComplementoPropagavel
     }): Promise<DecisaoPropagacaoComplemento> => {
-      if (pedidoRef.current) return { tipo: 'so-origem' }
+      if (
+        resolverDecisaoPreDialogoPropagacao({
+          pedidoAberto: Boolean(pedidoRef.current),
+          temToken: true,
+        }) === 'so-origem'
+      ) {
+        return { tipo: 'so-origem' }
+      }
 
       const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-      if (!token) {
+      if (
+        resolverDecisaoPreDialogoPropagacao({
+          pedidoAberto: false,
+          temToken: Boolean(token),
+        }) === 'so-origem' ||
+        !token
+      ) {
         showToast.error('Não foi possível listar os cardápios. A alteração fica só neste local.')
         return { tipo: 'so-origem' }
       }
 
       let usos: ComplementoUsoNoMenu[] = []
       try {
-        usos = await criarPropagarAlteracaoComplementoUseCase().listarUsosParaPropagar({
+        usos = await listarUsosParaPropagarComplementoUseCase.execute({
           complementoId: opts.complementoId,
           token,
           origem: opts.origem,
         })
-      } catch {
-        showToast.error('Não foi possível listar os cardápios. A alteração fica só neste local.')
+      } catch (error) {
+        showToast.error(
+          `Não foi possível listar os cardápios: ${handleApiError(error)}. A alteração fica só neste local.`
+        )
         return { tipo: 'so-origem' }
       }
 
-      if (usos.length === 0) return { tipo: 'so-origem' }
+      if (
+        resolverDecisaoPreDialogoPropagacao({
+          pedidoAberto: false,
+          temToken: true,
+          listagemOk: true,
+          quantidadeUsos: usos.length,
+        }) === 'so-origem'
+      ) {
+        return { tipo: 'so-origem' }
+      }
 
       return new Promise(resolve => {
         const next: Pedido = {
@@ -104,7 +132,7 @@ export function usePropagarAlteracaoComplemento(): {
     if (!token) {
       throw new Error('Token não encontrado. Faça login novamente.')
     }
-    await criarPropagarAlteracaoComplementoUseCase().aplicarVinculos({ token, vinculos })
+    await gravarOverridesComplementoGestorUseCase.execute({ token, vinculos })
   }, [])
 
   const confirmarEscolha = useCallback(() => {
@@ -144,12 +172,15 @@ export function usePropagarAlteracaoComplemento(): {
           return next
         })
       }}
-      onToggleTodos={marcado => {
-        const atual = pedidoRef.current
-        if (!atual) return
-        setSelecionados(
-          marcado ? new Set(atual.usos.map(uso => chaveUsoComplemento(uso))) : new Set()
-        )
+      onToggleTodos={(chaves, marcado) => {
+        setSelecionados(prev => {
+          const next = new Set(prev)
+          for (const chave of chaves) {
+            if (marcado) next.add(chave)
+            else next.delete(chave)
+          }
+          return next
+        })
       }}
       onDismiss={() => fechar({ tipo: 'cancelado' })}
     />
