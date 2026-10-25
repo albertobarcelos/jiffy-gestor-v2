@@ -11,6 +11,7 @@ import { formatarMoedaApp } from '@/src/presentation/expedicao/app/format'
 import { AppSpinner } from '@/src/presentation/expedicao/app/shell/AppSpinner'
 import { hrefWazeNavegacaoApp } from '@/src/application/expedicao/app/navegacaoEntregadorApp'
 import { hrefWhatsAppApp } from '@/src/application/expedicao/app/telefoneEntregadorApp'
+import { BotaoWazeApp } from '@/src/presentation/expedicao/app/tabs/BotaoWazeApp'
 
 const LIMIAR_PUXAR_PX = 64
 
@@ -167,7 +168,7 @@ export function PedidosTab(props: {
                             pedido.faltaPagar > 0 ? 'text-amber-700/70' : 'text-emerald-700/70'
                           }`}
                         >
-                          {pedido.faltaPagar > 0 ? 'A cobrar' : 'A cobrar'}
+                          {pedido.faltaPagar > 0 ? 'A cobrar' : 'Pago'}
                         </p>
                         <p
                           className={`mt-0.5 text-base font-extrabold ${
@@ -178,26 +179,21 @@ export function PedidosTab(props: {
                         </p>
                       </div>
                     </div>
+                    {pedido.trocoParaLevar > 0 ? (
+                      <div className="mt-2 rounded-xl bg-sky-50 px-3 py-2.5">
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-sky-700/70">
+                          Levar troco
+                        </p>
+                        <p className="mt-0.5 text-base font-extrabold text-sky-800">
+                          {formatarMoedaApp(pedido.trocoParaLevar)}
+                        </p>
+                      </div>
+                    ) : null}
                   </button>
                   {waze || whats ? (
                     <div className="mt-3 grid grid-cols-2 gap-2">
                       {waze ? (
-                        <a
-                          href={waze}
-                          target="_blank"
-                          rel="noreferrer"
-                          aria-label="Abrir no Waze"
-                          onClick={event => event.stopPropagation()}
-                          className="inline-flex h-10 items-center justify-center rounded-xl bg-[#33CCFF]"
-                        >
-                          <Image
-                            src="/images/expedicao/waze_logo.webp"
-                            alt=""
-                            width={120}
-                            height={40}
-                            className="h-9 w-auto"
-                          />
-                        </a>
+                        <BotaoWazeApp href={waze} onClick={event => event.stopPropagation()} />
                       ) : (
                         <span />
                       )}

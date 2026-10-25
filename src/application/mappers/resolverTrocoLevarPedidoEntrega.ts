@@ -2,11 +2,23 @@ import {
   nomesMeiosPagamentoDeVendaDelivery,
   pagamentosDeVendaDeliveryParaTroco,
 } from '@/src/application/mappers/CobrancaDeliveryPagamentoMapper'
-import { calcularTrocoPedido } from '@/src/domain/services/pedido/CalculadoraPagamentoPedido'
+import {
+  calcularTrocoPedido,
+  valorCobrancaDeCedula,
+} from '@/src/domain/services/pedido/CalculadoraPagamentoPedido'
+import {
+  pagamentoEstaCancelado,
+  pagamentoPendenteNaEntrega,
+} from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
 
 function roundCentavos(valor: number): number {
   return Math.round(valor * 100) / 100
+}
+
+function numeroFinito(valor: unknown): number {
+  const n = Number(valor)
+  return Number.isFinite(n) ? n : 0
 }
 
 /**
@@ -41,4 +53,27 @@ export function resolverTrocoLevarPedidoEntrega(
       considerarApenasNaoCancelados: true,
     })
   )
+}
+
+/**
+ * Valor a cobrar na entrega e troco a levar — mesma conversão cobrança → pagamento
+ * do detalhe, do kanban e do cupom (`pagamentosDeVendaDeliveryParaTroco`).
+ */
+export function resolverCobrancaNaEntregaPedido(
+  vendaData: Record<string, unknown>,
+  nomesMeiosPagamentoPorId: Record<string, string> = {}
+): { valorCobrarNaEntrega: number; trocoParaLevar: number } {
+  const pagamentos = pagamentosDeVendaDeliveryParaTroco(vendaData)
+  const troco = resolverTrocoLevarPedidoEntrega(vendaData, pagamentos, nomesMeiosPagamentoPorId)
+  const somaCedula = pagamentos
+    .filter(p => !pagamentoEstaCancelado(p) && pagamentoPendenteNaEntrega(p))
+    .reduce((soma, p) => soma + (Number(p.valor) || 0), 0)
+  const valorCobrarNaEntrega =
+    pagamentos.length > 0
+      ? valorCobrancaDeCedula(somaCedula, troco)
+      : roundCentavos(numeroFinito(vendaData.totalFaltaPagar))
+  return {
+    valorCobrarNaEntrega,
+    trocoParaLevar: troco > 0 ? roundCentavos(troco) : 0,
+  }
 }

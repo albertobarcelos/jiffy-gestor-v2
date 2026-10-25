@@ -36,6 +36,111 @@ describe('mapPedidoAppEntregador', () => {
     expect(pedido?.formaPagamento).toBe('Dinheiro')
     expect(pedido?.numeroVenda).toBe(69)
     expect(pedido?.faltaPagar).toBe(49.4)
+    expect(pedido?.trocoParaLevar).toBe(0)
+  })
+
+  it('cobra o pedido e leva o troco da cédula na entrega', () => {
+    const pedido = mapPedidoAppEntregador(
+      {
+        id: 'p1',
+        valorFinal: 39.9,
+        totalFaltaPagar: 50,
+        troco: 0,
+        cobrancas: [
+          {
+            meioPagamentoId: 'mp-dinheiro',
+            valor: 50,
+            momentoCobranca: 'na_entrega',
+            status: 'pendente',
+          },
+        ],
+      },
+      { 'mp-dinheiro': 'Dinheiro' }
+    )
+    expect(pedido?.faltaPagar).toBe(39.9)
+    expect(pedido?.trocoParaLevar).toBe(10.1)
+  })
+
+  it('nao inventa troco em PIX na entrega mesmo com valor acima do total', () => {
+    const pedido = mapPedidoAppEntregador(
+      {
+        id: 'p1',
+        valorFinal: 39.9,
+        totalFaltaPagar: 50,
+        troco: 0,
+        cobrancas: [
+          {
+            meioPagamentoId: 'mp-pix',
+            valor: 50,
+            momentoCobranca: 'na_entrega',
+            status: 'pendente',
+          },
+        ],
+      },
+      { 'mp-pix': 'PIX' }
+    )
+    expect(pedido?.faltaPagar).toBe(50)
+    expect(pedido?.trocoParaLevar).toBe(0)
+  })
+
+  it('pedido de 63 com nota de 100 cobra 63 e leva 37', () => {
+    const pedido = mapPedidoAppEntregador(
+      {
+        id: 'p1',
+        valorFinal: 63,
+        totalFaltaPagar: 100,
+        troco: 0,
+        cobrancas: [
+          {
+            meioPagamentoId: 'mp-dinheiro',
+            valor: 100,
+            momentoCobranca: 'na_entrega',
+            status: 'pendente',
+          },
+        ],
+      },
+      { 'mp-dinheiro': 'Dinheiro' }
+    )
+    expect(pedido?.faltaPagar).toBe(63)
+    expect(pedido?.trocoParaLevar).toBe(37)
+  })
+
+  it('nao cobra quando a cobranca ja foi paga mesmo com totalFaltaPagar velho', () => {
+    const pedido = mapPedidoAppEntregador({
+      id: 'p1',
+      valorFinal: 39.9,
+      totalFaltaPagar: 50,
+      troco: 10.1,
+      cobrancas: [
+        {
+          meioPagamentoId: 'mp-dinheiro',
+          valor: 50,
+          momentoCobranca: 'na_entrega',
+          status: 'paga',
+        },
+      ],
+    })
+    expect(pedido?.faltaPagar).toBe(0)
+    expect(pedido?.trocoParaLevar).toBe(0)
+  })
+
+  it('nao pede para levar troco quando o pedido ja foi pago', () => {
+    const pedido = mapPedidoAppEntregador({
+      id: 'p1',
+      valorFinal: 39.9,
+      totalFaltaPagar: 0,
+      troco: 10.1,
+      cobrancas: [
+        {
+          meioPagamentoId: 'mp-dinheiro',
+          valor: 50,
+          momentoCobranca: 'na_entrega',
+          status: 'paga',
+        },
+      ],
+    })
+    expect(pedido?.faltaPagar).toBe(0)
+    expect(pedido?.trocoParaLevar).toBe(0)
   })
 
   it('monta o endereço completo para o Waze', () => {

@@ -6,6 +6,7 @@ import {
 import { filtrarPedidosAtivosDoEntregador } from '@/src/application/expedicao/app/filtrarPedidosDoEntregador'
 import {
   aplicarNomesMeiosNoPedido,
+  idsMeioPagamentoPedidoApp,
   mapPedidoAppEntregador,
   type PedidoResumoAppEntregador,
 } from '@/src/application/expedicao/app/mapPedidoAppEntregador'
@@ -48,14 +49,22 @@ export async function listarPedidosAtivosEntregador(input: {
   })
   if (!res.ok) throw new Error(await lerErro(res, 'Não foi possível carregar os pedidos.'))
   const data = (await res.json()) as { items?: unknown[] }
-  const pedidos = (Array.isArray(data.items) ? data.items : [])
-    .map(mapPedidoAppEntregador)
+  const items = Array.isArray(data.items) ? data.items : []
+  const idsMeios = [
+    ...new Set(
+      items.flatMap(raw => {
+        if (!raw || typeof raw !== 'object') return []
+        return idsMeioPagamentoPedidoApp(raw as Record<string, unknown>)
+      })
+    ),
+  ]
+  const nomes = idsMeios.length > 0 ? await buscarNomesMeiosPagamentoApp(input.token, idsMeios) : {}
+  const pedidos = items
+    .map(raw => mapPedidoAppEntregador(raw, nomes))
     .filter((item): item is PedidoResumoAppEntregador => item !== null)
-  const ativos = filtrarPedidosAtivosDoEntregador(pedidos, input.entregadorId)
-  const ids = [...new Set(ativos.flatMap(pedido => pedido.meioPagamentoIds))]
-  if (ids.length === 0) return ativos
-  const nomes = await buscarNomesMeiosPagamentoApp(input.token, ids)
-  return ativos.map(pedido => aplicarNomesMeiosNoPedido(pedido, nomes))
+  return filtrarPedidosAtivosDoEntregador(pedidos, input.entregadorId).map(pedido =>
+    aplicarNomesMeiosNoPedido(pedido, nomes)
+  )
 }
 
 let cacheNomesMeios: { em: number; nomes: Record<string, string> } | null = null

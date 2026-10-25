@@ -8,7 +8,16 @@ describe('urlInstalacaoPwaEntregador', () => {
     expect(urlInstalacaoPwaEntregador('http://127.0.0.1:5552')).toBe('http://127.0.0.1:5552/e')
   })
 
-  it('fora do localhost usa o domínio público do JiffyGO', () => {
+  it('em homologação usa o Gestor + /e', () => {
+    expect(urlInstalacaoPwaEntregador('https://gestor.homologacao.jiffy.run')).toBe(
+      'https://gestor.homologacao.jiffy.run/e'
+    )
+    expect(urlInstalacaoPwaEntregador('https://gestor.homolog.jiffy.run/')).toBe(
+      'https://gestor.homolog.jiffy.run/e'
+    )
+  })
+
+  it('em produção usa o domínio público do JiffyGO', () => {
     expect(urlInstalacaoPwaEntregador('https://gestor.jiffy.run')).toBe(URL_PUBLICA_APP_ENTREGADOR)
     expect(urlInstalacaoPwaEntregador('https://app.jiffy.run')).toBe(URL_PUBLICA_APP_ENTREGADOR)
     expect(

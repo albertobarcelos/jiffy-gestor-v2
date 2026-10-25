@@ -14,6 +14,7 @@ export type PedidoResumoAppEntregador = {
   taxaEntrega: number | null
   entregadorId: string | null
   faltaPagar: number
+  trocoParaLevar: number
   observacao: string | null
   formaPagamento: string | null
   meioPagamentoIds: string[]

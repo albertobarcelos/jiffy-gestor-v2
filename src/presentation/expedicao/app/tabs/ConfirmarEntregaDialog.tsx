@@ -11,6 +11,7 @@ export function ConfirmarEntregaDialog(props: {
   onConfirmar: () => void
 }) {
   const cobrar = props.pedido.faltaPagar > 0
+  const troco = props.pedido.trocoParaLevar > 0 ? props.pedido.trocoParaLevar : 0
   return (
     <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-8 sm:items-center">
       <div
@@ -26,9 +27,11 @@ export function ConfirmarEntregaDialog(props: {
           #{props.pedido.numeroVenda ?? props.pedido.codigoVenda} · {props.pedido.clienteNome}
         </p>
         <p className="mt-3 text-sm text-zinc-700">
-          {cobrar
-            ? `Fecha com o cliente (${formatarMoedaApp(props.pedido.faltaPagar)}) e finaliza o pedido.`
-            : 'Finaliza este pedido. Depois não dá para desfazer.'}
+          {cobrar && troco > 0
+            ? `Cobra ${formatarMoedaApp(props.pedido.faltaPagar)} e leva ${formatarMoedaApp(troco)} de troco. Depois finaliza.`
+            : cobrar
+              ? `Fecha com o cliente (${formatarMoedaApp(props.pedido.faltaPagar)}) e finaliza o pedido.`
+              : 'Finaliza este pedido. Depois não dá para desfazer.'}
         </p>
         <div className="mt-5 grid grid-cols-2 gap-3">
           <button

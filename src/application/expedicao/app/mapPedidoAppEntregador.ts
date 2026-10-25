@@ -1,8 +1,22 @@
 import type { PedidoResumoAppEntregador } from '@/src/application/expedicao/app/filtrarPedidosDoEntregador'
 import { montarEnderecoNavegacaoApp } from '@/src/application/expedicao/app/navegacaoEntregadorApp'
 import { extrairNomeMeioPagamentoDeCobranca } from '@/src/application/mappers/CobrancaDeliveryPagamentoMapper'
+import { resolverCobrancaNaEntregaPedido } from '@/src/application/mappers/resolverTrocoLevarPedidoEntrega'
 
 export type { PedidoResumoAppEntregador }
+
+function texto(valor: unknown): string {
+  return String(valor ?? '').trim()
+}
+
+function numero(valor: unknown): number {
+  if (typeof valor === 'number' && Number.isFinite(valor)) return valor
+  if (typeof valor === 'string' && valor.trim() !== '') {
+    const n = Number(valor.replace(',', '.'))
+    return Number.isFinite(n) ? n : 0
+  }
+  return 0
+}
 
 function cobrancasAtivas(row: Record<string, unknown>): Record<string, unknown>[] {
   const cobrancas = Array.isArray(row.cobrancas) ? row.cobrancas : []
@@ -15,16 +29,40 @@ function cobrancasAtivas(row: Record<string, unknown>): Record<string, unknown>[
   })
 }
 
+function idMeioPagamentoCobranca(cobranca: Record<string, unknown>): string {
+  const nested =
+    cobranca.meioPagamento && typeof cobranca.meioPagamento === 'object'
+      ? (cobranca.meioPagamento as Record<string, unknown>)
+      : null
+  return texto(cobranca.meioPagamentoId ?? cobranca.meio_pagamento_id ?? nested?.id)
+}
+
+function cobrancaAppDoPedido(
+  row: Record<string, unknown>,
+  nomesPorId: Record<string, string>
+): { faltaPagar: number; trocoParaLevar: number } {
+  const cobranca = resolverCobrancaNaEntregaPedido(row, nomesPorId)
+  const faltaPagar = cobranca.valorCobrarNaEntrega
+  return {
+    faltaPagar,
+    trocoParaLevar: faltaPagar > 0 ? cobranca.trocoParaLevar : 0,
+  }
+}
+
 export function idsMeioPagamentoPedidoApp(row: Record<string, unknown>): string[] {
-  const ids = cobrancasAtivas(row)
-    .map(cobranca => texto(cobranca.meioPagamentoId))
-    .filter(Boolean)
+  const ids = cobrancasAtivas(row).map(idMeioPagamentoCobranca).filter(Boolean)
   return [...new Set(ids)]
 }
 
-export function rotuloPagamentoPedidoApp(row: Record<string, unknown>): string | null {
+export function rotuloPagamentoPedidoApp(
+  row: Record<string, unknown>,
+  nomesPorId: Record<string, string> = {}
+): string | null {
   const nomes = cobrancasAtivas(row)
-    .map(cobranca => extrairNomeMeioPagamentoDeCobranca(cobranca))
+    .map(cobranca => {
+      const id = idMeioPagamentoCobranca(cobranca)
+      return extrairNomeMeioPagamentoDeCobranca(cobranca) || (id ? nomesPorId[id] : '') || ''
+    })
     .filter(Boolean)
   if (nomes.length > 0) return [...new Set(nomes)].join(' + ')
   const fallback = texto(row.formaPagamento ?? row.meioPagamentoNome)
@@ -39,19 +77,6 @@ export function aplicarNomesMeiosNoPedido(
   const nomes = pedido.meioPagamentoIds.map(id => nomesPorId[id]).filter(Boolean)
   if (nomes.length === 0) return pedido
   return { ...pedido, formaPagamento: [...new Set(nomes)].join(' + ') }
-}
-
-function texto(valor: unknown): string {
-  return String(valor ?? '').trim()
-}
-
-function numero(valor: unknown): number {
-  if (typeof valor === 'number' && Number.isFinite(valor)) return valor
-  if (typeof valor === 'string' && valor.trim() !== '') {
-    const n = Number(valor.replace(',', '.'))
-    return Number.isFinite(n) ? n : 0
-  }
-  return 0
 }
 
 function formatarEndereco(endereco: Record<string, unknown>): string | null {
@@ -88,7 +113,10 @@ function pontoDoEndereco(endereco: Record<string, unknown>): {
   }
 }
 
-export function mapPedidoAppEntregador(raw: unknown): PedidoResumoAppEntregador | null {
+export function mapPedidoAppEntregador(
+  raw: unknown,
+  nomesPorId: Record<string, string> = {}
+): PedidoResumoAppEntregador | null {
   if (!raw || typeof raw !== 'object') return null
   const row = raw as Record<string, unknown>
   const id = texto(row.id)
@@ -135,9 +163,9 @@ export function mapPedidoAppEntregador(raw: unknown): PedidoResumoAppEntregador 
     valorFinal: numero(row.valorFinal),
     taxaEntrega: row.taxaEntrega == null ? null : numero(row.taxaEntrega),
     entregadorId: texto(entregador.id ?? row.entregadorId) || null,
-    faltaPagar: numero(row.totalFaltaPagar),
+    ...cobrancaAppDoPedido(row, nomesPorId),
     observacao: observacao || null,
-    formaPagamento: rotuloPagamentoPedidoApp(row),
+    formaPagamento: rotuloPagamentoPedidoApp(row, nomesPorId),
     meioPagamentoIds: idsMeioPagamentoPedidoApp(row),
   }
 }

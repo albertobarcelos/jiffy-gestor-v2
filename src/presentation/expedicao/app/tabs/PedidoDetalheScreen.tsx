@@ -1,12 +1,12 @@
 'use client'
 
-import Image from 'next/image'
 import { MdArrowBack, MdWhatsapp } from 'react-icons/md'
 import type { PedidoResumoAppEntregador } from '@/src/presentation/expedicao/app/api/expedicaoAppApi'
 import { formatarMoedaApp } from '@/src/presentation/expedicao/app/format'
 import { AppSpinner } from '@/src/presentation/expedicao/app/shell/AppSpinner'
 import { hrefWazeNavegacaoApp } from '@/src/application/expedicao/app/navegacaoEntregadorApp'
 import { hrefWhatsAppApp } from '@/src/application/expedicao/app/telefoneEntregadorApp'
+import { BotaoWazeApp } from '@/src/presentation/expedicao/app/tabs/BotaoWazeApp'
 
 export function PedidoDetalheScreen(props: {
   pedido: PedidoResumoAppEntregador
@@ -57,23 +57,7 @@ export function PedidoDetalheScreen(props: {
           </p>
           {waze || whats ? (
             <div className="mt-3 grid grid-cols-2 gap-2">
-              {waze ? (
-                <a
-                  href={waze}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="Abrir no Waze"
-                  className="inline-flex h-10 items-center justify-center rounded-xl bg-[#33CCFF]"
-                >
-                  <Image
-                    src="/images/expedicao/waze_logo.webp"
-                    alt=""
-                    width={120}
-                    height={40}
-                    className="h-9 w-auto"
-                  />
-                </a>
-              ) : null}
+              {waze ? <BotaoWazeApp href={waze} /> : null}
               {whats ? (
                 <a
                   href={whats}
@@ -106,6 +90,11 @@ export function PedidoDetalheScreen(props: {
           ) : (
             <p className="mt-1 text-sm text-zinc-500">Pago</p>
           )}
+          {props.pedido.trocoParaLevar > 0 ? (
+            <p className="mt-2 rounded-xl bg-sky-50 px-3 py-2 text-sm font-extrabold text-sky-800">
+              Levar troco {formatarMoedaApp(props.pedido.trocoParaLevar)}
+            </p>
+          ) : null}
         </section>
 
         {props.pedido.observacao ? (

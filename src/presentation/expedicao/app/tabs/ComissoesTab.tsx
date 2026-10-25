@@ -41,7 +41,7 @@ export function ComissoesTab(props: {
           </p>
         </div>
         <Image
-          src="/images/expedicao/comissao.png"
+          src="/images/expedicao/comissao.webp"
           alt=""
           width={220}
           height={220}

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { resolverTrocoLevarPedidoEntrega } from '@/src/application/mappers/resolverTrocoLevarPedidoEntrega'
+import {
+  resolverCobrancaNaEntregaPedido,
+  resolverTrocoLevarPedidoEntrega,
+} from '@/src/application/mappers/resolverTrocoLevarPedidoEntrega'
 
 describe('resolverTrocoLevarPedidoEntrega', () => {
   it('usa o troco da raiz quando o backend ja calculou', () => {
@@ -68,5 +71,48 @@ describe('resolverTrocoLevarPedidoEntrega', () => {
         { 'mp-pix': 'PIX' }
       )
     ).toBe(0)
+  })
+})
+
+describe('resolverCobrancaNaEntregaPedido', () => {
+  it('cobra o pedido e leva o troco da cédula', () => {
+    expect(
+      resolverCobrancaNaEntregaPedido(
+        {
+          valorFinal: 63,
+          totalFaltaPagar: 100,
+          troco: 0,
+          cobrancas: [
+            {
+              id: 'cob-1',
+              meioPagamentoId: 'mp-dinheiro',
+              valor: 100,
+              momentoCobranca: 'na_entrega',
+              status: 'pendente',
+            },
+          ],
+        },
+        { 'mp-dinheiro': 'Dinheiro' }
+      )
+    ).toEqual({ valorCobrarNaEntrega: 63, trocoParaLevar: 37 })
+  })
+
+  it('nao cobra a cédula quando a cobrança ja foi paga, mesmo com totalFaltaPagar velho', () => {
+    expect(
+      resolverCobrancaNaEntregaPedido({
+        valorFinal: 39.9,
+        totalFaltaPagar: 50,
+        troco: 10.1,
+        cobrancas: [
+          {
+            id: 'cob-1',
+            meioPagamentoId: 'mp-dinheiro',
+            valor: 50,
+            momentoCobranca: 'na_entrega',
+            status: 'paga',
+          },
+        ],
+      })
+    ).toEqual({ valorCobrarNaEntrega: 0, trocoParaLevar: 10.1 })
   })
 })
