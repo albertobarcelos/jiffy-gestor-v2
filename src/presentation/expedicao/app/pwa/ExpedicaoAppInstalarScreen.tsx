@@ -10,7 +10,7 @@ type ExpedicaoAppInstalarScreenProps = {
 export function ExpedicaoAppInstalarScreen({ pwa }: ExpedicaoAppInstalarScreenProps) {
   return (
     <div className="flex h-dvh flex-col bg-secondary text-white">
-      <div className="px-6 pb-10 pt-[max(2.25rem,env(safe-area-inset-top))]">
+      <div className="px-6 pb-8 pt-[max(2.25rem,env(safe-area-inset-top))]">
         <Image
           src="/images/expedicao/logo_app.png"
           alt="JiffyGO"
@@ -20,20 +20,19 @@ export function ExpedicaoAppInstalarScreen({ pwa }: ExpedicaoAppInstalarScreenPr
           priority
         />
         <h1 className="mt-6 text-[1.75rem] font-semibold leading-tight">
-          Instale o app para continuar
+          Coloque o JiffyGO na tela inicial
         </h1>
         <p className="mt-2 max-w-[22rem] text-[15px] leading-6 text-white/85">
-          O QR só abre o navegador. O login e os pedidos ficam no ícone da tela
-          inicial — o celular não instala sozinho.
+          Não precisa baixar na loja de apps. É só criar o atalho no celular.
         </p>
       </div>
-      <div className="min-h-0 flex-1 rounded-t-3xl bg-zinc-50 px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 text-zinc-900">
+      <div className="min-h-0 flex-1 overflow-y-auto rounded-t-3xl bg-zinc-50 px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 text-zinc-900">
         {pwa.acabouDeInstalar ? (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-5">
-            <p className="text-base font-semibold text-emerald-900">App instalado</p>
+            <p className="text-base font-semibold text-emerald-900">Pronto — ícone criado</p>
             <p className="mt-2 text-sm leading-6 text-emerald-800">
-              Feche esta aba e toque no ícone <strong>JiffyGO</strong> na tela
-              inicial. O login acontece lá.
+              Feche esta aba e abra o <strong>JiffyGO</strong> na tela inicial do
+              celular. É lá que você entra na loja.
             </p>
           </div>
         ) : (
@@ -44,27 +43,57 @@ export function ExpedicaoAppInstalarScreen({ pwa }: ExpedicaoAppInstalarScreenPr
                 onClick={() => void pwa.instalar()}
                 className="inline-flex h-14 w-full items-center justify-center rounded-2xl bg-violet-700 text-base font-semibold text-white"
               >
-                Instalar app
+                Adicionar à tela inicial
               </button>
-            ) : (
-              <ol className="space-y-3 text-sm leading-6 text-zinc-700">
-                <li>
-                  <span className="font-semibold text-zinc-900">Android (Chrome):</span> menu{' '}
-                  <span className="font-semibold">⋮</span> → Instalar app.
-                </li>
-                <li>
-                  <span className="font-semibold text-zinc-900">iPhone:</span> Compartilhar →
-                  Adicionar à Tela de Início.
-                </li>
-                <li>
-                  <span className="font-semibold text-zinc-900">WhatsApp/Instagram:</span> copie
-                  o link e abra no Chrome ou Safari. Esses apps não instalam PWA.
-                </li>
-              </ol>
-            )}
-            <p className="mt-6 text-center text-sm text-zinc-500">
-              Depois de instalar, abra o ícone e faça o login da loja.
-            </p>
+            ) : null}
+
+            <div className={`space-y-3 ${pwa.podeInstalar ? 'mt-5' : ''}`}>
+              <p className="text-sm font-semibold text-zinc-900">
+                {pwa.podeInstalar
+                  ? 'Ou faça pelo menu do celular:'
+                  : 'Siga o passo do seu celular:'}
+              </p>
+
+              <section className="rounded-2xl border border-zinc-200 bg-white px-4 py-4">
+                <h2 className="text-base font-semibold text-zinc-900">Android</h2>
+                <p className="mt-1 text-sm text-zinc-500">Chrome</p>
+                <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-zinc-700">
+                  <li>
+                    Toque no menu <span className="font-semibold text-zinc-900">⋮</span> no
+                    canto superior.
+                  </li>
+                  <li>
+                    Escolha <span className="font-semibold text-zinc-900">Instalar app</span>{' '}
+                    ou <span className="font-semibold text-zinc-900">Adicionar à tela inicial</span>.
+                  </li>
+                  <li>Confirme e abra o ícone JiffyGO que aparecer na tela.</li>
+                </ol>
+              </section>
+
+              <section className="rounded-2xl border border-zinc-200 bg-white px-4 py-4">
+                <h2 className="text-base font-semibold text-zinc-900">iPhone</h2>
+                <p className="mt-1 text-sm text-zinc-500">Safari</p>
+                <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-zinc-700">
+                  <li>
+                    Toque em <span className="font-semibold text-zinc-900">Compartilhar</span>{' '}
+                    (quadrado com a seta para cima).
+                  </li>
+                  <li>
+                    Role e toque em{' '}
+                    <span className="font-semibold text-zinc-900">Adicionar à Tela de Início</span>.
+                  </li>
+                  <li>Confirme e abra o ícone JiffyGO na tela inicial.</li>
+                </ol>
+              </section>
+
+              <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+                <span className="font-semibold">Abriu pelo WhatsApp ou Instagram?</span> Copie
+                o link, cole no <strong>Chrome</strong> (Android) ou no{' '}
+                <strong>Safari</strong> (iPhone) e faça os passos acima. Esses apps não criam o
+                atalho.
+              </p>
+            </div>
+
           </>
         )}
       </div>
