@@ -2,7 +2,7 @@
 
 import { useRef, useState, type TouchEvent } from 'react'
 import Image from 'next/image'
-import { MdNavigation, MdWhatsapp } from 'react-icons/md'
+import { MdWhatsapp } from 'react-icons/md'
 import type {
   ComissaoEntregadorApp,
   PedidoResumoAppEntregador,
@@ -130,15 +130,22 @@ export function PedidosTab(props: {
                     className="w-full text-left"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <p className="text-[28px] font-extrabold leading-none tracking-tight text-zinc-900">
-                        #{pedido.numeroVenda ?? pedido.codigoVenda}
+                      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 leading-none">
+                        <span className="text-[28px] font-extrabold tracking-tight text-zinc-900">
+                          #{pedido.numeroVenda ?? pedido.codigoVenda}
+                        </span>
+                        {pedido.numeroVenda && pedido.codigoVenda ? (
+                          <span className="text-sm font-semibold tracking-wide text-zinc-500">
+                            {pedido.codigoVenda}
+                          </span>
+                        ) : null}
                       </p>
                       <span className="shrink-0 rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] font-semibold text-zinc-600">
                         {pedido.etapa === 'EM_ROTA' ? 'Em rota' : 'Pronto'}
                       </span>
                     </div>
                     <p className="mt-2 text-sm font-medium text-zinc-600">{pedido.clienteNome}</p>
-                    <p className="mt-0.5 text-xs text-zinc-400">
+                    <p className="mt-1 text-sm font-semibold leading-5 text-zinc-900">
                       {pedido.endereco || pedido.bairro || 'Endereço não informado'}
                     </p>
                     <div className="mt-4 grid grid-cols-2 gap-2">
@@ -179,11 +186,17 @@ export function PedidosTab(props: {
                           href={waze}
                           target="_blank"
                           rel="noreferrer"
+                          aria-label="Abrir no Waze"
                           onClick={event => event.stopPropagation()}
-                          className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-[#33CCFF] text-sm font-semibold text-white"
+                          className="inline-flex h-10 items-center justify-center rounded-xl bg-[#33CCFF]"
                         >
-                          <MdNavigation className="h-4 w-4" aria-hidden />
-                          Waze
+                          <Image
+                            src="/images/expedicao/waze_logo.webp"
+                            alt=""
+                            width={120}
+                            height={40}
+                            className="h-9 w-auto"
+                          />
                         </a>
                       ) : (
                         <span />
@@ -210,11 +223,7 @@ export function PedidosTab(props: {
                       className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-secondary text-sm font-semibold text-white disabled:opacity-60"
                     >
                       {confirmando ? <AppSpinner tom="branco" /> : null}
-                      {confirmando
-                        ? 'Confirmando…'
-                        : pedido.faltaPagar > 0
-                          ? 'Recebi e confirmar'
-                          : 'Confirmar entrega'}
+                      {confirmando ? 'Finalizando…' : 'Entrega feita'}
                     </button>
                   ) : null}
                 </li>
