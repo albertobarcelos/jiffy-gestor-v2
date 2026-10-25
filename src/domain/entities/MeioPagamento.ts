@@ -65,15 +65,8 @@ export class MeioPagamento {
       parseBooleanFlag(data.ativo),
       parseBooleanFlag(data.isParcelavel),
       tipoParcelamento,
-      parseBooleanFlag(
-        data.ativoEntregaDelivery ?? data.ativoDelivery ?? data.isDelivery
-      ),
-      parseBooleanFlag(
-        data.ativoRetiradaDelivery ??
-          data.ativoEntregaDelivery ??
-          data.ativoDelivery ??
-          data.isDelivery
-      )
+      parseBooleanFlag(data.ativoEntregaDelivery ?? data.ativoDelivery ?? data.isDelivery),
+      parseBooleanFlag(data.ativoRetiradaDelivery ?? data.ativoDelivery ?? data.isDelivery)
     )
   }
 
@@ -90,7 +83,7 @@ export class MeioPagamento {
   }
 
   isDelivery(): boolean {
-    return this.ativoEntregaDelivery
+    return this.ativoEntregaDelivery || this.ativoRetiradaDelivery
   }
 
   isEntregaDelivery(): boolean {
@@ -99,6 +92,10 @@ export class MeioPagamento {
 
   isRetiradaDelivery(): boolean {
     return this.ativoRetiradaDelivery
+  }
+
+  disponivelParaTipoEntrega(tipo: 'entrega' | 'retirada'): boolean {
+    return tipo === 'entrega' ? this.ativoEntregaDelivery : this.ativoRetiradaDelivery
   }
 
   getFormaPagamentoFiscal(): string {

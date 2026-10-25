@@ -38,7 +38,7 @@ import { useCarregarVenda } from './data/useCarregarVenda'
 import { useEntregadoresQuery } from './data/useEntregadoresQuery'
 import { useTaxasEntregaQuery } from './data/useTaxasEntregaQuery'
 import { useNovoPedidoDelivery } from './useNovoPedidoDelivery'
-import { resolverFiltroMeiosPagamentoNovoPedido } from '@/src/domain/policies/pedido/MeiosPagamentoNovoPedidoPolicy'
+import { resolverFiltroMeiosPagamentoNovoPedido } from '@/src/application/meios-pagamentos/resolverFiltroMeiosPagamentoNovoPedido'
 import { useNovoPedidoPagamentos } from './useNovoPedidoPagamentos'
 import {
   useNovoPedidoResetOnExit,

@@ -1,43 +1,12 @@
 import type { TipoAtendimentoDelivery } from '@/src/domain/types/vendaDetalhe'
 
-interface ResolverFiltroMeiosPagamentoNovoPedidoParams {
-  pedidoDeliveryGestor: boolean
-  pedidoComRetirada: boolean
-  pedidoExistente: boolean
-  tipoEntregaPedidoExistente?: TipoAtendimentoDelivery | null
-}
-
-export function resolverFiltroMeiosPagamentoNovoPedido({
-  pedidoDeliveryGestor,
-  pedidoComRetirada,
-  pedidoExistente,
-  tipoEntregaPedidoExistente = null,
-}: ResolverFiltroMeiosPagamentoNovoPedidoParams) {
-  if (!pedidoDeliveryGestor) {
-    return { ativo: true }
-  }
-
-  if (pedidoExistente) {
-    if (tipoEntregaPedidoExistente === 'entrega') {
-      return { ativoEntregaDelivery: true }
-    }
-    if (tipoEntregaPedidoExistente === 'retirada') {
-      return { ativoRetiradaDelivery: true }
-    }
-    return {}
-  }
-
-  return pedidoComRetirada
-    ? { ativoRetiradaDelivery: true }
-    : { ativoEntregaDelivery: true }
-}
-
-interface DeveLimparPagamentosAoTrocarTipoParams {
+type DeveLimparPagamentosAoTrocarTipoParams = {
   tipoAtual: TipoAtendimentoDelivery
   tipoNovo: TipoAtendimentoDelivery
   pedidoExistente: boolean
 }
 
+/** Pedido novo: trocar entrega/retirada invalida os meios já escolhidos. */
 export function deveLimparPagamentosAoTrocarTipo({
   tipoAtual,
   tipoNovo,

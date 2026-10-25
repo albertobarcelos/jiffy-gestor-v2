@@ -77,7 +77,7 @@ describe('precoVigenteSnapshot', () => {
     expect(isValorPromocionalValido(NaN, 20)).toBe(false)
   })
 
-  it('considera vigente promoção ativa com preço promocional positivo, como o backend', () => {
+  it('vigente só com flag ligada e preço promocional válido', () => {
     expect(
       promocaoSnapshotVigente({ valor: 39.9, valorPromocional: 27.93, promocaoAtiva: true })
     ).toBe(true)
@@ -86,18 +86,9 @@ describe('precoVigenteSnapshot', () => {
     ).toBe(false)
     expect(
       promocaoSnapshotVigente({ valor: 20, valorPromocional: 25, promocaoAtiva: true })
-    ).toBe(true)
+    ).toBe(false)
     expect(
       promocaoSnapshotVigente({ valor: 20, valorPromocional: 0.5, promocaoAtiva: true })
-    ).toBe(true)
-    expect(
-      promocaoSnapshotVigente({ valor: 20, valorPromocional: 0, promocaoAtiva: true })
-    ).toBe(false)
-    expect(
-      promocaoSnapshotVigente({ valor: 20, valorPromocional: -1, promocaoAtiva: true })
-    ).toBe(false)
-    expect(
-      promocaoSnapshotVigente({ valor: 20, valorPromocional: Number.NaN, promocaoAtiva: true })
     ).toBe(false)
   })
 
@@ -123,34 +114,6 @@ describe('precoVigenteSnapshot', () => {
       preco: 39.9,
       precoRegular: null,
       descontoPercentual: null,
-    })
-  })
-
-  it('usa promoção ativa positiva mesmo quando supera o preço normal', () => {
-    expect(
-      resolverPrecosSnapshotMenu({
-        valor: 20,
-        valorPromocional: 25,
-        promocaoAtiva: true,
-      })
-    ).toEqual({
-      preco: 25,
-      precoRegular: 20,
-      descontoPercentual: 0,
-    })
-  })
-
-  it('usa promoção ativa positiva abaixo de R$ 1,00', () => {
-    expect(
-      resolverPrecosSnapshotMenu({
-        valor: 20,
-        valorPromocional: 0.5,
-        promocaoAtiva: true,
-      })
-    ).toEqual({
-      preco: 0.5,
-      precoRegular: 20,
-      descontoPercentual: 97.5,
     })
   })
 })

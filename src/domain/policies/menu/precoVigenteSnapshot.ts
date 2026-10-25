@@ -112,15 +112,13 @@ export function descontoPercentualFromPrecos(
 }
 
 /**
- * Espelha o backend: promoção ativa com preço promocional positivo.
- * A validação dos valores inseridos pelo usuário continua mais restritiva.
+ * Promo vigente neste cardápio: flag ligada e preço promocional válido.
+ * Usada para exibir, cobrar e travar o preço normal.
  */
 export function promocaoSnapshotVigente(input: SnapshotPrecoMenu): boolean {
-  const valorPromocional = Number(input.valorPromocional ?? 0)
   return (
     input.promocaoAtiva === true &&
-    Number.isFinite(valorPromocional) &&
-    valorPromocional > 0
+    isValorPromocionalValido(Number(input.valorPromocional ?? 0), Number(input.valor))
   )
 }
 

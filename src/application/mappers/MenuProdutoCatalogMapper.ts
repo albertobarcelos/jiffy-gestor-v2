@@ -1,7 +1,6 @@
 import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { Produto } from '@/src/domain/entities/Produto'
 import { parseQuantidadeLimiteGrupo } from '@/src/domain/policies/pedido/GrupoComplementoLimitesPolicy'
-import { resolverPrecosSnapshotMenu } from '@/src/domain/policies/menu/precoVigenteSnapshot'
 import type {
   MenuGrupoProduto,
   MenuProduto,
@@ -30,14 +29,6 @@ function quantidadeLimiteInformadaNoJson(raw: unknown): boolean {
   if (typeof raw === 'number') return Number.isFinite(raw)
   if (typeof raw === 'string') return raw.trim() !== '' && Number.isFinite(Number(raw))
   return false
-}
-
-function resolverValorVigenteMenu(snapshot: MenuProduto, fallback: number): number {
-  return resolverPrecosSnapshotMenu({
-    valor: typeof snapshot.valor === 'number' ? snapshot.valor : fallback,
-    valorPromocional: snapshot.valorPromocional,
-    promocaoAtiva: snapshot.promocaoAtiva,
-  }).preco
 }
 
 /** JSON cru infere pelos campos; flag explícita ganha (inclusive `false` do snapshot slim). */
@@ -315,7 +306,7 @@ export function menuProdutoToProduto(snapshot: MenuProduto, base?: Produto | nul
     produtoId,
     '',
     snapshot.nome?.trim() || 'Produto',
-    resolverValorVigenteMenu(snapshot, 0),
+    typeof snapshot.valor === 'number' ? snapshot.valor : 0,
     snapshot.ativo !== false,
     snapshot.descricao ?? undefined,
     grupoNome,
@@ -353,7 +344,7 @@ export function mergeProdutoComSnapshotMenu(base: Produto, snapshot: MenuProduto
     base.getId(),
     base.getCodigoProduto(),
     snapshot.nome?.trim() || base.getNome(),
-    resolverValorVigenteMenu(snapshot, base.getValor()),
+    typeof snapshot.valor === 'number' ? snapshot.valor : base.getValor(),
     snapshot.ativo !== false,
     snapshot.descricao ?? base.getDescricao(),
     grupoNome,

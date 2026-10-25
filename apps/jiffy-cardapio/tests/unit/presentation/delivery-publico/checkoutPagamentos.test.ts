@@ -13,7 +13,10 @@ import { montarPedidoPublico } from '@/src/application/mappers/MontarPedidoPubli
 import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
 import type { DeliveryCarrinhoItem } from '@/src/presentation/components/features/delivery-publico/shared/stores/deliveryCarrinhoStore'
 import { aplicarPatchFormCheckout } from '@/src/presentation/components/features/delivery-publico/shared/hooks/checkout/formHelpers'
-import { filtrarMeiosPagamentoPorTipoEntrega } from '@/src/domain/policies/FiltrarMeiosPagamentoPorTipoEntrega'
+import {
+  filtrarMeiosPagamentoPorTipoEntrega,
+  meioDisponivelParaTipoEntrega,
+} from '@/src/domain/policies/FiltrarMeiosPagamentoPorTipoEntrega'
 
 const itemCarrinho: DeliveryCarrinhoItem = {
   id: 'i1',
@@ -386,6 +389,11 @@ describe('filtrarMeiosPagamentoPorTipoEntrega', () => {
     { id: 'entrega', ativoEntregaDelivery: true, ativoRetiradaDelivery: false },
     { id: 'retirada', ativoEntregaDelivery: false, ativoRetiradaDelivery: true },
   ]
+
+  it('a regra de canal é a mesma da entidade: entrega ou retirada', () => {
+    expect(meioDisponivelParaTipoEntrega(meios[1], 'entrega')).toBe(true)
+    expect(meioDisponivelParaTipoEntrega(meios[1], 'retirada')).toBe(false)
+  })
 
   it('mantém apenas meios habilitados para entrega', () => {
     expect(filtrarMeiosPagamentoPorTipoEntrega(meios, 'entrega').map(meio => meio.id)).toEqual([

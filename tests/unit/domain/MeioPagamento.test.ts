@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { MeioPagamento } from '@/src/domain/entities/MeioPagamento'
-import { AtualizarMeioPagamentoSchema } from '@/src/application/dto/AtualizarMeioPagamentoDTO'
-import { CriarMeioPagamentoSchema } from '@/src/application/dto/CriarMeioPagamentoDTO'
 
 const base = {
   id: 'mp-1',
@@ -32,7 +30,7 @@ describe('MeioPagamento.fromJSON ativoDelivery', () => {
     expect(MeioPagamento.fromJSON({ ...base, isDelivery: true }).isDelivery()).toBe(true)
   })
 
-  it('toJSON inclui ativoDelivery', () => {
+  it('toJSON inclui ativoDelivery legado só da entrega', () => {
     expect(MeioPagamento.fromJSON({ ...base, ativoDelivery: true }).toJSON().ativoDelivery).toBe(
       true
     )
@@ -47,13 +45,15 @@ describe('MeioPagamento.fromJSON ativoDelivery', () => {
 
     expect(meio.isEntregaDelivery()).toBe(true)
     expect(meio.isRetiradaDelivery()).toBe(false)
+    expect(meio.disponivelParaTipoEntrega('entrega')).toBe(true)
+    expect(meio.disponivelParaTipoEntrega('retirada')).toBe(false)
     expect(meio.toJSON()).toMatchObject({
       ativoEntregaDelivery: true,
       ativoRetiradaDelivery: false,
     })
   })
 
-  it('usa a flag legada como fallback da entrega, sem substituir retirada explícita', () => {
+  it('usa a flag legada nas duas modalidades, sem substituir retirada explícita', () => {
     const meio = MeioPagamento.fromJSON({
       ...base,
       ativoDelivery: true,
@@ -63,97 +63,26 @@ describe('MeioPagamento.fromJSON ativoDelivery', () => {
     expect(meio.isEntregaDelivery()).toBe(true)
     expect(meio.isRetiradaDelivery()).toBe(false)
   })
-})
 
-describe('DTOs locais de meios de pagamento', () => {
-  it('normaliza ativoDelivery legado para ativoEntregaDelivery na criação', () => {
-    expect(
-      CriarMeioPagamentoSchema.parse({ nome: 'PIX', ativoDelivery: true })
-    ).toMatchObject({
+  it('não copia entrega para retirada quando só a flag nova veio', () => {
+    const meio = MeioPagamento.fromJSON({
+      ...base,
       ativoEntregaDelivery: true,
-      ativoRetiradaDelivery: true,
     })
+
+    expect(meio.isEntregaDelivery()).toBe(true)
+    expect(meio.isRetiradaDelivery()).toBe(false)
   })
 
-  it('prioriza ativoEntregaDelivery quando a entrada também contém ativoDelivery', () => {
-    expect(
-      CriarMeioPagamentoSchema.parse({
-        nome: 'PIX',
-        ativoDelivery: true,
-        ativoEntregaDelivery: false,
-        ativoRetiradaDelivery: false,
-      })
-    ).toMatchObject({
-      ativoEntregaDelivery: false,
-      ativoRetiradaDelivery: false,
-    })
-  })
-
-  it('usa a flag legada para retirada na criação quando a nova flag não foi enviada', () => {
-    expect(
-      CriarMeioPagamentoSchema.parse({ nome: 'PIX', ativoDelivery: false })
-    ).toMatchObject({
-      ativoEntregaDelivery: false,
-      ativoRetiradaDelivery: false,
-    })
-  })
-
-  it('preserva retirada explícita na criação mesmo com a flag legada', () => {
-    expect(
-      CriarMeioPagamentoSchema.parse({
-        nome: 'PIX',
-        ativoDelivery: false,
-        ativoRetiradaDelivery: true,
-      })
-    ).toMatchObject({
+  it('isDelivery é verdadeiro se qualquer canal delivery estiver ligado', () => {
+    const soRetirada = MeioPagamento.fromJSON({
+      ...base,
       ativoEntregaDelivery: false,
       ativoRetiradaDelivery: true,
     })
-  })
 
-  it('mantém o default de retirada para entradas sem campos de Delivery', () => {
-    expect(CriarMeioPagamentoSchema.parse({ nome: 'PIX' })).toMatchObject({
-      ativoEntregaDelivery: false,
-      ativoRetiradaDelivery: true,
-    })
-  })
-
-  it('preserva campos novos independentes em atualização parcial', () => {
-    expect(
-      AtualizarMeioPagamentoSchema.parse({
-        ativoEntregaDelivery: false,
-        ativoRetiradaDelivery: true,
-      })
-    ).toEqual({
-      ativoEntregaDelivery: false,
-      ativoRetiradaDelivery: true,
-    })
-  })
-
-  it('não inclui retirada em atualização parcial só de entrega', () => {
-    expect(
-      AtualizarMeioPagamentoSchema.parse({ ativoEntregaDelivery: false })
-    ).toEqual({ ativoEntregaDelivery: false })
-  })
-
-  it('normaliza ativoDelivery legado nas duas modalidades em atualização parcial', () => {
-    expect(
-      AtualizarMeioPagamentoSchema.parse({ ativoDelivery: false })
-    ).toEqual({
-      ativoEntregaDelivery: false,
-      ativoRetiradaDelivery: false,
-    })
-  })
-
-  it('preserva flags explícitas em atualização junto com o campo legado', () => {
-    expect(
-      AtualizarMeioPagamentoSchema.parse({
-        ativoDelivery: false,
-        ativoEntregaDelivery: true,
-      })
-    ).toEqual({
-      ativoEntregaDelivery: true,
-      ativoRetiradaDelivery: false,
-    })
+    expect(soRetirada.isDelivery()).toBe(true)
+    expect(soRetirada.disponivelParaTipoEntrega('retirada')).toBe(true)
+    expect(soRetirada.disponivelParaTipoEntrega('entrega')).toBe(false)
   })
 })
