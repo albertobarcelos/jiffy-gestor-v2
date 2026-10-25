@@ -468,13 +468,7 @@ export function useNovoPedidoOrchestrator({
     isFetching: isFetchingMeiosPagamento,
   } = useMeiosPagamentoInfinite({
     limit: 100,
-    // O detalhe pode chegar depois da primeira renderização; sem o tipo, não restringe a lista.
-    ...resolverFiltroMeiosPagamentoNovoPedido({
-      pedidoDeliveryGestor,
-      pedidoComRetirada,
-      pedidoExistente: Boolean(vendaId || modoVisualizacao),
-      tipoEntregaPedidoExistente: detalhesPedidoMeta?.tipoEntrega,
-    }),
+    ...resolverFiltroMeiosPagamentoNovoPedido(),
     // Step 3 usa meios de pagamento; em visualizacao/edicao pode ser usado para resolver nomes.
     enabled: open && (currentStep >= 3 || modoVisualizacao || !!vendaId),
     refetchOnWindowFocus: false,
