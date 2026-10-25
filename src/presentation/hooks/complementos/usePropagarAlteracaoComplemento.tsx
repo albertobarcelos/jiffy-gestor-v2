@@ -15,6 +15,7 @@ import {
   listarUsosParaPropagarComplementoUseCase,
 } from '@/src/infrastructure/composition/complementoUseCases'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { resolverDecisaoPreDialogoPropagacao } from '@/src/application/complementos/resolverDecisaoPreDialogoPropagacao'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 
 export type DecisaoPropagacaoComplemento =
@@ -64,12 +65,25 @@ export function usePropagarAlteracaoComplemento(): {
       origem?: OrigemUsoComplemento
       alteracao: AlteracaoComplementoPropagavel
     }): Promise<DecisaoPropagacaoComplemento> => {
-      if (pedidoRef.current) return { tipo: 'cancelado' }
+      if (
+        resolverDecisaoPreDialogoPropagacao({
+          pedidoAberto: Boolean(pedidoRef.current),
+          temToken: true,
+        }) === 'so-origem'
+      ) {
+        return { tipo: 'so-origem' }
+      }
 
       const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-      if (!token) {
-        showToast.error('Não foi possível listar os cardápios. Faça login novamente.')
-        return { tipo: 'cancelado' }
+      if (
+        resolverDecisaoPreDialogoPropagacao({
+          pedidoAberto: false,
+          temToken: Boolean(token),
+        }) === 'so-origem' ||
+        !token
+      ) {
+        showToast.error('Não foi possível listar os cardápios. A alteração fica só neste local.')
+        return { tipo: 'so-origem' }
       }
 
       let usos: ComplementoUsoNoMenu[] = []
@@ -80,11 +94,22 @@ export function usePropagarAlteracaoComplemento(): {
           origem: opts.origem,
         })
       } catch (error) {
-        showToast.error(`Não foi possível listar os cardápios: ${handleApiError(error)}`)
-        return { tipo: 'cancelado' }
+        showToast.error(
+          `Não foi possível listar os cardápios: ${handleApiError(error)}. A alteração fica só neste local.`
+        )
+        return { tipo: 'so-origem' }
       }
 
-      if (usos.length === 0) return { tipo: 'so-origem' }
+      if (
+        resolverDecisaoPreDialogoPropagacao({
+          pedidoAberto: false,
+          temToken: true,
+          listagemOk: true,
+          quantidadeUsos: usos.length,
+        }) === 'so-origem'
+      ) {
+        return { tipo: 'so-origem' }
+      }
 
       return new Promise(resolve => {
         const next: Pedido = {
