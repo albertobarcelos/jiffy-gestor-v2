@@ -161,13 +161,15 @@ export async function listarMeiosPagamentoEntregaApp(
 export async function buscarComissaoEntregador(input: {
   token: string
   entregadorId: string
-  periodo: PeriodoComissaoEntregador
+  periodo?: PeriodoComissaoEntregador
+  intervalo?: { inicio: Date; fim: Date }
 }): Promise<ComissaoEntregadorApp> {
-  const intervalo = isoIntervaloComissao(intervaloComissaoEntregador(input.periodo))
+  const faixa = input.intervalo ?? intervaloComissaoEntregador(input.periodo ?? 'hoje')
+  const intervalo = isoIntervaloComissao(faixa)
   const params = new URLSearchParams({
     dataFinalizacaoInicio: intervalo.dataFinalizacaoInicio,
     dataFinalizacaoFim: intervalo.dataFinalizacaoFim,
-    limit: '50',
+    limit: '200',
     offset: '0',
   })
   const res = await fetchGestorApi(

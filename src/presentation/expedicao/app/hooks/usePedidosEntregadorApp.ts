@@ -11,7 +11,6 @@ import {
   type MeioPagamentoAppEntregador,
   type PedidoResumoAppEntregador,
 } from '@/src/presentation/expedicao/app/api/expedicaoAppApi'
-import type { PeriodoComissaoEntregador } from '@/src/application/expedicao/app/periodoComissaoEntregador'
 import {
   montarPagamentosDasLinhasFinalizarApp,
   type LinhaPagamentoFinalizarApp,
@@ -21,10 +20,9 @@ import { avisoApp } from '@/src/presentation/expedicao/app/avisoApp'
 export function usePedidosEntregadorApp(input: {
   entregadorId: string | null
   tokenAtual: () => string | null
-  periodo: PeriodoComissaoEntregador
-  onEntregaConfirmada: (periodo: PeriodoComissaoEntregador) => Promise<void>
+  onEntregaConfirmada: () => Promise<void>
 }) {
-  const { entregadorId, tokenAtual, periodo, onEntregaConfirmada } = input
+  const { entregadorId, tokenAtual, onEntregaConfirmada } = input
   const [pedidos, setPedidos] = useState<PedidoResumoAppEntregador[]>([])
   const [carregandoPedidos, setCarregandoPedidos] = useState(false)
   const [atualizandoPedidos, setAtualizandoPedidos] = useState(false)
@@ -139,7 +137,7 @@ export function usePedidosEntregadorApp(input: {
       try {
         await confirmarEntregaPedido({ token, pedidoId, pagamentos })
         void carregarPedidos({ silencioso: true })
-        void onEntregaConfirmada(periodo)
+        void onEntregaConfirmada()
         return true
       } catch (error) {
         setPedidos(prev => mesclarPedidoPegoNaLista(prev, snapshot))
@@ -153,7 +151,7 @@ export function usePedidosEntregadorApp(input: {
         setConfirmandoId(null)
       }
     },
-    [carregarPedidos, onEntregaConfirmada, periodo, pedidos, tokenAtual]
+    [carregarPedidos, onEntregaConfirmada, pedidos, tokenAtual]
   )
 
   const resetarPedidos = useCallback(() => {

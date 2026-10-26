@@ -52,7 +52,10 @@ export function RodadaAppScreen(props: RodadaAppScreenProps) {
         </button>
       </header>
 
-      <ul className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-28 pt-1">
+      <ul
+        data-expedicao-scroll
+        className="min-h-0 flex-1 touch-pan-y space-y-3 overflow-y-auto overscroll-y-contain px-4 pb-28 pt-1"
+      >
         {props.avisos.map(aviso => (
           <li
             key={`${aviso.codigo}-${aviso.motivo}`}

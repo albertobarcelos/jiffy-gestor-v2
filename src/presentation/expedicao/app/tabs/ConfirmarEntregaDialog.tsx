@@ -59,7 +59,11 @@ export function ConfirmarEntregaDialog(props: ConfirmarEntregaDialogProps) {
 
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-      <div className="max-h-[88dvh] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-5 shadow-xl">
+      <div className="flex max-h-[min(88dvh,100%)] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-white shadow-xl">
+        <div
+          data-expedicao-scroll
+          className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-y-contain p-5"
+        >
         <h2 className="text-lg font-semibold text-zinc-900">Entrega feita?</h2>
         <p className="mt-1 text-sm text-zinc-500">
           #{props.pedido.numeroVenda ?? props.pedido.codigoVenda} · {props.pedido.clienteNome}
@@ -161,8 +165,9 @@ export function ConfirmarEntregaDialog(props: ConfirmarEntregaDialogProps) {
         {!fecha ? (
           <p className="mt-2 text-xs text-amber-800">A soma precisa fechar {formatarMoedaApp(valorAlvo)}.</p>
         ) : null}
+        </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-2">
+        <div className="grid shrink-0 grid-cols-2 gap-2 border-t border-zinc-100 px-5 pb-4 pt-3">
           <button
             type="button"
             onClick={props.onVoltar}

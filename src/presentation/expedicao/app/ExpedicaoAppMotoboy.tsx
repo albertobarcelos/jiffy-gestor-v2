@@ -59,17 +59,12 @@ export function ExpedicaoAppMotoboy() {
   const entregadorId = sessao.entregador?.id ?? null
   const comissao = useComissaoEntregadorApp(entregadorId, sessao.tokenAtual)
   const carregarComissao = comissao.carregarComissao
-  const onEntregaConfirmada = useCallback(
-    async (periodoAlvo: typeof comissao.periodo) => {
-      await carregarComissao('hoje')
-      if (periodoAlvo !== 'hoje') await carregarComissao(periodoAlvo)
-    },
-    [carregarComissao]
-  )
+  const onEntregaConfirmada = useCallback(async () => {
+    await carregarComissao()
+  }, [carregarComissao])
   const pedidos = usePedidosEntregadorApp({
     entregadorId,
     tokenAtual: sessao.tokenAtual,
-    periodo: comissao.periodo,
     onEntregaConfirmada,
   })
   const carregarPedidos = pedidos.carregarPedidos
@@ -100,7 +95,7 @@ export function ExpedicaoAppMotoboy() {
     setRecorde(lerRecordeTurnoEntregador(entregadorId))
   }, [entregadorId])
 
-  const quantidadeHoje = comissao.comissaoPorPeriodo.hoje?.quantidade
+  const quantidadeHoje = comissao.dadosHoje?.quantidade
   useEffect(() => {
     if (!entregadorId || quantidadeHoje == null) return
     const dia = chaveDiaLocalTurno()
@@ -122,7 +117,7 @@ export function ExpedicaoAppMotoboy() {
     async (pedidoId: string, linhas?: LinhaPagamentoFinalizarApp[]) => {
       const pedido = pedidos.pedidos.find(item => item.id === pedidoId)
       const recordeAntes = recorde
-      const qtdAntes = comissao.comissaoPorPeriodo.hoje?.quantidade ?? 0
+      const qtdAntes = comissao.dadosHoje?.quantidade ?? 0
       const ok = await pedidos.confirmarEntrega(pedidoId, linhas)
       if (!ok || !pedido) return
       const quantidadeNova = qtdAntes + 1
@@ -141,7 +136,7 @@ export function ExpedicaoAppMotoboy() {
         })
       )
     },
-    [comissao.comissaoPorPeriodo.hoje?.quantidade, entregadorId, pedidos, recorde]
+    [comissao.dadosHoje?.quantidade, entregadorId, pedidos, recorde]
   )
 
   useEffect(() => {
@@ -150,8 +145,8 @@ export function ExpedicaoAppMotoboy() {
 
   useEffect(() => {
     if (!entregadorId || aba !== 'comissoes') return
-    void carregarComissao(comissao.periodo)
-  }, [aba, carregarComissao, comissao.periodo, entregadorId])
+    void carregarComissao()
+  }, [aba, carregarComissao, entregadorId])
 
   useExpedicaoAppRealtime({
     habilitado: Boolean(sessao.entregador),
@@ -171,9 +166,9 @@ export function ExpedicaoAppMotoboy() {
   const sairEntregador = useCallback(() => {
     sessao.sairEntregador()
     pedidos.resetarPedidos()
-    comissao.setComissaoPorPeriodo({})
+    comissao.resetarComissao()
     setAba('pedidos')
-  }, [comissao.setComissaoPorPeriodo, pedidos.resetarPedidos, sessao])
+  }, [comissao.resetarComissao, pedidos.resetarPedidos, sessao])
 
   const compartilharLogs = useCallback(async () => {
     const texto = [
@@ -293,7 +288,7 @@ export function ExpedicaoAppMotoboy() {
 
   const lojas = (sessao.hubEmpresas ?? []).filter(loja => Boolean(loja.id) && !loja.bloqueado)
   const lojaNome = sessao.empresa?.nomeExibicao ?? 'Loja'
-  const comissaoHoje = comissao.comissaoPorPeriodo.hoje ?? null
+  const comissaoHoje = comissao.dadosHoje ?? null
   const diaHoje = chaveDiaLocalTurno()
   const recordeExibido = aplicarRecordeTurnoEntregador(recorde, {
     quantidade: comissaoHoje?.quantidade ?? 0,
@@ -305,7 +300,7 @@ export function ExpedicaoAppMotoboy() {
     recorde: recordeExibido,
     diaHoje,
   })
-  const comissaoAtual = comissao.comissaoPorPeriodo[comissao.periodo] ?? null
+  const comissaoAtual = comissao.dados
   const pedidoAberto = pedidos.pedidos.find(pedido => pedido.id === pedidos.pedidoAbertoId) ?? null
   const pedidoConfirmar = pedidos.pedidos.find(pedido => pedido.id === pedidos.confirmarId) ?? null
   const pedidoChecklist = rodada.rodada[rodada.indiceChecklist]
@@ -405,10 +400,13 @@ export function ExpedicaoAppMotoboy() {
               loja={lojaNome}
               periodo={comissao.periodo}
               onPeriodo={comissao.setPeriodo}
+              dataFiltro={comissao.dataFiltro}
+              onDataFiltro={comissao.setDataFiltro}
               dados={comissaoAtual}
+              serieDiaria={comissao.serieDiaria}
               carregando={comissao.carregandoComissao}
               erro={comissao.erroComissao}
-              onTentarNovamente={() => void comissao.carregarComissao(comissao.periodo)}
+              onTentarNovamente={() => void comissao.carregarComissao()}
             />
           ) : null}
           {aba === 'perfil' ? (
