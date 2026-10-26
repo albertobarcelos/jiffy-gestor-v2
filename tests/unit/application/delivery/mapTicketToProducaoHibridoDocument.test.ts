@@ -81,23 +81,45 @@ describe('mapTicketToProducaoHibridoDocument', () => {
     )
   })
 
-  it('imprime QR quando o template pede qrcode', () => {
-    const doc = mapTicketToProducaoHibridoDocument(root, ticket, {
-      simboloPedido: 'qrcode',
-    })
-    expect(doc.content.some(b => b.type === 'qrcode' && b.data === 'P1842' && b.moduleSize === 8)).toBe(
-      true
+  it('imprime QR só na via de conferência', () => {
+    const conferencia = mapTicketToProducaoHibridoDocument(
+      root,
+      { ...ticket, viaProducao: { kind: 'conference' } },
+      { simboloPedido: 'qrcode' }
     )
+    expect(
+      conferencia.content.some(b => b.type === 'qrcode' && b.data === 'P1842' && b.moduleSize === 8)
+    ).toBe(true)
+
+    const unitaria = mapTicketToProducaoHibridoDocument(
+      root,
+      { ...ticket, viaProducao: { kind: 'unit', unitIndex: 1, unitTotal: 6 } },
+      { simboloPedido: 'qrcode' }
+    )
+    expect(unitaria.content.some(b => b.type === 'qrcode')).toBe(false)
+
+    const agrupada = mapTicketToProducaoHibridoDocument(root, ticket, { simboloPedido: 'qrcode' })
+    expect(agrupada.content.some(b => b.type === 'qrcode')).toBe(false)
   })
 
-  it('imprime Code 128 quando o template pede código de barras', () => {
-    const doc = mapTicketToProducaoHibridoDocument(root, ticket, {
-      simboloPedido: 'codigo_barras',
-      desenharCodigoBarras: payload => `png-${payload}`,
-    })
-    expect(doc.content.some(b => b.type === 'qrcode')).toBe(false)
-    expect(doc.content.some(b => b.type === 'image' && b.data === 'png-P1842' && b.align === 'center')).toBe(
-      true
+  it('imprime Code 128 só na via de conferência', () => {
+    const conferencia = mapTicketToProducaoHibridoDocument(
+      root,
+      { ...ticket, viaProducao: { kind: 'conference' } },
+      { simboloPedido: 'codigo_barras', desenharCodigoBarras: payload => `png-${payload}` }
+    )
+    expect(conferencia.content.some(b => b.type === 'qrcode')).toBe(false)
+    expect(
+      conferencia.content.some(b => b.type === 'image' && b.data === 'png-P1842' && b.align === 'center')
+    ).toBe(true)
+
+    const unitaria = mapTicketToProducaoHibridoDocument(
+      root,
+      { ...ticket, viaProducao: { kind: 'unit', unitIndex: 1, unitTotal: 6 } },
+      { simboloPedido: 'codigo_barras', desenharCodigoBarras: payload => `png-${payload}` }
+    )
+    expect(unitaria.content.some(b => b.type === 'image' && String(b.data).startsWith('png-'))).toBe(
+      false
     )
   })
 

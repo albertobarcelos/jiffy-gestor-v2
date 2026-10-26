@@ -63,27 +63,37 @@ describe('renderDeliveryCupomHtml via de produção', () => {
     expect(html).toMatch(/Cozinha \| .*Atend: Carlos/)
   })
 
-  it('via de produção usa QR quando o template pede qrcode', () => {
-    const html = renderDeliveryCupomHtml({
+  it('QR e código de barras só na via de conferência', () => {
+    const conferencia = {
+      ...ticketProducao,
+      viaProducao: { kind: 'conference' as const },
+    }
+    const htmlQr = renderDeliveryCupomHtml({
       root,
-      ticket: ticketProducao,
+      ticket: conferencia,
       template: { ...DEFAULT_DELIVERY_CUPOM_TEMPLATE, simboloPedido: 'qrcode' },
     })
-    expect(html).toContain('class="pedido-qr"')
-    expect(html).toContain('width:220px')
-    expect(html).toContain('PABC123')
-    expect(html).not.toContain('class="pedido-barcode"')
-  })
+    expect(htmlQr).toContain('class="pedido-qr"')
+    expect(htmlQr).toContain('width:220px')
+    expect(htmlQr).toContain('PABC123')
+    expect(htmlQr).not.toContain('class="pedido-barcode"')
 
-  it('via de produção usa Code 128 quando o template pede código de barras', () => {
-    const html = renderDeliveryCupomHtml({
+    const htmlBarras = renderDeliveryCupomHtml({
       root,
-      ticket: ticketProducao,
+      ticket: conferencia,
       template: { ...DEFAULT_DELIVERY_CUPOM_TEMPLATE, simboloPedido: 'codigo_barras' },
     })
-    expect(html).toContain('pedido-barcode')
-    expect(html).toContain('PABC123')
-    expect(html).not.toContain('class="pedido-qr"')
+    expect(htmlBarras).toContain('pedido-barcode')
+    expect(htmlBarras).toContain('PABC123')
+    expect(htmlBarras).not.toContain('class="pedido-qr"')
+
+    const htmlUnitaria = renderDeliveryCupomHtml({
+      root,
+      ticket: { ...ticketProducao, viaProducao: { kind: 'unit', unitIndex: 1, unitTotal: 6 } },
+      template: { ...DEFAULT_DELIVERY_CUPOM_TEMPLATE, simboloPedido: 'qrcode' },
+    })
+    expect(htmlUnitaria).not.toContain('class="pedido-qr"')
+    expect(htmlUnitaria).not.toContain('class="pedido-barcode"')
   })
 
   it('via de produção omite símbolo quando o template pede nenhum', () => {

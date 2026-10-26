@@ -168,6 +168,19 @@ function comQuantidade(item: VendaGestorTicketItem, quantidade: number): VendaGe
     quantidade,
     valorFinal: scale(item.valorFinal),
     valorTotal: scale(item.valorTotal),
+    complementos: item.complementos?.map(comp => {
+      const q = quantidadeComplemento(comp) * ratio
+      return {
+        ...comp,
+        quantidade: q,
+        impressao: {
+          ...comp.impressao,
+          quantidade: q,
+          valorFinal: scale(comp.impressao?.valorFinal),
+          valorTotal: scale(comp.impressao?.valorTotal),
+        },
+      }
+    }),
   }
 }
 
