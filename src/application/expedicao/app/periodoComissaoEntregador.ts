@@ -42,6 +42,56 @@ export function isoIntervaloComissao(intervalo: IntervaloComissao): {
   }
 }
 
+export function chaveDiaLocalComissao(data: Date): string {
+  const y = data.getFullYear()
+  const m = String(data.getMonth() + 1).padStart(2, '0')
+  const d = String(data.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+export function chaveDiaLocalDeIso(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  const data = new Date(iso)
+  if (Number.isNaN(data.getTime())) return null
+  return chaveDiaLocalComissao(data)
+}
+
+export function dataDeChaveDiaLocal(chave: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(chave.trim())
+  if (!m) return null
+  const ano = Number(m[1])
+  const mes = Number(m[2]) - 1
+  const dia = Number(m[3])
+  const data = new Date(ano, mes, dia, 12, 0, 0, 0)
+  if (data.getFullYear() !== ano || data.getMonth() !== mes || data.getDate() !== dia) return null
+  return data
+}
+
+export function intervaloComissaoNoDia(data: Date): IntervaloComissao {
+  return { inicio: inicioDoDia(data), fim: fimDoDia(data) }
+}
+
+/** Domingo → sábado da semana do dia, sem passar de hoje. */
+export function intervaloSemanaQueContem(data: Date, agora = new Date()): IntervaloComissao {
+  const inicio = inicioDoDia(data)
+  inicio.setDate(inicio.getDate() - inicio.getDay())
+  const fimSemana = new Date(inicio)
+  fimSemana.setDate(inicio.getDate() + 6)
+  const teto = fimDoDia(agora)
+  const fim = fimDoDia(fimSemana).getTime() > teto.getTime() ? teto : fimDoDia(fimSemana)
+  return { inicio, fim }
+}
+
+export function rotuloDiaComissao(data: Date): string {
+  return new Intl.DateTimeFormat('pt-BR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+  })
+    .format(data)
+    .replace('.', '')
+}
+
 function formatarDiaCurto(data: Date): string {
   return new Intl.DateTimeFormat('pt-BR', {
     day: 'numeric',

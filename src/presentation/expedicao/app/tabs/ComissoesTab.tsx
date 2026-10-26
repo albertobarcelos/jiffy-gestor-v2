@@ -2,12 +2,17 @@
 
 import Image from 'next/image'
 import {
+  chaveDiaLocalComissao,
+  rotuloDiaComissao,
   rotuloPeriodoComissao,
+  dataDeChaveDiaLocal,
   type PeriodoComissaoEntregador,
 } from '@/src/application/expedicao/app/periodoComissaoEntregador'
 import type { ComissaoEntregadorApp } from '@/src/presentation/expedicao/app/api/expedicaoAppApi'
+import type { PontoSerieDiariaComissao } from '@/src/application/expedicao/app/serieDiariaComissaoEntregador'
 import { formatarMoedaApp } from '@/src/presentation/expedicao/app/format'
 import { AppSpinner } from '@/src/presentation/expedicao/app/shell/AppSpinner'
+import { ComissaoSerieDiariaChart } from '@/src/presentation/expedicao/app/tabs/ComissaoSerieDiariaChart'
 
 const PERIODOS: Array<{ id: PeriodoComissaoEntregador; label: string }> = [
   { id: 'hoje', label: 'Hoje' },
@@ -19,13 +24,18 @@ export function ComissoesTab(props: {
   loja: string
   periodo: PeriodoComissaoEntregador
   onPeriodo: (periodo: PeriodoComissaoEntregador) => void
+  dataFiltro: string | null
+  onDataFiltro: (dia: string | null) => void
   dados: ComissaoEntregadorApp | null
+  serieDiaria: PontoSerieDiariaComissao[]
   carregando: boolean
   erro: string | null
   onTentarNovamente: () => void
 }) {
-  const rotuloDia = rotuloPeriodoComissao(props.periodo)
+  const diaFiltro = props.dataFiltro ? dataDeChaveDiaLocal(props.dataFiltro) : null
+  const rotuloDia = diaFiltro ? rotuloDiaComissao(diaFiltro) : rotuloPeriodoComissao(props.periodo)
   const mostrarStale = props.carregando && props.dados != null
+  const hoje = chaveDiaLocalComissao(new Date())
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -50,10 +60,10 @@ export function ComissoesTab(props: {
         />
       </header>
 
-      <div className="shrink-0 px-4">
+      <div className="shrink-0 space-y-2 px-4">
         <div className="flex rounded-full bg-zinc-100 p-1">
           {PERIODOS.map(item => {
-            const ativo = props.periodo === item.id
+            const ativo = !props.dataFiltro && props.periodo === item.id
             return (
               <button
                 key={item.id}
@@ -68,6 +78,28 @@ export function ComissoesTab(props: {
             )
           })}
         </div>
+        <label className="flex items-center gap-2 rounded-2xl bg-white px-3 py-2 ring-1 ring-black/[0.06]">
+          <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Dia</span>
+          <input
+            type="date"
+            value={props.dataFiltro ?? ''}
+            max={hoje}
+            onChange={event => {
+              const valor = event.target.value
+              props.onDataFiltro(valor || null)
+            }}
+            className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-zinc-900 outline-none"
+          />
+          {props.dataFiltro ? (
+            <button
+              type="button"
+              onClick={() => props.onDataFiltro(null)}
+              className="text-xs font-semibold text-secondary"
+            >
+              Limpar
+            </button>
+          ) : null}
+        </label>
       </div>
 
       <div
@@ -92,7 +124,7 @@ export function ComissoesTab(props: {
           </div>
         ) : null}
         {props.dados ? (
-          <div className={`mt-6 space-y-3 ${mostrarStale ? 'opacity-60' : ''}`}>
+          <div className={`mt-5 space-y-3 ${mostrarStale ? 'opacity-60' : ''}`}>
             <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/[0.04]">
               <p className="text-sm text-zinc-500">Você fez neste período</p>
               <p className="mt-0.5 text-xs font-medium capitalize text-zinc-400">{rotuloDia}</p>
@@ -104,6 +136,7 @@ export function ComissoesTab(props: {
                 {props.dados.quantidade === 1 ? 'entrega confirmada' : 'entregas confirmadas'}
               </p>
             </div>
+            <ComissaoSerieDiariaChart serie={props.serieDiaria} />
             {props.dados.itens.length === 0 ? (
               <p className="px-2 pb-4 text-center text-sm text-zinc-500">
                 Só entra aqui depois que você confirma a entrega. Pedido pronto ou em rota ainda não

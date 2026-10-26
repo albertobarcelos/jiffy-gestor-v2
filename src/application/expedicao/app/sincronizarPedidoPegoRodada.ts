@@ -27,9 +27,10 @@ export function etapaAposSincronizarPego(etapa: string | null | undefined): stri
 
 /** Lista da busca já dá para o card da rodada — evita GET detalhe. */
 export function listaSuficienteParaCardRodada(
-  pedido: Pick<PedidoLeituraExpedicao, 'itens' | 'endereco' | 'bairro'> | null
+  pedido: Pick<PedidoLeituraExpedicao, 'itens' | 'endereco' | 'bairro' | 'formaPagamento'> | null
 ): boolean {
   if (!pedido) return false
   if (pedido.itens.length === 0) return false
+  if (!pedido.formaPagamento) return false
   return Boolean(pedido.endereco || pedido.bairro)
 }

@@ -40,19 +40,29 @@ describe('etapaAposSincronizarPego', () => {
 })
 
 describe('listaSuficienteParaCardRodada', () => {
-  it('só dispensa o detalhe com item e endereço', () => {
+  it('só dispensa o detalhe com item, endereço e pagamento', () => {
     expect(
       listaSuficienteParaCardRodada({
         itens: [{ id: '1', nome: 'Pastel', quantidade: 1 }],
         endereco: 'Rua A, 1 — Centro',
         bairro: 'Centro',
+        formaPagamento: 'PIX',
       })
     ).toBe(true)
+    expect(
+      listaSuficienteParaCardRodada({
+        itens: [{ id: '1', nome: 'Pastel', quantidade: 1 }],
+        endereco: 'Rua A, 1 — Centro',
+        bairro: 'Centro',
+        formaPagamento: null,
+      })
+    ).toBe(false)
     expect(
       listaSuficienteParaCardRodada({
         itens: [],
         endereco: 'Rua A',
         bairro: 'Centro',
+        formaPagamento: 'PIX',
       })
     ).toBe(false)
     expect(listaSuficienteParaCardRodada(null)).toBe(false)
