@@ -464,7 +464,7 @@ export function ExpedicaoAppMotoboy() {
           pedido={pedidoConfirmar}
           meios={pedidos.meiosPagamento}
           ocupado={pedidos.confirmandoId === pedidoConfirmar.id}
-          onCancelar={() => pedidos.setConfirmarId(null)}
+          onVoltar={() => pedidos.setConfirmarId(null)}
           onConfirmar={linhas => void confirmarEntregaComEstouro(pedidoConfirmar.id, linhas)}
         />
       ) : null}
