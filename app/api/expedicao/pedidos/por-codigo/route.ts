@@ -5,6 +5,7 @@ import {
   escolherPedidoPeloCodigo,
   mapPedidoLeituraExpedicao,
 } from '@/src/application/expedicao/mapPedidoLeituraExpedicao'
+import { listaSuficienteParaCardRodada } from '@/src/application/expedicao/app/sincronizarPedidoPegoRodada'
 
 /**
  * GET /api/expedicao/pedidos/por-codigo?codigo=
@@ -51,6 +52,11 @@ export async function GET(request: NextRequest) {
     }
 
     const id = String((resumo as { id: unknown }).id)
+    const peloResumo = mapPedidoLeituraExpedicao(resumo)
+    if (listaSuficienteParaCardRodada(peloResumo) && peloResumo) {
+      return NextResponse.json(peloResumo)
+    }
+
     let detalhe: unknown = resumo
     try {
       const full = await apiClient.request<unknown>(`/api/v1/delivery/pedidos/${encodeURIComponent(id)}`, {
@@ -62,7 +68,7 @@ export async function GET(request: NextRequest) {
       detalhe = resumo
     }
 
-    const pedido = mapPedidoLeituraExpedicao(detalhe)
+    const pedido = mapPedidoLeituraExpedicao(detalhe) ?? peloResumo
     if (!pedido) {
       return NextResponse.json({ error: 'Pedido não encontrado.' }, { status: 404 })
     }

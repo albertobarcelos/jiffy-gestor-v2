@@ -8,6 +8,7 @@ type RodadaAppScreenProps = {
   pedidos: PedidoLeituraExpedicao[]
   avisos: Array<{ codigo: string; motivo: string }>
   ocupado: boolean
+  sincronizandoIds?: string[]
   onPegar: () => void
   onConferir: () => void
   onExpedir: () => void
@@ -33,6 +34,8 @@ function resumoItens(pedido: PedidoLeituraExpedicao): string | null {
 }
 
 export function RodadaAppScreen(props: RodadaAppScreenProps) {
+  const sincronizando = new Set(props.sincronizandoIds ?? [])
+  const bloqueado = props.ocupado || sincronizando.size > 0
   return (
     <div className="relative flex h-full min-h-0 flex-col bg-zinc-100">
       <header className="flex shrink-0 items-center justify-between gap-3 px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
@@ -60,14 +63,21 @@ export function RodadaAppScreen(props: RodadaAppScreenProps) {
         ))}
         {props.pedidos.map(pedido => {
           const itens = resumoItens(pedido)
+          const sync = sincronizando.has(pedido.id)
           return (
             <li key={pedido.id} className="rounded-3xl bg-white px-4 py-4 shadow-sm ring-1 ring-black/[0.04]">
               <div className="flex items-start justify-between gap-3">
                 <p className="text-3xl font-black leading-none tracking-tight text-zinc-900">
                   #{pedido.numeroVenda ?? pedido.codigoVenda}
                 </p>
-                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-800">
-                  {rotuloEtapa(pedido.etapa)}
+                <span
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${
+                    sync
+                      ? 'bg-amber-50 text-amber-900'
+                      : 'bg-emerald-50 text-emerald-800'
+                  }`}
+                >
+                  {sync ? 'Sincronizando…' : rotuloEtapa(pedido.etapa)}
                 </span>
               </div>
               <p className="mt-3 text-lg font-bold uppercase leading-tight text-zinc-900">{pedido.clienteNome}</p>
@@ -110,7 +120,7 @@ export function RodadaAppScreen(props: RodadaAppScreenProps) {
         <button
           type="button"
           onClick={props.onConferir}
-          disabled={props.ocupado || props.pedidos.length === 0}
+          disabled={bloqueado || props.pedidos.length === 0}
           className="h-14 rounded-2xl bg-secondary text-base font-semibold text-white shadow-sm disabled:opacity-50"
         >
           Conferir
@@ -118,7 +128,7 @@ export function RodadaAppScreen(props: RodadaAppScreenProps) {
         <button
           type="button"
           onClick={props.onExpedir}
-          disabled={props.ocupado || props.pedidos.length === 0}
+          disabled={bloqueado || props.pedidos.length === 0}
           className="h-14 rounded-2xl bg-zinc-900 text-sm font-semibold text-white disabled:opacity-50"
         >
           {props.ocupado ? 'Saindo…' : 'Para Entrega'}
