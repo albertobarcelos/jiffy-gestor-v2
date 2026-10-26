@@ -1,12 +1,25 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import {
+  aplicarRecordeTurnoEntregador,
+  chaveDiaLocalTurno,
+  montarEstouroFinalizarEntrega,
+  montarPlacarTurnoEntregador,
+  type EstouroFinalizarEntrega,
+  type RecordeTurnoEntregador,
+} from '@/src/application/expedicao/app/placarTurnoEntregador'
+import {
+  gravarRecordeTurnoEntregador,
+  lerRecordeTurnoEntregador,
+} from '@/src/presentation/expedicao/app/prefs/recordeTurnoEntregadorStorage'
 import { ExpedicaoChecklist } from '@/src/presentation/expedicao/checklist/ExpedicaoChecklist'
 import { ExpedicaoTecladoSenha } from '@/src/presentation/expedicao/teclado/ExpedicaoTecladoSenha'
 import { ExpedicaoAppTabBar } from '@/src/presentation/expedicao/app/shell/ExpedicaoAppTabBar'
 import { PedidosTab } from '@/src/presentation/expedicao/app/tabs/PedidosTab'
 import { PedidoDetalheScreen } from '@/src/presentation/expedicao/app/tabs/PedidoDetalheScreen'
 import { ConfirmarEntregaDialog } from '@/src/presentation/expedicao/app/tabs/ConfirmarEntregaDialog'
+import { EstouroEntregaOverlay } from '@/src/presentation/expedicao/app/tabs/EstouroEntregaOverlay'
 import { RodadaAppScreen } from '@/src/presentation/expedicao/app/tabs/RodadaAppScreen'
 import { ComissoesTab } from '@/src/presentation/expedicao/app/tabs/ComissoesTab'
 import { PerfilTab } from '@/src/presentation/expedicao/app/tabs/PerfilTab'
@@ -37,6 +50,8 @@ export function ExpedicaoAppMotoboy() {
   const [prefs, setPrefs] = useState<PrefsAppEntregador>(lerPrefsAppEntregador)
   const [pedindoAviso, setPedindoAviso] = useState(false)
   const [compartilhandoLogs, setCompartilhandoLogs] = useState(false)
+  const [recorde, setRecorde] = useState<RecordeTurnoEntregador | null>(null)
+  const [estouro, setEstouro] = useState<EstouroFinalizarEntrega | null>(null)
   const pwa = usePwaInstallPrompt()
 
   const sessao = useSessaoEntregadorApp()
@@ -75,6 +90,59 @@ export function ExpedicaoAppMotoboy() {
     onExpedida,
     onPego,
   })
+
+  useEffect(() => {
+    if (!entregadorId) {
+      setRecorde(null)
+      setEstouro(null)
+      return
+    }
+    setRecorde(lerRecordeTurnoEntregador(entregadorId))
+  }, [entregadorId])
+
+  const quantidadeHoje = comissao.comissaoPorPeriodo.hoje?.quantidade
+  useEffect(() => {
+    if (!entregadorId || quantidadeHoje == null) return
+    const dia = chaveDiaLocalTurno()
+    setRecorde(prev => {
+      const next = aplicarRecordeTurnoEntregador(prev, { quantidade: quantidadeHoje, dia })
+      if (next.quantidade === (prev?.quantidade ?? 0) && next.dia === prev?.dia) return prev
+      gravarRecordeTurnoEntregador(entregadorId, next)
+      return next
+    })
+  }, [entregadorId, quantidadeHoje])
+
+  useEffect(() => {
+    if (!estouro) return
+    const id = window.setTimeout(() => setEstouro(null), 1700)
+    return () => window.clearTimeout(id)
+  }, [estouro])
+
+  const confirmarEntregaComEstouro = useCallback(
+    async (pedidoId: string, meioPagamentoId?: string | null) => {
+      const pedido = pedidos.pedidos.find(item => item.id === pedidoId)
+      const recordeAntes = recorde
+      const qtdAntes = comissao.comissaoPorPeriodo.hoje?.quantidade ?? 0
+      const ok = await pedidos.confirmarEntrega(pedidoId, meioPagamentoId)
+      if (!ok || !pedido) return
+      const quantidadeNova = qtdAntes + 1
+      const recordeDepois = aplicarRecordeTurnoEntregador(recordeAntes, {
+        quantidade: quantidadeNova,
+        dia: chaveDiaLocalTurno(),
+      })
+      setRecorde(recordeDepois)
+      if (entregadorId) gravarRecordeTurnoEntregador(entregadorId, recordeDepois)
+      setEstouro(
+        montarEstouroFinalizarEntrega({
+          taxa: pedido.taxaEntrega,
+          quantidadeHoje: quantidadeNova,
+          recordeAntes,
+          recordeDepois,
+        })
+      )
+    },
+    [comissao.comissaoPorPeriodo.hoje?.quantidade, entregadorId, pedidos, recorde]
+  )
 
   useEffect(() => {
     if (sessao.entregador) setAba('pedidos')
@@ -241,6 +309,17 @@ export function ExpedicaoAppMotoboy() {
   const lojas = (sessao.hubEmpresas ?? []).filter(loja => Boolean(loja.id) && !loja.bloqueado)
   const lojaNome = sessao.empresa?.nomeExibicao ?? 'Loja'
   const comissaoHoje = comissao.comissaoPorPeriodo.hoje ?? null
+  const diaHoje = chaveDiaLocalTurno()
+  const recordeExibido = aplicarRecordeTurnoEntregador(recorde, {
+    quantidade: comissaoHoje?.quantidade ?? 0,
+    dia: diaHoje,
+  })
+  const placarHoje = montarPlacarTurnoEntregador({
+    quantidadeHoje: comissaoHoje?.quantidade ?? 0,
+    totalTaxasHoje: comissaoHoje?.totalTaxas ?? 0,
+    recorde: recordeExibido,
+    diaHoje,
+  })
   const comissaoAtual = comissao.comissaoPorPeriodo[comissao.periodo] ?? null
   const pedidoAberto = pedidos.pedidos.find(pedido => pedido.id === pedidos.pedidoAbertoId) ?? null
   const pedidoConfirmar = pedidos.pedidos.find(pedido => pedido.id === pedidos.confirmarId) ?? null
@@ -319,6 +398,7 @@ export function ExpedicaoAppMotoboy() {
             <PedidosTab
               loja={lojaNome}
               hoje={comissaoHoje}
+              linhaRecorde={placarHoje.linhaRecorde}
               pedidos={pedidos.pedidos}
               carregando={pedidos.carregandoPedidos}
               atualizando={pedidos.atualizandoPedidos}
@@ -395,9 +475,10 @@ export function ExpedicaoAppMotoboy() {
           meios={pedidos.meiosPagamento}
           ocupado={pedidos.confirmandoId === pedidoConfirmar.id}
           onCancelar={() => pedidos.setConfirmarId(null)}
-          onConfirmar={meioPagamentoId => void pedidos.confirmarEntrega(pedidoConfirmar.id, meioPagamentoId)}
+          onConfirmar={meioPagamentoId => void confirmarEntregaComEstouro(pedidoConfirmar.id, meioPagamentoId)}
         />
       ) : null}
+      {estouro ? <EstouroEntregaOverlay estouro={estouro} /> : null}
     </div>
   )
 }

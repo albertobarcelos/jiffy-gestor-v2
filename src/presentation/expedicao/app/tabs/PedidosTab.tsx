@@ -17,6 +17,7 @@ const LIMIAR_PUXAR_PX = 64
 export function PedidosTab(props: {
   loja: string
   hoje: ComissaoEntregadorApp | null
+  linhaRecorde: string | null
   pedidos: PedidoResumoAppEntregador[]
   carregando: boolean
   atualizando?: boolean
@@ -42,16 +43,20 @@ export function PedidosTab(props: {
             {props.loja}
           </p>
         </div>
-        <div className="flex shrink-0 flex-col items-end">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Hoje</p>
+        <div className="flex min-w-0 shrink-0 flex-col items-end">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+            Hoje · {entregasHoje} {entregasHoje === 1 ? 'entrega' : 'entregas'}
+          </p>
           {props.hoje ? (
             <>
               <p className="text-[22px] font-extrabold tracking-tight text-emerald-600">
                 {formatarMoedaApp(props.hoje.totalTaxas)}
               </p>
-              <p className="text-[11px] font-semibold text-zinc-400">
-                {entregasHoje} {entregasHoje === 1 ? 'entrega' : 'entregas'}
-              </p>
+              {props.linhaRecorde ? (
+                <p className="max-w-[11.5rem] text-right text-[11px] font-semibold text-zinc-500">
+                  {props.linhaRecorde}
+                </p>
+              ) : null}
             </>
           ) : (
             <>

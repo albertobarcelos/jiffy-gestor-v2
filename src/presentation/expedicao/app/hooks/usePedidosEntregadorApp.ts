@@ -111,7 +111,7 @@ export function usePedidosEntregadorApp(input: {
       const token = tokenAtual()
       if (!token) {
         showToast.error('Sessão da loja expirada.')
-        return
+        return false
       }
       const pedido = pedidos.find(p => p.id === pedidoId)
       const pagamentos = pedido
@@ -125,17 +125,14 @@ export function usePedidosEntregadorApp(input: {
       setConfirmandoId(pedidoId)
       try {
         await confirmarEntregaPedido({ token, pedidoId, pagamentos })
-        showToast.success(
-          pedido && pedido.faltaPagar > 0
-            ? 'Pagamento recebido e entrega confirmada.'
-            : 'Entrega confirmada.'
-        )
         await carregarPedidos({ silencioso: true })
         await onEntregaConfirmada(periodo)
         setConfirmarId(null)
         setPedidoAbertoId(null)
+        return true
       } catch (error) {
         showToast.error(error instanceof Error ? error.message : 'Não foi possível confirmar a entrega.')
+        return false
       } finally {
         setConfirmandoId(null)
       }
