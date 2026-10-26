@@ -58,7 +58,7 @@ export function ConfirmarEntregaDialog(props: ConfirmarEntregaDialogProps) {
   const podeDividir = linhas.length > 1
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+    <div className="fixed inset-0 z-[45] flex items-end justify-center bg-black/40 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       <div className="flex max-h-[min(88dvh,100%)] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-white shadow-xl">
         <div
           data-expedicao-scroll

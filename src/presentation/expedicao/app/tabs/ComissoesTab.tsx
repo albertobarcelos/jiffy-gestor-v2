@@ -203,7 +203,7 @@ export function ComissoesTab(props: {
 
       <div
         data-expedicao-scroll
-        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-5"
+        className="relative z-0 min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-5 pb-16"
       >
         {props.carregando && !props.dados ? (
           <div className="flex justify-center pt-10">

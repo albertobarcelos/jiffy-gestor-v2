@@ -1,7 +1,15 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MdCheckCircle, MdClose, MdFlashlightOff, MdFlashlightOn, MdPhotoCamera } from 'react-icons/md'
+import {
+  MdCheckCircle,
+  MdClose,
+  MdFlashlightOff,
+  MdFlashlightOn,
+  MdPhotoCamera,
+  MdQrCodeScanner,
+  MdSearch,
+} from 'react-icons/md'
 import jsQR from 'jsqr'
 import {
   deveTentarInversaoJsQr,
@@ -21,6 +29,8 @@ import {
   tocarSomLeituraExpedicao,
 } from '@/src/presentation/expedicao/app/som/somLeituraExpedicao'
 import { AppSpinner } from '@/src/presentation/expedicao/app/shell/AppSpinner'
+
+type ModoColetarPedido = 'escanear' | 'pesquisar'
 
 type PegarPedidoScannerProps = {
   aberto: boolean
@@ -93,11 +103,13 @@ function agendarProximoFrame(video: HTMLVideoElement, tick: () => void): () => v
 export function PegarPedidoScanner({ aberto, ocupado, onFechar, onCodigo }: PegarPedidoScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const buscaRef = useRef<HTMLInputElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const onCodigoRef = useRef(onCodigo)
   const emitidoRef = useRef(false)
   const [erro, setErro] = useState<string | null>(null)
   const [manual, setManual] = useState('')
+  const [modo, setModo] = useState<ModoColetarPedido>('escanear')
   const [cameraAtiva, setCameraAtiva] = useState(false)
   const [solicitando, setSolicitando] = useState(false)
   const [lanterna, setLanterna] = useState(false)
@@ -217,7 +229,12 @@ export function PegarPedidoScanner({ aberto, ocupado, onFechar, onCodigo }: Pega
       setManual('')
       setErro(null)
       setFeedback('procurando')
+      setModo('escanear')
       emitidoRef.current = false
+      return
+    }
+    if (modo !== 'escanear') {
+      pararCamera()
       return
     }
     if (cameraDisponivelNesteContexto()) {
@@ -228,10 +245,16 @@ export function PegarPedidoScanner({ aberto, ocupado, onFechar, onCodigo }: Pega
     return () => {
       pararCamera()
     }
-  }, [aberto, iniciarCamera, pararCamera])
+  }, [aberto, modo, iniciarCamera, pararCamera])
 
   useEffect(() => {
-    if (!aberto || !cameraAtiva) return
+    if (!aberto || modo !== 'pesquisar') return
+    const id = window.setTimeout(() => buscaRef.current?.focus(), 80)
+    return () => window.clearTimeout(id)
+  }, [aberto, modo])
+
+  useEffect(() => {
+    if (!aberto || modo !== 'escanear' || !cameraAtiva) return
     let cancelled = false
     let ocupadoFrame = false
     let indiceFrame = 0
@@ -291,31 +314,69 @@ export function PegarPedidoScanner({ aberto, ocupado, onFechar, onCodigo }: Pega
       cancelled = true
       cancelarAgenda()
     }
-  }, [aberto, cameraAtiva, emitirCodigo, ocupado])
+  }, [aberto, cameraAtiva, emitirCodigo, modo, ocupado])
 
   if (!aberto) return null
 
   const lido = feedback === 'lido' || ocupado
   const status = mensagemFeedbackScanQr(feedback, ocupado)
+  const escanear = modo === 'escanear'
 
   return (
-    <div className="fixed inset-0 z-50 bg-black text-white">
+    <div className="fixed inset-0 z-50 flex flex-col bg-black text-white">
       <div className="flex items-center justify-between px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <button type="button" onClick={onFechar} className="rounded-full p-2" aria-label="Fechar">
           <MdClose className="h-7 w-7" />
         </button>
-        <h2 className="text-lg font-semibold">Pegar pedido</h2>
-        <button
-          type="button"
-          onClick={() => void alternarLanterna()}
-          className={`rounded-full p-2 ${lanterna ? 'text-amber-300' : 'text-white/70'}`}
-          aria-label={lanterna ? 'Desligar lanterna' : 'Ligar lanterna'}
-          aria-pressed={lanterna}
-        >
-          {lanterna ? <MdFlashlightOn className="h-6 w-6" /> : <MdFlashlightOff className="h-6 w-6" />}
-        </button>
+        <h2 className="text-lg font-semibold">Coletar pedido</h2>
+        {escanear ? (
+          <button
+            type="button"
+            onClick={() => void alternarLanterna()}
+            className={`rounded-full p-2 ${lanterna ? 'text-amber-300' : 'text-white/70'}`}
+            aria-label={lanterna ? 'Desligar lanterna' : 'Ligar lanterna'}
+            aria-pressed={lanterna}
+          >
+            {lanterna ? <MdFlashlightOn className="h-6 w-6" /> : <MdFlashlightOff className="h-6 w-6" />}
+          </button>
+        ) : (
+          <span className="inline-block w-11" aria-hidden />
+        )}
       </div>
 
+      <div
+        className="mx-4 mt-1 flex rounded-full bg-white/10 p-1"
+        role="tablist"
+        aria-label="Como coletar o pedido"
+      >
+        {(
+          [
+            { id: 'escanear', label: 'Escanear', icon: MdQrCodeScanner },
+            { id: 'pesquisar', label: 'Pesquisar', icon: MdSearch },
+          ] as const
+        ).map(item => {
+          const Icon = item.icon
+          const ativo = modo === item.id
+          return (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={ativo}
+              onClick={() => setModo(item.id)}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-full py-2.5 text-sm font-semibold ${
+                ativo ? 'bg-white text-zinc-900' : 'text-white/70'
+              }`}
+            >
+              <Icon className="h-5 w-5" aria-hidden />
+              {item.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {escanear ? (
+      <div className="flex min-h-0 flex-1 flex-col">
       <div
         className={`relative mx-auto mt-6 aspect-square w-[84vw] max-w-96 overflow-hidden rounded-[28px] bg-zinc-900 ring-2 ${
           lido ? 'ring-emerald-400' : feedback === 'falhou' ? 'ring-amber-300' : 'ring-white'
@@ -376,38 +437,61 @@ export function PegarPedidoScanner({ aberto, ocupado, onFechar, onCodigo }: Pega
       {cameraAtiva && !lanternaOk ? (
         <p className="mt-1 px-6 text-center text-xs text-white/50">Lanterna indisponível neste navegador.</p>
       ) : null}
-
-      <form
-        className="absolute inset-x-0 bottom-0 space-y-2 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
-        onSubmit={event => {
-          event.preventDefault()
-          void emitirCodigo(manual)
-        }}
-      >
-        <p className="text-center text-xs font-medium text-white/70">
-          Sem câmera? Digite o número ou o código da comanda.
-        </p>
-        <div className="flex gap-2">
-          <input
-            value={manual}
-            onChange={event => setManual(event.target.value)}
-            disabled={ocupado || lido}
-            placeholder="Ex: 69 ou JTTHYODA"
-            className="h-12 min-w-0 flex-1 rounded-2xl bg-white/15 px-4 text-center text-base uppercase tracking-widest outline-none placeholder:normal-case placeholder:tracking-normal placeholder:text-white/50"
-            autoCapitalize="characters"
-            autoComplete="off"
-            inputMode="text"
-            enterKeyHint="go"
-          />
-          <button
-            type="submit"
-            disabled={ocupado || lido || !manual.trim()}
-            className="h-12 shrink-0 rounded-2xl bg-white px-4 text-sm font-semibold text-zinc-900 disabled:opacity-40"
-          >
-            Pegar
-          </button>
+      </div>
+      ) : (
+        <div className="mt-4 flex min-h-0 flex-1 flex-col rounded-t-3xl bg-zinc-50 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-6 text-zinc-900">
+          {lido ? (
+            <div className="flex flex-col items-center gap-2 pt-10 text-center">
+              <MdCheckCircle className="h-16 w-16 text-emerald-500" aria-hidden />
+              <p className="text-lg font-semibold">Peguei!</p>
+              {ocupado ? (
+                <>
+                  <AppSpinner className="mt-1 h-6 w-6" />
+                  <p className="text-sm font-medium text-zinc-500">Adicionando pedido…</p>
+                </>
+              ) : null}
+            </div>
+          ) : (
+            <form
+              className="space-y-4"
+              onSubmit={event => {
+                event.preventDefault()
+                void emitirCodigo(manual)
+              }}
+            >
+              <div>
+                <label htmlFor="coletar-busca-pedido" className="text-sm font-semibold text-zinc-800">
+                  Número ou código do pedido
+                </label>
+                <input
+                  ref={buscaRef}
+                  id="coletar-busca-pedido"
+                  value={manual}
+                  onChange={event => setManual(event.target.value)}
+                  disabled={ocupado}
+                  placeholder="69 ou JTTHYODA"
+                  className="mt-2 h-14 w-full rounded-2xl bg-white px-4 text-lg text-zinc-900 shadow-sm outline-none ring-1 ring-black/[0.08] placeholder:text-zinc-400 focus:ring-2 focus:ring-secondary"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  inputMode="search"
+                  enterKeyHint="search"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={ocupado || !manual.trim()}
+                className="h-14 w-full rounded-2xl bg-secondary text-base font-semibold text-white disabled:opacity-40"
+              >
+                Coletar
+              </button>
+              <p className="text-sm leading-relaxed text-zinc-500">
+                Digite o número da comanda ou o código do cupom. A câmera fica desligada nesta aba.
+              </p>
+            </form>
+          )}
         </div>
-      </form>
+      )}
     </div>
   )
 }

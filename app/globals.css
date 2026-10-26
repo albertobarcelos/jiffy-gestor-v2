@@ -447,6 +447,8 @@ body.jiffy-mapa-google-indisponivel .gm-err-container {
 
 .expedicao-slide-direita {
   animation: expedicao-slide-direita 280ms ease-out;
+  isolation: isolate;
+  z-index: 0;
 }
 
 @keyframes expedicao-estouro {

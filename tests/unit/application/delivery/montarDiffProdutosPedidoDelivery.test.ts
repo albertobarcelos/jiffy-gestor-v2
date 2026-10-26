@@ -43,6 +43,23 @@ describe('montarDiffProdutosPedidoDelivery', () => {
     expect(diff.alterou).toBe(true)
   })
 
+  it('complemento + quantidade vira remove + add na mesma linha', () => {
+    const original = item({ produtoId: 'cat-1', produtoLancadoId: 'lan-1', quantidade: 1 })
+    const editado = item({
+      produtoId: 'cat-1',
+      produtoLancadoId: 'lan-1',
+      quantidade: 6,
+      complementos: [
+        { id: 'hamb', grupoId: 'g1', nome: 'Hambúrguer', valor: 8, quantidade: 6 },
+      ],
+    })
+    const diff = montarDiffProdutosPedidoDelivery([original], [editado])
+
+    expect(diff.remove).toEqual(['lan-1'])
+    expect(diff.add).toHaveLength(1)
+    expect(diff.add[0]).toMatchObject({ produtoId: 'cat-1', quantidade: 6 })
+  })
+
   it('alterar quantidade vira remove + add do mesmo item', () => {
     const original = item({ produtoId: 'cat-1', produtoLancadoId: 'lan-1', quantidade: 1 })
     const editado = item({ produtoId: 'cat-1', produtoLancadoId: 'lan-1', quantidade: 3 })
