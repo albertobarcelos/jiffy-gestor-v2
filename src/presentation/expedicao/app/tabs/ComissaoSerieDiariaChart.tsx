@@ -75,7 +75,7 @@ export function ComissaoSerieDiariaChart(props: ComissaoSerieDiariaChartProps) {
         </div>
         {!temValor ? <p className="text-[11px] font-medium text-zinc-400">Sem entregas neste recorte</p> : null}
       </div>
-      <div className="mt-3 h-40 w-full">
+      <div className="mt-3 h-40 w-full outline-none [-webkit-tap-highlight-color:transparent] [&_*]:outline-none [&_.recharts-rectangle.recharts-tooltip-cursor]:hidden [&_.recharts-tooltip-cursor]:hidden [&_.recharts-surface]:outline-none [&_.recharts-wrapper]:outline-none [&_svg]:outline-none [&_svg:focus]:outline-none">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} barCategoryGap={data.length > 10 ? '18%' : '28%'}>
             <XAxis
@@ -86,10 +86,20 @@ export function ComissaoSerieDiariaChart(props: ComissaoSerieDiariaChartProps) {
               tick={{ fill: '#71717a', fontSize: 11, fontWeight: 600 }}
             />
             <YAxis hide domain={[0, 'auto']} />
-            <Tooltip cursor={false} content={<TooltipDia />} />
-            <Bar dataKey="total" radius={[8, 8, 6, 6]} maxBarSize={28} activeBar={false}>
+            <Tooltip
+              cursor={false}
+              content={<TooltipDia />}
+              wrapperStyle={{ outline: 'none', border: 'none' }}
+            />
+            <Bar
+              dataKey="total"
+              radius={[8, 8, 6, 6]}
+              maxBarSize={28}
+              activeBar={false}
+              background={false}
+            >
               {data.map(ponto => (
-                <Cell key={ponto.dia} fill={ponto.destaque ? COR_DESTAQUE : COR_BARRA} />
+                <Cell key={ponto.dia} fill={ponto.destaque ? COR_DESTAQUE : COR_BARRA} stroke="none" />
               ))}
             </Bar>
           </BarChart>

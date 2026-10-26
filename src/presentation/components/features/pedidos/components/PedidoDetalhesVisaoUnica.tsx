@@ -1,6 +1,5 @@
 'use client'
 
-import { useMemo } from 'react'
 import { MdAccessTime, MdLocationOn, MdSportsMotorsports } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
 import { temSeloCanalOrigem } from '@/src/domain/policies/pedido/origemCanalMarketplace'
@@ -32,11 +31,6 @@ import {
   rotuloEtapaDetalhePedido,
   rotuloTipoAtendimento,
 } from '../utils/detalheVisaoUnica'
-import { PedidoDetalheColunaFiscal, rotulosNcmCestFiscal } from './PedidoNcmCestFiscalTexto'
-import {
-  ncmCestFiscalDoMapa,
-  useNcmCestFiscalPorProdutoIds,
-} from '@/src/presentation/hooks/pedidos/useNcmCestFiscalPorProdutoIds'
 
 function Cartao({ children }: { children: React.ReactNode }) {
   return (
@@ -122,12 +116,6 @@ export function PedidoDetalhesVisaoUnica() {
     ? formatarEnderecoEntregaMultilinha(detalhesEntregaPedido?.enderecoEntrega)
     : []
   const produtosAtivos = produtos.filter(p => !p.removido)
-  const produtoIdsDetalhe = useMemo(
-    () => produtos.filter(p => !p.removido).map(produto => produto.produtoId),
-    [produtos]
-  )
-  const { data: ncmCestFiscalPorProdutoId, isPending: ncmCestFiscalCarregando } =
-    useNcmCestFiscalPorProdutoIds(produtoIdsDetalhe)
   const tipoPagamento = formatarTipoPagamentoDetalhe(
     pagamentos,
     meiosPagamento ?? [],
@@ -329,12 +317,7 @@ export function PedidoDetalhesVisaoUnica() {
           <p className="text-sm text-gray-500">Nenhum produto</p>
         ) : (
           <ul className="space-y-2">
-            {produtosAtivos.map(produto => {
-              const fiscal = rotulosNcmCestFiscal(
-                ncmCestFiscalDoMapa(ncmCestFiscalPorProdutoId, produto.produtoId),
-                ncmCestFiscalCarregando
-              )
-              return (
+            {produtosAtivos.map(produto => (
               <li
                 key={produto.produtoLancadoId ?? `${produto.produtoId}-${produto.nome}`}
                 className="flex items-start justify-between gap-3 text-sm"
@@ -343,26 +326,6 @@ export function PedidoDetalhesVisaoUnica() {
                   <p className="text-gray-900">
                     <span className="font-semibold">{produto.quantidade}x</span> {produto.nome}
                   </p>
-                  <div className="mt-0.5 flex gap-3 text-xs">
-                    <span className="inline-flex min-w-[7.5rem] items-baseline gap-1">
-                      <span className="text-gray-500">NCM</span>
-                      <PedidoDetalheColunaFiscal
-                        texto={fiscal.ncm}
-                        vazio={fiscal.ncmVazio}
-                        indisponivel={fiscal.indisponivel}
-                        className="text-left"
-                      />
-                    </span>
-                    <span className="inline-flex min-w-[7.5rem] items-baseline gap-1">
-                      <span className="text-gray-500">CEST</span>
-                      <PedidoDetalheColunaFiscal
-                        texto={fiscal.cest}
-                        vazio={fiscal.cestVazio}
-                        indisponivel={fiscal.indisponivel}
-                        className="text-left"
-                      />
-                    </span>
-                  </div>
                   {produto.observacao?.trim() ? (
                     <p className="text-xs text-gray-500">Obs: {produto.observacao.trim()}</p>
                   ) : null}
@@ -376,8 +339,7 @@ export function PedidoDetalhesVisaoUnica() {
                   {transformarParaReal(produto.valorFinal ?? produto.valorUnitario)}
                 </span>
               </li>
-              )
-            })}
+            ))}
           </ul>
         )}
 
