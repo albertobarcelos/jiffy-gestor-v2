@@ -1,11 +1,19 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { MdExpandLess, MdExpandMore } from 'react-icons/md'
 import type { PedidoResumoAppEntregador } from '@/src/presentation/expedicao/app/api/expedicaoAppApi'
-import type { MeioPagamentoAppEntregador } from '@/src/application/expedicao/app/pagamentoFinalizarEntregaApp'
+import type {
+  LinhaPagamentoFinalizarApp,
+  MeioPagamentoAppEntregador,
+} from '@/src/application/expedicao/app/pagamentoFinalizarEntregaApp'
 import {
-  idMeioPagamentoPadraoFinalizarApp,
+  alternarMeioNasLinhasFinalizarApp,
+  atualizarValorLinhaFinalizarApp,
+  montarLinhasIniciaisFinalizarApp,
   montarOpcoesMeioPagamentoFinalizarApp,
+  somaLinhasPagamentoFinalizarApp,
+  valorACobrirFinalizarApp,
 } from '@/src/application/expedicao/app/pagamentoFinalizarEntregaApp'
 import { formatarMoedaApp } from '@/src/presentation/expedicao/app/format'
 import { AppSpinner } from '@/src/presentation/expedicao/app/shell/AppSpinner'
@@ -15,23 +23,51 @@ export function ConfirmarEntregaDialog(props: {
   meios: MeioPagamentoAppEntregador[]
   ocupado: boolean
   onCancelar: () => void
-  onConfirmar: (meioPagamentoId: string | null) => void
+  onConfirmar: (linhas: LinhaPagamentoFinalizarApp[]) => void
 }) {
   const cobrancas = props.pedido.cobrancas ?? []
-  const padrao = idMeioPagamentoPadraoFinalizarApp(cobrancas)
-  const [selecionadoId, setSelecionadoId] = useState<string | null>(padrao)
+  const valorAlvo = valorACobrirFinalizarApp({
+    cobrancas,
+    valorFinal: props.pedido.valorFinal,
+    faltaPagar: props.pedido.faltaPagar,
+  })
+  const [linhas, setLinhas] = useState<LinhaPagamentoFinalizarApp[]>(() =>
+    montarLinhasIniciaisFinalizarApp({
+      cobrancas,
+      valorFinal: props.pedido.valorFinal,
+      faltaPagar: props.pedido.faltaPagar,
+    })
+  )
+  const [aberto, setAberto] = useState(false)
   const opcoes = montarOpcoesMeioPagamentoFinalizarApp({
     meios: props.meios,
     cobrancas,
   })
   const cobrar = props.pedido.faltaPagar > 0
+  const idsEscolhidos = useMemo(
+    () => new Set(linhas.map(linha => linha.meioPagamentoId)),
+    [linhas]
+  )
   const rotuloAtual =
-    opcoes.find(opcao => opcao.id === (selecionadoId ?? padrao))?.nome ||
+    linhas
+      .map(linha => opcoes.find(opcao => opcao.id === linha.meioPagamentoId)?.nome)
+      .filter(Boolean)
+      .join(' + ') ||
     props.pedido.formaPagamento ||
-    (cobrar ? 'Na entrega' : 'Pago')
+    (cobrar ? 'Toque para escolher' : 'Pago')
+  const soma = somaLinhasPagamentoFinalizarApp(linhas)
+  const fechaCerto = linhas.length > 0 && Math.abs(soma - valorAlvo) < 0.009
+  const mostrarValores = linhas.length > 1 || valorAlvo > 0
 
   useEffect(() => {
-    setSelecionadoId(idMeioPagamentoPadraoFinalizarApp(props.pedido.cobrancas ?? []))
+    setLinhas(
+      montarLinhasIniciaisFinalizarApp({
+        cobrancas: props.pedido.cobrancas ?? [],
+        valorFinal: props.pedido.valorFinal,
+        faltaPagar: props.pedido.faltaPagar,
+      })
+    )
+    setAberto(false)
   }, [props.pedido.id])
 
   return (
@@ -61,43 +97,123 @@ export function ConfirmarEntregaDialog(props: {
           <p className="mt-4 text-[11px] font-bold uppercase tracking-wide text-zinc-400">
             Como o cliente pagou?
           </p>
-          <p className="mt-1 text-sm text-zinc-500">
-            Já vem <span className="font-semibold text-zinc-700">{rotuloAtual}</span> no pedido. Troque só se
-            for outro.
-          </p>
+          <button
+            type="button"
+            disabled={props.ocupado || opcoes.length === 0}
+            aria-expanded={aberto}
+            onClick={() => setAberto(prev => !prev)}
+            className="mt-2 flex w-full items-center justify-between gap-3 rounded-xl bg-zinc-100 px-4 py-3 text-left disabled:opacity-50"
+          >
+            <span>
+              <span className="block text-base font-semibold text-zinc-900">{rotuloAtual}</span>
+              <span className="mt-0.5 block text-xs font-medium text-zinc-500">
+                {opcoes.length === 0
+                  ? 'Sem formas para trocar agora'
+                  : aberto
+                    ? 'Toque de novo para fechar'
+                    : 'Toque para trocar ou somar formas'}
+              </span>
+            </span>
+            {aberto ? (
+              <MdExpandLess className="h-6 w-6 shrink-0 text-zinc-500" aria-hidden />
+            ) : (
+              <MdExpandMore className="h-6 w-6 shrink-0 text-zinc-500" aria-hidden />
+            )}
+          </button>
 
-          {opcoes.length > 0 ? (
-            <ul className="mt-3 grid grid-cols-2 gap-2">
+          {aberto && opcoes.length > 0 ? (
+            <ul className="mt-2 overflow-hidden rounded-xl ring-1 ring-zinc-200">
               {opcoes.map(opcao => {
-                const ativo = (selecionadoId ?? padrao) === opcao.id
+                const marcado = idsEscolhidos.has(opcao.id)
                 return (
-                  <li key={opcao.id}>
+                  <li key={opcao.id} className="border-b border-zinc-100 last:border-b-0">
                     <button
                       type="button"
                       disabled={props.ocupado}
-                      onClick={() => setSelecionadoId(opcao.id)}
-                      className={`flex h-[4.25rem] w-full flex-col items-start justify-center rounded-xl px-3 text-left disabled:opacity-50 ${
-                        ativo
-                          ? 'bg-secondary text-white'
-                          : 'bg-zinc-100 text-zinc-800'
-                      }`}
+                      onClick={() =>
+                        setLinhas(atual =>
+                          alternarMeioNasLinhasFinalizarApp({
+                            linhas: atual,
+                            meioPagamentoId: opcao.id,
+                            valorAlvo,
+                          })
+                        )
+                      }
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left disabled:opacity-50"
                     >
-                      <span className="line-clamp-2 text-sm font-semibold leading-tight">{opcao.nome}</span>
-                      {opcao.noPedido ? (
-                        <span className={`mt-1 text-[10px] font-bold uppercase tracking-wide ${ativo ? 'text-white/80' : 'text-zinc-400'}`}>
-                          No pedido
-                        </span>
-                      ) : null}
+                      <span
+                        aria-hidden
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-sm font-bold ${
+                          marcado ? 'bg-secondary text-white' : 'bg-zinc-200 text-zinc-500'
+                        }`}
+                      >
+                        {marcado ? '✓' : ''}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-semibold text-zinc-900">{opcao.nome}</span>
+                        {opcao.noPedido ? (
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">
+                            No pedido
+                          </span>
+                        ) : null}
+                      </span>
                     </button>
                   </li>
                 )
               })}
             </ul>
-          ) : (
-            <p className="mt-3 rounded-xl bg-zinc-50 px-3 py-2.5 text-sm font-semibold text-zinc-800">
-              {rotuloAtual}
+          ) : null}
+
+          {mostrarValores && linhas.length > 0 ? (
+            <ul className="mt-3 space-y-2">
+              {linhas.map((linha, indice) => {
+                const nome =
+                  opcoes.find(opcao => opcao.id === linha.meioPagamentoId)?.nome || 'Pagamento'
+                return (
+                  <li key={`${linha.meioPagamentoId}-${indice}`} className="flex items-center gap-3">
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-zinc-800">
+                      {nome}
+                    </span>
+                    {linhas.length > 1 ? (
+                      <label className="flex items-center gap-1">
+                        <span className="text-xs font-medium text-zinc-400">R$</span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          disabled={props.ocupado}
+                          key={`${linha.meioPagamentoId}-${linha.valor}`}
+                          defaultValue={linha.valor.toFixed(2).replace('.', ',')}
+                          onBlur={event => {
+                            const bruto = event.target.value.replace(/\s/g, '').replace(/\./g, '').replace(',', '.')
+                            const valor = Number(bruto)
+                            setLinhas(atual =>
+                              atualizarValorLinhaFinalizarApp({
+                                linhas: atual,
+                                indice,
+                                valor: Number.isFinite(valor) ? valor : 0,
+                                valorAlvo,
+                              })
+                            )
+                          }}
+                          className="h-10 w-24 rounded-xl bg-zinc-100 px-3 text-right text-sm font-semibold text-zinc-900 outline-none ring-1 ring-transparent focus:ring-secondary disabled:opacity-50"
+                        />
+                      </label>
+                    ) : (
+                      <span className="text-sm font-semibold text-zinc-900">
+                        {formatarMoedaApp(linha.valor)}
+                      </span>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          ) : null}
+
+          {linhas.length > 1 && !fechaCerto ? (
+            <p className="mt-2 text-xs font-semibold text-amber-700">
+              A soma precisa fechar {formatarMoedaApp(valorAlvo)}.
             </p>
-          )}
+          ) : null}
         </div>
 
         <div className="grid shrink-0 grid-cols-2 gap-3 border-t border-zinc-100 p-5">
@@ -111,8 +227,8 @@ export function ConfirmarEntregaDialog(props: {
           </button>
           <button
             type="button"
-            disabled={props.ocupado}
-            onClick={() => props.onConfirmar(selecionadoId)}
+            disabled={props.ocupado || !fechaCerto}
+            onClick={() => props.onConfirmar(linhas)}
             className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-secondary text-sm font-semibold text-white disabled:opacity-60"
           >
             {props.ocupado ? <AppSpinner tom="branco" /> : null}

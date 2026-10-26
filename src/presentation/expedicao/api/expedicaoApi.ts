@@ -99,7 +99,7 @@ export async function marcarPedidoPronto(input: {
   }
 }
 
-export async function vincularEDespacharPedido(input: {
+export async function vincularPedidoAoEntregador(input: {
   token: string
   pedidoId: string
   entregadorId: string
@@ -116,6 +116,14 @@ export async function vincularEDespacharPedido(input: {
   if (!patch.ok) {
     throw new Error(await lerErro(patch, 'Não foi possível vincular o entregador.'))
   }
+}
+
+export async function vincularEDespacharPedido(input: {
+  token: string
+  pedidoId: string
+  entregadorId: string
+}): Promise<void> {
+  await vincularPedidoAoEntregador(input)
   await transicionarStatus(input.token, input.pedidoId, 'EM_ROTA', 'Não foi possível expedir o pedido.')
 }
 

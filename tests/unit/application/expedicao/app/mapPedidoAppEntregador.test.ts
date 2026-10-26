@@ -21,6 +21,14 @@ describe('rotuloPagamentoPedidoApp', () => {
   it('cai no fallback do pedido', () => {
     expect(rotuloPagamentoPedidoApp({ formaPagamento: 'Crédito' })).toBe('Crédito')
   })
+
+  it('não mostra UUID no lugar do nome', () => {
+    expect(
+      rotuloPagamentoPedidoApp({
+        formaPagamento: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+      })
+    ).toBeNull()
+  })
 })
 
 describe('mapPedidoAppEntregador', () => {
@@ -82,5 +90,25 @@ describe('mapPedidoAppEntregador', () => {
     expect(
       aplicarNomesMeiosNoPedido(pedido!, { 'meio-dinheiro': 'Dinheiro' }).formaPagamento
     ).toBe('Dinheiro')
+  })
+
+  it('troca UUID já gravado no resumo pelo nome do catálogo', () => {
+    const pedido = mapPedidoAppEntregador({
+      id: 'p1',
+      formaPagamento: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+      cobrancas: [
+        {
+          meioPagamentoId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+          nome: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+          status: 'pendente',
+        },
+      ],
+    })
+    expect(pedido?.formaPagamento).toBeNull()
+    expect(
+      aplicarNomesMeiosNoPedido(pedido!, {
+        'a1b2c3d4-e5f6-7890-abcd-ef1234567890': 'Pix',
+      }).formaPagamento
+    ).toBe('Pix')
   })
 })

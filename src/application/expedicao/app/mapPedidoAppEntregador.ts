@@ -43,37 +43,53 @@ export function cobrancasPedidoApp(row: Record<string, unknown>): CobrancaAppEnt
         meioPagamentoId,
         valor: numero(cobranca.valor),
         pendente: !cobrancaPaga(cobranca),
-        nome: extrairNomeMeioPagamentoDeCobranca(cobranca) || null,
+        nome: nomeMeioVisivel(extrairNomeMeioPagamentoDeCobranca(cobranca)),
       },
     ]
   })
 }
 
+export function pareceIdentificadorMeioPagamento(valor: string | null | undefined): boolean {
+  const t = String(valor ?? '').trim()
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(t)
+}
+
 export function idsMeioPagamentoPedidoApp(row: Record<string, unknown>): string[] {
-  return [...new Set(cobrancasPedidoApp(row).map(cobranca => cobranca.meioPagamentoId))]
+  const ids = cobrancasPedidoApp(row).map(cobranca => cobranca.meioPagamentoId)
+  const fallback = texto(row.formaPagamento ?? row.meioPagamentoId)
+  if (pareceIdentificadorMeioPagamento(fallback)) ids.push(fallback)
+  return [...new Set(ids)]
+}
+
+function nomeMeioVisivel(valor: string | null | undefined): string | null {
+  const t = String(valor ?? '').trim()
+  if (!t || pareceIdentificadorMeioPagamento(t)) return null
+  return t
 }
 
 export function rotuloPagamentoPedidoApp(row: Record<string, unknown>): string | null {
   const nomes = cobrancasAtivas(row)
-    .map(cobranca => extrairNomeMeioPagamentoDeCobranca(cobranca))
-    .filter(Boolean)
+    .map(cobranca => nomeMeioVisivel(extrairNomeMeioPagamentoDeCobranca(cobranca)))
+    .filter((nome): nome is string => Boolean(nome))
   if (nomes.length > 0) return [...new Set(nomes)].join(' + ')
-  const fallback = texto(row.formaPagamento ?? row.meioPagamentoNome)
-  return fallback || null
+  return nomeMeioVisivel(texto(row.formaPagamento ?? row.meioPagamentoNome))
 }
 
 export function aplicarNomesMeiosNoPedido(
   pedido: PedidoResumoAppEntregador,
   nomesPorId: Record<string, string>
 ): PedidoResumoAppEntregador {
-  const cobrancas = pedido.cobrancas.map(cobranca =>
-    cobranca.nome ? cobranca : { ...cobranca, nome: nomesPorId[cobranca.meioPagamentoId] || null }
-  )
-  if (pedido.formaPagamento) return { ...pedido, cobrancas }
-  const nomes = cobrancas.map(cobranca => cobranca.nome).filter((nome): nome is string => Boolean(nome))
-  const fallback = pedido.meioPagamentoIds.map(id => nomesPorId[id]).filter(Boolean)
-  const formaPagamento = [...new Set(nomes.length > 0 ? nomes : fallback)].join(' + ') || null
-  if (!formaPagamento) return { ...pedido, cobrancas }
+  const cobrancas = pedido.cobrancas.map(cobranca => ({
+    ...cobranca,
+    nome: nomeMeioVisivel(cobranca.nome) ?? nomesPorId[cobranca.meioPagamentoId] ?? null,
+  }))
+  const nomes = cobrancas
+    .map(cobranca => cobranca.nome)
+    .filter((nome): nome is string => Boolean(nome))
+  const doCatalogo = pedido.meioPagamentoIds.map(id => nomesPorId[id]).filter(Boolean)
+  const formaPagamento =
+    [...new Set(nomes.length > 0 ? nomes : doCatalogo)].join(' + ') ||
+    nomeMeioVisivel(pedido.formaPagamento)
   return { ...pedido, cobrancas, formaPagamento }
 }
 

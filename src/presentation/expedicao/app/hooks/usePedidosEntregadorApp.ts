@@ -12,7 +12,10 @@ import {
   type PedidoResumoAppEntregador,
 } from '@/src/presentation/expedicao/app/api/expedicaoAppApi'
 import type { PeriodoComissaoEntregador } from '@/src/application/expedicao/app/periodoComissaoEntregador'
-import { montarPagamentosAoTrocarMeioFinalizarApp } from '@/src/application/expedicao/app/pagamentoFinalizarEntregaApp'
+import {
+  montarPagamentosDasLinhasFinalizarApp,
+  type LinhaPagamentoFinalizarApp,
+} from '@/src/application/expedicao/app/pagamentoFinalizarEntregaApp'
 import { showToast } from '@/src/shared/utils/toast'
 
 export function usePedidosEntregadorApp(input: {
@@ -68,15 +71,12 @@ export function usePedidosEntregadorApp(input: {
     async (pedidoId: string) => {
       const token = tokenAtual()
       if (!token || !entregadorId) return
-      const [pego, lista] = await Promise.all([
-        buscarPedidoResumoApp({ token, pedidoId }),
-        listarPedidosAtivosEntregador({ token, entregadorId }).catch(() => [] as PedidoResumoAppEntregador[]),
-      ])
+      const pego = await buscarPedidoResumoApp({ token, pedidoId })
       const pegoDoEntregador =
         pego && (pego.entregadorId === entregadorId || !pego.entregadorId)
-          ? { ...pego, entregadorId, etapa: pego.etapa || 'EM_ROTA' }
+          ? { ...pego, entregadorId, etapa: pego.etapa || 'PRONTO' }
           : pego
-      setPedidos(mesclarPedidoPegoNaLista(lista, pegoDoEntregador))
+      setPedidos(prev => mesclarPedidoPegoNaLista(prev, pegoDoEntregador))
       jaCarregouPedidos.current = true
     },
     [entregadorId, tokenAtual]
@@ -107,7 +107,7 @@ export function usePedidosEntregadorApp(input: {
   }, [tokenAtual])
 
   const confirmarEntrega = useCallback(
-    async (pedidoId: string, meioPagamentoId?: string | null) => {
+    async (pedidoId: string, linhas?: LinhaPagamentoFinalizarApp[]) => {
       const token = tokenAtual()
       if (!token) {
         showToast.error('Sessão da loja expirada.')
@@ -115,9 +115,9 @@ export function usePedidosEntregadorApp(input: {
       }
       const pedido = pedidos.find(p => p.id === pedidoId)
       const pagamentos = pedido
-        ? montarPagamentosAoTrocarMeioFinalizarApp({
+        ? montarPagamentosDasLinhasFinalizarApp({
             cobrancas: pedido.cobrancas ?? [],
-            meioPagamentoId: meioPagamentoId ?? null,
+            linhas: linhas ?? [],
             valorFinal: pedido.valorFinal,
             faltaPagar: pedido.faltaPagar,
           })

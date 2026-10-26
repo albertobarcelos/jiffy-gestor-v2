@@ -1,4 +1,5 @@
 import type { CobrancaAppEntregador } from '@/src/application/expedicao/app/filtrarPedidosDoEntregador'
+import { pareceIdentificadorMeioPagamento } from '@/src/application/expedicao/app/mapPedidoAppEntregador'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
 
 export type MeioPagamentoAppEntregador = {
@@ -10,6 +11,11 @@ export type OpcaoMeioPagamentoFinalizarApp = {
   id: string
   nome: string
   noPedido: boolean
+}
+
+export type LinhaPagamentoFinalizarApp = {
+  meioPagamentoId: string
+  valor: number
 }
 
 function arredondar(valor: number): number {
@@ -38,7 +44,10 @@ export function montarOpcoesMeioPagamentoFinalizarApp(input: {
     if (!cobranca.meioPagamentoId) continue
     porId.set(cobranca.meioPagamentoId, {
       id: cobranca.meioPagamentoId,
-      nome: cobranca.nome || cobranca.meioPagamentoId,
+      nome:
+        cobranca.nome && !pareceIdentificadorMeioPagamento(cobranca.nome)
+          ? cobranca.nome
+          : cobranca.meioPagamentoId,
       noPedido: true,
     })
   }
@@ -101,4 +110,145 @@ export function montarPagamentosAoTrocarMeioFinalizarApp(input: {
   const valorPago = arredondar(input.valorFinal)
   if (valorPago <= 0) return null
   return [{ meioPagamentoId: escolhido, valor: valorPago }]
+}
+
+export function valorACobrirFinalizarApp(input: {
+  cobrancas: CobrancaAppEntregador[]
+  valorFinal: number
+  faltaPagar: number
+}): number {
+  const pendentes = input.cobrancas.filter(cobranca => cobranca.pendente)
+  if (pendentes.length > 0 || input.faltaPagar > 0) {
+    return arredondar(
+      pendentes.reduce((soma, cobranca) => soma + cobranca.valor, 0) ||
+        input.faltaPagar ||
+        input.valorFinal
+    )
+  }
+  return arredondar(input.valorFinal)
+}
+
+export function montarLinhasIniciaisFinalizarApp(input: {
+  cobrancas: CobrancaAppEntregador[]
+  valorFinal: number
+  faltaPagar: number
+}): LinhaPagamentoFinalizarApp[] {
+  const alvo = valorACobrirFinalizarApp(input)
+  const fonte =
+    input.faltaPagar > 0 || input.cobrancas.some(cobranca => cobranca.pendente)
+      ? input.cobrancas.filter(cobranca => cobranca.pendente && cobranca.meioPagamentoId)
+      : input.cobrancas.filter(cobranca => cobranca.meioPagamentoId)
+  if (fonte.length === 0) return []
+  return encaixarLinhasNoAlvo(
+    fonte.map(cobranca => ({
+      meioPagamentoId: cobranca.meioPagamentoId,
+      valor: arredondar(cobranca.valor),
+    })),
+    alvo
+  )
+}
+
+export function somaLinhasPagamentoFinalizarApp(linhas: LinhaPagamentoFinalizarApp[]): number {
+  return arredondar(linhas.reduce((soma, linha) => soma + linha.valor, 0))
+}
+
+export function alternarMeioNasLinhasFinalizarApp(input: {
+  linhas: LinhaPagamentoFinalizarApp[]
+  meioPagamentoId: string
+  valorAlvo: number
+}): LinhaPagamentoFinalizarApp[] {
+  const id = input.meioPagamentoId.trim()
+  if (!id) return input.linhas
+  const existe = input.linhas.some(linha => linha.meioPagamentoId === id)
+  if (existe) {
+    const resto = input.linhas.filter(linha => linha.meioPagamentoId !== id)
+    return encaixarLinhasNoAlvo(resto, input.valorAlvo)
+  }
+  const soma = somaLinhasPagamentoFinalizarApp(input.linhas)
+  const resto = arredondar(input.valorAlvo - soma)
+  return [...input.linhas, { meioPagamentoId: id, valor: resto > 0 ? resto : 0 }]
+}
+
+export function atualizarValorLinhaFinalizarApp(input: {
+  linhas: LinhaPagamentoFinalizarApp[]
+  indice: number
+  valor: number
+  valorAlvo: number
+}): LinhaPagamentoFinalizarApp[] {
+  if (input.indice < 0 || input.indice >= input.linhas.length) return input.linhas
+  const teto = Math.max(0, input.valorAlvo)
+  const valor = arredondar(Math.min(teto, Math.max(0, input.valor)))
+  const next = input.linhas.map((linha, indice) =>
+    indice === input.indice ? { ...linha, valor } : linha
+  )
+  if (next.length === 1) return [{ ...next[0], valor: teto }]
+  const outro = next.length - 1 === input.indice ? next.length - 2 : next.length - 1
+  const somaOutros = arredondar(
+    next.reduce((soma, linha, indice) => soma + (indice === outro ? 0 : linha.valor), 0)
+  )
+  next[outro] = { ...next[outro], valor: arredondar(Math.max(0, teto - somaOutros)) }
+  return next
+}
+
+export function montarPagamentosDasLinhasFinalizarApp(input: {
+  cobrancas: CobrancaAppEntregador[]
+  linhas: LinhaPagamentoFinalizarApp[]
+  valorFinal: number
+  faltaPagar: number
+}): PagamentoSelecionado[] | null {
+  const linhas = input.linhas.filter(linha => linha.meioPagamentoId && linha.valor > 0)
+  if (linhas.length === 0) return null
+  const alvo = valorACobrirFinalizarApp(input)
+  if (Math.abs(somaLinhasPagamentoFinalizarApp(linhas) - alvo) > 0.009) return null
+
+  const pagas = input.cobrancas.filter(cobranca => !cobranca.pendente && cobranca.id)
+  const pendentes = input.cobrancas.filter(cobranca => cobranca.pendente)
+  const iguaisPendentes =
+    (pendentes.length > 0 || input.faltaPagar > 0) &&
+    pendentes.length === linhas.length &&
+    pendentes.every(
+      (cobranca, indice) =>
+        cobranca.meioPagamentoId === linhas[indice]?.meioPagamentoId &&
+        Math.abs(cobranca.valor - linhas[indice].valor) < 0.009
+    )
+  if (iguaisPendentes) return null
+
+  if (pendentes.length > 0 || input.faltaPagar > 0) {
+    return [
+      ...pagas.map(cobranca => ({
+        id: cobranca.id,
+        meioPagamentoId: cobranca.meioPagamentoId,
+        valor: cobranca.valor,
+      })),
+      ...linhas.map(linha => ({
+        meioPagamentoId: linha.meioPagamentoId,
+        valor: arredondar(linha.valor),
+      })),
+    ]
+  }
+
+  const iguaisPagas =
+    pagas.length === linhas.length &&
+    pagas.every(
+      (cobranca, indice) =>
+        cobranca.meioPagamentoId === linhas[indice]?.meioPagamentoId &&
+        Math.abs(cobranca.valor - linhas[indice].valor) < 0.009
+    )
+  if (iguaisPagas) return null
+  return linhas.map(linha => ({
+    meioPagamentoId: linha.meioPagamentoId,
+    valor: arredondar(linha.valor),
+  }))
+}
+
+function encaixarLinhasNoAlvo(
+  linhas: LinhaPagamentoFinalizarApp[],
+  valorAlvo: number
+): LinhaPagamentoFinalizarApp[] {
+  if (linhas.length === 0) return []
+  if (linhas.length === 1) return [{ ...linhas[0], valor: arredondar(valorAlvo) }]
+  const teto = arredondar(valorAlvo)
+  const semUltima = linhas.slice(0, -1)
+  const soma = somaLinhasPagamentoFinalizarApp(semUltima)
+  return [...semUltima, { ...linhas[linhas.length - 1], valor: arredondar(Math.max(0, teto - soma)) }]
 }
