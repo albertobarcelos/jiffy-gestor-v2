@@ -44,7 +44,7 @@ export function ExpedicaoAppTabBar(props: {
 }) {
   return (
     <nav
-      className="grid grid-cols-5 items-end border-t border-black/[0.06] bg-white px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-2"
+      className="grid shrink-0 grid-cols-5 items-end border-t border-black/[0.06] bg-white px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-2"
       aria-label="Navegação do entregador"
     >
       {ABAS_ESQ.map(item => (

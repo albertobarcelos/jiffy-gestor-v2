@@ -2,9 +2,57 @@
 
 import { useEffect } from 'react'
 import { isSuperficieExpedicaoApp } from '@/src/application/expedicao/app/detectarSuperficieExpedicao'
+import {
+  deveImpedirOverscrollDocumentoExpedicaoApp,
+  EXPEDICAO_APP_VIEWPORT_CLASS,
+} from '@/src/application/expedicao/app/travaViewportExpedicaoApp'
 
 const MANIFEST_HREF = '/expedicao-app/manifest.webmanifest'
 const SW_HREF = '/sw-expedicao-app.js'
+
+function travaDocumentoExpedicaoApp() {
+  const html = document.documentElement
+  const body = document.body
+  html.classList.add(EXPEDICAO_APP_VIEWPORT_CLASS)
+  body.classList.add(EXPEDICAO_APP_VIEWPORT_CLASS)
+
+  let ultimoY: number | null = null
+
+  const onTouchStart = (event: TouchEvent) => {
+    ultimoY = event.touches[0]?.clientY ?? null
+  }
+  const onTouchMove = (event: TouchEvent) => {
+    if (!event.cancelable) return
+    const y = event.touches[0]?.clientY
+    const deltaY = ultimoY != null && y != null ? y - ultimoY : 0
+    if (y != null) ultimoY = y
+    if (deveImpedirOverscrollDocumentoExpedicaoApp({ target: event.target, deltaY })) {
+      event.preventDefault()
+    }
+  }
+  const onTouchEnd = () => {
+    ultimoY = null
+  }
+  const onScrollJanela = () => {
+    if (window.scrollY !== 0 || window.scrollX !== 0) window.scrollTo(0, 0)
+  }
+
+  document.addEventListener('touchstart', onTouchStart, { passive: true })
+  document.addEventListener('touchmove', onTouchMove, { passive: false })
+  document.addEventListener('touchend', onTouchEnd, { passive: true })
+  document.addEventListener('touchcancel', onTouchEnd, { passive: true })
+  window.addEventListener('scroll', onScrollJanela, { passive: true })
+
+  return () => {
+    html.classList.remove(EXPEDICAO_APP_VIEWPORT_CLASS)
+    body.classList.remove(EXPEDICAO_APP_VIEWPORT_CLASS)
+    document.removeEventListener('touchstart', onTouchStart)
+    document.removeEventListener('touchmove', onTouchMove)
+    document.removeEventListener('touchend', onTouchEnd)
+    document.removeEventListener('touchcancel', onTouchEnd)
+    window.removeEventListener('scroll', onScrollJanela)
+  }
+}
 
 export function ExpedicaoAppPwa() {
   useEffect(() => {
@@ -14,6 +62,8 @@ export function ExpedicaoAppPwa() {
       host: window.location.host,
     })
     if (!app) return
+
+    const soltarDocumento = travaDocumentoExpedicaoApp()
 
     const link = document.createElement('link')
     link.rel = 'manifest'
@@ -43,6 +93,7 @@ export function ExpedicaoAppPwa() {
     }
 
     return () => {
+      soltarDocumento()
       link.remove()
       apple.remove()
       metas.forEach(meta => meta.remove())

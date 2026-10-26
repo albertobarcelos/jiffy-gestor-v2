@@ -61,10 +61,19 @@ export function ExpedicaoAppMotoboy() {
     () => carregarPedidos({ silencioso: true }),
     [carregarPedidos]
   )
+  const incluirPedidoPego = pedidos.incluirPedidoPego
+  const onPego = useCallback(
+    async (pedidoId: string) => {
+      setAba('pedidos')
+      await incluirPedidoPego(pedidoId)
+    },
+    [incluirPedidoPego]
+  )
   const rodada = useRodadaEntregadorApp({
     entregadorId,
     tokenAtual: sessao.tokenAtual,
     onExpedida,
+    onPego,
   })
 
   useEffect(() => {
@@ -164,7 +173,7 @@ export function ExpedicaoAppMotoboy() {
 
   if (!pwa.pronto || sessao.aguardandoBootstrap) {
     return (
-      <div className="flex h-dvh items-center justify-center bg-[#f4f6f8]">
+      <div className="expedicao-app-shell flex h-dvh overflow-hidden overscroll-none items-center justify-center bg-[#f4f6f8]">
         <JiffyLoading text="Abrindo o app…" />
       </div>
     )
@@ -187,7 +196,7 @@ export function ExpedicaoAppMotoboy() {
 
   if (!sessao.entregador) {
     return (
-      <div className="h-dvh bg-[#f4f6f8] text-zinc-900">
+      <div className="expedicao-app-shell h-dvh overflow-hidden overscroll-none bg-[#f4f6f8] text-zinc-900">
         {overlaySaindo}
         <ExpedicaoTecladoSenha
           senha={sessao.senha}
@@ -238,7 +247,7 @@ export function ExpedicaoAppMotoboy() {
   const pedidoChecklist = rodada.rodada[rodada.indiceChecklist]
 
   return (
-    <div className="flex h-dvh flex-col bg-[#f4f6f8] text-zinc-900">
+    <div className="expedicao-app-shell flex h-dvh max-h-dvh flex-col overflow-hidden overscroll-none bg-[#f4f6f8] text-zinc-900">
       {overlaySaindo}
       {rodada.tela === 'rodada' ? (
         <RodadaAppScreen
@@ -265,6 +274,7 @@ export function ExpedicaoAppMotoboy() {
       {rodada.tela === 'checklist' && pedidoChecklist ? (
         <div className="min-h-0 flex-1">
           <ExpedicaoChecklist
+            key={pedidoChecklist.id}
             pedido={pedidoChecklist}
             indice={rodada.indiceChecklist}
             total={rodada.rodada.length}
@@ -273,6 +283,8 @@ export function ExpedicaoAppMotoboy() {
             onToggle={itemId =>
               rodada.setMarcados(prev => ({ ...prev, [itemId]: !prev[itemId] }))
             }
+            rotuloFinal="Em rota"
+            rotuloFinalOcupado="Em rota…"
             onContinuar={() => {
               if (rodada.indiceChecklist + 1 >= rodada.rodada.length) {
                 void rodada.expedirRodada()
@@ -302,7 +314,7 @@ export function ExpedicaoAppMotoboy() {
         />
       ) : null}
       {rodada.tela === 'abas' && !(aba === 'pedidos' && pedidoAberto) ? (
-        <div key={aba} className="expedicao-slide-direita flex min-h-0 flex-1 flex-col">
+        <div key={aba} className="expedicao-slide-direita flex min-h-0 flex-1 flex-col overflow-hidden">
           {aba === 'pedidos' ? (
             <PedidosTab
               loja={lojaNome}
@@ -380,9 +392,10 @@ export function ExpedicaoAppMotoboy() {
       {pedidoConfirmar ? (
         <ConfirmarEntregaDialog
           pedido={pedidoConfirmar}
+          meios={pedidos.meiosPagamento}
           ocupado={pedidos.confirmandoId === pedidoConfirmar.id}
           onCancelar={() => pedidos.setConfirmarId(null)}
-          onConfirmar={() => void pedidos.confirmarEntrega(pedidoConfirmar.id)}
+          onConfirmar={meioPagamentoId => void pedidos.confirmarEntrega(pedidoConfirmar.id, meioPagamentoId)}
         />
       ) : null}
     </div>

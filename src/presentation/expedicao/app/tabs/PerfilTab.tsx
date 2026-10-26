@@ -17,11 +17,14 @@ export function PerfilTab(props: {
   trocandoLojaId: string | null
 }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <header className="px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <header className="shrink-0 px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
         <h1 className="text-[28px] font-semibold tracking-tight text-zinc-900">Perfil</h1>
       </header>
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-4">
+      <div
+        data-expedicao-scroll
+        className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-y-contain px-4 pb-4"
+      >
         <section className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/[0.04]">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-secondary text-xl font-semibold text-white">
             {inicialNome(props.nome)}

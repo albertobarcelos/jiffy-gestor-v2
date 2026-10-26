@@ -14,7 +14,7 @@ export function ExpedicaoAppPwaPortao({ children }: { children: ReactNode }) {
     return (
       <>
         <ExpedicaoAppPwa />
-        <div className="h-dvh bg-secondary" aria-busy="true" aria-label="Carregando" />
+        <div className="expedicao-app-shell h-dvh bg-secondary" aria-busy="true" aria-label="Carregando" />
       </>
     )
   }

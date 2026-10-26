@@ -8,8 +8,8 @@ import { ExpedicaoAppPwaPortao } from '@/src/presentation/expedicao/app/pwa/Expe
 export function ExpedicaoAppLoginScreen() {
   return (
     <ExpedicaoAppPwaPortao>
-      <div className="expedicao-app-login flex h-dvh flex-col bg-secondary text-zinc-900">
-        <header className="px-6 pb-10 pt-[max(2.25rem,env(safe-area-inset-top))] text-white">
+      <div className="expedicao-app-login expedicao-app-shell flex h-dvh flex-col overflow-hidden bg-secondary text-zinc-900">
+        <header className="shrink-0 px-6 pb-10 pt-[max(2.25rem,env(safe-area-inset-top))] text-white">
           <Image
             src="/images/expedicao/logo_app.png"
             alt="JiffyGO"
@@ -25,7 +25,10 @@ export function ExpedicaoAppLoginScreen() {
             Use a conta da loja para ver seus pedidos.
           </p>
         </header>
-        <div className="min-h-0 flex-1 rounded-t-3xl bg-zinc-50 px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6">
+        <div
+          data-expedicao-scroll
+          className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain rounded-t-3xl bg-zinc-50 px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6"
+        >
           <LoginInviteRedirect />
           <LoginForm variante="app" />
         </div>

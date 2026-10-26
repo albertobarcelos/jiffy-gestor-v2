@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { filtrarPedidosAtivosDoEntregador } from '@/src/application/expedicao/app/filtrarPedidosDoEntregador'
+import {
+  filtrarPedidosAtivosDoEntregador,
+  mesclarPedidoPegoNaLista,
+} from '@/src/application/expedicao/app/filtrarPedidosDoEntregador'
 
 const pedido = (parcial: { entregadorId: string | null; etapa: string | null }) => ({
   ...parcial,
@@ -23,5 +26,16 @@ describe('filtrarPedidosAtivosDoEntregador', () => {
 
   it('sem id não devolve nada', () => {
     expect(filtrarPedidosAtivosDoEntregador([pedido({ entregadorId: 'e1', etapa: 'PRONTO' })], '')).toEqual([])
+  })
+})
+
+describe('mesclarPedidoPegoNaLista', () => {
+  it('coloca o pedido pego no topo e não duplica', () => {
+    const pego = { id: 'novo' }
+    expect(mesclarPedidoPegoNaLista([{ id: 'a' }, { id: 'novo' }], pego)).toEqual([
+      { id: 'novo' },
+      { id: 'a' },
+    ])
+    expect(mesclarPedidoPegoNaLista([{ id: 'a' }], pego)[0].id).toBe('novo')
   })
 })

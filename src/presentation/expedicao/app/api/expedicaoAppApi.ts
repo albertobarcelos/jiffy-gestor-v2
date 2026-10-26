@@ -3,7 +3,10 @@ import {
   intervaloComissaoEntregador,
   type PeriodoComissaoEntregador,
 } from '@/src/application/expedicao/app/periodoComissaoEntregador'
-import { filtrarPedidosAtivosDoEntregador } from '@/src/application/expedicao/app/filtrarPedidosDoEntregador'
+import {
+  filtrarPedidosAtivosDoEntregador,
+  mesclarPedidoPegoNaLista,
+} from '@/src/application/expedicao/app/filtrarPedidosDoEntregador'
 import {
   aplicarNomesMeiosNoPedido,
   mapPedidoAppEntregador,
@@ -13,7 +16,13 @@ import {
   montarComissaoEntregadorApp,
   type ComissaoEntregadorApp,
 } from '@/src/application/expedicao/app/montarComissaoEntregadorApp'
-import { confirmarCobrancaPendentePedidoDeliveryUseCase } from '@/src/infrastructure/composition/pedidoUseCases'
+import {
+  atualizarCobrancasPedidoDeliveryUseCase,
+  confirmarCobrancaPendentePedidoDeliveryUseCase,
+} from '@/src/infrastructure/composition/pedidoUseCases'
+import { montarQueryListagemMeiosPagamento } from '@/src/application/meios-pagamentos/listagemMeiosPagamentoQuery'
+import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
+import type { MeioPagamentoAppEntregador } from '@/src/application/expedicao/app/pagamentoFinalizarEntregaApp'
 import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { avaliarPedidoParaRodada, type PedidoLeituraExpedicao } from '@/src/application/expedicao/avaliarPedidoParaRodada'
@@ -26,7 +35,7 @@ import {
 
 export type { PedidoResumoAppEntregador }
 
-export type { ComissaoEntregadorApp }
+export type { ComissaoEntregadorApp, MeioPagamentoAppEntregador }
 
 async function lerErro(res: Response, fallback: string): Promise<string> {
   const raw: unknown = await res.json().catch(() => ({}))
@@ -38,7 +47,7 @@ export async function listarPedidosAtivosEntregador(input: {
   entregadorId: string
 }): Promise<PedidoResumoAppEntregador[]> {
   const params = new URLSearchParams()
-  params.set('limit', '50')
+  params.set('limit', '100')
   params.set('offset', '0')
   params.set('cancelado', 'false')
   params.append('statusDelivery', 'PRONTO')
@@ -57,6 +66,19 @@ export async function listarPedidosAtivosEntregador(input: {
   const nomes = await buscarNomesMeiosPagamentoApp(input.token, ids)
   return ativos.map(pedido => aplicarNomesMeiosNoPedido(pedido, nomes))
 }
+
+export async function buscarPedidoResumoApp(input: {
+  token: string
+  pedidoId: string
+}): Promise<PedidoResumoAppEntregador | null> {
+  const res = await fetchGestorApi(`/api/delivery/pedidos/${encodeURIComponent(input.pedidoId)}`, {
+    headers: { Authorization: `Bearer ${input.token}`, Accept: 'application/json' },
+  })
+  if (!res.ok) return null
+  return mapPedidoAppEntregador(await res.json())
+}
+
+export { mesclarPedidoPegoNaLista }
 
 let cacheNomesMeios: { em: number; nomes: Record<string, string> } | null = null
 
@@ -95,6 +117,37 @@ async function buscarNomesMeiosPagamentoApp(
   return nomes
 }
 
+export async function listarMeiosPagamentoEntregaApp(
+  token: string
+): Promise<MeioPagamentoAppEntregador[]> {
+  const query = montarQueryListagemMeiosPagamento({
+    ativo: true,
+    ativoEntregaDelivery: true,
+    ativoDelivery: true,
+    limit: 100,
+    offset: 0,
+  })
+  const res = await fetchGestorApi(`/api/meios-pagamentos?${query.toString()}`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(await lerErro(res, 'Não foi possível carregar as formas de pagamento.'))
+  const data = (await res.json()) as {
+    items?: Array<{ id?: string; nome?: string; tefAtivo?: boolean; ativo?: boolean }>
+  }
+  const meios: MeioPagamentoAppEntregador[] = []
+  const nomes: Record<string, string> = { ...(cacheNomesMeios?.nomes ?? {}) }
+  for (const item of data.items ?? []) {
+    const id = String(item.id ?? '').trim()
+    const nome = String(item.nome ?? '').trim()
+    if (!id || !nome) continue
+    nomes[id] = nome
+    if (item.ativo === false || item.tefAtivo === true) continue
+    meios.push({ id, nome })
+  }
+  cacheNomesMeios = { em: Date.now(), nomes }
+  return meios
+}
+
 export async function buscarComissaoEntregador(input: {
   token: string
   entregadorId: string
@@ -115,7 +168,10 @@ export async function buscarComissaoEntregador(input: {
   return montarComissaoEntregadorApp((await res.json()) as Record<string, unknown>, input.entregadorId)
 }
 
-/** Valida e marca PRONTO. O cupom sai no PC da receptora via realtime. */
+/**
+ * Pega o pedido: marca PRONTO (cupom na receptora), vincula o entregador e sai EM_ROTA.
+ * Assim o pedido entra na lista mesmo se o app fechar depois da leitura.
+ */
 export async function adicionarPedidoNaRodada(input: {
   token: string
   codigoVenda: string
@@ -126,12 +182,22 @@ export async function adicionarPedidoNaRodada(input: {
   if (!avaliacao.ok) {
     throw new Error(avaliacao.motivo)
   }
+  const etapa = String(pedido.etapa ?? '').trim().toUpperCase()
+  const jaMeu = String(pedido.entregadorId ?? '').trim() === input.entregadorId
+  if (jaMeu && etapa === 'EM_ROTA') {
+    return pedido
+  }
   await marcarPedidoPronto({
     token: input.token,
     pedidoId: pedido.id,
     etapaAtual: pedido.etapa,
   })
-  return { ...pedido, etapa: 'PRONTO' }
+  await vincularEDespacharPedido({
+    token: input.token,
+    pedidoId: pedido.id,
+    entregadorId: input.entregadorId,
+  })
+  return { ...pedido, etapa: 'EM_ROTA', entregadorId: input.entregadorId }
 }
 
 export async function expedirPedidosDaRodada(input: {
@@ -150,7 +216,7 @@ export async function expedirPedidosDaRodada(input: {
     } catch (error) {
       falhas.push({
         codigo: pedido.codigoVenda || pedido.id,
-        motivo: error instanceof Error ? error.message : 'Falha ao expedir.',
+        motivo: error instanceof Error ? error.message : 'Falha ao sair para entrega.',
       })
     }
   }
@@ -188,7 +254,16 @@ export async function buscarItensPedidoApp(input: {
 export async function confirmarEntregaPedido(input: {
   token: string
   pedidoId: string
+  pagamentos?: PagamentoSelecionado[] | null
 }): Promise<void> {
+  if (input.pagamentos && input.pagamentos.length > 0) {
+    await atualizarCobrancasPedidoDeliveryUseCase.execute(
+      input.pedidoId,
+      input.token,
+      input.pagamentos,
+      'ja_pago'
+    )
+  }
   await efetivarCobrancasPendentesDoPedido(input)
 
   const res = await fetchGestorApi(`/api/delivery/pedidos/${encodeURIComponent(input.pedidoId)}/transicao-status`, {

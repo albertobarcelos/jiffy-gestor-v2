@@ -1,7 +1,9 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import type { PedidoLeituraExpedicao } from '@/src/application/expedicao/avaliarPedidoParaRodada'
 import { AppSpinner } from '@/src/presentation/expedicao/app/shell/AppSpinner'
+import { marcarItemCompletaConferencia } from '@/src/application/expedicao/marcarItemCompletaConferencia'
 
 type ExpedicaoChecklistProps = {
   pedido: PedidoLeituraExpedicao
@@ -12,6 +14,8 @@ type ExpedicaoChecklistProps = {
   onToggle: (itemId: string) => void
   onContinuar: () => void
   onVoltar: () => void
+  rotuloFinal?: string
+  rotuloFinalOcupado?: string
 }
 
 export function ExpedicaoChecklist({
@@ -23,12 +27,29 @@ export function ExpedicaoChecklist({
   onToggle,
   onContinuar,
   onVoltar,
+  rotuloFinal = 'Expedir',
+  rotuloFinalOcupado = 'Expedindo…',
 }: ExpedicaoChecklistProps) {
-  const todos = pedido.itens.length === 0 || pedido.itens.every(item => marcados[item.id])
+  const listaRef = useRef<HTMLUListElement>(null)
+  const ultimoDaRodada = indice + 1 >= total
+
+  useEffect(() => {
+    listaRef.current?.scrollTo({ top: 0 })
+  }, [pedido.id])
+
+  const conferirItem = (itemId: string) => {
+    const completa = marcarItemCompletaConferencia({
+      itemIds: pedido.itens.map(item => item.id),
+      marcados,
+      itemId,
+    })
+    onToggle(itemId)
+    if (completa && !ultimoDaRodada && !ocupado) onContinuar()
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="border-b border-black/5 px-6 py-4">
+      <header className="shrink-0 border-b border-black/5 px-6 py-4">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/80">
           Pedido {indice + 1} de {total}
         </p>
@@ -38,7 +59,12 @@ export function ExpedicaoChecklist({
         {pedido.bairro ? <p className="text-sm text-secondary-text">{pedido.bairro}</p> : null}
       </header>
 
-      <ul className="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 py-5">
+      <ul
+        key={pedido.id}
+        ref={listaRef}
+        data-expedicao-scroll
+        className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-y-contain px-6 py-5"
+      >
         {pedido.itens.length === 0 ? (
           <li className="text-base text-secondary-text">Sem itens para conferir neste pedido.</li>
         ) : (
@@ -48,7 +74,7 @@ export function ExpedicaoChecklist({
               <li key={item.id}>
                 <button
                   type="button"
-                  onClick={() => onToggle(item.id)}
+                  onClick={() => conferirItem(item.id)}
                   className={`flex w-full items-center gap-4 rounded-2xl px-5 py-5 text-left ring-1 ${
                     marcado
                       ? 'bg-emerald-50 ring-emerald-200'
@@ -74,7 +100,7 @@ export function ExpedicaoChecklist({
         )}
       </ul>
 
-      <footer className="grid grid-cols-2 gap-3 border-t border-black/5 bg-white px-6 py-4">
+      <footer className="grid shrink-0 grid-cols-2 gap-3 border-t border-black/5 bg-white px-6 py-4">
         <button
           type="button"
           disabled={ocupado}
@@ -85,12 +111,12 @@ export function ExpedicaoChecklist({
         </button>
         <button
           type="button"
-          disabled={ocupado || !todos}
+          disabled={ocupado}
           onClick={onContinuar}
           className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-primary text-base font-semibold text-white disabled:opacity-40"
         >
           {ocupado && indice + 1 >= total ? <AppSpinner tom="branco" /> : null}
-          {ocupado && indice + 1 >= total ? 'Expedindo…' : indice + 1 >= total ? 'Expedir' : 'Próximo'}
+          {ocupado && indice + 1 >= total ? rotuloFinalOcupado : indice + 1 >= total ? rotuloFinal : 'Próximo'}
         </button>
       </footer>
     </div>

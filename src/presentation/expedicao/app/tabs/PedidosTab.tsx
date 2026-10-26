@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, type TouchEvent } from 'react'
+import { useEffect, useRef, useState, type TouchEvent } from 'react'
 import Image from 'next/image'
 import { MdWhatsapp } from 'react-icons/md'
 import type {
@@ -32,8 +32,8 @@ export function PedidosTab(props: {
   const puxar = usePuxarParaAtualizar(props.onAtualizar, !props.carregando)
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-zinc-50">
-      <header className="flex items-start justify-between gap-4 bg-white px-5 pb-5 pt-[max(1.5rem,env(safe-area-inset-top))] shadow-sm ring-1 ring-black/[0.03]">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-zinc-50">
+      <header className="flex shrink-0 items-start justify-between gap-4 bg-white px-5 pb-5 pt-[max(1.5rem,env(safe-area-inset-top))] shadow-sm ring-1 ring-black/[0.03]">
         <div className="flex min-w-0 items-center gap-2 pt-1">
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white">
             {props.loja.charAt(0).toUpperCase()}
@@ -64,7 +64,8 @@ export function PedidosTab(props: {
 
       <div
         ref={puxar.scrollRef}
-        className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-4"
+        data-expedicao-scroll
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-4 pt-4"
         onTouchStart={puxar.onTouchStart}
         onTouchMove={puxar.onTouchMove}
         onTouchEnd={() => void puxar.onTouchEnd()}
@@ -259,6 +260,20 @@ function usePuxarParaAtualizar(onAtualizar: () => Promise<void>, habilitado: boo
   const deltaRef = useRef(0)
   const [deslocamento, setDeslocamento] = useState(0)
   const [atualizando, setAtualizando] = useState(false)
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const onMove = (event: globalThis.TouchEvent) => {
+      if (inicioY.current == null) return
+      const delta = Math.max(0, event.touches[0].clientY - inicioY.current)
+      if (delta > 0 && event.cancelable) event.preventDefault()
+      deltaRef.current = Math.min(delta, 96)
+      setDeslocamento(deltaRef.current)
+    }
+    el.addEventListener('touchmove', onMove, { passive: false })
+    return () => el.removeEventListener('touchmove', onMove)
+  }, [])
 
   return {
     scrollRef,

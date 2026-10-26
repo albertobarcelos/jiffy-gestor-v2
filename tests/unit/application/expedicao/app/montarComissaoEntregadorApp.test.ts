@@ -17,6 +17,7 @@ describe('montarComissaoEntregadorApp', () => {
             {
               id: 'v1',
               codigoVenda: 'ABC',
+              numeroVenda: 12,
               valorFinal: 40,
               taxaEntrega: 7,
               cliente: { nome: 'Ana' },
@@ -28,7 +29,12 @@ describe('montarComissaoEntregadorApp', () => {
     )
     expect(comissao.totalTaxas).toBe(15)
     expect(comissao.quantidade).toBe(2)
-    expect(comissao.itens[0]).toMatchObject({ codigoVenda: 'ABC', taxaEntrega: 7, clienteNome: 'Ana' })
+    expect(comissao.itens[0]).toMatchObject({
+      codigoVenda: 'ABC',
+      numeroVenda: 12,
+      taxaEntrega: 7,
+      clienteNome: 'Ana',
+    })
   })
 
   it('não zera quando a API omite o objeto entregador', () => {

@@ -1,4 +1,7 @@
-import type { PedidoResumoAppEntregador } from '@/src/application/expedicao/app/filtrarPedidosDoEntregador'
+import type {
+  CobrancaAppEntregador,
+  PedidoResumoAppEntregador,
+} from '@/src/application/expedicao/app/filtrarPedidosDoEntregador'
 import { montarEnderecoNavegacaoApp } from '@/src/application/expedicao/app/navegacaoEntregadorApp'
 import { extrairNomeMeioPagamentoDeCobranca } from '@/src/application/mappers/CobrancaDeliveryPagamentoMapper'
 
@@ -15,11 +18,39 @@ function cobrancasAtivas(row: Record<string, unknown>): Record<string, unknown>[
   })
 }
 
+function cobrancaPaga(cobranca: Record<string, unknown>): boolean {
+  const status = String(cobranca.status ?? '').toLowerCase()
+  if (status === 'paga') return true
+  if (status === 'pendente' || status === 'cancelada') return false
+  return cobranca.pagamentoEfetivado != null && typeof cobranca.pagamentoEfetivado === 'object'
+}
+
+function idMeioDaCobranca(cobranca: Record<string, unknown>): string {
+  const nested =
+    cobranca.meioPagamento && typeof cobranca.meioPagamento === 'object'
+      ? (cobranca.meioPagamento as Record<string, unknown>)
+      : null
+  return texto(cobranca.meioPagamentoId ?? nested?.id)
+}
+
+export function cobrancasPedidoApp(row: Record<string, unknown>): CobrancaAppEntregador[] {
+  return cobrancasAtivas(row).flatMap(cobranca => {
+    const meioPagamentoId = idMeioDaCobranca(cobranca)
+    if (!meioPagamentoId) return []
+    return [
+      {
+        id: texto(cobranca.id),
+        meioPagamentoId,
+        valor: numero(cobranca.valor),
+        pendente: !cobrancaPaga(cobranca),
+        nome: extrairNomeMeioPagamentoDeCobranca(cobranca) || null,
+      },
+    ]
+  })
+}
+
 export function idsMeioPagamentoPedidoApp(row: Record<string, unknown>): string[] {
-  const ids = cobrancasAtivas(row)
-    .map(cobranca => texto(cobranca.meioPagamentoId))
-    .filter(Boolean)
-  return [...new Set(ids)]
+  return [...new Set(cobrancasPedidoApp(row).map(cobranca => cobranca.meioPagamentoId))]
 }
 
 export function rotuloPagamentoPedidoApp(row: Record<string, unknown>): string | null {
@@ -35,10 +66,15 @@ export function aplicarNomesMeiosNoPedido(
   pedido: PedidoResumoAppEntregador,
   nomesPorId: Record<string, string>
 ): PedidoResumoAppEntregador {
-  if (pedido.formaPagamento) return pedido
-  const nomes = pedido.meioPagamentoIds.map(id => nomesPorId[id]).filter(Boolean)
-  if (nomes.length === 0) return pedido
-  return { ...pedido, formaPagamento: [...new Set(nomes)].join(' + ') }
+  const cobrancas = pedido.cobrancas.map(cobranca =>
+    cobranca.nome ? cobranca : { ...cobranca, nome: nomesPorId[cobranca.meioPagamentoId] || null }
+  )
+  if (pedido.formaPagamento) return { ...pedido, cobrancas }
+  const nomes = cobrancas.map(cobranca => cobranca.nome).filter((nome): nome is string => Boolean(nome))
+  const fallback = pedido.meioPagamentoIds.map(id => nomesPorId[id]).filter(Boolean)
+  const formaPagamento = [...new Set(nomes.length > 0 ? nomes : fallback)].join(' + ') || null
+  if (!formaPagamento) return { ...pedido, cobrancas }
+  return { ...pedido, cobrancas, formaPagamento }
 }
 
 function texto(valor: unknown): string {
@@ -139,5 +175,6 @@ export function mapPedidoAppEntregador(raw: unknown): PedidoResumoAppEntregador 
     observacao: observacao || null,
     formaPagamento: rotuloPagamentoPedidoApp(row),
     meioPagamentoIds: idsMeioPagamentoPedidoApp(row),
+    cobrancas: cobrancasPedidoApp(row),
   }
 }

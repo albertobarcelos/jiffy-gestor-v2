@@ -9,8 +9,8 @@ type ExpedicaoAppInstalarScreenProps = {
 
 export function ExpedicaoAppInstalarScreen({ pwa }: ExpedicaoAppInstalarScreenProps) {
   return (
-    <div className="flex h-dvh flex-col bg-secondary text-white">
-      <div className="px-6 pb-8 pt-[max(2.25rem,env(safe-area-inset-top))]">
+    <div className="expedicao-app-shell flex h-dvh flex-col overflow-hidden bg-secondary text-white">
+      <div className="shrink-0 px-6 pb-8 pt-[max(2.25rem,env(safe-area-inset-top))]">
         <Image
           src="/images/expedicao/logo_app.png"
           alt="JiffyGO"
@@ -26,7 +26,10 @@ export function ExpedicaoAppInstalarScreen({ pwa }: ExpedicaoAppInstalarScreenPr
           Não precisa baixar na loja de apps. É só criar o atalho no celular.
         </p>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto rounded-t-3xl bg-zinc-50 px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 text-zinc-900">
+      <div
+        data-expedicao-scroll
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain rounded-t-3xl bg-zinc-50 px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 text-zinc-900"
+      >
         {pwa.acabouDeInstalar ? (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-5">
             <p className="text-base font-semibold text-emerald-900">Pronto — ícone criado</p>

@@ -28,8 +28,8 @@ export function ComissoesTab(props: {
   const mostrarStale = props.carregando && props.dados != null
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <header className="flex items-start justify-between gap-3 px-5 pb-2 pt-[max(1rem,env(safe-area-inset-top))]">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <header className="flex shrink-0 items-start justify-between gap-3 px-5 pb-2 pt-[max(1rem,env(safe-area-inset-top))]">
         <div className="min-w-0 flex-1 pt-1">
           <div className="flex items-center gap-2">
             <h1 className="text-[28px] font-semibold tracking-tight text-zinc-900">Comissões</h1>
@@ -50,7 +50,7 @@ export function ComissoesTab(props: {
         />
       </header>
 
-      <div className="px-4">
+      <div className="shrink-0 px-4">
         <div className="flex rounded-full bg-zinc-100 p-1">
           {PERIODOS.map(item => {
             const ativo = props.periodo === item.id
@@ -70,7 +70,10 @@ export function ComissoesTab(props: {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5">
+      <div
+        data-expedicao-scroll
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-5"
+      >
         {props.carregando && !props.dados ? (
           <div className="flex justify-center pt-10">
             <AppSpinner className="h-8 w-8" />
@@ -113,15 +116,26 @@ export function ComissoesTab(props: {
                     key={item.id}
                     className="rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-black/[0.04]"
                   >
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-zinc-900">
-                        {item.clienteNome || item.codigoVenda}
-                      </p>
-                      <p className="text-sm font-semibold text-emerald-600">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 leading-none">
+                          <span className="text-[28px] font-extrabold tracking-tight text-zinc-900">
+                            #{item.numeroVenda ?? item.codigoVenda}
+                          </span>
+                          {item.numeroVenda && item.codigoVenda ? (
+                            <span className="text-sm font-semibold tracking-wide text-zinc-500">
+                              {item.codigoVenda}
+                            </span>
+                          ) : null}
+                        </p>
+                        <p className="mt-2 truncate text-sm font-medium text-zinc-600">
+                          {item.clienteNome || 'Cliente'}
+                        </p>
+                      </div>
+                      <p className="shrink-0 pt-1 text-sm font-semibold text-emerald-600">
                         {formatarMoedaApp(item.taxaEntrega ?? 0)}
                       </p>
                     </div>
-                    <p className="mt-0.5 text-xs text-zinc-400">#{item.codigoVenda}</p>
                   </li>
                 ))}
               </ul>

@@ -62,14 +62,22 @@ export function mapPedidoLeituraExpedicao(raw: unknown): PedidoLeituraExpedicao 
   }
 }
 
-export function escolherPedidoPeloCodigo(items: unknown[], codigoVenda: string): unknown | null {
-  const alvo = codigoVenda.trim().toUpperCase()
+export function escolherPedidoPeloCodigo(items: unknown[], codigoOuNumero: string): unknown | null {
+  const alvo = codigoOuNumero.trim().toUpperCase()
   if (!alvo) return null
   const lista = Array.isArray(items) ? items : []
+  const porCodigo = lista.find(item => {
+    if (!item || typeof item !== 'object') return false
+    return texto((item as Record<string, unknown>).codigoVenda).toUpperCase() === alvo
+  })
+  if (porCodigo) return porCodigo
+
+  const numero = Number(alvo)
+  if (!Number.isFinite(numero) || numero <= 0) return null
   return (
     lista.find(item => {
       if (!item || typeof item !== 'object') return false
-      return texto((item as Record<string, unknown>).codigoVenda).toUpperCase() === alvo
+      return Number((item as Record<string, unknown>).numeroVenda) === numero
     }) ?? null
   )
 }
