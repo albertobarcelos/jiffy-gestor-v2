@@ -9,11 +9,14 @@ import {
   origemModeloProducaoDeTicket,
   type OrigemModeloProducaoDeTicketOptions,
 } from '@/src/application/delivery/origemModeloProducao'
+import { qrPedidoModuleSizeForWidth } from '@/src/application/delivery/cupomPrintLayout'
 import { headerIdentidadeComContorno } from '@/src/application/delivery/cupomPrintHeaderBlocks'
+import type { DesenharCodigoBarrasPedido } from '@/src/application/ports/IDesenharCodigoBarrasPedido'
 import type {
   DesenharMolduraIdentidade,
   DesenharPilulaProducao,
 } from '@/src/application/ports/IDesenharPilulaProducao'
+import type { DeliveryCupomSimboloPedido } from '@/src/shared/types/deliveryCupomTemplate'
 import type {
   PrintAlign,
   PrintContentBlock,
@@ -28,6 +31,8 @@ export type MapTicketToProducaoHibridoOptions = OrigemModeloProducaoDeTicketOpti
   desenharPilula?: DesenharPilulaProducao
   desenharMolduraIdentidade?: DesenharMolduraIdentidade
   desenharSeparador?: DesenharSeparadorProducao
+  desenharCodigoBarras?: DesenharCodigoBarrasPedido
+  simboloPedido?: DeliveryCupomSimboloPedido
 }
 
 const SIZE_COMPLEMENTO: PrintSize = 'double-b'
@@ -73,11 +78,36 @@ function pushPilula(
   pushTexto(content, texto, { align: 'center', bold: true, size: 'double' })
 }
 
+function pushSimboloPedido(
+  content: PrintContentBlock[],
+  payload: string,
+  simboloPedido: DeliveryCupomSimboloPedido,
+  desenharCodigoBarras?: DesenharCodigoBarrasPedido
+): void {
+  if (simboloPedido === 'nenhum') return
+  if (simboloPedido === 'codigo_barras') {
+    const png = desenharCodigoBarras?.(payload)
+    if (png) {
+      content.push({ type: 'image', data: png, align: 'center' })
+      return
+    }
+    pushTexto(content, payload, { align: 'center', bold: true, size: 'normal' })
+    return
+  }
+  content.push({
+    type: 'qrcode',
+    data: payload,
+    moduleSize: qrPedidoModuleSizeForWidth(PRODUCAO_80MM.papelMm),
+  })
+}
+
 export function modeloToProducaoHibridoContent(
   modelo: ModeloProducao80mm,
   desenharPilula?: DesenharPilulaProducao,
   desenharSeparador?: DesenharSeparadorProducao,
-  desenharMolduraIdentidade?: DesenharMolduraIdentidade
+  desenharMolduraIdentidade?: DesenharMolduraIdentidade,
+  simboloPedido: DeliveryCupomSimboloPedido = 'nenhum',
+  desenharCodigoBarras?: DesenharCodigoBarrasPedido
 ): PrintContentBlock[] {
   const content: PrintContentBlock[] = []
   if (modelo.reimpressao) {
@@ -146,6 +176,9 @@ export function modeloToProducaoHibridoContent(
   for (const linha of modelo.rodape) {
     pushTexto(content, linha, { align: 'center', bold: true, size: 'small' })
   }
+  if (modelo.codigoBarras) {
+    pushSimboloPedido(content, modelo.codigoBarras, simboloPedido, desenharCodigoBarras)
+  }
   content.push({ type: 'feed', lines: PRODUCAO_80MM.linhasAntesDoCorte })
   content.push({ type: 'cut' })
   return content
@@ -164,7 +197,11 @@ export function mapTicketToProducaoHibridoDocument(
       modelo,
       options?.desenharPilula,
       options?.desenharSeparador,
-      options?.desenharMolduraIdentidade
+      options?.desenharMolduraIdentidade,
+      options?.simboloPedido === 'qrcode' || options?.simboloPedido === 'codigo_barras'
+        ? options.simboloPedido
+        : 'nenhum',
+      options?.desenharCodigoBarras
     ),
   }
 }

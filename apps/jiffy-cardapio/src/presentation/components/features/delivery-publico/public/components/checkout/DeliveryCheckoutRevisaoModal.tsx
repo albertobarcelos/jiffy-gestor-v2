@@ -50,6 +50,8 @@ type DeliveryCheckoutRevisaoModalProps = {
   subtotalOficial?: number | null
   taxaEntregaOficial?: number | null
   totalOficial?: number | null
+  /** Troco já calculado pela API. Quando informado, substitui o cálculo local. */
+  trocoOficial?: number | null
   cotacaoLoading?: boolean
   cotacaoPronta?: boolean
   pagamentos: Array<{
@@ -168,6 +170,7 @@ export function DeliveryCheckoutRevisaoModal({
   subtotalOficial = null,
   taxaEntregaOficial = null,
   totalOficial = null,
+  trocoOficial = null,
   cotacaoLoading = false,
   cotacaoPronta = true,
   pagamentos,
@@ -230,20 +233,23 @@ export function DeliveryCheckoutRevisaoModal({
     cotacaoLoading && !enviando && !temValoresOficiais
       ? 'Calculando...'
       : formatDeliveryCurrency(taxaExibicao)
-  const trocoReceber = calcularTrocoCheckout(
-    totalExibicao,
-    pagamentos.map(p => ({ meioPagamentoId: p.meioPagamentoId, valor: p.valor })),
-    meioPagamentoId =>
-      isMeioPagamentoDinheiro(
-        pagamentos.find(p => p.meioPagamentoId === meioPagamentoId)?.meio ?? null
-      )
-  )
+  const trocoReceber =
+    trocoOficial != null
+      ? trocoOficial
+      : calcularTrocoCheckout(
+          totalExibicao,
+          pagamentos.map(p => ({ meioPagamentoId: p.meioPagamentoId, valor: p.valor })),
+          meioPagamentoId =>
+            isMeioPagamentoDinheiro(
+              pagamentos.find(p => p.meioPagamentoId === meioPagamentoId)?.meio ?? null
+            )
+        )
   const primeiroMeioNome = pagamentos[0]?.meio?.nome ?? ''
   const IconePagamento = obterIconeMeioPagamento(primeiroMeioNome)
   const observacaoTrim = observacaoPedido.trim()
   const cpfTrim = cpfNotaFiscal.replace(/\D/g, '')
-  const cpfObrigatorioIncompleto =
-    (exigeCpfVenda || desejaNotaFiscal) && cpfTrim.length !== 11
+  const cpfObrigatorio = exigeCpfVenda || desejaNotaFiscal
+  const cpfObrigatorioIncompleto = cpfObrigatorio && cpfTrim.length !== 11
   const pagamentosGate = validarPagamentosPedidoPublico(
     pagamentos.map(p => ({ meioPagamentoId: p.meioPagamentoId, valor: p.valor })),
     totalExibicao
@@ -520,9 +526,11 @@ export function DeliveryCheckoutRevisaoModal({
                 <p className="mt-0.5 text-sm delivery-text-primary">{observacaoTrim}</p>
               </div>
             ) : null}
-            {cpfTrim.length === 11 ? (
+            {cpfTrim.length === 11 || cpfTrim.length === 14 ? (
               <div>
-                <p className="text-xs delivery-text-secondary">CPF na nota fiscal</p>
+                <p className="text-xs delivery-text-secondary">
+                  {cpfTrim.length === 14 ? 'CNPJ na nota fiscal' : 'CPF na nota fiscal'}
+                </p>
                 <p className="mt-0.5 text-sm delivery-text-primary">
                   {formatarCpfCnpjInput(cpfTrim)}
                 </p>

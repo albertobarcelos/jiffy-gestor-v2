@@ -49,6 +49,23 @@ export function qrModuleSizeForWidth(larguraMm: number): number {
   return larguraMm === 58 ? 3 : 4
 }
 
+/** QR do pedido (`P`+código) — maior que o do WhatsApp para leitura na bancada. */
+export function qrPedidoModuleSizeForWidth(larguraMm: number): number {
+  return larguraMm === 58 ? 6 : 8
+}
+
+export function qrPedidoHtmlSizePx(larguraMm: number): number {
+  return larguraMm === 58 ? 168 : 220
+}
+
+export function barcodePedidoHtmlSize(larguraMm: number): { widthPx: number; heightPx: number } {
+  return larguraMm === 58 ? { widthPx: 176, heightPx: 48 } : { widthPx: 260, heightPx: 56 }
+}
+
+export function barcodePedidoRasterSize(larguraMm: number): { widthPx: number; heightPx: number } {
+  return larguraMm === 58 ? { widthPx: 344, heightPx: 64 } : { widthPx: 520, heightPx: 80 }
+}
+
 function fonteBloco(v: number | null | undefined, fallback: number): number {
   return Math.min(18, Math.max(8, Math.floor(v ?? fallback)))
 }

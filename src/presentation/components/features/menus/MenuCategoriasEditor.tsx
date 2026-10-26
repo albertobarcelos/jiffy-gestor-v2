@@ -10,6 +10,10 @@ import {
   useMenuProdutos,
 } from '@/src/presentation/hooks/menus/useMenuCatalog'
 import { useMenuMutations } from '@/src/presentation/hooks/menus/useMenuMutations'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { mensagemLegivelDeliveryMediaError } from '@/src/infrastructure/api/deliveryMediaApi'
+import { removerImagemUseCase } from '@/src/presentation/hooks/media/criarImagemMediaUseCases'
 import { useEntityImageCropUpload } from '@/src/presentation/hooks/useEntityImageCropUpload'
 import { MENU_GRUPO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
 import {
@@ -23,6 +27,7 @@ import { showToast } from '@/src/shared/utils/toast'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
+import { categoriaAtivaNoSnapshot } from '@/src/domain/policies/menu/categoriaStatusNoMenu'
 import { coletarGruposMenuPorSnapshot } from './ordenarGruposMenuSnapshot'
 import { MenuCardapioChrome } from './MenuCardapioChrome'
 import { MenuCardapioAcoes } from './MenuCardapioAcoes'
@@ -57,6 +62,8 @@ export function MenuCategoriasEditor({ menuId }: MenuCategoriasEditorProps) {
   const [removerBusy, setRemoverBusy] = useState(false)
   const tipoCadastro = useEscolherTipoProdutoCadastro()
   const { syncProdutos, uploadImagemGrupo } = useMenuMutations(menuId)
+  const invalidate = useInvalidateTenantQueries()
+  const { auth } = useAuthStore()
 
   useEffect(() => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
@@ -138,6 +145,31 @@ export function MenuCategoriasEditor({ menuId }: MenuCategoriasEditorProps) {
       }
     },
     [uploadImagemGrupo]
+  )
+
+  const handleClearImage = useCallback(
+    async (grupoProdutoId: string) => {
+      const grupo = gruposTodos.find(item => item.grupoBase.id === grupoProdutoId)
+      const idImagem = grupo?.image?.imageId?.trim()
+      if (!idImagem) {
+        showToast.error('Não foi possível identificar a imagem para remover.')
+        return
+      }
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado')
+        return
+      }
+      const toastId = showToast.loading('Removendo imagem...')
+      try {
+        await removerImagemUseCase().execute({ imageId: idImagem, token })
+        await invalidate(['menu-grupos', menuId])
+        showToast.successLoading(toastId, 'Imagem removida desta categoria.')
+      } catch (error) {
+        showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+      }
+    },
+    [auth, gruposTodos, invalidate, menuId]
   )
 
   const { selectForEntity, cropModal } = useEntityImageCropUpload({
@@ -296,6 +328,7 @@ export function MenuCategoriasEditor({ menuId }: MenuCategoriasEditorProps) {
                     variant="menu"
                     id={grupoId}
                     nome={grupo.nome || grupo.grupoBase.nome}
+                    nomeInativo={!categoriaAtivaNoSnapshot(grupo)}
                     valor={0}
                     ativo
                     imagemUrl={imagemUrlMenuGrupo(grupo)}
@@ -313,6 +346,7 @@ export function MenuCategoriasEditor({ menuId }: MenuCategoriasEditorProps) {
                     onEdit={handleEdit}
                     onRemove={handleAskRemove}
                     onChangeImage={handleChangeImage}
+                    onClearImage={grupo.image?.imageId ? handleClearImage : undefined}
                   />
                 </div>
               )

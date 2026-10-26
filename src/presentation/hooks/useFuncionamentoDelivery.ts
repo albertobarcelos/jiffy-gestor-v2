@@ -8,8 +8,13 @@ import {
   useInvalidateTenantQueries,
 } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
+import { requireGestorConfig } from '@/src/infrastructure/api/gestorConfigRequest'
+import {
+  getAgendaFuncionamentoDelivery,
+  getFuncionamentoDelivery,
+  postToggleFuncionamentoDelivery,
+  putAgendaFuncionamentoDelivery,
+} from '@/src/infrastructure/api/deliveryConfigApi'
 import type {
   AgendaFuncionamentoDeliveryDTO,
   DisponibilidadeFuncionamentoDeliveryDTO,
@@ -21,33 +26,11 @@ import { msAteRefetchFuncionamentoDelivery } from '@/src/shared/utils/funcioname
 
 export const FUNCIONAMENTO_DELIVERY_QUERY_KEY = ['delivery', 'funcionamento'] as const
 
-async function parseJsonOrThrow(res: Response): Promise<unknown> {
-  const raw: unknown = await res.json().catch(() => ({}))
-  if (!res.ok) {
-    const msg =
-      textoErroCorpoApi(raw) ||
-      (raw &&
-      typeof raw === 'object' &&
-      'error' in raw &&
-      typeof (raw as { error: unknown }).error === 'string'
-        ? (raw as { error: string }).error
-        : '') ||
-      `Erro HTTP ${res.status}`
-    throw new Error(msg)
-  }
-  return raw
-}
-
 export function useFuncionamentoDelivery(options?: { enabled?: boolean }) {
   return useSecureTenantQuery<FuncionamentoDeliveryDTO>(
     FUNCIONAMENTO_DELIVERY_QUERY_KEY,
-    async ({ token }) => {
-      const res = await fetchGestorApi('/api/delivery/empresas/me/funcionamento', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const data = await parseJsonOrThrow(res)
-      return data as FuncionamentoDeliveryDTO
-    },
+    async ({ token }) =>
+      requireGestorConfig(await getFuncionamentoDelivery(token)) as FuncionamentoDeliveryDTO,
     {
       enabled: options?.enabled ?? true,
       staleTime: 0,
@@ -62,13 +45,10 @@ export function useFuncionamentoDelivery(options?: { enabled?: boolean }) {
 export function useAgendaFuncionamentoDelivery(options?: { enabled?: boolean }) {
   return useSecureTenantQuery<AgendaFuncionamentoDeliveryDTO>(
     [...FUNCIONAMENTO_DELIVERY_QUERY_KEY, 'agenda'],
-    async ({ token }) => {
-      const res = await fetchGestorApi('/api/delivery/empresas/me/funcionamento/agenda', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const data = await parseJsonOrThrow(res)
-      return data as AgendaFuncionamentoDeliveryDTO
-    },
+    async ({ token }) =>
+      requireGestorConfig(
+        await getAgendaFuncionamentoDelivery(token)
+      ) as AgendaFuncionamentoDeliveryDTO,
     { enabled: options?.enabled ?? true }
   )
 }
@@ -100,16 +80,9 @@ export function useSubstituirAgendaFuncionamento() {
     AgendaFuncionamentoDeliveryDTO,
     SubstituirAgendaFuncionamentoDeliveryRequest
   >(async ({ token }, variables) => {
-    const res = await fetchGestorApi('/api/delivery/empresas/me/funcionamento/agenda', {
-      method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(variables),
-    })
-    const data = await parseJsonOrThrow(res)
-    return data as AgendaFuncionamentoDeliveryDTO
+    return requireGestorConfig(
+      await putAgendaFuncionamentoDelivery(token, variables)
+    ) as AgendaFuncionamentoDeliveryDTO
   }, {
     onSuccess: async () => {
       await invalidate(FUNCIONAMENTO_DELIVERY_QUERY_KEY)
@@ -124,14 +97,10 @@ export function useToggleFuncionamentoManual() {
   const empresaId = useTenantEmpresaId()
 
   return useSecureTenantMutation<DisponibilidadeFuncionamentoDeliveryDTO, void>(
-    async ({ token }) => {
-      const res = await fetchGestorApi('/api/delivery/empresas/me/funcionamento/toggle', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const data = await parseJsonOrThrow(res)
-      return data as DisponibilidadeFuncionamentoDeliveryDTO
-    },
+    async ({ token }) =>
+      requireGestorConfig(
+        await postToggleFuncionamentoDelivery(token)
+      ) as DisponibilidadeFuncionamentoDeliveryDTO,
     {
       onSuccess: async disponibilidade => {
         patchFuncionamentoDisponibilidadeNoCache(queryClient, empresaId, disponibilidade)

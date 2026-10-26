@@ -387,7 +387,7 @@ export function DeliveryCheckoutIdentifiqueSeModal({
                     onClick={handleLimparIdentificacao}
                     aria-label="Buscar outro número"
                     title="Buscar outro número"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
                     style={{ color: 'var(--delivery-text-muted)' }}
                   >
                     <X className="h-4 w-4" strokeWidth={2} />
@@ -437,7 +437,7 @@ export function DeliveryCheckoutIdentifiqueSeModal({
                     onClick={handleLimparIdentificacao}
                     aria-label="Buscar outro número"
                     title="Buscar outro número"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
                     style={{ color: 'var(--delivery-text-muted)' }}
                   >
                     <X className="h-4 w-4" strokeWidth={2} />

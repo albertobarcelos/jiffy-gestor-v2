@@ -1,7 +1,7 @@
 'use client'
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
-import { MdPerson } from 'react-icons/md'
+import { MdPerson, MdQrCode2 } from 'react-icons/md'
 import {
   JiffySidePanelModal,
   type JiffySidePanelFooterActions,
@@ -15,6 +15,13 @@ import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { formatarTelefoneBr } from '@/src/shared/utils/telefoneBr'
 import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
+import {
+  normalizarSenhaEntregadorDelivery,
+  senhaEntregadorDeliveryValida,
+} from '@/src/application/delivery/senhaEntregadorDelivery'
+import { entregadorPossuiSenhaApp } from '@/src/application/delivery/entregadorPossuiSenhaApp'
+import { EntregadorSenhaDialog } from './EntregadorSenhaDialog'
+import { EntregadorSenhaAppStatus } from './EntregadorSenhaAppStatus'
 
 const ENTREGADOR_FORM_ID = 'entregador-delivery-form'
 
@@ -37,12 +44,14 @@ interface EntregadorDeliveryModalProps {
   entregadorId: string | null
   onClose: () => void
   onSalvo: () => void
+  onAbrirPwaQr?: () => void
 }
 
 interface EntregadorFormState {
   nome: string
   telefone: string
   cpf: string
+  senha: string
   ativo: boolean
 }
 
@@ -50,6 +59,7 @@ const EMPTY_FORM: EntregadorFormState = {
   nome: '',
   telefone: '',
   cpf: '',
+  senha: '',
   ativo: true,
 }
 
@@ -86,22 +96,29 @@ export function EntregadorDeliveryModal({
   entregadorId,
   onClose,
   onSalvo,
+  onAbrirPwaQr,
 }: EntregadorDeliveryModalProps) {
   const [form, setForm] = useState<EntregadorFormState>(EMPTY_FORM)
   const [carregando, setCarregando] = useState(false)
   const [salvando, setSalvando] = useState(false)
+  const [possuiSenhaApp, setPossuiSenhaApp] = useState(true)
+  const [senhaDialogAberto, setSenhaDialogAberto] = useState(false)
 
   const isEdicao = Boolean(entregadorId)
-  const canSubmit = Boolean(form.nome.trim()) && !carregando
+  const senhaOk = isEdicao || senhaEntregadorDeliveryValida(form.senha)
+  const canSubmit = Boolean(form.nome.trim()) && senhaOk && !carregando
 
   useEffect(() => {
     if (!open) {
       setForm(EMPTY_FORM)
+      setPossuiSenhaApp(true)
+      setSenhaDialogAberto(false)
       return
     }
 
     if (!entregadorId) {
       setForm(EMPTY_FORM)
+      setPossuiSenhaApp(false)
       return
     }
 
@@ -142,8 +159,10 @@ export function EntregadorDeliveryModal({
           nome: data.nome != null ? String(data.nome) : '',
           telefone: telefoneRaw ? formatarTelefoneBr(telefoneRaw) : '',
           cpf: cpfRaw ? formatCPF(cpfRaw) : '',
+          senha: '',
           ativo: typeof data.ativo === 'boolean' ? data.ativo : true,
         })
+        setPossuiSenhaApp(entregadorPossuiSenhaApp(data) ?? true)
       } catch (error) {
         if (!cancelado) {
           showToast.error(error instanceof Error ? error.message : 'Erro ao carregar entregador')
@@ -179,11 +198,20 @@ export function EntregadorDeliveryModal({
     }
 
     const telefoneDigits = somenteDigitos(form.telefone)
+    const senhaDigits = normalizarSenhaEntregadorDelivery(form.senha)
+    if (!isEdicao && !senhaEntregadorDeliveryValida(senhaDigits)) {
+      showToast.error('Informe a senha de 4 dígitos.')
+      return
+    }
+
     const payload: Record<string, unknown> = {
       nome,
       telefone: telefoneDigits || null,
       cpf: cpfDigits || null,
       ativo: form.ativo,
+    }
+    if (!isEdicao) {
+      payload.senha = senhaDigits
     }
 
     setSalvando(true)
@@ -235,6 +263,7 @@ export function EntregadorDeliveryModal({
   const title = isEdicao ? 'Editar Entregador' : 'Novo Entregador'
 
   return (
+    <>
     <JiffySidePanelModal
       open={open}
       onClose={onClose}
@@ -256,6 +285,16 @@ export function EntregadorDeliveryModal({
                 <div className="flex items-center gap-3">
                   <h2 className="text-xl font-semibold text-primary">Dados do Entregador</h2>
                   <div className="flex-1 border-t border-primary/40" aria-hidden />
+                  {onAbrirPwaQr ? (
+                    <button
+                      type="button"
+                      aria-label="Mostrar QR Code do app do entregador"
+                      onClick={onAbrirPwaQr}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-primary/30 text-primary transition-colors hover:bg-primary/10"
+                    >
+                      <MdQrCode2 className="h-5 w-5" />
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
@@ -335,6 +374,38 @@ export function EntregadorDeliveryModal({
                     InputLabelProps={INPUT_LABEL_PROPS}
                     sx={INPUT_SX}
                   />
+                  {isEdicao ? (
+                    <EntregadorSenhaAppStatus
+                      cadastrada={possuiSenhaApp}
+                      disabled={salvando}
+                      onAlterar={() => setSenhaDialogAberto(true)}
+                    />
+                  ) : (
+                    <Input
+                      label="Senha do app (4 dígitos)"
+                      helperText="Obrigatória no cadastro. É a senha do app do entregador."
+                      value={form.senha}
+                      onChange={e =>
+                        setForm(prev => ({
+                          ...prev,
+                          senha: normalizarSenhaEntregadorDelivery(e.target.value),
+                        }))
+                      }
+                      placeholder="0000"
+                      type="password"
+                      inputProps={{
+                        maxLength: 4,
+                        inputMode: 'numeric',
+                        autoComplete: 'new-password',
+                      }}
+                      required
+                      fullWidth
+                      size="small"
+                      disabled={salvando}
+                      InputLabelProps={INPUT_LABEL_PROPS}
+                      sx={INPUT_SX}
+                    />
+                  )}
                 </div>
               </div>
             </form>
@@ -342,5 +413,17 @@ export function EntregadorDeliveryModal({
         )}
       </div>
     </JiffySidePanelModal>
+    <EntregadorSenhaDialog
+      open={senhaDialogAberto}
+      entregadorId={entregadorId}
+      entregadorNome={form.nome.trim() || null}
+      cadastrada={possuiSenhaApp}
+      onClose={() => setSenhaDialogAberto(false)}
+      onSalvo={() => {
+        setPossuiSenhaApp(true)
+        setSenhaDialogAberto(false)
+      }}
+    />
+    </>
   )
 }

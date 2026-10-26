@@ -2,11 +2,19 @@
 
 import { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHandle } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import {
+  criarTerminal,
+  getPreferenciaTerminal,
+  getTerminalDetalhes,
+  listarImpressorasPagina,
+  patchTerminal,
+  salvarPreferenciasTerminal,
+} from '@/src/infrastructure/api/terminaisConfigApi'
 import { Input } from '@/src/presentation/components/ui/input'
 import { UppercaseLocaleInput } from '@/src/presentation/components/ui/UppercaseLocaleInput'
 import { Button } from '@/src/presentation/components/ui/button'
 import { showToast } from '@/src/shared/utils/toast'
+import { generateUuid } from '@/src/shared/utils/generateUuid'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { MdClose, MdPhone, MdPrint } from 'react-icons/md'
 import { MenuItem, CircularProgress, Box } from '@mui/material'
@@ -288,30 +296,17 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
 
       // Loop para carregar todas as páginas
       while (hasMore) {
-        const params = new URLSearchParams({
-          limit: limit.toString(),
-          offset: currentOffset.toString(),
-        })
-
-        const response = await fetchGestorApi(`/api/impressoras?${params.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
+        const response = await listarImpressorasPagina(token, { limit, offset: currentOffset })
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.error || 'Erro ao buscar impressoras')
+          throw new Error(response.error)
         }
 
-        const data = await response.json()
-        const newImpressoras = (data.items || []).map(
-          (i: { id: string; nome?: string | null }) => ({
-            id: i.id,
-            nome: i.nome || 'Sem nome',
-          })
-        )
+        const data = response.data
+        const newImpressoras = (data.items || []).map(i => ({
+          id: String(i.id ?? ''),
+          nome: typeof i.nome === 'string' && i.nome.trim() ? i.nome : 'Sem nome',
+        }))
 
         allImpressoras.push(...newImpressoras)
 
@@ -341,19 +336,13 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
     setIsLoadingTerminal(true)
 
     try {
-      const response = await fetchGestorApi(`/api/terminais/${terminalId}/detalhes`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      })
+      const response = await getTerminalDetalhes(token, terminalId)
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || 'Erro ao buscar terminal')
+        throw new Error(response.error)
       }
 
-      const data: TerminalData = await response.json()
+      const data = response.data as unknown as TerminalData
 
       // Preenche campos do formulário
       setNomeTerminal(maiusculasPt(data.nome || ''))
@@ -385,19 +374,13 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
     }
 
     try {
-      const response = await fetchGestorApi(`/api/preferencias-terminal/${terminalId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      })
+      const response = await getPreferenciaTerminal(token, terminalId)
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || 'Erro ao buscar preferências')
+        throw new Error(response.error)
       }
 
-      const data: TerminalPreferences = await response.json()
+      const data = response.data as unknown as TerminalPreferences
 
       // Preenche preferências
       setCompartilhaValue(data.compartilharMesas || false)
@@ -511,25 +494,17 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
 
     try {
       if (isCreate) {
-        const newId = crypto.randomUUID()
-        const createResponse = await fetchGestorApi(`/api/terminais`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
+        const newId = generateUuid()
+        const createResponse = await criarTerminal(token, {
             id: newId,
             nome: nomeTerminal.trim(),
             modeloDispositivo: 'GESTOR',
             versaoApk: '0.0.0',
             ...(menuPrincipalId ? { menuPrincipalId } : {}),
-          }),
-        })
+          })
 
         if (!createResponse.ok) {
-          const errorData = await createResponse.json().catch(() => ({}))
-          throw new Error(errorData.error || 'Erro ao cadastrar terminal')
+          throw new Error(createResponse.error)
         }
 
         // Backend já cria preferências padrão no CreateTerminalUseCase.
@@ -548,23 +523,14 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
           Boolean(impressoraSelecionadaId)
 
         if (prefsChangedFromCreateDefaults) {
-          const preferencesResponse = await fetchGestorApi(`/api/preferencias-terminal`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
+          const preferencesResponse = await salvarPreferenciasTerminal(token, {
               terminaisId: newId,
               fields: buildPreferenciasFields(),
-            }),
           })
 
           if (!preferencesResponse.ok) {
-            // Terminal já existe — não deixar o usuário retentar e duplicar.
-            const errorData = await preferencesResponse.json().catch(() => ({}))
             showToast.error(
-              errorData.error ||
+              preferencesResponse.error ||
                 'Terminal criado, mas falhou ao salvar preferências. Ajuste na edição.'
             )
             window.setTimeout(() => {
@@ -584,41 +550,25 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
           throw new Error('ID do terminal não encontrado')
         }
 
-        const terminalResponse = await fetchGestorApi(`/api/terminais/${terminalId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
+        const terminalResponse = await patchTerminal(token, terminalId, {
             nome: nomeTerminal,
             modeloDispositivo,
             versaoApk,
             bloqueado: false,
             ...(menuPrincipalId ? { menuPrincipalId } : {}),
-          }),
-        })
+          })
 
         if (!terminalResponse.ok) {
-          const errorData = await terminalResponse.json().catch(() => ({}))
-          throw new Error(errorData.error || 'Erro ao atualizar terminal')
+          throw new Error(terminalResponse.error)
         }
 
-        const preferencesResponse = await fetchGestorApi(`/api/preferencias-terminal`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
+        const preferencesResponse = await salvarPreferenciasTerminal(token, {
             terminaisId: terminalId,
             fields: buildPreferenciasFields(),
-          }),
         })
 
         if (!preferencesResponse.ok) {
-          const errorData = await preferencesResponse.json().catch(() => ({}))
-          throw new Error(errorData.error || 'Erro ao atualizar preferências')
+          throw new Error(preferencesResponse.error)
         }
 
         showToast.success('Terminal atualizado com sucesso!')

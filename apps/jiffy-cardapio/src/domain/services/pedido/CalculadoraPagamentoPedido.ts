@@ -17,6 +17,24 @@ function emCentavos(valor: number): number {
   return Math.round(valor * 100)
 }
 
+function numeroFinito(valor: number): number {
+  return Number.isFinite(valor) ? valor : 0
+}
+
+function roundCentavos(valor: number): number {
+  return Math.round(valor * 100) / 100
+}
+
+/**
+ * A cédula lançada não é o valor a cobrar.
+ * O entregador cobra o pedido e leva o troco da nota.
+ */
+export function valorCobrancaDeCedula(cedula: number, troco: number): number {
+  const nota = numeroFinito(cedula)
+  const levar = numeroFinito(troco) > 0 ? troco : 0
+  return Math.max(0, roundCentavos(nota - levar))
+}
+
 export function totalPagamentosEfetivos(pagamentos: PagamentoSelecionado[]): number {
   return pagamentos.reduce(
     (sum, p) => sum + (pagamentoContaComoEfetivo(p) ? p.valor : 0),

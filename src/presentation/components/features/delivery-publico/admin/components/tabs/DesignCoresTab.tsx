@@ -160,11 +160,9 @@ export function DesignCoresTab({ config, onChange }: DesignCoresTabProps) {
   }
 
   return (
-    <div className="space-y-2">
-      <h3 className="text-base font-semibold text-primary">Cores sugeridas</h3>
+    <div className="space-y-5">
       <p className="text-sm text-secondary-text">
-        Teste qualquer paleta no preview. Por enquanto, apenas as paletas{' '}
-        {getPublishablePaletteLabel()} podem ser publicadas.
+        Por enquanto, apenas as paletas {getPublishablePaletteLabel()} podem ser publicadas.
       </p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <CustomPaletteCard

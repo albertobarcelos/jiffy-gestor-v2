@@ -10,8 +10,7 @@ import {
 } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import { Complemento } from '@/src/domain/entities/Complemento'
+import { criarPersistirCadastroComplementoUseCase } from '@/src/presentation/hooks/complementos/criarPersistirCadastroComplementoUseCase'
 import { FormControl, InputLabel, MenuItem, Select } from '@mui/material'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
@@ -20,11 +19,17 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { DeliveryImageUploadField } from '@/src/presentation/components/ui/DeliveryImageUploadField'
 import { DELIVERY_COMPLEMENTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
 import { showToast } from '@/src/shared/utils/toast'
+import { alteracaoValorAtivo } from '@/src/domain/policies/complemento/propagarAlteracaoComplemento'
+import type { VinculoComplementoOverride } from '@/src/domain/repositories/IComplementoOverrideRepository'
+import { usePropagarAlteracaoComplemento } from '@/src/presentation/hooks/complementos/usePropagarAlteracaoComplemento'
 import { urlImagemHttp } from '@/src/application/services/cadastroImagem'
 import {
   complementoImagemMedia,
   mensagemLegivelDeliveryMediaError,
+  uploadComplementoImagem,
 } from '@/src/infrastructure/api/deliveryMediaApi'
+import { removerImagemUseCase } from '@/src/presentation/hooks/media/criarImagemMediaUseCases'
+import { previewImagemEhLocal } from '@/src/presentation/utils/previewImagemLocal'
 
 /** Labels outlined em preto (MUI usa cinza por padrão) */
 const sxOutlinedLabelTextoEscuro = {
@@ -62,6 +67,17 @@ const sxEntradaCompactaComplemento = {
   '& .MuiOutlinedInput-input': entradaCompactaInput,
   '& .MuiSelect-select': entradaCompactaSelect,
 } as const
+
+function baselineValorAtivo(serializado: string): { valor: number; ativo: boolean } | null {
+  if (!serializado) return null
+  try {
+    const parsed = JSON.parse(serializado) as { valor?: unknown; ativo?: unknown }
+    if (typeof parsed.valor !== 'number' || typeof parsed.ativo !== 'boolean') return null
+    return { valor: parsed.valor, ativo: parsed.ativo }
+  } catch {
+    return null
+  }
+}
 
 /** Nome e descrição: estado normalizado no onChange (placeholder não deve ficar em caixa alta). */
 const sxCampoTextoMaiusculo = {
@@ -129,9 +145,16 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingComplemento, setIsLoadingComplemento] = useState(false)
   const [isUploadingImagem, setIsUploadingImagem] = useState(false)
+  const [removendoImagem, setRemovendoImagem] = useState(false)
   const [serverImagemUrl, setServerImagemUrl] = useState<string | null>(null)
   const [imagemPreviewUrl, setImagemPreviewUrl] = useState<string | null>(null)
+  const [imageId, setImageId] = useState<string | null>(null)
   const baselineSerializedRef = useRef<string>('')
+  const {
+    pedirConfirmacao: pedirPropagacao,
+    aplicarVinculos: aplicarPropagacao,
+    dialog: dialogPropagacao,
+  } = usePropagarAlteracaoComplemento()
 
   const applyImagemUrl = useCallback((url: string | null) => {
     setServerImagemUrl(url)
@@ -231,18 +254,14 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
 
     const loadComplemento = async () => {
       try {
-        const response = await fetchGestorApi(`/api/complementos/${complementoId}`, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
+        const complemento = await criarPersistirCadastroComplementoUseCase().buscar({
+          id: complementoId,
+          token: accessToken,
         })
 
         if (cancelled) return
 
-        if (response.ok) {
-          const data = await response.json()
-          const complemento = Complemento.fromJSON(data)
+        if (complemento) {
 
           setNome(complemento.getNome().toUpperCase())
           setDescricao((complemento.getDescricao() || '').toUpperCase())
@@ -254,6 +273,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
           setAtivo(complemento.isAtivo())
 
           const deliveryImagemUrl = await complementoImagemMedia.resolverUma(complementoId, accessToken)
+          setImageId(complemento.getImageId())
           applyImagemUrl(deliveryImagemUrl ?? complemento.getImagemUrl() ?? null)
 
           window.setTimeout(() => {
@@ -300,7 +320,9 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
       const toastId = showToast.loading('Enviando imagem...')
 
       try {
-        const persistedUrl = await complementoImagemMedia.enviar(complementoId, file, token)
+        const confirmado = await uploadComplementoImagem(complementoId, file, token)
+        setImageId(confirmado.imageId)
+        const persistedUrl = await complementoImagemMedia.resolverUma(complementoId, token)
         applyImagemUrl(persistedUrl ?? preview)
         showToast.successLoading(toastId, 'Imagem enviada com sucesso!')
       } catch (error) {
@@ -323,6 +345,37 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
     })
   }, [serverImagemUrl])
 
+  const handleRemoverImagem = useCallback(async () => {
+    const previewLocal = previewImagemEhLocal(imagemPreviewUrl, serverImagemUrl)
+    if (previewLocal) {
+      handleClearImagemPreview()
+      return
+    }
+    if (!imageId) {
+      showToast.error('Não foi possível identificar a imagem para remover.')
+      return
+    }
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+    if (!token) {
+      showToast.error('Token não encontrado')
+      return
+    }
+    setRemovendoImagem(true)
+    setIsUploadingImagem(true)
+    const toastId = showToast.loading('Removendo imagem...')
+    try {
+      await removerImagemUseCase().execute({ imageId, token })
+      setImageId(null)
+      applyImagemUrl(null)
+      showToast.successLoading(toastId, 'Imagem removida.')
+    } catch (error) {
+      showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+    } finally {
+      setRemovendoImagem(false)
+      setIsUploadingImagem(false)
+    }
+  }, [applyImagemUrl, handleClearImagemPreview, imageId, imagemPreviewUrl, serverImagemUrl])
+
   const persistComplemento = useCallback(async () => {
     const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
@@ -334,40 +387,54 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
 
     try {
       const valorNumero = parseValorToNumber(valor)
+      let vinculosParaCopiar: VinculoComplementoOverride[] = []
+
+      if (isEditing && complementoId) {
+        const anterior = baselineValorAtivo(baselineSerializedRef.current)
+        const alteracao = anterior
+          ? alteracaoValorAtivo({
+              valorAnterior: anterior.valor,
+              ativoAnterior: anterior.ativo,
+              valorNovo: valorNumero,
+              ativoNovo: ativo,
+            })
+          : null
+        if (alteracao) {
+          const decisao = await pedirPropagacao({ complementoId, alteracao })
+          if (decisao.tipo === 'cancelado') return
+          if (decisao.tipo === 'aplicar') vinculosParaCopiar = decisao.vinculos
+        }
+      }
 
       const nomeUpper = nome.trim().toUpperCase()
       const descUpper = descricao.trim().toUpperCase()
 
-      const body: any = {
+      const dados = {
         nome: nomeUpper,
         descricao: descUpper || undefined,
         valor: valorNumero,
         ativo,
         tipoImpactoPreco,
       }
-
-      const url = isEditing
-        ? `/api/complementos/${complementoId}`
-        : '/api/complementos'
-      const method = isEditing ? 'PATCH' : 'POST'
-
-      const response = await fetchGestorApi(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || 'Erro ao salvar complemento')
-      }
-
-      const savedData = (await response.json().catch(() => ({}))) as { id?: string }
-      const savedId = savedData?.id?.toString() || complementoId
+      const cadastro = criarPersistirCadastroComplementoUseCase()
+      const salvo =
+        isEditing && complementoId
+          ? await cadastro.atualizar({ token, id: complementoId, dados })
+          : await cadastro.criar({ token, dados })
+      const savedId = salvo.getId() || complementoId
       showToast.success(isEditing ? 'Complemento atualizado com sucesso!' : 'Complemento criado com sucesso!')
+      if (vinculosParaCopiar.length > 0) {
+        try {
+          await aplicarPropagacao(vinculosParaCopiar)
+          showToast.success('Alteração aplicada nos cardápios marcados.')
+        } catch (error) {
+          showToast.error(
+            error instanceof Error
+              ? error.message
+              : 'Complemento salvo, mas não foi possível copiar para os outros cardápios.'
+          )
+        }
+      }
       commitBaselineLatestRef.current()
       let imagemPersistida =
         urlImagemHttp(serverImagemUrl) ?? urlImagemHttp(imagemPreviewUrl)
@@ -399,6 +466,8 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
     tipoImpactoPreco,
     isEmbedded,
     onSaved,
+    pedirPropagacao,
+    aplicarPropagacao,
     router,
     serverImagemUrl,
     imagemPreviewUrl,
@@ -584,6 +653,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
                 label="Foto do complemento"
                 disabled={!isEditing}
                 busy={isUploadingImagem}
+                busyLabel={removendoImagem ? 'Removendo imagem…' : 'Enviando foto…'}
                 previewUrl={imagemPreviewUrl}
                 cropPreset={DELIVERY_COMPLEMENTO_CROP_PRESET}
                 helperText={
@@ -598,9 +668,11 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
                 }
                 onFileSelected={handleImagemUpload}
                 onClearPreview={
-                  imagemPreviewUrl?.startsWith('blob:') &&
-                  imagemPreviewUrl !== serverImagemUrl
-                    ? handleClearImagemPreview
+                  (imagemPreviewUrl?.startsWith('blob:') && imagemPreviewUrl !== serverImagemUrl) ||
+                  imageId
+                    ? () => {
+                        void handleRemoverImagem()
+                      }
                     : undefined
                 }
               />
@@ -623,6 +695,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
           )}
         </form>
       </div>
+      {dialogPropagacao}
     </div>
   )
 })

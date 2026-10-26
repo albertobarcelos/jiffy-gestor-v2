@@ -3,6 +3,8 @@ import { Superficie } from '@/src/domain/superficie/Superficie'
 /** Destino do operador de pedidos. */
 export const PATH_GESTOR_PEDIDOS = '/pedidos'
 export const PATH_DASHBOARD_ERP = '/dashboard'
+export const PATH_EXPEDICAO = '/expedicao'
+export const PATH_EXPEDICAO_CURTO = '/e'
 
 const PREFIXOS_PUBLICOS = [
   '/login',
@@ -41,13 +43,18 @@ export function isRotaQuadroPedidos(path: string): boolean {
   return coincidePrefixo(normalizarPathModulo(path), PATH_GESTOR_PEDIDOS)
 }
 
+export function isRotaExpedicaoBancada(path: string): boolean {
+  const normalizado = normalizarPathModulo(path)
+  return coincidePrefixo(normalizado, PATH_EXPEDICAO) || coincidePrefixo(normalizado, PATH_EXPEDICAO_CURTO)
+}
+
 export class RotasDaSuperficie {
   static pathPermitido(superficie: Superficie, path: string): boolean {
     const normalizado = normalizarPathModulo(path)
     if (isRotaPublicaAuth(normalizado) || isRotaSessaoHub(normalizado)) {
       return true
     }
-    if (isRotaQuadroPedidos(normalizado)) {
+    if (isRotaQuadroPedidos(normalizado) || isRotaExpedicaoBancada(normalizado)) {
       return true
     }
     if (superficie.isGestorPedidos()) {

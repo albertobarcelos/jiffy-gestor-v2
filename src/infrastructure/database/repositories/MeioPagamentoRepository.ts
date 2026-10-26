@@ -1,6 +1,8 @@
 import { IMeioPagamentoRepository, BuscarMeiosPagamentosParams, CriarMeioPagamentoDTO, AtualizarMeioPagamentoDTO } from '@/src/domain/repositories/IMeioPagamentoRepository'
 import { MeioPagamento } from '@/src/domain/entities/MeioPagamento'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
+import { montarQueryListagemMeiosPagamento } from '@/src/application/meios-pagamentos/listagemMeiosPagamentoQuery'
+import { montarCorpoCriarMeioPagamento } from '@/src/application/meios-pagamentos/montarCorpoCriarMeioPagamento'
 
 /**
  * Implementação do repositório de meios de pagamento
@@ -24,18 +26,10 @@ export class MeioPagamentoRepository implements IMeioPagamentoRepository {
     total: number
   }> {
     try {
-      const { limit, offset, q = '', ativo, ativoDelivery } = params
-
-      let url = `/api/v1/pagamento/meios-pagamento?limit=${limit}&offset=${offset}`
-      if (q) {
-        url += `&q=${encodeURIComponent(q)}`
-      }
-      if (ativo !== null && ativo !== undefined) {
-        url += `&ativo=${ativo}`
-      }
-      if (ativoDelivery !== null && ativoDelivery !== undefined) {
-        url += `&ativoDelivery=${ativoDelivery}`
-      }
+      const url = `/api/v1/pagamento/meios-pagamento?${montarQueryListagemMeiosPagamento({
+        ...params,
+        q: params.q ?? '',
+      }).toString()}`
 
       const response = await this.apiClient.request<{
         items: any[]
@@ -103,18 +97,7 @@ export class MeioPagamentoRepository implements IMeioPagamentoRepository {
 
   async criarMeioPagamento(data: CriarMeioPagamentoDTO): Promise<MeioPagamento> {
     try {
-      const body: Record<string, unknown> = {
-        nome: data.nome,
-        tefAtivo: data.tefAtivo !== undefined ? data.tefAtivo : true,
-        ativoDelivery: data.ativoDelivery !== undefined ? data.ativoDelivery : false,
-        formaPagamentoFiscal: data.formaPagamentoFiscal || 'Dinheiro',
-        ativo: data.ativo !== undefined ? data.ativo : true,
-        isParcelavel: data.isParcelavel !== undefined ? data.isParcelavel : false,
-      }
-
-      if (data.tipoParcelamento) {
-        body.tipoParcelamento = data.tipoParcelamento
-      }
+      const body = montarCorpoCriarMeioPagamento(data)
 
       const response = await this.apiClient.request<any>(
         `/api/v1/pagamento/meios-pagamento`,
@@ -149,7 +132,12 @@ export class MeioPagamentoRepository implements IMeioPagamentoRepository {
 
       if (data.nome) requestBody.nome = data.nome
       if (data.tefAtivo !== undefined) requestBody.tefAtivo = data.tefAtivo
-      if (data.ativoDelivery !== undefined) requestBody.ativoDelivery = data.ativoDelivery
+      if (data.ativoEntregaDelivery !== undefined) {
+        requestBody.ativoEntregaDelivery = data.ativoEntregaDelivery
+      }
+      if (data.ativoRetiradaDelivery !== undefined) {
+        requestBody.ativoRetiradaDelivery = data.ativoRetiradaDelivery
+      }
       if (data.formaPagamentoFiscal !== undefined) requestBody.formaPagamentoFiscal = data.formaPagamentoFiscal
       if (data.ativo !== undefined) requestBody.ativo = data.ativo
       if (data.isParcelavel !== undefined) requestBody.isParcelavel = data.isParcelavel
@@ -208,4 +196,3 @@ export class MeioPagamentoRepository implements IMeioPagamentoRepository {
     }
   }
 }
-

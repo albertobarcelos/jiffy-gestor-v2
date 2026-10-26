@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { avisoCobrancaEntregadorCupom } from '@/src/application/delivery/textoPagamentoCupomDelivery'
 import { montarTicketsResponseFromInstrucoes } from '@/src/application/delivery/montarTicketsResponseFromInstrucoes'
 import { DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY } from '@/src/shared/types/deliveryImpressao'
 
@@ -280,6 +281,38 @@ describe('montarTicketsResponseFromInstrucoes', () => {
     expect(result.pagamento?.meios).toEqual([
       { nome: 'Dinheiro', valor: 45, naEntrega: true },
     ])
+  })
+
+  it('pedido de 63 pago com 100 cobra 63 e leva troco de 37', () => {
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: { mapeamentos: [], warnings: [] },
+      pedido: {
+        ...pedidoBase,
+        valorFinal: 63,
+        totalPago: 0,
+        totalFaltaPagar: 63,
+        troco: 0,
+        cobrancas: [
+          {
+            id: 'cob-1',
+            meioPagamentoId: 'mp-dinheiro',
+            valor: 100,
+            momentoCobranca: 'na_entrega',
+            status: 'pendente',
+          },
+        ],
+      },
+      prefs: DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      nomesMeiosPagamentoPorId: { 'mp-dinheiro': 'Dinheiro' },
+    })
+
+    expect(result.pagamento?.trocoParaLevar).toBe(37)
+    expect(result.pagamento?.valorCobrarNaEntrega).toBe(63)
+    expect(
+      avisoCobrancaEntregadorCupom(result.pagamento, valor => valor.toFixed(2))
+    ).toEqual({
+      linhas: [{ left: 'COBRAR DINHEIRO', right: '63.00' }],
+    })
   })
 
   it('nao leva troco no cupom quando a cobranca na entrega e PIX', () => {

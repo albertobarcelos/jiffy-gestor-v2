@@ -1,5 +1,6 @@
 import type { InvalidateOptions, InvalidateQueryFilters, QueryClient } from '@tanstack/react-query'
 import { JIFFY_TENANT_QUERY_BROADCAST_CHANNEL } from '@/src/shared/constants/tenantQueryBroadcast'
+import { generateUuid } from '@/src/shared/utils/generateUuid'
 
 export type TenantQueryInvalidateMessage = {
   type: 'invalidate'
@@ -37,7 +38,7 @@ export function attachTenantQueryCrossTabSync(queryClient: QueryClient): () => v
     return () => undefined
   }
 
-  const tabId = crypto.randomUUID()
+  const tabId = generateUuid()
   const channel = new BroadcastChannel(JIFFY_TENANT_QUERY_BROADCAST_CHANNEL)
   let applyingRemote = false
 

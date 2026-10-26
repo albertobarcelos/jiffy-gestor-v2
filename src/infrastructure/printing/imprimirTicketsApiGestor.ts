@@ -1,6 +1,7 @@
 import { criarImprimirTicketsApiGestor } from '@/src/application/delivery/imprimirTicketsApiGestor'
 import { buildPrintJobId } from '@/src/infrastructure/printing/agent/printJobId'
 import { mapTicketToGraphicPrintDocument } from '@/src/infrastructure/printing/mapTicketToGraphicPrintDocument'
+import { desenharCodigoBarras128Png } from '@/src/infrastructure/printing/codigoBarras128Png'
 import {
   desenharMolduraIdentidadePng,
   desenharPilulaProducaoPng,
@@ -13,6 +14,7 @@ export const imprimirTicketsApiGestor = criarImprimirTicketsApiGestor({
   desenharPilula: desenharPilulaProducaoPng,
   desenharMolduraIdentidade: desenharMolduraIdentidadePng,
   desenharSeparador: desenharSeparadorTracejadoPng,
+  desenharCodigoBarras: desenharCodigoBarras128Png,
   mapTicketToGraphicPrintDocument,
   enviarCupom: printDeliveryCupom,
   gerarJobId: buildPrintJobId,

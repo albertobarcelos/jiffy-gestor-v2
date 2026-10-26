@@ -30,7 +30,8 @@ export async function fetchAgentSystemPrinters(): Promise<AgentSystemPrinter[]> 
       headers: { Accept: 'application/json' },
     })
   } catch {
-    throw new Error(mensagemJiffyPrintIndisponivel())
+    const origin = typeof window !== 'undefined' ? window.location.origin : ''
+    throw new Error(mensagemJiffyPrintIndisponivel(origin))
   }
   if (!response.ok) {
     throw new Error(

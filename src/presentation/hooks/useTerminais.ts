@@ -6,7 +6,7 @@ import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
 import { showToast } from '@/src/shared/utils/toast'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { listarTerminaisPagina } from '@/src/infrastructure/api/terminaisConfigApi'
 
 interface Terminal {
   id: string
@@ -27,26 +27,17 @@ export function useTerminais(params: TerminaisQueryParams = {}) {
   return useSecureTenantQuery<Terminal[]>(
     ['terminais', params.q],
     async ({ token }) => {
-      const queryParams = new URLSearchParams()
-      if (params.q) queryParams.append('q', params.q)
-      if (params.limit) queryParams.append('limit', params.limit.toString())
-      queryParams.append('offset', '0')
-
-      const response = await fetchGestorApi(`/api/terminais?${queryParams.toString()}`, {
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      const response = await listarTerminaisPagina(token, {
+        offset: 0,
+        limit: params.limit,
+        q: params.q,
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new ApiError(
-          errorData.error || 'Erro ao carregar terminais',
-          response.status,
-          errorData
-        )
+        throw new ApiError(response.error, response.status)
       }
 
-      const data = await response.json()
-      return data.items || []
+      return (response.data.items || []) as Terminal[]
     },
     { staleTime: 1000 * 60 * 10 }
   )

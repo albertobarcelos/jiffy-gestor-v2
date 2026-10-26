@@ -7,9 +7,9 @@ export const showToast = {
   /**
    * Exibe uma notificação de sucesso
    */
-  success: (message: string) => {
+  success: (message: string, options?: { duration?: number }) => {
     toast.success(message, {
-      duration: 4000,
+      duration: options?.duration ?? 4000,
     })
   },
 

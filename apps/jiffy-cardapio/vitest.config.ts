@@ -18,6 +18,18 @@ export default defineConfig({
         __dirname,
         '../../src/domain/policies/menu/precoVigenteSnapshot.ts'
       ),
+      '@jiffy/intervalo-horario': path.resolve(
+        __dirname,
+        '../../src/shared/utils/intervaloHorario.ts'
+      ),
+      '@jiffy/funcionamento-delivery-core': path.resolve(
+        __dirname,
+        '../../src/shared/utils/funcionamentoDeliveryCore.ts'
+      ),
+      '@jiffy/resolver-flags-canal-delivery': path.resolve(
+        __dirname,
+        '../../src/domain/policies/pagamento/resolverFlagsCanalDelivery.ts'
+      ),
     },
   },
 })

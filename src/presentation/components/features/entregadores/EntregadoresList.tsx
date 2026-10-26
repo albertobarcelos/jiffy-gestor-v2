@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MdDelete, MdSearch } from 'react-icons/md'
+import { MdDelete, MdLock, MdQrCode2, MdSearch } from 'react-icons/md'
 import { Tooltip as MuiTooltip } from '@mui/material'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
@@ -20,12 +20,17 @@ import {
   DialogTitle,
 } from '@/src/presentation/components/ui/dialog'
 import { EntregadorDeliveryModal } from './EntregadorDeliveryModal'
+import { EntregadorSenhaDialog } from './EntregadorSenhaDialog'
+import { EntregadorPwaQrDialog } from './EntregadorPwaQrDialog'
 
 export interface EntregadorDeliveryResumo {
   id: string
   nome: string | null
   telefone?: string | null
 }
+
+const LISTA_GRADE =
+  'grid w-full min-w-0 grid-cols-[minmax(0,1fr)_2.75rem_2.75rem] items-center gap-x-2 md:grid-cols-[minmax(0,1.4fr)_minmax(8rem,1fr)_3.5rem_5.25rem] md:gap-x-2.5'
 
 const TOOLTIP_SLOT_PROPS = {
   tooltip: {
@@ -96,6 +101,9 @@ export function EntregadoresList() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deletingNome, setDeletingNome] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [senhaEntregadorId, setSenhaEntregadorId] = useState<string | null>(null)
+  const [senhaEntregadorNome, setSenhaEntregadorNome] = useState<string | null>(null)
+  const [pwaQrAberto, setPwaQrAberto] = useState(false)
 
   const searchTextRef = useRef('')
   const filterStatusRef = useRef(filterStatus)
@@ -203,6 +211,20 @@ export function EntregadoresList() {
     void loadEntregadores()
   }
 
+  const abrirSenha = (entregador: EntregadorDeliveryResumo) => {
+    setSenhaEntregadorId(entregador.id)
+    setSenhaEntregadorNome(entregador.nome?.trim() || null)
+  }
+
+  const fecharSenha = () => {
+    setSenhaEntregadorId(null)
+    setSenhaEntregadorNome(null)
+  }
+
+  const handleSenhaSalva = () => {
+    fecharSenha()
+  }
+
   const solicitarExclusao = (entregador: EntregadorDeliveryResumo) => {
     setDeletingId(entregador.id)
     setDeletingNome(entregador.nome?.trim() || null)
@@ -240,22 +262,32 @@ export function EntregadoresList() {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex-shrink-0 px-1 py-1 md:px-[30px]">
-        <div className="flex items-center justify-between">
-          <div className="w-1/2 md:pl-5">
-            <p className="text-primary text-sm font-semibold md:text-lg">
+    <div className="flex h-full min-w-0 w-full flex-col">
+      <div className="flex-shrink-0 px-1 pb-1 pt-1 md:px-6">
+        <div className="flex min-w-0 items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-primary md:text-xl">
               Entregadores Cadastrados
             </p>
-            <p className="text-tertiary text-sm font-normal md:text-[22px]">
+            <p className="text-sm font-medium text-tertiary md:text-[22px]">
               Total {entregadores.length} de {total}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex shrink-0 items-center gap-2">
+            <MuiTooltip title="QR Code do app (PWA)" placement="bottom" slotProps={TOOLTIP_SLOT_PROPS}>
+              <button
+                type="button"
+                aria-label="Mostrar QR Code do app do entregador"
+                onClick={() => setPwaQrAberto(true)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-primary/30 bg-info text-primary transition-colors hover:bg-primary/10"
+              >
+                <MdQrCode2 className="h-5 w-5" />
+              </button>
+            </MuiTooltip>
             <button
               type="button"
               onClick={abrirCriar}
-              className="flex h-8 items-center gap-2 rounded-lg bg-primary px-[30px] text-sm font-semibold text-info transition-colors hover:bg-primary/90"
+              className="flex h-8 items-center gap-2 rounded-lg bg-primary px-2 text-sm font-semibold text-info transition-colors hover:bg-primary/90 md:px-[30px]"
             >
               Novo
               <span className="text-lg">+</span>
@@ -264,59 +296,61 @@ export function EntregadoresList() {
         </div>
       </div>
 
-      <div className="h-[4px] flex-shrink-0 border-t-2 border-primary/70" />
-
-      <div className="flex items-start justify-start gap-3 p-1">
-        <div className="flex flex-row items-start justify-start gap-2">
-          <div className="relative flex-col h-8 min-w-[300px] max-w-[360px]">
-            <MdSearch
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
-              size={18}
-            />
-            <input
-              id="entregadores-search"
-              type="text"
-              placeholder="Pesquisar entregador..."
-              value={searchText}
-              onChange={e => setSearchText(e.target.value)}
-              className="h-full w-full rounded-lg border border-gray-200 bg-info pl-11 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
-            />
+      <div className="flex min-w-0 flex-shrink-0 gap-3 px-1 py-1 md:px-[20px]">
+        <div className="min-w-0 flex-1 border-t-2 border-primary/70">
+          <div className="mt-2 flex flex-wrap items-start gap-3">
+            <div className="relative h-8 min-w-0 max-w-[360px] flex-1 basis-[180px]">
+              <MdSearch
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
+                size={18}
+              />
+              <input
+                id="entregadores-search"
+                type="text"
+                placeholder="Pesquisar entregador..."
+                value={searchText}
+                onChange={e => setSearchText(e.target.value)}
+                className="h-full w-full rounded-lg border border-gray-200 bg-info pl-11 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+              />
+            </div>
+            <div className="mt-0 flex w-full min-w-0 items-center gap-2 sm:w-[160px] sm:shrink-0">
+              <label className="block text-xs font-semibold text-secondary-text">Status</label>
+              <select
+                value={filterStatus}
+                onChange={e =>
+                  setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
+                }
+                className="h-8 w-full rounded-lg border border-gray-200 bg-info px-5 text-sm text-primary-text focus:border-primary focus:outline-none"
+              >
+                <option value="Todos">Todos</option>
+                <option value="Ativo">Ativo</option>
+                <option value="Desativado">Desativado</option>
+              </select>
+            </div>
           </div>
-        </div>
-
-        <div className="flex w-full flex-row items-center justify-start gap-2 sm:w-[160px]">
-          <label className="mb-1 block text-xs font-semibold text-secondary-text">Status</label>
-          <select
-            value={filterStatus}
-            onChange={e =>
-              setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
-            }
-            className="h-8 w-full rounded-lg border border-gray-200 bg-info px-5 text-sm text-primary-text focus:border-primary focus:outline-none"
-          >
-            <option value="Todos">Todos</option>
-            <option value="Ativo">Ativo</option>
-            <option value="Desativado">Desativado</option>
-          </select>
         </div>
       </div>
 
-      <div className="mt-0 flex-shrink-0 md:px-[0px]">
-        <div className="flex h-10 items-center gap-2 rounded-lg bg-custom-2 px-4">
-          <div className="flex-[2] text-xs font-semibold text-primary-text md:text-sm">
+      <div className="mt-0 min-w-0 flex-shrink-0 px-1 md:px-[20px]">
+        <div className={`${LISTA_GRADE} h-10 rounded-lg bg-custom-2 px-2 md:px-4`}>
+          <div className="min-w-0 text-xs font-semibold text-primary-text md:text-sm">
             Nome
           </div>
-          <div className="flex-[2] text-xs font-semibold text-primary-text md:text-sm">
+          <div className="hidden min-w-0 text-xs font-semibold text-primary-text md:block md:text-sm">
             Telefone
           </div>
-          <div className="flex w-16 shrink-0 justify-end text-xs font-semibold text-primary-text md:text-sm">
-            Remover
+          <div className="text-center text-[10px] font-semibold leading-tight text-primary-text md:text-sm">
+            <span className="hidden whitespace-nowrap md:inline">Senha</span>
+          </div>
+          <div className="text-center text-[10px] font-semibold leading-tight text-primary-text md:text-sm">
+            <span className="hidden whitespace-nowrap md:inline">Remover</span>
           </div>
         </div>
       </div>
 
       <div
         ref={scrollContainerRef}
-        className="mt-1 flex-1 overflow-y-auto px-1 scrollbar-hide md:px-[0px]"
+        className="mt-1 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-1 scrollbar-hide md:px-[20px]"
         style={{ maxHeight: 'calc(100vh - 300px)' }}
       >
         {(isLoading || !hasLoadedInitialRef.current) && entregadores.length === 0 && (
@@ -339,16 +373,33 @@ export function EntregadoresList() {
             <div
               key={entregador.id}
               onClick={() => abrirEditar(entregador.id)}
-              className={`${bgClass} mb-1 flex cursor-pointer items-center rounded-lg py-2 hover:bg-secondary-bg/15 md:px-4`}
+              className={`${LISTA_GRADE} ${bgClass} mb-1 cursor-pointer rounded-lg px-2 py-2 hover:bg-secondary-bg/15 md:px-4`}
             >
-              <div className="flex-[2] flex items-center text-xs font-normal text-primary-text md:text-sm">
-                <span>{entregador.nome?.trim() || '-'}</span>
+              <div className="min-w-0 truncate text-xs font-normal text-primary-text md:text-sm">
+                {entregador.nome?.trim() || '-'}
               </div>
-              <div className="flex-[2] text-xs text-secondary-text md:text-sm">
+              <div className="hidden min-w-0 truncate text-xs text-secondary-text md:block md:text-sm">
                 {telefoneListaExibicao(entregador.telefone)}
               </div>
               <div
-                className="flex w-16 shrink-0 justify-end"
+                className="flex justify-center"
+                onClick={e => e.stopPropagation()}
+                onMouseDown={e => e.stopPropagation()}
+                onTouchStart={e => e.stopPropagation()}
+              >
+                <MuiTooltip title="Alterar senha do app" placement="bottom" slotProps={TOOLTIP_SLOT_PROPS}>
+                  <button
+                    type="button"
+                    aria-label="Alterar senha do app"
+                    onClick={() => abrirSenha(entregador)}
+                    className="flex h-7 w-7 items-center justify-center rounded transition-colors hover:bg-primary/10"
+                  >
+                    <MdLock className="h-4 w-4 text-primary" />
+                  </button>
+                </MuiTooltip>
+              </div>
+              <div
+                className="flex justify-center"
                 onClick={e => e.stopPropagation()}
                 onMouseDown={e => e.stopPropagation()}
                 onTouchStart={e => e.stopPropagation()}
@@ -381,6 +432,17 @@ export function EntregadoresList() {
         entregadorId={editingId}
         onClose={fecharModal}
         onSalvo={handleSalvo}
+        onAbrirPwaQr={() => setPwaQrAberto(true)}
+      />
+
+      <EntregadorPwaQrDialog open={pwaQrAberto} onClose={() => setPwaQrAberto(false)} />
+
+      <EntregadorSenhaDialog
+        open={Boolean(senhaEntregadorId)}
+        entregadorId={senhaEntregadorId}
+        entregadorNome={senhaEntregadorNome}
+        onClose={fecharSenha}
+        onSalvo={handleSenhaSalva}
       />
 
       <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>

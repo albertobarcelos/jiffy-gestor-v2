@@ -21,6 +21,18 @@ export function parseProdutoIdIndex(value: unknown): string {
   return ''
 }
 
+export function parseImageIdProdutoIndex(item: Record<string, unknown>): string | null {
+  const image = item.image
+  const nested =
+    image && typeof image === 'object' && !Array.isArray(image)
+      ? (image as Record<string, unknown>).imageId
+      : null
+  const raw = item.imageId ?? nested
+  if (typeof raw !== 'string') return null
+  const trimmed = raw.trim()
+  return trimmed || null
+}
+
 export function parseImagemUrlProdutoIndex(item: Record<string, unknown>): string | null {
   const image = item.image
   const nested =

@@ -87,12 +87,15 @@ export interface CatalogProductRowProps {
   onRemove?: (id: string) => void
   /** Troca a imagem (cadastro base ou snapshot do cardápio) — abre o crop no pai. */
   onChangeImage?: (id: string, file: File) => void
+  onClearImage?: (id: string) => void
   /** Esconde preço e pause/status (ex.: categorias neste cardápio). */
   hidePauseAndPrice?: boolean
   /** Esconde o selo COD. */
   hideCodigo?: boolean
   /** Centraliza as ações no espaço entre o nome e os metadados. */
   centerActions?: boolean
+  /** Nome em cinza quando a categoria está desativada neste cardápio. */
+  nomeInativo?: boolean
 }
 
 function CatalogProductRowInner({
@@ -119,9 +122,11 @@ function CatalogProductRowInner({
   onEdit,
   onRemove,
   onChangeImage,
+  onClearImage,
   hidePauseAndPrice = false,
   hideCodigo = false,
   centerActions = false,
+  nomeInativo = false,
 }: CatalogProductRowProps) {
   const [imagemExpandida, setImagemExpandida] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -265,6 +270,27 @@ function CatalogProductRowInner({
               decoding="async"
               className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
             />
+            {onClearImage && !isSavingImage ? (
+              <span
+                role="button"
+                tabIndex={0}
+                title="Remover imagem"
+                aria-label={`Remover imagem de ${nome}`}
+                onClick={event => {
+                  event.stopPropagation()
+                  onClearImage(id)
+                }}
+                onKeyDown={event => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return
+                  event.preventDefault()
+                  event.stopPropagation()
+                  onClearImage(id)
+                }}
+                className="absolute right-0.5 top-0.5 z-10 inline-flex h-5 w-5 items-center justify-center rounded bg-white/90 text-red-600 shadow-sm"
+              >
+                <MdDeleteOutline size={14} />
+              </span>
+            ) : null}
             <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
               {podeTrocarImagem ? (
                 <MdAddAPhoto className="text-white drop-shadow" size={22} />
@@ -308,6 +334,7 @@ function CatalogProductRowInner({
               'truncate text-sm font-normal tracking-wide text-primary-text md:text-base'
             )}
             title={nomeTruncado ? nome : undefined}
+            style={nomeInativo ? { color: '#9CA3AF' } : undefined}
           >
             {nomeExibicao}
           </span>
@@ -322,7 +349,7 @@ function CatalogProductRowInner({
                 ? 'w-full justify-start md:w-full md:justify-start'
                 : hideCodigo
                 ? 'justify-self-end md:justify-self-center'
-                : 'w-full justify-start md:w-auto md:justify-center'
+                : 'w-full justify-start md:justify-center'
             )}
           >
             {actionsSlot}
@@ -506,9 +533,11 @@ function arePropsEqual(prev: CatalogProductRowProps, next: CatalogProductRowProp
     prev.onEdit === next.onEdit &&
     prev.onRemove === next.onRemove &&
     prev.onChangeImage === next.onChangeImage &&
+    prev.onClearImage === next.onClearImage &&
     prev.hidePauseAndPrice === next.hidePauseAndPrice &&
     prev.hideCodigo === next.hideCodigo &&
-    prev.centerActions === next.centerActions
+    prev.centerActions === next.centerActions &&
+    prev.nomeInativo === next.nomeInativo
   )
 }
 

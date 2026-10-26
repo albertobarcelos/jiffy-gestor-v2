@@ -2,6 +2,8 @@ export type DeliveryCupomLargura = 58 | 80
 export type DeliveryCupomDensidade = 'compacto' | 'normal' | 'espacoso'
 export type DeliveryCupomModelo = 'producao' | 'expedicao'
 export type DeliveryCupomModoPapel = 'texto' | 'grafico'
+/** Símbolo do pedido no cupom de produção (cozinha / bancada). Padrão = nenhum. */
+export type DeliveryCupomSimboloPedido = 'nenhum' | 'qrcode' | 'codigo_barras'
 
 export interface DeliveryCupomModeloFonteConfig {
   tamanhoFonteCabecalho: number | null
@@ -23,6 +25,8 @@ export interface DeliveryCupomModeloFonteConfig {
 export interface DeliveryCupomTemplateConfig extends DeliveryCupomModeloFonteConfig {
   /** texto = ESC/POS nativo; grafico = foto do HTML (igual ao preview). */
   modoPapel: DeliveryCupomModoPapel
+  /** Nenhum, QR ou Code 128 (`P`+código) — só na via de produção. Default `nenhum`. */
+  simboloPedido: DeliveryCupomSimboloPedido
   larguraMm: DeliveryCupomLargura
   /** Margem lateral (mm) aplicada nas duas laterais do cupom — ajuste fino para evitar corte na borda imprimível. */
   margemLateralMm: number
@@ -74,6 +78,7 @@ export const DEFAULT_FONTES_EXPEDICAO: DeliveryCupomModeloFonteConfig = {
 
 export const DEFAULT_DELIVERY_CUPOM_TEMPLATE: DeliveryCupomTemplateConfig = {
   modoPapel: 'grafico',
+  simboloPedido: 'nenhum',
   larguraMm: 80,
   margemLateralMm: 0,
   densidade: 'compacto',

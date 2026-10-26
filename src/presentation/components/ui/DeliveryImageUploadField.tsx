@@ -16,6 +16,8 @@ interface DeliveryImageUploadFieldProps {
   variant?: DeliveryImageUploadVariant
   disabled?: boolean
   busy?: boolean
+  /** Texto do loading sobre a foto. O padrão vale para o envio. */
+  busyLabel?: string
   previewUrl?: string | null
   helperText?: string
   emptyHint?: string
@@ -91,6 +93,7 @@ export function DeliveryImageUploadField({
   variant = 'default',
   disabled = false,
   busy = false,
+  busyLabel = 'Enviando foto…',
   previewUrl,
   helperText,
   emptyHint = 'Arraste uma imagem ou clique para selecionar',
@@ -113,7 +116,12 @@ export function DeliveryImageUploadField({
   onFileSelectedRef.current = onFileSelected
 
   const isDisabled = disabled || busy
-  const hint = busy ? 'Quase lá — estamos enviando a foto.' : helperText
+  const hint = busy
+    ? busyLabel === 'Enviando foto…'
+      ? 'Quase lá — estamos enviando a foto.'
+      : busyLabel
+    : helperText
+  const clearLabel = previewUrl?.startsWith('blob:') ? 'Remover preview' : 'Remover imagem'
 
   const { openWithFile, cropModal } = useImageCropFlow({
     // Hook sempre precisa de preset; só usamos openWithFile quando cropPreset existe.
@@ -141,14 +149,14 @@ export function DeliveryImageUploadField({
       className={cn(
         'space-y-1',
         hasCrop && 'flex w-full flex-col',
-        hasCrop && !isWideCrop && 'items-center'
+        hasCrop && !isWideCrop && 'items-start'
       )}
     >
       {label ? (
         <label
           className={cn(
             'block text-sm font-medium text-gray-700',
-            hasCrop && !isWideCrop && 'w-full text-center',
+            hasCrop && !isWideCrop && 'w-full text-left',
             isWideCrop && 'w-full'
           )}
         >
@@ -221,8 +229,8 @@ export function DeliveryImageUploadField({
               {onClearPreview && !busy ? (
                 <button
                   type="button"
-                  title="Remover preview"
-                  aria-label="Remover preview"
+                  title={clearLabel}
+                  aria-label={clearLabel}
                   onClick={e => {
                     e.stopPropagation()
                     onClearPreview()
@@ -280,7 +288,7 @@ export function DeliveryImageUploadField({
               className="h-8 w-8 animate-spin rounded-full border-[3px] border-white/40 border-t-white"
               aria-hidden
             />
-            <p className="px-2 text-center text-sm font-medium text-white">Enviando foto…</p>
+            <p className="px-2 text-center text-sm font-medium text-white">{busyLabel}</p>
           </div>
         ) : null}
       </div>
@@ -290,9 +298,9 @@ export function DeliveryImageUploadField({
           className={cn(
             'text-xs text-neutral-500',
             busy && 'font-medium text-primary',
-            hasCrop && 'w-full text-center',
-            hasCrop && isCropSquare && 'max-w-[280px]',
-            hasCrop && !isCropSquare && 'max-w-[360px]'
+            hasCrop && isWideCrop && 'w-full text-center max-w-[360px]',
+            hasCrop && !isWideCrop && 'self-start text-left',
+            hasCrop && isCropSquare && 'max-w-[280px]'
           )}
         >
           {hint}

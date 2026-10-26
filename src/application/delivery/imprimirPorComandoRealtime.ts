@@ -8,10 +8,11 @@ import {
 import {
   jaImprimiuDeliveryRecentemente,
   marcarImpressaoDeliveryRecente,
+  type TipoDedupeImpressaoDelivery,
 } from '@/src/application/delivery/impressaoDeliveryDedupe'
 import type { CarregarPayloadTicketsImpressao } from '@/src/application/delivery/carregarPayloadTicketsImpressaoDelivery'
 import type { DeliveryCupomTemplateConfig } from '@/src/shared/types/deliveryCupomTemplate'
-import type { PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
+import type { PreferenciasImpressaoDelivery, TipoCupomDelivery } from '@/src/shared/types/deliveryImpressao'
 import type { EmpresaMeResumo } from '@/src/application/dto/EmpresaMeDTO'
 import { erroImpressao, logImpressao, warnImpressao } from '@/src/shared/utils/logImpressaoDelivery'
 
@@ -33,6 +34,10 @@ export type ImprimirPorComandoRealtimeParams = {
   onAviso?: (mensagem: string) => void
   imprimirTickets: ImprimirTicketsApiGestor
   carregarPayload: CarregarPayloadTicketsImpressao
+  tipoCupom?: TipoCupomDelivery
+  tipoDedupe?: TipoDedupeImpressaoDelivery
+  jobNamePrefix?: string
+  estacaoImpressaoId?: string | null
 }
 
 /**
@@ -46,8 +51,9 @@ export async function imprimirPorComandoRealtime(
   logImpressao('realtime.comando.entrada', { vendaId })
 
   if (!vendaId) return 'erro_fetch'
-  if (jaImprimiuDeliveryRecentemente(vendaId)) {
-    logImpressao('realtime.comando.skipped_dedupe', { vendaId })
+  const tipoDedupe = params.tipoDedupe ?? 'comando'
+  if (jaImprimiuDeliveryRecentemente(vendaId, Date.now(), tipoDedupe)) {
+    logImpressao('realtime.comando.skipped_dedupe', { vendaId, tipoDedupe })
     return 'skipped_dedupe'
   }
 
@@ -62,6 +68,7 @@ export async function imprimirPorComandoRealtime(
     accessToken: token,
     prefs: params.prefs,
     empresa: params.empresa,
+    estacaoImpressaoId: params.estacaoImpressaoId,
   })
   if (!ticketsFetch.ok) {
     erroImpressao('realtime.comando.fetch_erro', {
@@ -73,7 +80,8 @@ export async function imprimirPorComandoRealtime(
     return 'erro_fetch'
   }
 
-  const tipoCupom = decidirTipoCupomComandoImpressaoRealtime(params.prefs.modo)
+  const tipoCupom =
+    params.tipoCupom ?? decidirTipoCupomComandoImpressaoRealtime(params.prefs.modo)
   const filtrados = filtrarTicketsPorTipoDecidido(ticketsFetch.data.tickets, tipoCupom)
   if (filtrados.length === 0) {
     warnImpressao('realtime.comando.sem_tickets', { vendaId, tipoCupom })
@@ -96,7 +104,7 @@ export async function imprimirPorComandoRealtime(
     response: ticketsFetch.data,
     ticketsAImprimir: filtrados,
     nomeEmpresa: params.empresa?.nomeExibicao,
-    jobNamePrefix: 'Delivery',
+    jobNamePrefix: params.jobNamePrefix ?? 'Delivery',
     cupomTemplate: params.cupomTemplate,
     accessToken: token,
     onMensagem: params.onMensagem,
@@ -104,7 +112,7 @@ export async function imprimirPorComandoRealtime(
     onAviso: params.onAviso,
   })
 
-  marcarImpressaoDeliveryRecente(vendaId)
+  marcarImpressaoDeliveryRecente(vendaId, Date.now(), tipoDedupe)
 
   logImpressao('realtime.comando.ok', { vendaId, qTickets: filtrados.length })
   return 'ok'

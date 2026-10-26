@@ -1,4 +1,5 @@
 import type { GetMeiosPagamentoPublicosResponseDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import { normalizarMeiosPagamentoPublicos } from '@/src/application/mappers/normalizarMeiosPagamentoPublicos'
 import type { IMeiosPagamentoPublicoPort } from '@/src/application/ports/delivery-publico'
 
 export class ListarMeiosPagamentoPublicoUseCase {
@@ -9,6 +10,7 @@ export class ListarMeiosPagamentoPublicoUseCase {
     if (!slugNormalizado) {
       throw new Error('Slug é obrigatório')
     }
-    return this.meiosPort.listarPorSlug(slugNormalizado)
+    const resposta = await this.meiosPort.listarPorSlug(slugNormalizado)
+    return normalizarMeiosPagamentoPublicos(resposta)
   }
 }

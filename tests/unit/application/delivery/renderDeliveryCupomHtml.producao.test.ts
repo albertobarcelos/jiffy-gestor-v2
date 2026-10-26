@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { renderDeliveryCupomHtml } from '@/src/application/delivery/renderDeliveryCupomHtml'
+import { DEFAULT_DELIVERY_CUPOM_TEMPLATE } from '@/src/shared/types/deliveryCupomTemplate'
 import type { VendaGestorTicket, VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
 
 const root: VendaGestorTicketsResponse = {
@@ -47,6 +48,8 @@ describe('renderDeliveryCupomHtml via de produção', () => {
     expect(html).not.toContain('ITENS DO PEDIDO')
     expect(html).not.toContain('Data Prevista:')
     expect(html).not.toContain('Feito com carinho')
+    expect(html).not.toContain('class="pedido-qr"')
+    expect(html).not.toContain('class="pedido-barcode"')
     expect(html).toContain('.prod-80 .prod-extra + .prod-extra { margin-top:8px; }')
     expect(html).toContain('.prod-80 .prod-extra[data-grupo="neutro"] + .prod-extra[data-grupo="acao"]')
     expect(html).toContain('EscPosFontA')
@@ -58,6 +61,49 @@ describe('renderDeliveryCupomHtml via de produção', () => {
     expect(html.indexOf('OBSERVACAO DO PEDIDO')).toBeLessThan(html.indexOf('Atend: Carlos'))
     expect(html).toContain('prod-resumo')
     expect(html).toMatch(/Cozinha \| .*Atend: Carlos/)
+  })
+
+  it('QR e código de barras só na via de conferência', () => {
+    const conferencia = {
+      ...ticketProducao,
+      viaProducao: { kind: 'conference' as const },
+    }
+    const htmlQr = renderDeliveryCupomHtml({
+      root,
+      ticket: conferencia,
+      template: { ...DEFAULT_DELIVERY_CUPOM_TEMPLATE, simboloPedido: 'qrcode' },
+    })
+    expect(htmlQr).toContain('class="pedido-qr"')
+    expect(htmlQr).toContain('width:220px')
+    expect(htmlQr).toContain('PABC123')
+    expect(htmlQr).not.toContain('class="pedido-barcode"')
+
+    const htmlBarras = renderDeliveryCupomHtml({
+      root,
+      ticket: conferencia,
+      template: { ...DEFAULT_DELIVERY_CUPOM_TEMPLATE, simboloPedido: 'codigo_barras' },
+    })
+    expect(htmlBarras).toContain('pedido-barcode')
+    expect(htmlBarras).toContain('PABC123')
+    expect(htmlBarras).not.toContain('class="pedido-qr"')
+
+    const htmlUnitaria = renderDeliveryCupomHtml({
+      root,
+      ticket: { ...ticketProducao, viaProducao: { kind: 'unit', unitIndex: 1, unitTotal: 6 } },
+      template: { ...DEFAULT_DELIVERY_CUPOM_TEMPLATE, simboloPedido: 'qrcode' },
+    })
+    expect(htmlUnitaria).not.toContain('class="pedido-qr"')
+    expect(htmlUnitaria).not.toContain('class="pedido-barcode"')
+  })
+
+  it('via de produção omite símbolo quando o template pede nenhum', () => {
+    const html = renderDeliveryCupomHtml({
+      root,
+      ticket: ticketProducao,
+      template: { ...DEFAULT_DELIVERY_CUPOM_TEMPLATE, simboloPedido: 'nenhum' },
+    })
+    expect(html).not.toContain('class="pedido-qr"')
+    expect(html).not.toContain('class="pedido-barcode"')
   })
 
   it('via de expedição usa produto no tamanho do cupom, com preço na mesma linha', () => {
@@ -109,6 +155,7 @@ describe('renderDeliveryCupomHtml via de produção', () => {
     expect(html).toMatch(/40,00/)
     expect(html).toContain('text-overflow:ellipsis')
     expect(html).not.toContain('2 X X-Bacon')
+    expect(html).not.toContain('class="pedido-qr"')
   })
 
   it('retirada não renderiza QR de WhatsApp na expedição', () => {
