@@ -3,8 +3,10 @@ import {
   chaveDiaLocalComissao,
   dataDeChaveDiaLocal,
   intervaloComissaoEntregador,
+  intervaloEntreChavesLocais,
   intervaloSemanaQueContem,
   isoIntervaloComissao,
+  rotuloFaixaComissao,
   rotuloPeriodoComissao,
 } from '@/src/application/expedicao/app/periodoComissaoEntregador'
 
@@ -69,5 +71,21 @@ describe('intervaloSemanaQueContem', () => {
     expect(chaveDiaLocalComissao(new Date(2026, 9, 5, 9, 0))).toBe('2026-10-05')
     expect(dataDeChaveDiaLocal('2026-10-05')?.getDate()).toBe(5)
     expect(dataDeChaveDiaLocal('2026-13-40')).toBeNull()
+  })
+})
+
+describe('intervaloEntreChavesLocais', () => {
+  const agora = new Date(2026, 9, 23, 18, 0, 0)
+
+  it('ordena as pontas e não passa de hoje', () => {
+    const faixa = intervaloEntreChavesLocais('2026-10-22', '2026-10-20', agora)
+    expect(faixa?.inicio.getDate()).toBe(20)
+    expect(faixa?.fim.getDate()).toBe(22)
+  })
+
+  it('rótulo da faixa usa traço quando há dois dias', () => {
+    const inicio = dataDeChaveDiaLocal('2026-10-20')
+    const fim = dataDeChaveDiaLocal('2026-10-22')
+    expect(inicio && fim && rotuloFaixaComissao(inicio, fim)).toMatch(/—/)
   })
 })

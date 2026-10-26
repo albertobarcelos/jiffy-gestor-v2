@@ -86,13 +86,10 @@ export function ComissaoSerieDiariaChart(props: ComissaoSerieDiariaChartProps) {
               tick={{ fill: '#71717a', fontSize: 11, fontWeight: 600 }}
             />
             <YAxis hide domain={[0, 'auto']} />
-            <Tooltip cursor={{ fill: 'rgba(91,33,182,0.06)' }} content={<TooltipDia />} />
-            <Bar dataKey="total" radius={[8, 8, 6, 6]} maxBarSize={28}>
+            <Tooltip cursor={false} content={<TooltipDia />} />
+            <Bar dataKey="total" radius={[8, 8, 6, 6]} maxBarSize={28} activeBar={false}>
               {data.map(ponto => (
-                <Cell
-                  key={ponto.dia}
-                  fill={ponto.destaque ? COR_DESTAQUE : COR_BARRA}
-                />
+                <Cell key={ponto.dia} fill={ponto.destaque ? COR_DESTAQUE : COR_BARRA} />
               ))}
             </Bar>
           </BarChart>
