@@ -56,7 +56,7 @@ export function useRodadaEntregadorApp(input: {
       ) {
         showToast.success('Pedido já está na lista.')
         setScannerAberto(false)
-        setTela('abas')
+        setTela('rodada')
         const ja = rodada.find(
           p => p.codigoVenda === codigoVenda || String(p.numeroVenda ?? '') === codigoVenda
         )
@@ -73,11 +73,11 @@ export function useRodadaEntregadorApp(input: {
         })
         setRodada(prev => (prev.some(item => item.id === pedido.id) ? prev : [...prev, pedido]))
         setScannerAberto(false)
-        setTela('abas')
+        setTela('rodada')
         showToast.success(
           `Pedido #${pedido.numeroVenda ?? pedido.codigoVenda} pego.`
         )
-        await onPego(pedido.id)
+        void onPego(pedido.id)
       } catch (error) {
         const motivo = error instanceof Error ? error.message : 'Não foi possível pegar o pedido.'
         setAvisosRodada(prev => [{ codigo: codigoVenda, motivo }, ...prev].slice(0, 6))

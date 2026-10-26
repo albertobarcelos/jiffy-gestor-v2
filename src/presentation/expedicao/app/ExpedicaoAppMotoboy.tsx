@@ -42,6 +42,7 @@ import { useRodadaEntregadorApp } from '@/src/presentation/expedicao/app/hooks/u
 import { usePwaInstallPrompt } from '@/src/presentation/expedicao/app/pwa/usePwaInstallPrompt'
 import { ExpedicaoAppInstalarScreen } from '@/src/presentation/expedicao/app/pwa/ExpedicaoAppInstalarScreen'
 import { deveMostrarPortaoInstalacaoPwa } from '@/src/application/expedicao/app/portaoInstalacaoPwaEntregador'
+import type { LinhaPagamentoFinalizarApp } from '@/src/application/expedicao/app/pagamentoFinalizarEntregaApp'
 
 const VERSAO_APP = '0.1.0'
 
@@ -79,7 +80,6 @@ export function ExpedicaoAppMotoboy() {
   const incluirPedidoPego = pedidos.incluirPedidoPego
   const onPego = useCallback(
     async (pedidoId: string) => {
-      setAba('pedidos')
       await incluirPedidoPego(pedidoId)
     },
     [incluirPedidoPego]
@@ -119,11 +119,11 @@ export function ExpedicaoAppMotoboy() {
   }, [estouro])
 
   const confirmarEntregaComEstouro = useCallback(
-    async (pedidoId: string, meioPagamentoId?: string | null) => {
+    async (pedidoId: string, linhas?: LinhaPagamentoFinalizarApp[]) => {
       const pedido = pedidos.pedidos.find(item => item.id === pedidoId)
       const recordeAntes = recorde
       const qtdAntes = comissao.comissaoPorPeriodo.hoje?.quantidade ?? 0
-      const ok = await pedidos.confirmarEntrega(pedidoId, meioPagamentoId)
+      const ok = await pedidos.confirmarEntrega(pedidoId, linhas)
       if (!ok || !pedido) return
       const quantidadeNova = qtdAntes + 1
       const recordeDepois = aplicarRecordeTurnoEntregador(recordeAntes, {
@@ -160,23 +160,8 @@ export function ExpedicaoAppMotoboy() {
     idsAtuais: pedidos.pedidos.map(pedido => pedido.id),
     onAtualizar: () => {
       void carregarPedidos({ silencioso: true })
-      void carregarComissao('hoje')
     },
   })
-
-  useEffect(() => {
-    if (!entregadorId || aba !== 'pedidos' || rodada.tela !== 'abas') return
-    const refetch = () => {
-      if (document.visibilityState !== 'visible') return
-      void carregarPedidos({ silencioso: true })
-    }
-    window.addEventListener('focus', refetch)
-    document.addEventListener('visibilitychange', refetch)
-    return () => {
-      window.removeEventListener('focus', refetch)
-      document.removeEventListener('visibilitychange', refetch)
-    }
-  }, [aba, carregarPedidos, entregadorId, rodada.tela])
 
   const atualizarPrefs = useCallback((next: PrefsAppEntregador) => {
     setPrefs(next)
@@ -475,7 +460,7 @@ export function ExpedicaoAppMotoboy() {
           meios={pedidos.meiosPagamento}
           ocupado={pedidos.confirmandoId === pedidoConfirmar.id}
           onCancelar={() => pedidos.setConfirmarId(null)}
-          onConfirmar={meioPagamentoId => void confirmarEntregaComEstouro(pedidoConfirmar.id, meioPagamentoId)}
+          onConfirmar={linhas => void confirmarEntregaComEstouro(pedidoConfirmar.id, linhas)}
         />
       ) : null}
       {estouro ? <EstouroEntregaOverlay estouro={estouro} /> : null}

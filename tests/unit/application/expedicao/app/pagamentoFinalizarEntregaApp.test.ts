@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { CobrancaAppEntregador } from '@/src/application/expedicao/app/filtrarPedidosDoEntregador'
 import {
+  alternarMeioNasLinhasFinalizarApp,
+  atualizarValorLinhaFinalizarApp,
   idMeioPagamentoPadraoFinalizarApp,
+  montarLinhasIniciaisFinalizarApp,
   montarOpcoesMeioPagamentoFinalizarApp,
   montarPagamentosAoTrocarMeioFinalizarApp,
+  montarPagamentosDasLinhasFinalizarApp,
 } from '@/src/application/expedicao/app/pagamentoFinalizarEntregaApp'
 
 const dinheiro: CobrancaAppEntregador = {
@@ -76,5 +80,48 @@ describe('pagamentoFinalizarEntregaApp', () => {
         faltaPagar: 0,
       })
     ).toEqual([{ meioPagamentoId: 'mp-din', valor: 20 }])
+  })
+
+  it('permite duas formas na porta e reparte o valor', () => {
+    const inicial = montarLinhasIniciaisFinalizarApp({
+      cobrancas: [dinheiro],
+      valorFinal: 49.4,
+      faltaPagar: 49.4,
+    })
+    expect(inicial).toEqual([{ meioPagamentoId: 'mp-din', valor: 49.4 }])
+    const duas = alternarMeioNasLinhasFinalizarApp({
+      linhas: inicial,
+      meioPagamentoId: 'mp-pix',
+      valorAlvo: 49.4,
+    })
+    expect(duas).toEqual([
+      { meioPagamentoId: 'mp-din', valor: 49.4 },
+      { meioPagamentoId: 'mp-pix', valor: 0 },
+    ])
+    const repartido = atualizarValorLinhaFinalizarApp({
+      linhas: duas,
+      indice: 0,
+      valor: 20,
+      valorAlvo: 49.4,
+    })
+    expect(repartido).toEqual([
+      { meioPagamentoId: 'mp-din', valor: 20 },
+      { meioPagamentoId: 'mp-pix', valor: 29.4 },
+    ])
+    expect(
+      montarPagamentosDasLinhasFinalizarApp({
+        cobrancas: [pixPago, dinheiro],
+        linhas: [
+          { meioPagamentoId: 'mp-din', valor: 20 },
+          { meioPagamentoId: 'mp-cartao', valor: 29.4 },
+        ],
+        valorFinal: 69.4,
+        faltaPagar: 49.4,
+      })
+    ).toEqual([
+      { id: 'cob-pix', meioPagamentoId: 'mp-pix', valor: 20 },
+      { meioPagamentoId: 'mp-din', valor: 20 },
+      { meioPagamentoId: 'mp-cartao', valor: 29.4 },
+    ])
   })
 })

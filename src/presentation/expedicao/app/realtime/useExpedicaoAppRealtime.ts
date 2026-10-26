@@ -35,9 +35,8 @@ export function useExpedicaoAppRealtime(input: {
 
     const ouvir = (evento: Event) => {
       const payload = (evento as CustomEvent).detail
-      onAtualizarRef.current()
       const pedido = mapPedidoAppEntregador(payload)
-      if (!pedido || !avisosRef.current) return
+      if (!pedido) return
       if (
         !deveAvisarPedidoEntregador({
           entregadorId,
@@ -49,6 +48,8 @@ export function useExpedicaoAppRealtime(input: {
       ) {
         return
       }
+      onAtualizarRef.current()
+      if (!avisosRef.current) return
       prepararSomLeituraExpedicao()
       tocarSomLeituraExpedicao()
       const numero = pedido.numeroVenda ?? pedido.codigoVenda

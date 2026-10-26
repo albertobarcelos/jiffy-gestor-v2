@@ -31,6 +31,7 @@ import {
   buscarPedidoPorCodigo,
   marcarPedidoPronto,
   vincularEDespacharPedido,
+  vincularPedidoAoEntregador,
 } from '@/src/presentation/expedicao/api/expedicaoApi'
 
 export type { PedidoResumoAppEntregador }
@@ -75,7 +76,12 @@ export async function buscarPedidoResumoApp(input: {
     headers: { Authorization: `Bearer ${input.token}`, Accept: 'application/json' },
   })
   if (!res.ok) return null
-  return mapPedidoAppEntregador(await res.json())
+  const pedido = mapPedidoAppEntregador(await res.json())
+  if (!pedido) return null
+  const ids = pedido.meioPagamentoIds
+  if (ids.length === 0) return pedido
+  const nomes = await buscarNomesMeiosPagamentoApp(input.token, ids)
+  return aplicarNomesMeiosNoPedido(pedido, nomes)
 }
 
 export { mesclarPedidoPegoNaLista }
@@ -169,8 +175,8 @@ export async function buscarComissaoEntregador(input: {
 }
 
 /**
- * Pega o pedido: marca PRONTO (cupom na receptora), vincula o entregador e sai EM_ROTA.
- * Assim o pedido entra na lista mesmo se o app fechar depois da leitura.
+ * Pega o pedido: marca PRONTO se ainda não estiver e vincula o entregador.
+ * EM_ROTA fica para Conferir / Em rota, para o scan não travar na porta.
  */
 export async function adicionarPedidoNaRodada(input: {
   token: string
@@ -184,7 +190,7 @@ export async function adicionarPedidoNaRodada(input: {
   }
   const etapa = String(pedido.etapa ?? '').trim().toUpperCase()
   const jaMeu = String(pedido.entregadorId ?? '').trim() === input.entregadorId
-  if (jaMeu && etapa === 'EM_ROTA') {
+  if (jaMeu && (etapa === 'EM_ROTA' || etapa === 'PRONTO')) {
     return pedido
   }
   await marcarPedidoPronto({
@@ -192,12 +198,18 @@ export async function adicionarPedidoNaRodada(input: {
     pedidoId: pedido.id,
     etapaAtual: pedido.etapa,
   })
-  await vincularEDespacharPedido({
-    token: input.token,
-    pedidoId: pedido.id,
+  if (!jaMeu) {
+    await vincularPedidoAoEntregador({
+      token: input.token,
+      pedidoId: pedido.id,
+      entregadorId: input.entregadorId,
+    })
+  }
+  return {
+    ...pedido,
+    etapa: etapa === 'EM_ROTA' ? 'EM_ROTA' : 'PRONTO',
     entregadorId: input.entregadorId,
-  })
-  return { ...pedido, etapa: 'EM_ROTA', entregadorId: input.entregadorId }
+  }
 }
 
 export async function expedirPedidosDaRodada(input: {
