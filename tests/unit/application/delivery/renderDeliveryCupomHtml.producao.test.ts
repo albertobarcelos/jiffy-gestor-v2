@@ -63,7 +63,7 @@ describe('renderDeliveryCupomHtml via de produção', () => {
     expect(html).toMatch(/Cozinha \| .*Atend: Carlos/)
   })
 
-  it('QR e código de barras só na via de conferência', () => {
+  it('QR e código de barras na via single e na conferência; some na unitária', () => {
     const conferencia = {
       ...ticketProducao,
       viaProducao: { kind: 'conference' as const },
@@ -74,8 +74,11 @@ describe('renderDeliveryCupomHtml via de produção', () => {
       template: { ...DEFAULT_DELIVERY_CUPOM_TEMPLATE, simboloPedido: 'qrcode' },
     })
     expect(htmlQr).toContain('class="pedido-qr"')
-    expect(htmlQr).toContain('width:220px')
+    expect(htmlQr).toContain('prod-simbolo-row')
     expect(htmlQr).toContain('PABC123')
+    expect(htmlQr.indexOf('class="pedido-qr"')).toBeLessThan(
+      htmlQr.indexOf('class="prod-simbolo-texto"')
+    )
     expect(htmlQr).not.toContain('class="pedido-barcode"')
 
     const htmlBarras = renderDeliveryCupomHtml({
@@ -94,6 +97,14 @@ describe('renderDeliveryCupomHtml via de produção', () => {
     })
     expect(htmlUnitaria).not.toContain('class="pedido-qr"')
     expect(htmlUnitaria).not.toContain('class="pedido-barcode"')
+
+    const htmlSingle = renderDeliveryCupomHtml({
+      root,
+      ticket: ticketProducao,
+      template: { ...DEFAULT_DELIVERY_CUPOM_TEMPLATE, simboloPedido: 'qrcode' },
+    })
+    expect(htmlSingle).toContain('class="pedido-qr"')
+    expect(htmlSingle).toContain('PABC123')
   })
 
   it('via de produção omite símbolo quando o template pede nenhum', () => {
