@@ -52,6 +52,48 @@ export function comEntregadorNoRelatorio(
   }
 }
 
+/** Teto do GET detalhe `/relatorios/entregadores/:id/entregas` (validação: ≤ 50). */
+export const LIMITE_PAGINA_COMISSAO_ENTREGADOR = 50
+
+export function hasNextPaginaComissaoRelatorio(raw: Record<string, unknown>): boolean | undefined {
+  const vendas = objeto(raw.vendas)
+  return typeof vendas?.hasNext === 'boolean' ? vendas.hasNext : undefined
+}
+
+export function deveBuscarProximaPaginaComissao(input: {
+  itensNaPagina: number
+  limit: number
+  hasNext?: boolean
+}): boolean {
+  if (input.hasNext === false) return false
+  if (input.hasNext === true) return true
+  return input.itensNaPagina >= input.limit
+}
+
+export function juntarPaginasComissaoEntregador(
+  paginas: ComissaoEntregadorApp[]
+): ComissaoEntregadorApp {
+  if (paginas.length === 0) {
+    return { itens: [], quantidade: 0, totalTaxas: 0 }
+  }
+  const vistos = new Set<string>()
+  const itens: ComissaoEntregadorApp['itens'] = []
+  for (const pagina of paginas) {
+    for (const item of pagina.itens) {
+      if (vistos.has(item.id)) continue
+      vistos.add(item.id)
+      itens.push(item)
+    }
+  }
+  const primeira = paginas[0]
+  const somaItens = itens.reduce((acc, item) => acc + (item.taxaEntrega ?? 0), 0)
+  return {
+    itens,
+    quantidade: Math.max(primeira.quantidade, itens.length),
+    totalTaxas: primeira.totalTaxas > 0 ? primeira.totalTaxas : Math.round(somaItens * 100) / 100,
+  }
+}
+
 export function montarComissaoEntregadorApp(
   raw: Record<string, unknown>,
   entregadorId: string

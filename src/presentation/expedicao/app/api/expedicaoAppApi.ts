@@ -13,6 +13,10 @@ import {
   type PedidoResumoAppEntregador,
 } from '@/src/application/expedicao/app/mapPedidoAppEntregador'
 import {
+  deveBuscarProximaPaginaComissao,
+  hasNextPaginaComissaoRelatorio,
+  juntarPaginasComissaoEntregador,
+  LIMITE_PAGINA_COMISSAO_ENTREGADOR,
   montarComissaoEntregadorApp,
   type ComissaoEntregadorApp,
 } from '@/src/application/expedicao/app/montarComissaoEntregadorApp'
@@ -166,18 +170,38 @@ export async function buscarComissaoEntregador(input: {
 }): Promise<ComissaoEntregadorApp> {
   const faixa = input.intervalo ?? intervaloComissaoEntregador(input.periodo ?? 'hoje')
   const intervalo = isoIntervaloComissao(faixa)
-  const params = new URLSearchParams({
-    dataFinalizacaoInicio: intervalo.dataFinalizacaoInicio,
-    dataFinalizacaoFim: intervalo.dataFinalizacaoFim,
-    limit: '200',
-    offset: '0',
-  })
-  const res = await fetchGestorApi(
-    `/api/relatorios/entregadores/${encodeURIComponent(input.entregadorId)}/entregas?${params}`,
-    { headers: { Authorization: `Bearer ${input.token}`, Accept: 'application/json' } }
-  )
-  if (!res.ok) throw new Error(await lerErro(res, 'Não foi possível carregar as comissões.'))
-  return montarComissaoEntregadorApp((await res.json()) as Record<string, unknown>, input.entregadorId)
+  const paginas: ComissaoEntregadorApp[] = []
+  let offset = 0
+  const limit = LIMITE_PAGINA_COMISSAO_ENTREGADOR
+  const maxPaginas = 20
+  for (;;) {
+    const params = new URLSearchParams({
+      dataFinalizacaoInicio: intervalo.dataFinalizacaoInicio,
+      dataFinalizacaoFim: intervalo.dataFinalizacaoFim,
+      limit: String(limit),
+      offset: String(offset),
+    })
+    const res = await fetchGestorApi(
+      `/api/relatorios/entregadores/${encodeURIComponent(input.entregadorId)}/entregas?${params}`,
+      { headers: { Authorization: `Bearer ${input.token}`, Accept: 'application/json' } }
+    )
+    if (!res.ok) throw new Error(await lerErro(res, 'Não foi possível carregar as comissões.'))
+    const raw = (await res.json()) as Record<string, unknown>
+    const pagina = montarComissaoEntregadorApp(raw, input.entregadorId)
+    paginas.push(pagina)
+    if (
+      paginas.length >= maxPaginas ||
+      !deveBuscarProximaPaginaComissao({
+        itensNaPagina: pagina.itens.length,
+        limit,
+        hasNext: hasNextPaginaComissaoRelatorio(raw),
+      })
+    ) {
+      break
+    }
+    offset += limit
+  }
+  return juntarPaginasComissaoEntregador(paginas)
 }
 
 /**
