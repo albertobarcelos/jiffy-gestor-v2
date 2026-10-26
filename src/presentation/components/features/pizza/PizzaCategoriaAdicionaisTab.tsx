@@ -1,12 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import {
-  Autocomplete,
-  Checkbox,
-  FormControlLabel,
-  TextField,
-} from '@mui/material'
+import { Checkbox, FormControlLabel } from '@mui/material'
+import { MdSearch } from 'react-icons/md'
 import { Complemento } from '@/src/domain/entities/Complemento'
 import { normalizarTipoImpactoPreco } from '@/src/domain/complemento/tipos'
 import { useComplementos } from '@/src/presentation/hooks/useComplementos'
@@ -16,12 +12,18 @@ import {
   usePizzaComplementos,
   useVincularPizzaComplementoMutation,
 } from '@/src/presentation/hooks/pizza/usePizza'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
+import { PizzaCurrencyTextField } from '@/src/presentation/components/features/pizza/PizzaCurrencyTextField'
 import { showToast } from '@/src/shared/utils/toast'
 import type {
   ComplementoPizza,
   PrecoComplementoPizza,
   TipoImpactoPreco,
 } from '@/src/shared/types/pizza'
+
+type FilterTab = 'vinculados' | 'catalogo' | 'todos'
+
+const EMPTY_COMPLEMENTOS: Complemento[] = []
 
 interface PizzaComplementoTamanhoOption {
   id: string
@@ -63,15 +65,16 @@ function PizzaComplementoPrecoEditor({
     return Object.fromEntries(
       tamanhos.map(tamanho => {
         const temPreco = existentes.has(tamanho.id)
-        const valor =
+        const valorBruto =
           tipoImpactoPreco === 'nenhum'
             ? 0
-            : existentes.get(tamanho.id) ?? valorInicial ?? 0
+            : (existentes.get(tamanho.id) ?? valorInicial ?? 0)
+        const valor = Number.isFinite(valorBruto) ? Math.max(0, valorBruto) : 0
         return [
           tamanho.id,
           {
             ativo: temPreco || iniciarTodosSelecionados,
-            valor: String(valor),
+            valor,
           },
         ]
       })
@@ -91,12 +94,7 @@ function PizzaComplementoPrecoEditor({
         novosPrecos.push({ pizzaTamanhoId: tamanho.id, valor: 0 })
         continue
       }
-      const valorTexto = valores[tamanho.id].valor.trim()
-      if (!valorTexto) {
-        showToast.error(`Informe um preço para o tamanho ${tamanho.nome}`)
-        return
-      }
-      const valor = Number(valorTexto.replace(',', '.'))
+      const valor = valores[tamanho.id]?.valor
       if (!Number.isFinite(valor) || valor < 0) {
         showToast.error(`Informe um preço válido para o tamanho ${tamanho.nome}`)
         return
@@ -109,16 +107,16 @@ function PizzaComplementoPrecoEditor({
 
   return (
     <div className="space-y-3">
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         {tamanhos.map(tamanho => {
           const valor = valores[tamanho.id]
           return (
             <div
               key={tamanho.id}
-              className="flex items-center gap-3 rounded-lg border border-gray-200 px-3 py-2"
+              className="flex flex-col gap-2 rounded-lg border border-gray-200 px-3 py-2"
             >
               <FormControlLabel
-                className="m-0 min-w-0 flex-1"
+                className="m-0 min-w-0"
                 control={
                   <Checkbox
                     size="small"
@@ -136,9 +134,9 @@ function PizzaComplementoPrecoEditor({
                 }
                 label={<span className="truncate text-sm">{tamanho.nome}</span>}
               />
-              <TextField
-                type="number"
+              <PizzaCurrencyTextField
                 size="small"
+                fullWidth
                 label={
                   tipoImpactoPreco === 'aumenta'
                     ? 'Acréscimo'
@@ -146,19 +144,17 @@ function PizzaComplementoPrecoEditor({
                       ? 'Desconto'
                       : 'Valor'
                 }
-                value={valor?.valor ?? ''}
+                value={valor?.valor ?? 0}
                 disabled={!valor?.ativo || tipoImpactoPreco === 'nenhum'}
-                inputProps={{ min: 0, step: 0.01 }}
-                onChange={event =>
+                onChange={novoValor =>
                   setValores(current => ({
                     ...current,
                     [tamanho.id]: {
                       ...current[tamanho.id],
-                      valor: event.target.value,
+                      valor: Math.max(0, novoValor),
                     },
                   }))
                 }
-                sx={{ width: 125 }}
               />
             </div>
           )
@@ -190,39 +186,119 @@ export function PizzaCategoriaAdicionaisTab({
     [tamanhos]
   )
   const complementosQuery = usePizzaComplementos(categoriaId)
-  const cadastroQuery = useComplementos({ ativo: true, limit: 2000 })
+  const cadastroQuery = useComplementos({ limit: 2000 })
   const vincularMutation = useVincularPizzaComplementoMutation()
   const precosMutation = useAtualizarPrecosPizzaComplementoMutation()
   const desvincularMutation = useDesvincularPizzaComplementoMutation()
-  const [complementoSelecionado, setComplementoSelecionado] =
-    useState<Complemento | null>(null)
 
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterTab, setFilterTab] = useState<FilterTab>('vinculados')
+  const [pendenteComplementoId, setPendenteComplementoId] = useState<string | null>(null)
+
+  const catalogo = cadastroQuery.data ?? EMPTY_COMPLEMENTOS
   const complementosVinculados = complementosQuery.data ?? []
+  const vinculadosByComplementoId = useMemo(() => {
+    const map = new Map<string, ComplementoPizza>()
+    for (const item of complementosVinculados) {
+      map.set(item.complementoId, item)
+    }
+    return map
+  }, [complementosVinculados])
   const idsVinculados = useMemo(
-    () => new Set(complementosVinculados.map(complemento => complemento.complementoId)),
+    () => new Set(complementosVinculados.map(item => item.complementoId)),
     [complementosVinculados]
   )
-  const opcoes = useMemo(
+
+  const complementoPendente = useMemo(
     () =>
-      (cadastroQuery.data ?? []).filter(
-        complemento => complemento.isAtivo() && !idsVinculados.has(complemento.getId())
-      ),
-    [cadastroQuery.data, idsVinculados]
-  )
-  const tipoImpactoSelecionado = normalizarTipoImpactoPreco(
-    complementoSelecionado?.getTipoImpactoPreco()
+      pendenteComplementoId
+        ? (catalogo.find(item => item.getId() === pendenteComplementoId) ?? null)
+        : null,
+    [catalogo, pendenteComplementoId]
   )
 
+  const filterCounts = useMemo(() => {
+    let vinculados = 0
+    let catalogoAtivos = 0
+    for (const item of catalogo) {
+      const linked = idsVinculados.has(item.getId())
+      if (linked && item.isAtivo()) vinculados += 1
+      if (!linked && item.isAtivo()) catalogoAtivos += 1
+    }
+    return {
+      vinculados,
+      catalogo: catalogoAtivos,
+      todos: catalogo.length,
+    }
+  }, [catalogo, idsVinculados])
+
+  const listaFiltrada = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase()
+    const bySearch = !term
+      ? catalogo
+      : catalogo.filter(item => {
+          const nome = item.getNome()?.toLowerCase() || ''
+          const descricao = item.getDescricao()?.toLowerCase() || ''
+          return nome.includes(term) || descricao.includes(term)
+        })
+
+    if (filterTab === 'vinculados') {
+      return bySearch.filter(item => idsVinculados.has(item.getId()) && item.isAtivo())
+    }
+    if (filterTab === 'catalogo') {
+      return bySearch.filter(item => !idsVinculados.has(item.getId()) && item.isAtivo())
+    }
+
+    const vinculados: Complemento[] = []
+    const naoVinculados: Complemento[] = []
+    for (const item of bySearch) {
+      if (idsVinculados.has(item.getId())) vinculados.push(item)
+      else naoVinculados.push(item)
+    }
+    return [...vinculados, ...naoVinculados]
+  }, [catalogo, searchTerm, filterTab, idsVinculados])
+
+  const tipoImpactoPendente = normalizarTipoImpactoPreco(
+    complementoPendente?.getTipoImpactoPreco()
+  )
+
+  const iniciarVinculo = (complementoId: string) => {
+    if (tamanhosDisponiveis.length === 0) {
+      showToast.error('Salve ao menos um tamanho ativo antes de vincular adicionais')
+      return
+    }
+    if (idsVinculados.has(complementoId)) return
+    setPendenteComplementoId(complementoId)
+    setFilterTab('vinculados')
+  }
+
+  const handleToggleVinculo = async (complementoId: string, checked: boolean) => {
+    if (checked) {
+      iniciarVinculo(complementoId)
+      return
+    }
+
+    if (pendenteComplementoId === complementoId) {
+      setPendenteComplementoId(null)
+      return
+    }
+
+    const vinculado = vinculadosByComplementoId.get(complementoId)
+    if (!vinculado) return
+    await handleDesvincular(vinculado)
+  }
+
   const handleVincular = async (precos: PrecoComplementoPizza[]) => {
-    if (!complementoSelecionado) return
+    if (!complementoPendente) return
     try {
       await vincularMutation.mutateAsync({
         categoriaPizzaId: categoriaId,
-        complementoId: complementoSelecionado.getId(),
+        complementoId: complementoPendente.getId(),
         precos,
       })
       showToast.success('Adicional vinculado à categoria')
-      setComplementoSelecionado(null)
+      setPendenteComplementoId(null)
+      setFilterTab('vinculados')
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Erro ao vincular adicional')
     }
@@ -257,123 +333,309 @@ export function PizzaCategoriaAdicionaisTab({
     }
   }
 
+  const isLoading = cadastroQuery.isLoading || complementosQuery.isLoading
+  const labels: Record<FilterTab, string> = {
+    vinculados: 'Nesta categoria',
+    catalogo: 'Disponíveis',
+    todos: 'Todos',
+  }
+
   return (
-    <section className="min-h-0 flex-1 space-y-6 overflow-y-auto p-4 md:p-6">
-      <header>
+    <section className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 md:p-6">
+      <header className="mb-3 shrink-0">
         <h2 className="text-lg font-semibold text-primary-text">Adicionais da pizza</h2>
         <p className="mt-1 text-sm text-secondary-text">
-          Vincule complementos já cadastrados e defina o preço cobrado uma vez por pizza,
-          conforme o tamanho. O cadastro global do complemento não será alterado.
+          Selecione em Disponíveis e defina o preço por tamanho em Nesta categoria. O cadastro
+          global do complemento não será alterado.
         </p>
       </header>
 
       {tamanhosDisponiveis.length === 0 ? (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+        <div className="mb-3 shrink-0 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
           Salve ao menos um tamanho ativo da categoria antes de configurar os adicionais.
         </div>
       ) : null}
 
-      <div className="space-y-3 rounded-xl border border-gray-200 p-4">
-        <h3 className="font-medium text-primary-text">Vincular complemento existente</h3>
-        {cadastroQuery.isError ? (
-          <p className="text-sm text-error">
-            {cadastroQuery.error instanceof Error
-              ? cadastroQuery.error.message
-              : 'Erro ao carregar complementos cadastrados'}
-          </p>
-        ) : null}
-        <Autocomplete
-          options={opcoes}
-          value={complementoSelecionado}
-          loading={cadastroQuery.isLoading}
-          disabled={
-            tamanhosDisponiveis.length === 0 ||
-            cadastroQuery.isError ||
-            vincularMutation.isPending
-          }
-          getOptionLabel={option => option.getNome()}
-          isOptionEqualToValue={(option, value) => option.getId() === value.getId()}
-          onChange={(_event, value) => setComplementoSelecionado(value)}
-          noOptionsText="Nenhum complemento disponível para vincular"
-          renderInput={params => (
-            <TextField {...params} label="Complemento" placeholder="Buscar complemento" />
-          )}
-        />
-        {complementoSelecionado ? (
-          <div className="space-y-3 rounded-lg bg-gray-50 p-3">
-            <p className="text-sm text-secondary-text">
-              Impacto: <strong>{nomeImpacto(tipoImpactoSelecionado)}</strong>.
-              {tipoImpactoSelecionado === 'nenhum'
-                ? ' O valor será R$ 0,00; escolha os tamanhos em que o adicional gratuito ficará disponível.'
-                : ' Os valores começam pelo valor-base cadastrado e podem ser ajustados por tamanho.'}
-            </p>
-            <PizzaComplementoPrecoEditor
-              key={complementoSelecionado.getId()}
-              tamanhos={tamanhosDisponiveis}
-              precos={[]}
-              tipoImpactoPreco={tipoImpactoSelecionado}
-              valorInicial={tipoImpactoSelecionado === 'nenhum' ? 0 : complementoSelecionado.getValor()}
-              iniciarTodosSelecionados
-              pending={vincularMutation.isPending}
-              onSave={handleVincular}
-            />
-          </div>
-        ) : null}
+      <div className="mb-3 flex shrink-0 flex-wrap items-center gap-2">
+        <div className="relative min-w-[180px] flex-1">
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={event => setSearchTerm(event.target.value)}
+            placeholder="Buscar..."
+            className="h-8 w-full min-w-0 rounded-lg border border-gray-200 pl-9 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+          />
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text">
+            <MdSearch size={16} />
+          </span>
+        </div>
+        <div className="flex h-8 shrink-0 overflow-hidden rounded-lg border border-gray-200 text-xs font-medium">
+          {(['vinculados', 'catalogo', 'todos'] as const).map(tab => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setFilterTab(tab)}
+              className={`flex h-full items-center gap-1.5 px-3 transition-colors ${
+                filterTab === tab
+                  ? 'bg-primary text-white'
+                  : 'bg-white text-secondary-text hover:bg-gray-50'
+              }`}
+            >
+              <span>{labels[tab]}</span>
+              <span
+                className={`tabular-nums ${
+                  filterTab === tab ? 'text-white/80' : 'text-secondary-text/80'
+                }`}
+              >
+                ({filterCounts[tab]})
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="space-y-3">
-        <h3 className="font-medium text-primary-text">Adicionais vinculados</h3>
-        {complementosQuery.isLoading ? (
-          <p className="text-sm text-secondary-text">Carregando adicionais...</p>
+      <div className="min-h-0 flex-1 overflow-y-auto pr-0.5">
+        {isLoading ? (
+          <div className="flex justify-center py-10">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          </div>
         ) : null}
-        {complementosQuery.isError ? (
-          <p className="text-sm text-error">
-            {complementosQuery.error instanceof Error
-              ? complementosQuery.error.message
-              : 'Erro ao carregar adicionais da pizza'}
+
+        {!isLoading && (cadastroQuery.isError || complementosQuery.isError) ? (
+          <p className="py-6 text-center text-sm text-error">
+            {cadastroQuery.error instanceof Error
+              ? cadastroQuery.error.message
+              : complementosQuery.error instanceof Error
+                ? complementosQuery.error.message
+                : 'Erro ao carregar adicionais da pizza'}
           </p>
         ) : null}
-        {!complementosQuery.isLoading &&
-        !complementosQuery.isError &&
-        complementosVinculados.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-gray-300 p-4 text-sm text-secondary-text">
-            Nenhum adicional vinculado a esta categoria.
-          </p>
-        ) : null}
-        {complementosVinculados.map(complemento => (
-          <article
-            key={complemento.id}
-            className="space-y-4 rounded-xl border border-gray-200 p-4"
-          >
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h4 className="font-medium text-primary-text">{complemento.nome}</h4>
-                <p className="mt-1 text-sm text-secondary-text">
-                  Impacto: {nomeImpacto(complemento.tipoImpactoPreco)}
-                </p>
-                {complemento.descricao ? (
-                  <p className="mt-1 text-sm text-secondary-text">{complemento.descricao}</p>
+
+        {!isLoading && !cadastroQuery.isError && !complementosQuery.isError ? (
+          <>
+            {filterTab === 'vinculados' ? (
+              <div className="space-y-3">
+                {complementoPendente ? (
+                  <article className="space-y-4 rounded-xl border border-primary/40 bg-primary/5 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+                          Novo vínculo — defina os preços por tamanho
+                        </p>
+                        <h4 className="mt-1 font-medium text-primary-text">
+                          {complementoPendente.getNome()}
+                        </h4>
+                        {complementoPendente.getDescricao()?.trim() ? (
+                          <p className="mt-1 text-sm text-secondary-text">
+                            {complementoPendente.getDescricao()}
+                          </p>
+                        ) : null}
+                        <p className="mt-1 text-sm text-secondary-text">
+                          Impacto: {nomeImpacto(tipoImpactoPendente)}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPendenteComplementoId(null)}
+                        className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-secondary-text hover:bg-white"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                    <PizzaComplementoPrecoEditor
+                      key={`pendente-${complementoPendente.getId()}`}
+                      tamanhos={tamanhosDisponiveis}
+                      precos={[]}
+                      tipoImpactoPreco={tipoImpactoPendente}
+                      valorInicial={
+                        tipoImpactoPendente === 'nenhum' ? 0 : complementoPendente.getValor()
+                      }
+                      iniciarTodosSelecionados
+                      pending={vincularMutation.isPending}
+                      onSave={handleVincular}
+                    />
+                  </article>
                 ) : null}
+
+                {listaFiltrada.length === 0 && !complementoPendente ? (
+                  <p className="rounded-lg border border-dashed border-gray-300 p-4 text-center text-sm text-secondary-text">
+                    Nenhum adicional nesta categoria. Selecione em Disponíveis para vincular.
+                  </p>
+                ) : null}
+
+                {listaFiltrada.map(item => {
+                  const vinculado = vinculadosByComplementoId.get(item.getId())
+                  if (!vinculado) return null
+                  return (
+                    <article
+                      key={vinculado.id}
+                      className="space-y-4 rounded-xl border border-gray-200 p-4"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <h4 className="font-medium text-primary-text">{vinculado.nome}</h4>
+                          {vinculado.descricao ? (
+                            <p className="mt-1 text-sm text-secondary-text">{vinculado.descricao}</p>
+                          ) : null}
+                          <p className="mt-1 text-sm text-secondary-text">
+                            Impacto: {nomeImpacto(vinculado.tipoImpactoPreco)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <JiffyIconSwitch
+                            checked
+                            onChange={event => {
+                              event.stopPropagation()
+                              void handleToggleVinculo(item.getId(), event.target.checked)
+                            }}
+                            disabled={desvincularMutation.isPending}
+                            bordered={false}
+                            size="sm"
+                            inputProps={{ 'aria-label': 'Desvincular' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => void handleDesvincular(vinculado)}
+                            disabled={desvincularMutation.isPending}
+                            className="rounded-lg border border-error px-3 py-1.5 text-sm font-medium text-error disabled:opacity-50"
+                          >
+                            Desvincular
+                          </button>
+                        </div>
+                      </div>
+                      <PizzaComplementoPrecoEditor
+                        key={`${vinculado.id}-${complementosQuery.dataUpdatedAt}`}
+                        tamanhos={tamanhosDisponiveis}
+                        precos={vinculado.precos}
+                        tipoImpactoPreco={vinculado.tipoImpactoPreco}
+                        pending={precosMutation.isPending}
+                        onSave={precos => handleSalvarPrecos(vinculado, precos)}
+                      />
+                    </article>
+                  )
+                })}
               </div>
-              <button
-                type="button"
-                onClick={() => void handleDesvincular(complemento)}
-                disabled={desvincularMutation.isPending}
-                className="rounded-lg border border-error px-3 py-1.5 text-sm font-medium text-error disabled:opacity-50"
-              >
-                Desvincular
-              </button>
-            </div>
-            <PizzaComplementoPrecoEditor
-              key={`${complemento.id}-${complementosQuery.dataUpdatedAt}`}
-              tamanhos={tamanhosDisponiveis}
-              precos={complemento.precos}
-              tipoImpactoPreco={complemento.tipoImpactoPreco}
-              pending={precosMutation.isPending}
-              onSave={precos => handleSalvarPrecos(complemento, precos)}
-            />
-          </article>
-        ))}
+            ) : (
+              <div>
+                {listaFiltrada.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-secondary-text">
+                    Nenhum complemento encontrado.
+                  </p>
+                ) : (
+                  <>
+                    <div
+                      className="sticky top-0 z-10 mb-1 hidden items-center gap-3 border-b border-gray-200 bg-white px-2 py-1.5 sm:grid"
+                      style={{ gridTemplateColumns: 'minmax(0,1fr) 7rem 3.25rem' }}
+                    >
+                      <span className="text-xs font-semibold text-secondary-text">Complemento</span>
+                      <span className="text-center text-xs font-semibold text-secondary-text">
+                        Impacto
+                      </span>
+                      <span className="text-center text-xs font-semibold text-secondary-text">
+                        Vínculo
+                      </span>
+                    </div>
+                    {listaFiltrada.map(item => {
+                      const id = item.getId()
+                      const isLinked = idsVinculados.has(id)
+                      const isPendente = pendenteComplementoId === id
+                      const tipo = normalizarTipoImpactoPreco(item.getTipoImpactoPreco())
+                      const descricao = item.getDescricao()?.trim()
+                      return (
+                        <div
+                          key={id}
+                          className={`border-b border-gray-100 px-2 py-2 transition-colors hover:bg-primary-bg/40 ${
+                            isLinked || isPendente ? '' : 'opacity-80'
+                          }`}
+                        >
+                          <div
+                            className="hidden items-center gap-3 sm:grid"
+                            style={{ gridTemplateColumns: 'minmax(0,1fr) 7rem 3.25rem' }}
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium text-primary-text">
+                                {item.getNome()}
+                              </p>
+                              {descricao ? (
+                                <p className="truncate text-xs text-secondary-text">{descricao}</p>
+                              ) : null}
+                              {!item.isAtivo() ? (
+                                <p className="text-xs text-amber-700">Inativo no cadastro</p>
+                              ) : null}
+                              {isPendente ? (
+                                <p className="text-xs font-medium text-primary">
+                                  Aguardando preços em Nesta categoria
+                                </p>
+                              ) : null}
+                            </div>
+                            <span className="block text-center text-[11px] text-secondary-text">
+                              {nomeImpacto(tipo)}
+                            </span>
+                            <div className="flex justify-center">
+                              <JiffyIconSwitch
+                                checked={isLinked || isPendente}
+                                onChange={event => {
+                                  event.stopPropagation()
+                                  void handleToggleVinculo(id, event.target.checked)
+                                }}
+                                disabled={
+                                  desvincularMutation.isPending ||
+                                  vincularMutation.isPending ||
+                                  (!isLinked && !item.isAtivo())
+                                }
+                                bordered={false}
+                                size="sm"
+                                inputProps={{
+                                  'aria-label':
+                                    isLinked || isPendente ? 'Desvincular' : 'Vincular',
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-start justify-between gap-2 sm:hidden">
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium text-primary-text">
+                                {item.getNome()}
+                              </p>
+                              {descricao ? (
+                                <p className="truncate text-xs text-secondary-text">{descricao}</p>
+                              ) : null}
+                              <p className="mt-1 text-xs text-secondary-text">{nomeImpacto(tipo)}</p>
+                              {isPendente ? (
+                                <p className="text-xs font-medium text-primary">
+                                  Aguardando preços em Nesta categoria
+                                </p>
+                              ) : null}
+                            </div>
+                            <JiffyIconSwitch
+                              checked={isLinked || isPendente}
+                              onChange={event => {
+                                event.stopPropagation()
+                                void handleToggleVinculo(id, event.target.checked)
+                              }}
+                              disabled={
+                                desvincularMutation.isPending ||
+                                vincularMutation.isPending ||
+                                (!isLinked && !item.isAtivo())
+                              }
+                              bordered={false}
+                              size="sm"
+                              inputProps={{
+                                'aria-label':
+                                  isLinked || isPendente ? 'Desvincular' : 'Vincular',
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </>
+                )}
+              </div>
+            )}
+          </>
+        ) : null}
       </div>
     </section>
   )
