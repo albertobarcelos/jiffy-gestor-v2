@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   comEntregadorNoRelatorio,
+  deveBuscarProximaPaginaComissao,
+  hasNextPaginaComissaoRelatorio,
+  juntarPaginasComissaoEntregador,
   montarComissaoEntregadorApp,
 } from '@/src/application/expedicao/app/montarComissaoEntregadorApp'
 
@@ -64,6 +67,80 @@ describe('montarComissaoEntregadorApp', () => {
     )
     expect(comissao.quantidade).toBe(2)
     expect(comissao.totalTaxas).toBe(9)
+  })
+})
+
+describe('paginação da comissão', () => {
+  it('para quando a API diz que não há próxima', () => {
+    expect(
+      deveBuscarProximaPaginaComissao({ itensNaPagina: 50, limit: 50, hasNext: false })
+    ).toBe(false)
+    expect(
+      deveBuscarProximaPaginaComissao({ itensNaPagina: 50, limit: 50, hasNext: true })
+    ).toBe(true)
+    expect(deveBuscarProximaPaginaComissao({ itensNaPagina: 50, limit: 50 })).toBe(true)
+    expect(deveBuscarProximaPaginaComissao({ itensNaPagina: 12, limit: 50 })).toBe(false)
+  })
+
+  it('lê hasNext do bloco vendas', () => {
+    expect(hasNextPaginaComissaoRelatorio({ vendas: { hasNext: true } })).toBe(true)
+    expect(hasNextPaginaComissaoRelatorio({ vendas: { items: [] } })).toBeUndefined()
+  })
+
+  it('junta páginas sem duplicar e preserva o total da primeira', () => {
+    const junta = juntarPaginasComissaoEntregador([
+      {
+        totalTaxas: 80,
+        quantidade: 3,
+        itens: [
+          {
+            id: '1',
+            codigoVenda: 'A',
+            numeroVenda: 1,
+            clienteNome: 'A',
+            taxaEntrega: 10,
+            valorFinal: 20,
+            dataFinalizacao: null,
+          },
+          {
+            id: '2',
+            codigoVenda: 'B',
+            numeroVenda: 2,
+            clienteNome: 'B',
+            taxaEntrega: 20,
+            valorFinal: 30,
+            dataFinalizacao: null,
+          },
+        ],
+      },
+      {
+        totalTaxas: 80,
+        quantidade: 3,
+        itens: [
+          {
+            id: '2',
+            codigoVenda: 'B',
+            numeroVenda: 2,
+            clienteNome: 'B',
+            taxaEntrega: 20,
+            valorFinal: 30,
+            dataFinalizacao: null,
+          },
+          {
+            id: '3',
+            codigoVenda: 'C',
+            numeroVenda: 3,
+            clienteNome: 'C',
+            taxaEntrega: 50,
+            valorFinal: 60,
+            dataFinalizacao: null,
+          },
+        ],
+      },
+    ])
+    expect(junta.itens.map(item => item.id)).toEqual(['1', '2', '3'])
+    expect(junta.quantidade).toBe(3)
+    expect(junta.totalTaxas).toBe(80)
   })
 })
 
