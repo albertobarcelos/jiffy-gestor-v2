@@ -47,6 +47,7 @@ import {
 } from '@/src/presentation/components/features/complementos/complementoOverrideApi'
 import { BotaoAtivoComplemento } from '@/src/presentation/components/features/complementos/BotaoAtivoComplemento'
 import { normalizarTipoImpactoPreco } from '@/src/domain/complemento/tipos'
+import { parseQuantidadeLimiteGrupo } from '@/src/domain/policies/pedido/GrupoComplementoLimitesPolicy'
 import { cn } from '@/src/shared/utils/cn'
 import type { JiffySidePanelFooterActions } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
@@ -67,7 +68,16 @@ interface GrupoCatalogoItem {
   id: string
   nome: string
   obrigatorio: boolean
+  qtdMinima: number
+  qtdMaxima: number
   complementos?: Complemento[]
+}
+
+/** Texto dos limites do grupo (máximo 0 = sem teto → ∞). */
+function rotuloLimitesGrupo(qtdMinima: number, qtdMaxima: number): string {
+  const minimo = `Minimo ${qtdMinima}`
+  const maximo = qtdMaxima > 0 ? `Maximo ${qtdMaxima}` : 'Maximo ∞'
+  return `${minimo} - ${maximo}`
 }
 
 /** Máximo permitido pela API (`GrupoComplementoRepository` / schema: limit ≤ 100). */
@@ -112,8 +122,13 @@ function mapApiGrupoToGrupoComplemento(grupo: any): GrupoComplementoItem {
     nome,
     complementos: mapComplementosFromApi(raw?.complementos),
     obrigatorio: Boolean(raw?.obrigatorio),
-    qtdMinima: typeof raw?.qtdMinima === 'number' ? raw.qtdMinima : raw?.obrigatorio ? 1 : 0,
-    qtdMaxima: typeof raw?.qtdMaxima === 'number' && raw.qtdMaxima > 0 ? raw.qtdMaxima : 0,
+    qtdMinima:
+      raw?.qtdMinima != null
+        ? parseQuantidadeLimiteGrupo(raw.qtdMinima)
+        : raw?.obrigatorio
+          ? 1
+          : 0,
+    qtdMaxima: parseQuantidadeLimiteGrupo(raw?.qtdMaxima),
   }
 }
 
@@ -276,6 +291,9 @@ function mapResumoToGrupos(
   resumo?: ReadonlyArray<{
     id: string
     nome: string
+    qtdMinima?: number
+    qtdMaxima?: number
+    obrigatorio?: boolean
     complementos?: ReadonlyArray<{
       id: string
       nome: string
@@ -287,23 +305,27 @@ function mapResumoToGrupos(
   if (!resumo?.length) return []
   return resumo
     .filter(g => Boolean(g?.id))
-    .map(g => ({
-      id: g.id,
-      nome: g.nome || 'Grupo',
-      complementos: (g.complementos || []).map(c =>
-        Complemento.create(
-          c.id,
-          c.nome || 'Complemento',
-          '',
-          typeof c.valor === 'number' ? c.valor : 0,
-          true,
-          c.tipoImpactoPreco ?? 'nenhum'
-        )
-      ),
-      obrigatorio: false,
-      qtdMinima: 0,
-      qtdMaxima: 0,
-    }))
+    .map(g => {
+      const qtdMinima = parseQuantidadeLimiteGrupo(g.qtdMinima)
+      const qtdMaxima = parseQuantidadeLimiteGrupo(g.qtdMaxima)
+      return {
+        id: g.id,
+        nome: g.nome || 'Grupo',
+        complementos: (g.complementos || []).map(c =>
+          Complemento.create(
+            c.id,
+            c.nome || 'Complemento',
+            '',
+            typeof c.valor === 'number' ? c.valor : 0,
+            true,
+            c.tipoImpactoPreco ?? 'nenhum'
+          )
+        ),
+        obrigatorio: Boolean(g.obrigatorio) || qtdMinima > 0,
+        qtdMinima,
+        qtdMaxima,
+      }
+    })
 }
 
 interface ComplementosMultiSelectDialogProps {
@@ -314,6 +336,9 @@ interface ComplementosMultiSelectDialogProps {
   initialGruposResumo?: ReadonlyArray<{
     id: string
     nome: string
+    qtdMinima?: number
+    qtdMaxima?: number
+    obrigatorio?: boolean
     complementos?: ReadonlyArray<{
       id: string
       nome: string
@@ -748,6 +773,13 @@ export const ComplementosMultiSelectDialog = forwardRef<
               id,
               nome: item.nome?.toString() || 'Grupo',
               obrigatorio: Boolean(item.obrigatorio),
+              qtdMinima:
+                item.qtdMinima != null
+                  ? parseQuantidadeLimiteGrupo(item.qtdMinima)
+                  : item.obrigatorio
+                    ? 1
+                    : 0,
+              qtdMaxima: parseQuantidadeLimiteGrupo(item.qtdMaxima),
               ...(complementos ? { complementos } : {}),
             } satisfies GrupoCatalogoItem
           })
@@ -850,14 +882,26 @@ export const ComplementosMultiSelectDialog = forwardRef<
       byId.set(g.id, g)
     }
     for (const g of groups) {
-      if (!byId.has(g.id)) {
+      const existente = byId.get(g.id)
+      if (!existente) {
         byId.set(g.id, {
           id: g.id,
           nome: g.nome,
           obrigatorio: g.obrigatorio,
+          qtdMinima: g.qtdMinima,
+          qtdMaxima: g.qtdMaxima,
           complementos: g.complementos,
         })
+        continue
       }
+      byId.set(g.id, {
+        ...existente,
+        nome: g.nome || existente.nome,
+        obrigatorio: g.obrigatorio,
+        qtdMinima: g.qtdMinima,
+        qtdMaxima: g.qtdMaxima,
+        complementos: g.complementos?.length ? g.complementos : existente.complementos,
+      })
     }
     return Array.from(byId.values())
   }, [allSelectableGroups, groups])
@@ -1279,10 +1323,10 @@ export const ComplementosMultiSelectDialog = forwardRef<
               {
                 id: gid,
                 nome: meta?.nome ?? 'Grupo',
-                complementos: [],
+                complementos: meta?.complementos ?? [],
                 obrigatorio: Boolean(meta?.obrigatorio),
-                qtdMinima: meta?.obrigatorio ? 1 : 0,
-                qtdMaxima: 0,
+                qtdMinima: meta?.qtdMinima ?? (meta?.obrigatorio ? 1 : 0),
+                qtdMaxima: meta?.qtdMaxima ?? 0,
               },
             ]
           }
@@ -1795,6 +1839,10 @@ export const ComplementosMultiSelectDialog = forwardRef<
                   const vinculado = gruposVinculadosIds.includes(grupo.id)
                   const expandido = expandedGrupoIds.has(grupo.id)
                   const grupoVinculado = groups.find(g => g.id === grupo.id)
+                  const qtdMinima = grupoVinculado?.qtdMinima ?? grupo.qtdMinima
+                  const qtdMaxima = grupoVinculado?.qtdMaxima ?? grupo.qtdMaxima
+                  const obrigatorioGrupo =
+                    grupoVinculado?.obrigatorio ?? grupo.obrigatorio ?? qtdMinima > 0
                   const complementosLista =
                     (grupoVinculado?.complementos?.length
                       ? grupoVinculado.complementos
@@ -1820,11 +1868,11 @@ export const ComplementosMultiSelectDialog = forwardRef<
                     <>
                       <div
                         className={cn(
-                          'flex items-center justify-between gap-2 px-2 py-1.5 hover:bg-white/80',
+                          'relative flex items-center gap-2 px-2 py-1.5 hover:bg-white/80',
                           !vinculado && filterTab === 'todos' && 'opacity-70'
                         )}
                       >
-                        <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden">
+                        <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden pr-2">
                           <button
                             type="button"
                             onClick={() => toggleGrupoExpanded(grupo.id)}
@@ -1859,7 +1907,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
                                   ({qtdComplementosConhecida})
                                 </span>
                               ) : null}
-                              {grupo.obrigatorio ? (
+                              {obrigatorioGrupo ? (
                                 <span className="inline-flex rounded-full bg-primary/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-primary">
                                   Obrigatório
                                 </span>
@@ -1867,7 +1915,13 @@ export const ComplementosMultiSelectDialog = forwardRef<
                             </div>
                           </button>
                         </div>
-                        <div className="flex shrink-0 items-center gap-1">
+                        <p
+                          className="pointer-events-none absolute left-1/2 top-1/2 z-[1] -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-[11px] tabular-nums text-secondary-text"
+                          title="Quantidade mínima e máxima de complementos neste grupo"
+                        >
+                          {rotuloLimitesGrupo(qtdMinima, qtdMaxima)}
+                        </p>
+                        <div className="relative z-[2] flex shrink-0 items-center gap-1 pl-2">
                           {arrasteGrupo ? (
                             <AlcaArraste
                               label={grupo.nome || 'Grupo'}
