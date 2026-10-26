@@ -16,7 +16,7 @@ export interface UseEdicaoProdutosDeliveryParams {
   observacaoPedido: string
   /** Muda a cada nova carga do detalhe — usado para capturar o snapshot original uma vez. */
   vendaDataUpdatedAt?: number
-  onSuccess: () => void
+  onSuccess: () => void | Promise<void>
   onClose: () => void
   setInternalDialogOpen: (open: boolean) => void
   /**
@@ -118,13 +118,14 @@ export function useEdicaoProdutosDelivery({
     setSalvandoProdutos(true)
     try {
       await useCase.execute({ pedidoId, token, add: diff.add, remove: diff.remove })
+      produtosOriginaisRef.current = produtosRef.current.map(p => ({
+        ...p,
+        complementos: p.complementos.map(c => ({ ...c })),
+      }))
       showToast.success('Produtos atualizados com sucesso!')
-      if (permanecerNoPainel) {
-        onSuccess()
-        return
-      }
+      await onSuccess()
+      if (permanecerNoPainel) return
       setInternalDialogOpen(false)
-      onSuccess()
       onClose()
     } catch (error: unknown) {
       console.error('Erro ao atualizar produtos do pedido delivery:', error)
