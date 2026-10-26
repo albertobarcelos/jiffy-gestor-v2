@@ -449,6 +449,33 @@ body.jiffy-mapa-google-indisponivel .gm-err-container {
   animation: expedicao-slide-direita 280ms ease-out;
 }
 
+@keyframes expedicao-estouro {
+  0% {
+    transform: scale(0.72);
+    opacity: 0;
+  }
+  14% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+  24% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  78% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+}
+
+.expedicao-estouro {
+  animation: expedicao-estouro 1.7s ease-out forwards;
+}
+
 /**
  * PWA do entregador: o documento não pode rubber-band.
  * Header e tab bar ficam no shell; só [data-expedicao-scroll] rola.
