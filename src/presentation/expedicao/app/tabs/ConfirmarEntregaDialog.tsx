@@ -1,12 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { MdExpandLess, MdExpandMore } from 'react-icons/md'
-import type { PedidoResumoAppEntregador } from '@/src/presentation/expedicao/app/api/expedicaoAppApi'
-import type {
-  LinhaPagamentoFinalizarApp,
-  MeioPagamentoAppEntregador,
-} from '@/src/application/expedicao/app/pagamentoFinalizarEntregaApp'
+import { MdCheck } from 'react-icons/md'
+import type { PedidoResumoAppEntregador } from '@/src/application/expedicao/app/filtrarPedidosDoEntregador'
 import {
   alternarMeioNasLinhasFinalizarApp,
   atualizarValorLinhaFinalizarApp,
@@ -14,17 +10,20 @@ import {
   montarOpcoesMeioPagamentoFinalizarApp,
   somaLinhasPagamentoFinalizarApp,
   valorACobrirFinalizarApp,
+  type LinhaPagamentoFinalizarApp,
+  type MeioPagamentoAppEntregador,
 } from '@/src/application/expedicao/app/pagamentoFinalizarEntregaApp'
 import { formatarMoedaApp } from '@/src/presentation/expedicao/app/format'
-import { AppSpinner } from '@/src/presentation/expedicao/app/shell/AppSpinner'
 
-export function ConfirmarEntregaDialog(props: {
+type ConfirmarEntregaDialogProps = {
   pedido: PedidoResumoAppEntregador
   meios: MeioPagamentoAppEntregador[]
   ocupado: boolean
-  onCancelar: () => void
+  onVoltar: () => void
   onConfirmar: (linhas: LinhaPagamentoFinalizarApp[]) => void
-}) {
+}
+
+export function ConfirmarEntregaDialog(props: ConfirmarEntregaDialogProps) {
   const cobrancas = props.pedido.cobrancas ?? []
   const valorAlvo = valorACobrirFinalizarApp({
     cobrancas,
@@ -38,26 +37,6 @@ export function ConfirmarEntregaDialog(props: {
       faltaPagar: props.pedido.faltaPagar,
     })
   )
-  const [aberto, setAberto] = useState(false)
-  const opcoes = montarOpcoesMeioPagamentoFinalizarApp({
-    meios: props.meios,
-    cobrancas,
-  })
-  const cobrar = props.pedido.faltaPagar > 0
-  const idsEscolhidos = useMemo(
-    () => new Set(linhas.map(linha => linha.meioPagamentoId)),
-    [linhas]
-  )
-  const rotuloAtual =
-    linhas
-      .map(linha => opcoes.find(opcao => opcao.id === linha.meioPagamentoId)?.nome)
-      .filter(Boolean)
-      .join(' + ') ||
-    props.pedido.formaPagamento ||
-    (cobrar ? 'Toque para escolher' : 'Pago')
-  const soma = somaLinhasPagamentoFinalizarApp(linhas)
-  const fechaCerto = linhas.length > 0 && Math.abs(soma - valorAlvo) < 0.009
-  const mostrarValores = linhas.length > 1 || valorAlvo > 0
 
   useEffect(() => {
     setLinhas(
@@ -67,171 +46,137 @@ export function ConfirmarEntregaDialog(props: {
         faltaPagar: props.pedido.faltaPagar,
       })
     )
-    setAberto(false)
-  }, [props.pedido.id])
+  }, [props.pedido.id, props.pedido.cobrancas, props.pedido.faltaPagar, props.pedido.valorFinal])
+
+  const opcoes = useMemo(
+    () => montarOpcoesMeioPagamentoFinalizarApp({ meios: props.meios, cobrancas }),
+    [cobrancas, props.meios]
+  )
+  const selecionados = new Set(linhas.map(linha => linha.meioPagamentoId))
+  const soma = somaLinhasPagamentoFinalizarApp(linhas)
+  const fecha = Math.abs(soma - valorAlvo) < 0.009
+  const podeDividir = linhas.length > 1
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-8 sm:items-center">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="confirmar-entrega-titulo"
-        className="flex max-h-[min(88dvh,40rem)] w-full max-w-sm flex-col overflow-hidden rounded-2xl bg-white text-zinc-900 shadow-lg"
-      >
-        <div
-          data-expedicao-scroll
-          className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-5"
-        >
-          <h2 id="confirmar-entrega-titulo" className="text-lg font-semibold">
-            Entrega feita?
-          </h2>
-          <p className="mt-2 text-sm text-zinc-500">
-            #{props.pedido.numeroVenda ?? props.pedido.codigoVenda} · {props.pedido.clienteNome}
-          </p>
-          <p className="mt-3 text-sm text-zinc-700">
-            {cobrar
-              ? `Fecha com o cliente (${formatarMoedaApp(props.pedido.faltaPagar)}) e finaliza o pedido.`
-              : 'Finaliza este pedido. Depois não dá para desfazer.'}
-          </p>
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="max-h-[88dvh] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-5 shadow-xl">
+        <h2 className="text-lg font-semibold text-zinc-900">Entrega feita?</h2>
+        <p className="mt-1 text-sm text-zinc-500">
+          #{props.pedido.numeroVenda ?? props.pedido.codigoVenda} · {props.pedido.clienteNome}
+        </p>
+        <p className="mt-3 text-sm text-zinc-700">
+          {props.pedido.faltaPagar > 0
+            ? `Fecha com o cliente (${formatarMoedaApp(props.pedido.faltaPagar)}) e finaliza o pedido.`
+            : 'Confirme como o cliente pagou e finalize.'}
+        </p>
 
-          <p className="mt-4 text-[11px] font-bold uppercase tracking-wide text-zinc-400">
-            Como o cliente pagou?
+        <div className="mt-4">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Como o cliente pagou?</p>
+          <p className="mt-1 text-sm leading-snug text-zinc-600">
+            Toque nas formas usadas. Para dividir (PIX + dinheiro), marque as duas e ajuste o valor.
           </p>
-          <button
-            type="button"
-            disabled={props.ocupado || opcoes.length === 0}
-            aria-expanded={aberto}
-            onClick={() => setAberto(prev => !prev)}
-            className="mt-2 flex w-full items-center justify-between gap-3 rounded-xl bg-zinc-100 px-4 py-3 text-left disabled:opacity-50"
-          >
-            <span>
-              <span className="block text-base font-semibold text-zinc-900">{rotuloAtual}</span>
-              <span className="mt-0.5 block text-xs font-medium text-zinc-500">
-                {opcoes.length === 0
-                  ? 'Sem formas para trocar agora'
-                  : aberto
-                    ? 'Toque de novo para fechar'
-                    : 'Toque para trocar ou somar formas'}
-              </span>
-            </span>
-            {aberto ? (
-              <MdExpandLess className="h-6 w-6 shrink-0 text-zinc-500" aria-hidden />
-            ) : (
-              <MdExpandMore className="h-6 w-6 shrink-0 text-zinc-500" aria-hidden />
-            )}
-          </button>
-
-          {aberto && opcoes.length > 0 ? (
-            <ul className="mt-2 overflow-hidden rounded-xl ring-1 ring-zinc-200">
-              {opcoes.map(opcao => {
-                const marcado = idsEscolhidos.has(opcao.id)
-                return (
-                  <li key={opcao.id} className="border-b border-zinc-100 last:border-b-0">
-                    <button
-                      type="button"
-                      disabled={props.ocupado}
-                      onClick={() =>
-                        setLinhas(atual =>
-                          alternarMeioNasLinhasFinalizarApp({
-                            linhas: atual,
-                            meioPagamentoId: opcao.id,
-                            valorAlvo,
-                          })
-                        )
-                      }
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left disabled:opacity-50"
+          <ul className="mt-3 space-y-2">
+            {opcoes.map(opcao => {
+              const marcado = selecionados.has(opcao.id)
+              const indice = linhas.findIndex(linha => linha.meioPagamentoId === opcao.id)
+              const linha = indice >= 0 ? linhas[indice] : null
+              return (
+                <li key={opcao.id}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLinhas(prev =>
+                        alternarMeioNasLinhasFinalizarApp({
+                          linhas: prev,
+                          meioPagamentoId: opcao.id,
+                          valorAlvo,
+                        })
+                      )
+                    }
+                    className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left ${
+                      marcado ? 'border-secondary bg-secondary/5' : 'border-zinc-200 bg-white'
+                    }`}
+                  >
+                    <span
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${
+                        marcado ? 'bg-secondary text-white' : 'border border-zinc-300 bg-white text-transparent'
+                      }`}
                     >
-                      <span
-                        aria-hidden
-                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-sm font-bold ${
-                          marcado ? 'bg-secondary text-white' : 'bg-zinc-200 text-zinc-500'
-                        }`}
-                      >
-                        {marcado ? '✓' : ''}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-semibold text-zinc-900">{opcao.nome}</span>
-                        {opcao.noPedido ? (
-                          <span className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">
-                            No pedido
-                          </span>
-                        ) : null}
-                      </span>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          ) : null}
-
-          {mostrarValores && linhas.length > 0 ? (
-            <ul className="mt-3 space-y-2">
-              {linhas.map((linha, indice) => {
-                const nome =
-                  opcoes.find(opcao => opcao.id === linha.meioPagamentoId)?.nome || 'Pagamento'
-                return (
-                  <li key={`${linha.meioPagamentoId}-${indice}`} className="flex items-center gap-3">
-                    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-zinc-800">
-                      {nome}
+                      <MdCheck className="h-4 w-4" aria-hidden />
                     </span>
-                    {linhas.length > 1 ? (
-                      <label className="flex items-center gap-1">
-                        <span className="text-xs font-medium text-zinc-400">R$</span>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          disabled={props.ocupado}
-                          key={`${linha.meioPagamentoId}-${linha.valor}`}
-                          defaultValue={linha.valor.toFixed(2).replace('.', ',')}
-                          onBlur={event => {
-                            const bruto = event.target.value.replace(/\s/g, '').replace(/\./g, '').replace(',', '.')
-                            const valor = Number(bruto)
-                            setLinhas(atual =>
-                              atualizarValorLinhaFinalizarApp({
-                                linhas: atual,
-                                indice,
-                                valor: Number.isFinite(valor) ? valor : 0,
-                                valorAlvo,
-                              })
-                            )
-                          }}
-                          className="h-10 w-24 rounded-xl bg-zinc-100 px-3 text-right text-sm font-semibold text-zinc-900 outline-none ring-1 ring-transparent focus:ring-secondary disabled:opacity-50"
-                        />
-                      </label>
-                    ) : (
-                      <span className="text-sm font-semibold text-zinc-900">
-                        {formatarMoedaApp(linha.valor)}
-                      </span>
-                    )}
-                  </li>
-                )
-              })}
-            </ul>
-          ) : null}
-
-          {linhas.length > 1 && !fechaCerto ? (
-            <p className="mt-2 text-xs font-semibold text-amber-700">
-              A soma precisa fechar {formatarMoedaApp(valorAlvo)}.
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold text-zinc-900">{opcao.nome}</span>
+                      {opcao.noPedido ? (
+                        <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+                          No pedido
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-zinc-400">Toque para somar</span>
+                      )}
+                    </span>
+                    {marcado && linha && !podeDividir ? (
+                      <span className="text-sm font-bold text-zinc-900">{formatarMoedaApp(linha.valor)}</span>
+                    ) : null}
+                  </button>
+                  {marcado && linha && podeDividir ? (
+                    <label className="mt-1.5 flex items-center justify-between gap-3 rounded-2xl bg-zinc-50 px-3 py-2">
+                      <span className="text-xs font-medium text-zinc-500">Valor neste meio</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        step="0.01"
+                        value={linha.valor}
+                        onChange={event =>
+                          setLinhas(prev =>
+                            atualizarValorLinhaFinalizarApp({
+                              linhas: prev,
+                              indice,
+                              valor: Number(event.target.value),
+                              valorAlvo,
+                            })
+                          )
+                        }
+                        className="w-28 rounded-xl border border-zinc-200 bg-white px-2 py-1.5 text-right text-sm font-semibold text-zinc-900"
+                      />
+                    </label>
+                  ) : null}
+                </li>
+              )
+            })}
+          </ul>
+          {opcoes.length <= 1 ? (
+            <p className="mt-2 text-xs text-zinc-500">
+              Se outras formas não aparecerem, puxe a lista de novo ao abrir a entrega.
             </p>
           ) : null}
         </div>
 
-        <div className="grid shrink-0 grid-cols-2 gap-3 border-t border-zinc-100 p-5">
+        <div className="mt-4 flex items-center justify-between border-t border-zinc-100 pt-3 text-sm">
+          <span className="font-medium text-zinc-600">
+            {linhas.map(linha => opcoes.find(opcao => opcao.id === linha.meioPagamentoId)?.nome ?? 'Pagamento').join(' + ')}
+          </span>
+          <span className="font-semibold text-zinc-900">{formatarMoedaApp(soma)}</span>
+        </div>
+        {!fecha ? (
+          <p className="mt-2 text-xs text-amber-800">A soma precisa fechar {formatarMoedaApp(valorAlvo)}.</p>
+        ) : null}
+
+        <div className="mt-5 grid grid-cols-2 gap-2">
           <button
             type="button"
+            onClick={props.onVoltar}
             disabled={props.ocupado}
-            onClick={props.onCancelar}
-            className="h-11 rounded-xl bg-zinc-100 text-sm font-semibold text-zinc-800 disabled:opacity-50"
+            className="h-12 rounded-2xl bg-zinc-100 text-sm font-semibold text-zinc-800"
           >
             Voltar
           </button>
           <button
             type="button"
-            disabled={props.ocupado || !fechaCerto}
             onClick={() => props.onConfirmar(linhas)}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-secondary text-sm font-semibold text-white disabled:opacity-60"
+            disabled={props.ocupado || !fecha || linhas.length === 0}
+            className="h-12 rounded-2xl bg-secondary text-sm font-semibold text-white disabled:opacity-50"
           >
-            {props.ocupado ? <AppSpinner tom="branco" /> : null}
             {props.ocupado ? 'Finalizando…' : 'Finalizar'}
           </button>
         </div>

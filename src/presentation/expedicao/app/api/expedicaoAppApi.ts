@@ -22,7 +22,10 @@ import {
 } from '@/src/infrastructure/composition/pedidoUseCases'
 import { montarQueryListagemMeiosPagamento } from '@/src/application/meios-pagamentos/listagemMeiosPagamentoQuery'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
-import type { MeioPagamentoAppEntregador } from '@/src/application/expedicao/app/pagamentoFinalizarEntregaApp'
+import {
+  filtrarMeiosPagamentoNaPortaApp,
+  type MeioPagamentoAppEntregador,
+} from '@/src/application/expedicao/app/pagamentoFinalizarEntregaApp'
 import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { avaliarPedidoParaRodada, type PedidoLeituraExpedicao } from '@/src/application/expedicao/avaliarPedidoParaRodada'
@@ -138,18 +141,15 @@ export async function listarMeiosPagamentoEntregaApp(
   })
   if (!res.ok) throw new Error(await lerErro(res, 'Não foi possível carregar as formas de pagamento.'))
   const data = (await res.json()) as {
-    items?: Array<{ id?: string; nome?: string; tefAtivo?: boolean; ativo?: boolean }>
+    items?: Array<{ id?: string; nome?: string; ativo?: boolean }>
   }
-  const meios: MeioPagamentoAppEntregador[] = []
   const nomes: Record<string, string> = { ...(cacheNomesMeios?.nomes ?? {}) }
   for (const item of data.items ?? []) {
     const id = String(item.id ?? '').trim()
     const nome = String(item.nome ?? '').trim()
-    if (!id || !nome) continue
-    nomes[id] = nome
-    if (item.ativo === false || item.tefAtivo === true) continue
-    meios.push({ id, nome })
+    if (id && nome) nomes[id] = nome
   }
+  const meios = filtrarMeiosPagamentoNaPortaApp(data.items ?? [])
   cacheNomesMeios = { em: Date.now(), nomes }
   return meios
 }

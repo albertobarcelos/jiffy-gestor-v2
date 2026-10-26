@@ -3,6 +3,7 @@ import type { CobrancaAppEntregador } from '@/src/application/expedicao/app/filt
 import {
   alternarMeioNasLinhasFinalizarApp,
   atualizarValorLinhaFinalizarApp,
+  filtrarMeiosPagamentoNaPortaApp,
   idMeioPagamentoPadraoFinalizarApp,
   montarLinhasIniciaisFinalizarApp,
   montarOpcoesMeioPagamentoFinalizarApp,
@@ -95,8 +96,8 @@ describe('pagamentoFinalizarEntregaApp', () => {
       valorAlvo: 49.4,
     })
     expect(duas).toEqual([
-      { meioPagamentoId: 'mp-din', valor: 49.4 },
-      { meioPagamentoId: 'mp-pix', valor: 0 },
+      { meioPagamentoId: 'mp-din', valor: 24.7 },
+      { meioPagamentoId: 'mp-pix', valor: 24.7 },
     ])
     const repartido = atualizarValorLinhaFinalizarApp({
       linhas: duas,
@@ -122,6 +123,20 @@ describe('pagamentoFinalizarEntregaApp', () => {
       { id: 'cob-pix', meioPagamentoId: 'mp-pix', valor: 20 },
       { meioPagamentoId: 'mp-din', valor: 20 },
       { meioPagamentoId: 'mp-cartao', valor: 29.4 },
+    ])
+  })
+
+  it('lista meios da porta mesmo se a loja usa TEF no PDV', () => {
+    expect(
+      filtrarMeiosPagamentoNaPortaApp([
+        { id: 'mp-pix', nome: 'PIX', ativo: true },
+        { id: 'mp-din', nome: 'Dinheiro', ativo: true },
+        { id: 'mp-off', nome: 'Inativo', ativo: false },
+        { id: '', nome: 'Sem id' },
+      ])
+    ).toEqual([
+      { id: 'mp-pix', nome: 'PIX' },
+      { id: 'mp-din', nome: 'Dinheiro' },
     ])
   })
 })
