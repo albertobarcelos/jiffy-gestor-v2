@@ -11,6 +11,7 @@ import {
   desenharPilulaProducaoPng,
 } from '@/src/infrastructure/printing/pilulaProducaoPng'
 import { desenharCodigoBarras128Png } from '@/src/infrastructure/printing/codigoBarras128Png'
+import { desenharSimboloPedidoLinhaPng } from '@/src/infrastructure/printing/simboloPedidoLinhaPng'
 import { desenharSeparadorTracejadoPng } from '@/src/shared/printing/receiptBitmaps'
 import { showToast } from '@/src/shared/utils/toast'
 import { DeliveryConfigCollapsibleSection } from './DeliveryConfigCollapsibleSection'
@@ -470,6 +471,7 @@ export function DeliveryCupomTemplateEditor({
               desenharMolduraIdentidade: desenharMolduraIdentidadePng,
               desenharSeparador: desenharSeparadorTracejadoPng,
               desenharCodigoBarras: desenharCodigoBarras128Png,
+              desenharSimboloPedidoLinha: desenharSimboloPedidoLinhaPng,
             })
           : value.modoPapel === 'grafico'
             ? await mapTicketToGraphicPrintDocument(sample.root, sample.ticket, {

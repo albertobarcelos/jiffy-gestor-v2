@@ -81,7 +81,7 @@ describe('mapTicketToProducaoHibridoDocument', () => {
     )
   })
 
-  it('imprime QR só na via de conferência', () => {
+  it('imprime QR na via single e na conferência; omite na unitária', () => {
     const conferencia = mapTicketToProducaoHibridoDocument(
       root,
       { ...ticket, viaProducao: { kind: 'conference' } },
@@ -99,7 +99,29 @@ describe('mapTicketToProducaoHibridoDocument', () => {
     expect(unitaria.content.some(b => b.type === 'qrcode')).toBe(false)
 
     const agrupada = mapTicketToProducaoHibridoDocument(root, ticket, { simboloPedido: 'qrcode' })
-    expect(agrupada.content.some(b => b.type === 'qrcode')).toBe(false)
+    expect(
+      agrupada.content.some(b => b.type === 'qrcode' && b.data === 'P1842' && b.moduleSize === 8)
+    ).toBe(true)
+  })
+
+  it('quando há drawer, QR e texto do rodapé saem numa imagem à esquerda', () => {
+    const doc = mapTicketToProducaoHibridoDocument(root, ticket, {
+      simboloPedido: 'qrcode',
+      desenharSimboloPedidoLinha: ({ payload, tipo, linhas }) => {
+        expect(payload).toBe('P1842')
+        expect(tipo).toBe('qrcode')
+        expect(linhas.some(l => l.includes('Atend: Carlos'))).toBe(true)
+        expect(linhas).toContain('P1842')
+        return 'png-qr-linha'
+      },
+    })
+    expect(doc.content.some(b => b.type === 'qrcode')).toBe(false)
+    expect(
+      doc.content.some(b => b.type === 'image' && b.data === 'png-qr-linha' && b.align === 'left')
+    ).toBe(true)
+    expect(doc.content.some(b => b.type === 'text' && (b.text ?? '').includes('Atend: Carlos'))).toBe(
+      false
+    )
   })
 
   it('imprime Code 128 só na via de conferência', () => {

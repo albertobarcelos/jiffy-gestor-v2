@@ -459,6 +459,6 @@ export function montarModeloProducao80mm(origem: OrigemModeloProducao80mm): Mode
       versao: origem.versao,
       codigoTerminal: origem.codigoTerminal,
     }),
-    codigoBarras: viaKind === 'conference' && codigo ? `P${codigo}` : null,
+    codigoBarras: viaKind === 'unit' || !codigo ? null : `P${codigo}`,
   }
 }

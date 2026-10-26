@@ -135,7 +135,7 @@ describe('layoutProducao80mm', () => {
     expect(identidadePrimariaEhTipoAvulso('MESA 12')).toBe(false)
   })
 
-  it('código do pedido no papel só na via de conferência', () => {
+  it('código do pedido some só na via unitária; single e conferência levam', () => {
     const conferencia = montarModeloProducao80mm({
       codigoVenda: '1842',
       via: { kind: 'conference' },
@@ -149,6 +149,12 @@ describe('layoutProducao80mm', () => {
     })
     expect(unitaria.codigoBarras).toBeNull()
     expect(unitaria.conferencia).toBe(false)
+
+    const agrupada = montarModeloProducao80mm({
+      codigoVenda: '1842',
+      via: { kind: 'single' },
+    })
+    expect(agrupada.codigoBarras).toBe('P1842')
   })
 
   it('pílula por unidade é o código, sem a palavra PEDIDO', () => {

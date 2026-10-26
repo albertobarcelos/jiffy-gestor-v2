@@ -12,6 +12,7 @@ import {
 import { qrPedidoModuleSizeForWidth } from '@/src/application/delivery/cupomPrintLayout'
 import { headerIdentidadeComContorno } from '@/src/application/delivery/cupomPrintHeaderBlocks'
 import type { DesenharCodigoBarrasPedido } from '@/src/application/ports/IDesenharCodigoBarrasPedido'
+import type { DesenharSimboloPedidoLinha } from '@/src/application/ports/IDesenharSimboloPedidoLinha'
 import type {
   DesenharMolduraIdentidade,
   DesenharPilulaProducao,
@@ -32,6 +33,7 @@ export type MapTicketToProducaoHibridoOptions = OrigemModeloProducaoDeTicketOpti
   desenharMolduraIdentidade?: DesenharMolduraIdentidade
   desenharSeparador?: DesenharSeparadorProducao
   desenharCodigoBarras?: DesenharCodigoBarrasPedido
+  desenharSimboloPedidoLinha?: DesenharSimboloPedidoLinha
   simboloPedido?: DeliveryCupomSimboloPedido
 }
 
@@ -101,13 +103,47 @@ function pushSimboloPedido(
   })
 }
 
+function pushRodapeESimbolo(
+  content: PrintContentBlock[],
+  modelo: ModeloProducao80mm,
+  simboloPedido: DeliveryCupomSimboloPedido,
+  desenharCodigoBarras?: DesenharCodigoBarrasPedido,
+  desenharSimboloPedidoLinha?: DesenharSimboloPedidoLinha
+): void {
+  const payload = modelo.codigoBarras
+  const linhasTexto = [modelo.resumo, ...modelo.rodape].filter(Boolean)
+  if (payload && simboloPedido !== 'nenhum' && desenharSimboloPedidoLinha) {
+    const png = desenharSimboloPedidoLinha({
+      payload,
+      tipo: simboloPedido === 'codigo_barras' ? 'codigo_barras' : 'qrcode',
+      linhas: [...linhasTexto, payload],
+    })
+    if (png) {
+      content.push({ type: 'image', data: png, align: 'left' })
+      return
+    }
+  }
+  pushTexto(content, textoEscPosProducao(modelo.resumo), {
+    align: 'center',
+    bold: true,
+    size: 'small',
+  })
+  for (const linha of modelo.rodape) {
+    pushTexto(content, linha, { align: 'center', bold: true, size: 'small' })
+  }
+  if (payload) {
+    pushSimboloPedido(content, payload, simboloPedido, desenharCodigoBarras)
+  }
+}
+
 export function modeloToProducaoHibridoContent(
   modelo: ModeloProducao80mm,
   desenharPilula?: DesenharPilulaProducao,
   desenharSeparador?: DesenharSeparadorProducao,
   desenharMolduraIdentidade?: DesenharMolduraIdentidade,
   simboloPedido: DeliveryCupomSimboloPedido = 'nenhum',
-  desenharCodigoBarras?: DesenharCodigoBarrasPedido
+  desenharCodigoBarras?: DesenharCodigoBarrasPedido,
+  desenharSimboloPedidoLinha?: DesenharSimboloPedidoLinha
 ): PrintContentBlock[] {
   const content: PrintContentBlock[] = []
   if (modelo.reimpressao) {
@@ -168,17 +204,7 @@ export function modeloToProducaoHibridoContent(
     pushSeparador(content, desenharSeparador)
   }
   content.push({ type: 'feed', lines: PRODUCAO_80MM.linhasAposPontilhadoRodape })
-  pushTexto(content, textoEscPosProducao(modelo.resumo), {
-    align: 'center',
-    bold: true,
-    size: 'small',
-  })
-  for (const linha of modelo.rodape) {
-    pushTexto(content, linha, { align: 'center', bold: true, size: 'small' })
-  }
-  if (modelo.codigoBarras) {
-    pushSimboloPedido(content, modelo.codigoBarras, simboloPedido, desenharCodigoBarras)
-  }
+  pushRodapeESimbolo(content, modelo, simboloPedido, desenharCodigoBarras, desenharSimboloPedidoLinha)
   content.push({ type: 'feed', lines: PRODUCAO_80MM.linhasAntesDoCorte })
   content.push({ type: 'cut' })
   return content
@@ -201,7 +227,8 @@ export function mapTicketToProducaoHibridoDocument(
       options?.simboloPedido === 'qrcode' || options?.simboloPedido === 'codigo_barras'
         ? options.simboloPedido
         : 'nenhum',
-      options?.desenharCodigoBarras
+      options?.desenharCodigoBarras,
+      options?.desenharSimboloPedidoLinha
     ),
   }
 }
