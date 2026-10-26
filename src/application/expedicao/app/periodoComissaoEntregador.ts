@@ -71,6 +71,32 @@ export function intervaloComissaoNoDia(data: Date): IntervaloComissao {
   return { inicio: inicioDoDia(data), fim: fimDoDia(data) }
 }
 
+/** Teto do relatório de entregas. */
+export const MAX_DIAS_INTERVALO_COMISSAO = 90
+
+/** Recorte local entre duas chaves YYYY-MM-DD, sem passar de hoje. */
+export function intervaloEntreChavesLocais(
+  inicioChave: string,
+  fimChave: string,
+  agora = new Date()
+): IntervaloComissao | null {
+  const a = dataDeChaveDiaLocal(inicioChave)
+  const b = dataDeChaveDiaLocal(fimChave)
+  if (!a || !b) return null
+  const menor = a.getTime() <= b.getTime() ? a : b
+  const maior = a.getTime() <= b.getTime() ? b : a
+  const inicio = inicioDoDia(menor)
+  let fim = fimDoDia(maior)
+  const teto = fimDoDia(agora)
+  if (fim.getTime() > teto.getTime()) fim = teto
+  const limite = new Date(inicio)
+  limite.setDate(limite.getDate() + (MAX_DIAS_INTERVALO_COMISSAO - 1))
+  const fimLimite = fimDoDia(limite)
+  if (fim.getTime() > fimLimite.getTime()) fim = fimLimite
+  if (fim.getTime() < inicio.getTime()) return null
+  return { inicio, fim }
+}
+
 /** Domingo → sábado da semana do dia, sem passar de hoje. */
 export function intervaloSemanaQueContem(data: Date, agora = new Date()): IntervaloComissao {
   const inicio = inicioDoDia(data)
@@ -90,6 +116,13 @@ export function rotuloDiaComissao(data: Date): string {
   })
     .format(data)
     .replace('.', '')
+}
+
+export function rotuloFaixaComissao(inicio: Date, fim: Date): string {
+  if (chaveDiaLocalComissao(inicio) === chaveDiaLocalComissao(fim)) {
+    return rotuloDiaComissao(inicio)
+  }
+  return `${formatarDiaCurto(inicio)} — ${formatarDiaCurto(fim)}`
 }
 
 function formatarDiaCurto(data: Date): string {

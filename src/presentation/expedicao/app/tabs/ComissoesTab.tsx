@@ -1,13 +1,17 @@
 'use client'
 
+import { useState } from 'react'
 import Image from 'next/image'
+import { MdCalendarMonth } from 'react-icons/md'
 import {
   chaveDiaLocalComissao,
   rotuloDiaComissao,
+  rotuloFaixaComissao,
   rotuloPeriodoComissao,
   dataDeChaveDiaLocal,
   type PeriodoComissaoEntregador,
 } from '@/src/application/expedicao/app/periodoComissaoEntregador'
+import type { IntervaloFiltroComissao } from '@/src/application/expedicao/app/visaoComissaoEntregador'
 import type { ComissaoEntregadorApp } from '@/src/presentation/expedicao/app/api/expedicaoAppApi'
 import type { PontoSerieDiariaComissao } from '@/src/application/expedicao/app/serieDiariaComissaoEntregador'
 import { formatarMoedaApp } from '@/src/presentation/expedicao/app/format'
@@ -20,22 +24,41 @@ const PERIODOS: Array<{ id: PeriodoComissaoEntregador; label: string }> = [
   { id: 'mes', label: 'Mês' },
 ]
 
+type AbaInternaComissao = 'resumo' | 'entregas'
+
 export function ComissoesTab(props: {
   loja: string
   periodo: PeriodoComissaoEntregador
   onPeriodo: (periodo: PeriodoComissaoEntregador) => void
-  dataFiltro: string | null
-  onDataFiltro: (dia: string | null) => void
+  intervaloFiltro: IntervaloFiltroComissao | null
+  onIntervaloFiltro: (faixa: IntervaloFiltroComissao | null) => void
   dados: ComissaoEntregadorApp | null
   serieDiaria: PontoSerieDiariaComissao[]
   carregando: boolean
   erro: string | null
   onTentarNovamente: () => void
 }) {
-  const diaFiltro = props.dataFiltro ? dataDeChaveDiaLocal(props.dataFiltro) : null
-  const rotuloDia = diaFiltro ? rotuloDiaComissao(diaFiltro) : rotuloPeriodoComissao(props.periodo)
-  const mostrarStale = props.carregando && props.dados != null
+  const [abaInterna, setAbaInterna] = useState<AbaInternaComissao>('resumo')
+  const [calendarioAberto, setCalendarioAberto] = useState(false)
+  const [rascunhoInicio, setRascunhoInicio] = useState(props.intervaloFiltro?.inicio ?? '')
+  const [rascunhoFim, setRascunhoFim] = useState(props.intervaloFiltro?.fim ?? '')
+
   const hoje = chaveDiaLocalComissao(new Date())
+  const faixa = props.intervaloFiltro
+  const inicioFaixa = faixa ? dataDeChaveDiaLocal(faixa.inicio) : null
+  const fimFaixa = faixa ? dataDeChaveDiaLocal(faixa.fim) : null
+  const rotuloDia =
+    inicioFaixa && fimFaixa
+      ? rotuloFaixaComissao(inicioFaixa, fimFaixa)
+      : rotuloPeriodoComissao(props.periodo)
+  const mostrarStale = props.carregando && props.dados != null
+
+  function aplicarFaixa(inicio: string, fim: string) {
+    if (!inicio || !fim || !dataDeChaveDiaLocal(inicio) || !dataDeChaveDiaLocal(fim)) return
+    const menor = inicio <= fim ? inicio : fim
+    const maior = inicio <= fim ? fim : inicio
+    props.onIntervaloFiltro({ inicio: menor, fim: maior > hoje ? hoje : maior })
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -61,45 +84,121 @@ export function ComissoesTab(props: {
       </header>
 
       <div className="shrink-0 space-y-2 px-4">
-        <div className="flex rounded-full bg-zinc-100 p-1">
-          {PERIODOS.map(item => {
-            const ativo = !props.dataFiltro && props.periodo === item.id
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => props.onPeriodo(item.id)}
-                className={`flex-1 rounded-full py-2 text-sm font-semibold ${
-                  ativo ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500'
-                }`}
-              >
-                {item.label}
-              </button>
-            )
-          })}
-        </div>
-        <label className="flex items-center gap-2 rounded-2xl bg-white px-3 py-2 ring-1 ring-black/[0.06]">
-          <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Dia</span>
-          <input
-            type="date"
-            value={props.dataFiltro ?? ''}
-            max={hoje}
-            onChange={event => {
-              const valor = event.target.value
-              props.onDataFiltro(valor || null)
+        <div className="flex items-center gap-2">
+          <div className="flex min-w-0 flex-1 rounded-full bg-zinc-100 p-1">
+            {PERIODOS.map(item => {
+              const ativo = !faixa && props.periodo === item.id
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    setCalendarioAberto(false)
+                    setRascunhoInicio('')
+                    setRascunhoFim('')
+                    props.onPeriodo(item.id)
+                  }}
+                  className={`flex-1 rounded-full py-2 text-sm font-semibold ${
+                    ativo ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              )
+            })}
+          </div>
+          <button
+            type="button"
+            aria-label="Escolher período"
+            onClick={() => {
+              setCalendarioAberto(aberto => {
+                const proximo = !aberto
+                if (proximo) {
+                  setRascunhoInicio(faixa?.inicio ?? '')
+                  setRascunhoFim(faixa?.fim ?? '')
+                }
+                return proximo
+              })
             }}
-            className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-zinc-900 outline-none"
-          />
-          {props.dataFiltro ? (
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${
+              faixa || calendarioAberto
+                ? 'bg-secondary text-white'
+                : 'bg-zinc-100 text-zinc-600'
+            }`}
+          >
+            <MdCalendarMonth className="h-5 w-5" />
+          </button>
+        </div>
+
+        {calendarioAberto ? (
+          <div className="space-y-2 rounded-2xl bg-white px-3 py-3 ring-1 ring-black/[0.06]">
+            <div className="grid grid-cols-2 gap-2">
+              <label className="min-w-0">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">De</span>
+                <input
+                  type="date"
+                  value={rascunhoInicio}
+                  max={hoje}
+                  onChange={event => {
+                    const inicio = event.target.value
+                    setRascunhoInicio(inicio)
+                    aplicarFaixa(inicio, rascunhoFim)
+                  }}
+                  className="mt-1 w-full bg-transparent text-sm font-semibold text-zinc-900 outline-none"
+                />
+              </label>
+              <label className="min-w-0">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Até</span>
+                <input
+                  type="date"
+                  value={rascunhoFim}
+                  max={hoje}
+                  min={rascunhoInicio || undefined}
+                  onChange={event => {
+                    const fim = event.target.value
+                    setRascunhoFim(fim)
+                    aplicarFaixa(rascunhoInicio, fim)
+                  }}
+                  className="mt-1 w-full bg-transparent text-sm font-semibold text-zinc-900 outline-none"
+                />
+              </label>
+            </div>
+            {faixa ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setRascunhoInicio('')
+                  setRascunhoFim('')
+                  setCalendarioAberto(false)
+                  props.onIntervaloFiltro(null)
+                }}
+                className="text-xs font-semibold text-secondary"
+              >
+                Limpar período
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className="flex rounded-full bg-zinc-100 p-1">
+          {(
+            [
+              { id: 'resumo', label: 'Resumo' },
+              { id: 'entregas', label: 'Entregas' },
+            ] as const
+          ).map(item => (
             <button
+              key={item.id}
               type="button"
-              onClick={() => props.onDataFiltro(null)}
-              className="text-xs font-semibold text-secondary"
+              onClick={() => setAbaInterna(item.id)}
+              className={`flex-1 rounded-full py-2 text-sm font-semibold ${
+                abaInterna === item.id ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500'
+              }`}
             >
-              Limpar
+              {item.label}
             </button>
-          ) : null}
-        </label>
+          ))}
+        </div>
       </div>
 
       <div
@@ -124,26 +223,29 @@ export function ComissoesTab(props: {
           </div>
         ) : null}
         {props.dados ? (
-          <div className={`mt-5 space-y-3 ${mostrarStale ? 'opacity-60' : ''}`}>
-            <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/[0.04]">
-              <p className="text-sm text-zinc-500">Você fez neste período</p>
-              <p className="mt-0.5 text-xs font-medium capitalize text-zinc-400">{rotuloDia}</p>
-              <p className="mt-1 text-3xl font-semibold text-zinc-900">
-                {formatarMoedaApp(props.dados.totalTaxas)}
-              </p>
-              <p className="mt-1 text-xs text-zinc-400">
-                {props.dados.quantidade}{' '}
-                {props.dados.quantidade === 1 ? 'entrega confirmada' : 'entregas confirmadas'}
-              </p>
-            </div>
-            <ComissaoSerieDiariaChart serie={props.serieDiaria} />
-            {props.dados.itens.length === 0 ? (
-              <p className="px-2 pb-4 text-center text-sm text-zinc-500">
+          <div className={`mt-5 space-y-3 pb-4 ${mostrarStale ? 'opacity-60' : ''}`}>
+            {abaInterna === 'resumo' ? (
+              <>
+                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/[0.04]">
+                  <p className="text-sm text-zinc-500">Você fez neste período</p>
+                  <p className="mt-0.5 text-xs font-medium capitalize text-zinc-400">{rotuloDia}</p>
+                  <p className="mt-1 text-3xl font-semibold text-zinc-900">
+                    {formatarMoedaApp(props.dados.totalTaxas)}
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-400">
+                    {props.dados.quantidade}{' '}
+                    {props.dados.quantidade === 1 ? 'entrega confirmada' : 'entregas confirmadas'}
+                  </p>
+                </div>
+                <ComissaoSerieDiariaChart serie={props.serieDiaria} />
+              </>
+            ) : props.dados.itens.length === 0 ? (
+              <p className="px-2 pt-6 text-center text-sm text-zinc-500">
                 Só entra aqui depois que você confirma a entrega. Pedido pronto ou em rota ainda não
                 conta.
               </p>
             ) : (
-              <ul className="space-y-2 pb-4">
+              <ul className="space-y-2">
                 {props.dados.itens.map(item => (
                   <li
                     key={item.id}
@@ -164,6 +266,11 @@ export function ComissoesTab(props: {
                         <p className="mt-2 truncate text-sm font-medium text-zinc-600">
                           {item.clienteNome || 'Cliente'}
                         </p>
+                        {item.dataFinalizacao ? (
+                          <p className="mt-1 text-xs capitalize text-zinc-400">
+                            {rotuloDiaComissao(new Date(item.dataFinalizacao))}
+                          </p>
+                        ) : null}
                       </div>
                       <p className="shrink-0 pt-1 text-sm font-semibold text-emerald-600">
                         {formatarMoedaApp(item.taxaEntrega ?? 0)}

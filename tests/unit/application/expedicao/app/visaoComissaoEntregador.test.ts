@@ -11,11 +11,14 @@ import {
 const agora = new Date(2026, 9, 23, 18, 0, 0)
 
 describe('visaoComissaoEntregador', () => {
-  it('dia escolhido ganha do período', () => {
+  it('intervalo escolhido ganha do período', () => {
     expect(
-      visaoComissaoEntregador({ periodo: 'semana', dataFiltro: '2026-10-20' })
-    ).toEqual({ tipo: 'dia', dia: '2026-10-20' })
-    expect(visaoComissaoEntregador({ periodo: 'mes', dataFiltro: null })).toEqual({
+      visaoComissaoEntregador({
+        periodo: 'semana',
+        intervaloFiltro: { inicio: '2026-10-20', fim: '2026-10-22' },
+      })
+    ).toEqual({ tipo: 'intervalo', inicio: '2026-10-20', fim: '2026-10-22' })
+    expect(visaoComissaoEntregador({ periodo: 'mes', intervaloFiltro: null })).toEqual({
       tipo: 'periodo',
       periodo: 'mes',
     })
@@ -29,10 +32,13 @@ describe('intervaloBuscaComissao', () => {
     expect(fim.getDate()).toBe(23)
   })
 
-  it('um dia avulso busca a semana que o contém', () => {
-    const { inicio, fim } = intervaloBuscaComissao({ tipo: 'dia', dia: '2026-10-20' }, agora)
-    expect(inicio.getDate()).toBe(18)
-    expect(fim.getDate()).toBe(23)
+  it('intervalo customizado busca exatamente o recorte', () => {
+    const { inicio, fim } = intervaloBuscaComissao(
+      { tipo: 'intervalo', inicio: '2026-10-20', fim: '2026-10-22' },
+      agora
+    )
+    expect(inicio.getDate()).toBe(20)
+    expect(fim.getDate()).toBe(22)
   })
 })
 
@@ -43,14 +49,24 @@ describe('recorte e cache', () => {
     )
   })
 
-  it('lista de hoje recorta o dia; semana não recorta', () => {
+  it('lista de hoje recorta o dia; intervalo não recorta', () => {
     expect(chaveRecorteListaComissao({ tipo: 'periodo', periodo: 'hoje' }, agora)).toBe('2026-10-23')
     expect(chaveRecorteListaComissao({ tipo: 'periodo', periodo: 'semana' }, agora)).toBeNull()
-    expect(chaveRecorteListaComissao({ tipo: 'dia', dia: '2026-10-20' }, agora)).toBe('2026-10-20')
+    expect(
+      chaveRecorteListaComissao(
+        { tipo: 'intervalo', inicio: '2026-10-20', fim: '2026-10-22' },
+        agora
+      )
+    ).toBeNull()
   })
 
   it('destaque do gráfico é o dia da visão', () => {
-    expect(diaDestaqueGraficoComissao({ tipo: 'dia', dia: '2026-10-20' }, agora)).toBe('2026-10-20')
+    expect(
+      diaDestaqueGraficoComissao(
+        { tipo: 'intervalo', inicio: '2026-10-18', fim: '2026-10-20' },
+        agora
+      )
+    ).toBe('2026-10-20')
     expect(diaDestaqueGraficoComissao({ tipo: 'periodo', periodo: 'semana' }, agora)).toBe(
       '2026-10-23'
     )

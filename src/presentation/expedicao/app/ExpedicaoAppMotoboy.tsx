@@ -400,8 +400,8 @@ export function ExpedicaoAppMotoboy() {
               loja={lojaNome}
               periodo={comissao.periodo}
               onPeriodo={comissao.setPeriodo}
-              dataFiltro={comissao.dataFiltro}
-              onDataFiltro={comissao.setDataFiltro}
+              intervaloFiltro={comissao.intervaloFiltro}
+              onIntervaloFiltro={comissao.setIntervaloFiltro}
               dados={comissaoAtual}
               serieDiaria={comissao.serieDiaria}
               carregando={comissao.carregandoComissao}

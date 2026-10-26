@@ -10,6 +10,7 @@ import {
   diaDestaqueGraficoComissao,
   intervaloBuscaComissao,
   visaoComissaoEntregador,
+  type IntervaloFiltroComissao,
 } from '@/src/application/expedicao/app/visaoComissaoEntregador'
 
 export function useComissaoEntregadorApp(
@@ -17,28 +18,28 @@ export function useComissaoEntregadorApp(
   tokenAtual: () => string | null
 ) {
   const [periodo, setPeriodoState] = useState<PeriodoComissaoEntregador>('hoje')
-  const [dataFiltro, setDataFiltroState] = useState<string | null>(null)
+  const [intervaloFiltro, setIntervaloFiltroState] = useState<IntervaloFiltroComissao | null>(null)
   const [cache, setCache] = useState<Record<string, ComissaoEntregadorApp>>({})
   const [carregandoComissao, setCarregandoComissao] = useState(false)
   const [erroComissao, setErroComissao] = useState<string | null>(null)
 
-  const visao = visaoComissaoEntregador({ periodo, dataFiltro })
-  const visaoHoje = visaoComissaoEntregador({ periodo: 'hoje', dataFiltro: null })
+  const visao = visaoComissaoEntregador({ periodo, intervaloFiltro })
+  const visaoHoje = visaoComissaoEntregador({ periodo: 'hoje', intervaloFiltro: null })
 
   const setPeriodo = useCallback((proximo: PeriodoComissaoEntregador) => {
-    setDataFiltroState(null)
+    setIntervaloFiltroState(null)
     setPeriodoState(proximo)
   }, [])
 
-  const setDataFiltro = useCallback((chave: string | null) => {
-    setDataFiltroState(chave)
+  const setIntervaloFiltro = useCallback((faixa: IntervaloFiltroComissao | null) => {
+    setIntervaloFiltroState(faixa)
   }, [])
 
   const carregarComissao = useCallback(async () => {
     const token = tokenAtual()
     if (!token || !entregadorId) return
-    const atual = visaoComissaoEntregador({ periodo, dataFiltro })
-    const placar = visaoComissaoEntregador({ periodo: 'hoje', dataFiltro: null })
+    const atual = visaoComissaoEntregador({ periodo, intervaloFiltro })
+    const placar = visaoComissaoEntregador({ periodo: 'hoje', intervaloFiltro: null })
     const chaveAtual = chaveCacheBuscaComissao(atual)
     const chavePlacar = chaveCacheBuscaComissao(placar)
     setCarregandoComissao(true)
@@ -68,7 +69,7 @@ export function useComissaoEntregadorApp(
     } finally {
       setCarregandoComissao(false)
     }
-  }, [dataFiltro, entregadorId, periodo, tokenAtual])
+  }, [entregadorId, intervaloFiltro, periodo, tokenAtual])
 
   useEffect(() => {
     if (!entregadorId) return
@@ -82,17 +83,17 @@ export function useComissaoEntregadorApp(
 
   const serieDiaria = useMemo(() => {
     if (!bruto) return []
-    const atual = visaoComissaoEntregador({ periodo, dataFiltro })
+    const atual = visaoComissaoEntregador({ periodo, intervaloFiltro })
     return serieDiariaComissaoEntregador({
       itens: bruto.itens,
       intervalo: intervaloBuscaComissao(atual),
       destaqueDia: diaDestaqueGraficoComissao(atual),
     })
-  }, [bruto, dataFiltro, periodo])
+  }, [bruto, intervaloFiltro, periodo])
 
   const resetarComissao = useCallback(() => {
     setCache({})
-    setDataFiltroState(null)
+    setIntervaloFiltroState(null)
     setPeriodoState('hoje')
     setErroComissao(null)
   }, [])
@@ -100,8 +101,8 @@ export function useComissaoEntregadorApp(
   return {
     periodo,
     setPeriodo,
-    dataFiltro,
-    setDataFiltro,
+    intervaloFiltro,
+    setIntervaloFiltro,
     dados,
     dadosHoje,
     serieDiaria,
