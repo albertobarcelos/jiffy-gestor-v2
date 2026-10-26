@@ -29,6 +29,10 @@ import {
 import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { avaliarPedidoParaRodada, type PedidoLeituraExpedicao } from '@/src/application/expedicao/avaliarPedidoParaRodada'
+import {
+  etapaAposSincronizarPego,
+  pedidoJaSincronizadoNaRodada,
+} from '@/src/application/expedicao/app/sincronizarPedidoPegoRodada'
 import { mapPedidoLeituraExpedicao } from '@/src/application/expedicao/mapPedidoLeituraExpedicao'
 import {
   buscarPedidoPorCodigo,
@@ -175,10 +179,10 @@ export async function buscarComissaoEntregador(input: {
 }
 
 /**
- * Pega o pedido: marca PRONTO se ainda não estiver e vincula o entregador.
- * EM_ROTA fica para Conferir / Em rota, para o scan não travar na porta.
+ * Só localiza e valida. Não inventa vínculo nem PRONTO —
+ * isso fica em `sincronizarPedidoPegoNaRodada`.
  */
-export async function adicionarPedidoNaRodada(input: {
+export async function localizarPedidoParaRodada(input: {
   token: string
   codigoVenda: string
   entregadorId: string
@@ -188,28 +192,49 @@ export async function adicionarPedidoNaRodada(input: {
   if (!avaliacao.ok) {
     throw new Error(avaliacao.motivo)
   }
-  const etapa = String(pedido.etapa ?? '').trim().toUpperCase()
-  const jaMeu = String(pedido.entregadorId ?? '').trim() === input.entregadorId
-  if (jaMeu && (etapa === 'EM_ROTA' || etapa === 'PRONTO')) {
-    return pedido
+  return pedido
+}
+
+/** PRONTO + vínculo (cupom na loja). Usa o entregador original do pedido. */
+export async function sincronizarPedidoPegoNaRodada(input: {
+  token: string
+  pedido: PedidoLeituraExpedicao
+  entregadorId: string
+}): Promise<PedidoLeituraExpedicao> {
+  if (pedidoJaSincronizadoNaRodada(input.pedido, input.entregadorId)) {
+    return input.pedido
   }
+  const jaMeu = String(input.pedido.entregadorId ?? '').trim() === input.entregadorId
   await marcarPedidoPronto({
     token: input.token,
-    pedidoId: pedido.id,
-    etapaAtual: pedido.etapa,
+    pedidoId: input.pedido.id,
+    etapaAtual: input.pedido.etapa,
   })
   if (!jaMeu) {
     await vincularPedidoAoEntregador({
       token: input.token,
-      pedidoId: pedido.id,
+      pedidoId: input.pedido.id,
       entregadorId: input.entregadorId,
     })
   }
   return {
-    ...pedido,
-    etapa: etapa === 'EM_ROTA' ? 'EM_ROTA' : 'PRONTO',
+    ...input.pedido,
+    etapa: etapaAposSincronizarPego(input.pedido.etapa),
     entregadorId: input.entregadorId,
   }
+}
+
+export async function adicionarPedidoNaRodada(input: {
+  token: string
+  codigoVenda: string
+  entregadorId: string
+}): Promise<PedidoLeituraExpedicao> {
+  const pedido = await localizarPedidoParaRodada(input)
+  return sincronizarPedidoPegoNaRodada({
+    token: input.token,
+    pedido,
+    entregadorId: input.entregadorId,
+  })
 }
 
 export async function expedirPedidosDaRodada(input: {

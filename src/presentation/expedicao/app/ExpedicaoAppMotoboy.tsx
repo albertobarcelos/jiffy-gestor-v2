@@ -318,11 +318,16 @@ export function ExpedicaoAppMotoboy() {
           pedidos={rodada.rodada}
           avisos={rodada.avisosRodada}
           ocupado={rodada.expedindo}
-          onPegarMais={() => {
+          sincronizandoIds={rodada.sincronizandoIds}
+          onPegar={() => {
             prepararSomLeituraExpedicao()
             rodada.setScannerAberto(true)
           }}
           onConferir={() => {
+            if (rodada.sincronizandoIds.length > 0) {
+              avisoApp.error('Aguarde sincronizar o pedido pego.')
+              return
+            }
             rodada.setIndiceChecklist(0)
             rodada.setMarcados({})
             rodada.setTela('checklist')
@@ -343,7 +348,7 @@ export function ExpedicaoAppMotoboy() {
             indice={rodada.indiceChecklist}
             total={rodada.rodada.length}
             marcados={rodada.marcados}
-            ocupado={rodada.expedindo}
+            ocupado={rodada.expedindo || rodada.sincronizandoIds.length > 0}
             onToggle={itemId =>
               rodada.setMarcados(prev => ({ ...prev, [itemId]: !prev[itemId] }))
             }

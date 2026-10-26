@@ -3,8 +3,9 @@
 import { useCallback, useRef, useState } from 'react'
 import type { PedidoLeituraExpedicao } from '@/src/application/expedicao/avaliarPedidoParaRodada'
 import {
-  adicionarPedidoNaRodada,
   expedirPedidosDaRodada,
+  localizarPedidoParaRodada,
+  sincronizarPedidoPegoNaRodada,
 } from '@/src/presentation/expedicao/app/api/expedicaoAppApi'
 import { avisoApp } from '@/src/presentation/expedicao/app/avisoApp'
 
@@ -24,15 +25,31 @@ export function useRodadaEntregadorApp(input: {
   const [marcados, setMarcados] = useState<Record<string, boolean>>({})
   const [expedindo, setExpedindo] = useState(false)
   const [pegando, setPegando] = useState(false)
+  const [sincronizandoIds, setSincronizandoIds] = useState<string[]>([])
   const [scannerAberto, setScannerAberto] = useState(false)
   const pegandoRef = useRef(false)
+  const rodadaRef = useRef(rodada)
+  const sincronizandoRef = useRef<string[]>([])
+  rodadaRef.current = rodada
 
   const limparRodada = useCallback(() => {
     setRodada([])
     setAvisosRodada([])
     setIndiceChecklist(0)
     setMarcados({})
+    setSincronizandoIds([])
+    sincronizandoRef.current = []
     setTela('abas')
+  }, [])
+
+  const marcarSincronizando = useCallback((pedidoId: string, ativo: boolean) => {
+    setSincronizandoIds(prev => {
+      const next = ativo
+        ? prev.includes(pedidoId) ? prev : [...prev, pedidoId]
+        : prev.filter(id => id !== pedidoId)
+      sincronizandoRef.current = next
+      return next
+    })
   }, [])
 
   const pegarPedido = useCallback(
@@ -50,23 +67,23 @@ export function useRodadaEntregadorApp(input: {
         throw new Error('Sessão da loja expirada.')
       }
       if (
-        rodada.some(
+        rodadaRef.current.some(
           p => p.codigoVenda === codigoVenda || String(p.numeroVenda ?? '') === codigoVenda
         )
       ) {
         avisoApp.success('Pedido já está na lista.')
         setScannerAberto(false)
         setTela('rodada')
-        const ja = rodada.find(
+        const ja = rodadaRef.current.find(
           p => p.codigoVenda === codigoVenda || String(p.numeroVenda ?? '') === codigoVenda
         )
-        if (ja) await onPego(ja.id)
+        if (ja) void onPego(ja.id)
         return
       }
       pegandoRef.current = true
       setPegando(true)
       try {
-        const pedido = await adicionarPedidoNaRodada({
+        const pedido = await localizarPedidoParaRodada({
           token,
           codigoVenda,
           entregadorId,
@@ -74,56 +91,96 @@ export function useRodadaEntregadorApp(input: {
         setRodada(prev => (prev.some(item => item.id === pedido.id) ? prev : [...prev, pedido]))
         setScannerAberto(false)
         setTela('rodada')
-        avisoApp.success(
-          `Pedido #${pedido.numeroVenda ?? pedido.codigoVenda} pego.`
-        )
-        void onPego(pedido.id)
+        avisoApp.success(`Pedido #${pedido.numeroVenda ?? pedido.codigoVenda} pego.`)
+        pegandoRef.current = false
+        setPegando(false)
+
+        marcarSincronizando(pedido.id, true)
+        void (async () => {
+          try {
+            const sincronizado = await sincronizarPedidoPegoNaRodada({
+              token,
+              pedido,
+              entregadorId,
+            })
+            setRodada(prev =>
+              prev.map(item => (item.id === sincronizado.id ? { ...item, ...sincronizado } : item))
+            )
+            void onPego(sincronizado.id)
+          } catch (error) {
+            const motivo =
+              error instanceof Error ? error.message : 'Não foi possível sincronizar o pedido.'
+            setRodada(prev => prev.filter(item => item.id !== pedido.id))
+            setAvisosRodada(prev =>
+              [{ codigo: pedido.codigoVenda || codigoVenda, motivo }, ...prev].slice(0, 6)
+            )
+            avisoApp.error(motivo)
+          } finally {
+            marcarSincronizando(pedido.id, false)
+          }
+        })()
       } catch (error) {
         const motivo = error instanceof Error ? error.message : 'Não foi possível pegar o pedido.'
         setAvisosRodada(prev => [{ codigo: codigoVenda, motivo }, ...prev].slice(0, 6))
         avisoApp.error(motivo)
-        throw error
-      } finally {
         pegandoRef.current = false
         setPegando(false)
+        throw error
       }
     },
-    [entregadorId, onPego, rodada, tokenAtual]
+    [entregadorId, marcarSincronizando, onPego, tokenAtual]
   )
 
   const expedirRodada = useCallback(async () => {
-    if (!entregadorId || rodada.length === 0) return
+    if (!entregadorId || rodadaRef.current.length === 0) return
+    if (sincronizandoRef.current.length > 0) {
+      avisoApp.error('Aguarde sincronizar o pedido pego.')
+      return
+    }
     const token = tokenAtual()
     if (!token) {
       avisoApp.error('Sessão da loja expirada.')
       return
     }
+    const pedidosSnapshot = [...rodadaRef.current]
     setExpedindo(true)
-    try {
-      const falhas = await expedirPedidosDaRodada({
-        token,
-        entregadorId,
-        pedidos: rodada,
-      })
-      if (falhas.length === 0) {
-        avisoApp.success(
-          rodada.length === 1 ? 'Pedido saiu para entrega.' : `${rodada.length} pedidos saíram para entrega.`
+    limparRodada()
+    avisoApp.success(
+      pedidosSnapshot.length === 1
+        ? 'Pedido saiu para entrega.'
+        : `${pedidosSnapshot.length} pedidos saíram para entrega.`
+    )
+    void (async () => {
+      try {
+        const falhas = await expedirPedidosDaRodada({
+          token,
+          entregadorId,
+          pedidos: pedidosSnapshot,
+        })
+        if (falhas.length === 0) {
+          await onExpedida()
+          return
+        }
+        const okIds = new Set(
+          pedidosSnapshot
+            .filter(p => !falhas.some(f => f.codigo === p.codigoVenda))
+            .map(p => p.id)
         )
-        limparRodada()
+        const voltaram = pedidosSnapshot.filter(p => !okIds.has(p.id))
+        setRodada(voltaram)
+        setAvisosRodada(falhas)
+        setTela('rodada')
+        avisoApp.error('Alguns pedidos não saíram. Veja o aviso na lista.')
         await onExpedida()
-        return
+      } catch (error) {
+        setRodada(pedidosSnapshot)
+        setTela('rodada')
+        avisoApp.error(error instanceof Error ? error.message : 'Não foi possível sair para entrega.')
+      } finally {
+        setExpedindo(false)
       }
-      const okIds = new Set(
-        rodada.filter(p => !falhas.some(f => f.codigo === p.codigoVenda)).map(p => p.id)
-      )
-      setRodada(prev => prev.filter(p => !okIds.has(p.id)))
-      setAvisosRodada(falhas)
-      setTela('rodada')
-      avisoApp.error('Alguns pedidos não saíram. Veja o aviso na lista.')
-    } finally {
-      setExpedindo(false)
-    }
-  }, [entregadorId, limparRodada, onExpedida, rodada, tokenAtual])
+    })()
+  }, [entregadorId, limparRodada, onExpedida, tokenAtual])
 
   return {
     tela,
@@ -136,6 +193,7 @@ export function useRodadaEntregadorApp(input: {
     setMarcados,
     expedindo,
     pegando,
+    sincronizandoIds,
     scannerAberto,
     setScannerAberto,
     limparRodada,

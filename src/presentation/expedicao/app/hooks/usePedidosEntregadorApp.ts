@@ -124,24 +124,30 @@ export function usePedidosEntregadorApp(input: {
         return false
       }
       const pedido = pedidos.find(p => p.id === pedidoId)
-      const pagamentos = pedido
-        ? montarPagamentosDasLinhasFinalizarApp({
-            cobrancas: pedido.cobrancas ?? [],
-            linhas: linhas ?? [],
-            valorFinal: pedido.valorFinal,
-            faltaPagar: pedido.faltaPagar,
-          })
-        : null
+      if (!pedido) return false
+      const pagamentos = montarPagamentosDasLinhasFinalizarApp({
+        cobrancas: pedido.cobrancas ?? [],
+        linhas: linhas ?? [],
+        valorFinal: pedido.valorFinal,
+        faltaPagar: pedido.faltaPagar,
+      })
+      const snapshot = pedido
+      setConfirmarId(null)
+      setPedidoAbertoId(null)
+      setPedidos(prev => prev.filter(p => p.id !== pedidoId))
       setConfirmandoId(pedidoId)
       try {
         await confirmarEntregaPedido({ token, pedidoId, pagamentos })
-        await carregarPedidos({ silencioso: true })
-        await onEntregaConfirmada(periodo)
-        setConfirmarId(null)
-        setPedidoAbertoId(null)
+        void carregarPedidos({ silencioso: true })
+        void onEntregaConfirmada(periodo)
         return true
       } catch (error) {
-        avisoApp.error(error instanceof Error ? error.message : 'Não foi possível confirmar a entrega.')
+        setPedidos(prev => mesclarPedidoPegoNaLista(prev, snapshot))
+        setPedidoAbertoId(pedidoId)
+        setConfirmarId(pedidoId)
+        avisoApp.error(
+          error instanceof Error ? error.message : 'Não foi possível confirmar a entrega.'
+        )
         return false
       } finally {
         setConfirmandoId(null)
