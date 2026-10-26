@@ -25,4 +25,14 @@ describe('avaliarPedidoParaRodada', () => {
       )
     ).toEqual({ ok: false, motivo: 'Já saiu com João.' })
   })
+
+  it('aceita de novo o pedido que este entregador já pegou', () => {
+    expect(
+      avaliarPedidoParaRodada(
+        { etapa: 'EM_ROTA', entregadorId: 'e1', entregadorNome: 'Kleverson' },
+        'e1'
+      )
+    ).toEqual({ ok: true })
+  })
 })
+

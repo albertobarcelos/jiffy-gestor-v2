@@ -32,6 +32,9 @@ export function avaliarPedidoParaRodada(
   }
   if (etapa.valor === 'EM_ROTA') {
     const outro = String(pedido.entregadorId ?? '').trim()
+    if (outro && outro === entregadorAtualId) {
+      return { ok: true }
+    }
     if (outro && outro !== entregadorAtualId) {
       const nome = pedido.entregadorNome?.trim()
       return {

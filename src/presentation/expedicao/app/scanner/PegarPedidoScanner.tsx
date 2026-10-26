@@ -32,7 +32,7 @@ type PegarPedidoScannerProps = {
 function codigoPedido(bruto: string): string | null {
   const lido = parseCodigoBarrasExpedicao(bruto)
   if (lido?.tipo === 'pedido') return lido.codigoVenda
-  const limpo = bruto.trim().toUpperCase()
+  const limpo = bruto.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
   return limpo || null
 }
 
@@ -378,22 +378,35 @@ export function PegarPedidoScanner({ aberto, ocupado, onFechar, onCodigo }: Pega
       ) : null}
 
       <form
-        className="absolute inset-x-0 bottom-0 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
+        className="absolute inset-x-0 bottom-0 space-y-2 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
         onSubmit={event => {
           event.preventDefault()
           void emitirCodigo(manual)
         }}
       >
-        <input
-          value={manual}
-          onChange={event => setManual(event.target.value)}
-          disabled={ocupado || lido}
-          placeholder="Ou digite o código"
-          className="h-12 w-full rounded-2xl bg-white/15 px-4 text-center text-base uppercase tracking-widest outline-none placeholder:normal-case placeholder:tracking-normal placeholder:text-white/50"
-          autoCapitalize="characters"
-          autoComplete="off"
-          inputMode="text"
-        />
+        <p className="text-center text-xs font-medium text-white/70">
+          Sem câmera? Digite o número ou o código da comanda.
+        </p>
+        <div className="flex gap-2">
+          <input
+            value={manual}
+            onChange={event => setManual(event.target.value)}
+            disabled={ocupado || lido}
+            placeholder="Ex: 69 ou JTTHYODA"
+            className="h-12 min-w-0 flex-1 rounded-2xl bg-white/15 px-4 text-center text-base uppercase tracking-widest outline-none placeholder:normal-case placeholder:tracking-normal placeholder:text-white/50"
+            autoCapitalize="characters"
+            autoComplete="off"
+            inputMode="text"
+            enterKeyHint="go"
+          />
+          <button
+            type="submit"
+            disabled={ocupado || lido || !manual.trim()}
+            className="h-12 shrink-0 rounded-2xl bg-white px-4 text-sm font-semibold text-zinc-900 disabled:opacity-40"
+          >
+            Pegar
+          </button>
+        </div>
       </form>
     </div>
   )

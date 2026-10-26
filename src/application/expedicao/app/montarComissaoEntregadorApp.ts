@@ -10,6 +10,7 @@ export type ComissaoEntregadorApp = {
   itens: Array<{
     id: string
     codigoVenda: string
+    numeroVenda: number | null
     clienteNome: string | null
     taxaEntrega: number | null
     valorFinal: number
@@ -61,6 +62,7 @@ export function montarComissaoEntregadorApp(
   const itens = itensFonte.map(venda => ({
     id: venda.id,
     codigoVenda: venda.codigoVenda,
+    numeroVenda: venda.numeroVenda,
     clienteNome: venda.nomeCliente,
     taxaEntrega: venda.taxaEntrega,
     valorFinal: venda.valorFinal,

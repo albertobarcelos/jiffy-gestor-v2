@@ -3,6 +3,9 @@ import { ExpedicaoAppMotoboy } from '@/src/presentation/expedicao/app/ExpedicaoA
 
 export const viewport: Viewport = {
   themeColor: '#5b21b6',
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
 }
 
 export const metadata: Metadata = {

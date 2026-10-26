@@ -28,12 +28,24 @@ export async function GET(request: NextRequest) {
       Accept: 'application/json',
     }
 
-    const lista = await apiClient.request<{ items?: unknown[] }>(
-      `/api/v1/delivery/pedidos?q=${encodeURIComponent(codigo)}&limit=20&offset=0`,
-      { method: 'GET', headers }
-    )
-    const items = Array.isArray(lista.data?.items) ? lista.data.items : []
-    const resumo = escolherPedidoPeloCodigo(items, codigo)
+    const buscas = [`q=${encodeURIComponent(codigo)}&limit=20&offset=0&cancelado=false`]
+    if (/^\d+$/.test(codigo)) {
+      buscas.push(
+        'limit=50&offset=0&cancelado=false&statusDelivery=PENDENTE&statusDelivery=EM_PREPARO&statusDelivery=PRONTO'
+      )
+    }
+
+    let resumo: unknown = null
+    for (const query of buscas) {
+      const lista = await apiClient.request<{ items?: unknown[] }>(
+        `/api/v1/delivery/pedidos?${query}`,
+        { method: 'GET', headers }
+      )
+      const items = Array.isArray(lista.data?.items) ? lista.data.items : []
+      resumo = escolherPedidoPeloCodigo(items, codigo)
+      if (resumo && typeof resumo === 'object' && 'id' in resumo) break
+      resumo = null
+    }
     if (!resumo || typeof resumo !== 'object' || !('id' in resumo)) {
       return NextResponse.json({ error: 'Pedido não encontrado.' }, { status: 404 })
     }

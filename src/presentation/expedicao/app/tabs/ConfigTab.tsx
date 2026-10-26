@@ -15,11 +15,14 @@ export function ConfigTab(props: {
   onInstalarPwa?: () => void
 }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <header className="px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <header className="shrink-0 px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
         <h1 className="text-[28px] font-semibold tracking-tight text-zinc-900">Configurações</h1>
       </header>
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-4">
+      <div
+        data-expedicao-scroll
+        className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-y-contain px-4 pb-4"
+      >
         <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/[0.04]">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Notificações</p>
           <div className="mt-3 flex items-start gap-3">

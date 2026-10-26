@@ -68,6 +68,15 @@ export function numeroRelatorioEntregas(raw: unknown): number {
   return 0
 }
 
+function numeroVendaRelatorio(raw: unknown): number | null {
+  if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) return Math.floor(raw)
+  if (typeof raw === 'string' && raw.trim() !== '') {
+    const n = Number(raw.replace(',', '.'))
+    if (Number.isFinite(n) && n > 0) return Math.floor(n)
+  }
+  return null
+}
+
 export function mapEntregadorResumoEntregas(raw: unknown): EntregadorResumoEntregasDTO | null {
   if (!raw || typeof raw !== 'object') return null
   const o = raw as Record<string, unknown>
@@ -141,12 +150,7 @@ export function mapRelatorioEntregasVenda(raw: unknown): RelatorioEntregasVendaD
   return {
     id,
     codigoVenda: String(o.codigoVenda ?? o.codigo_venda ?? '').trim(),
-    numeroVenda:
-      typeof o.numeroVenda === 'number'
-        ? o.numeroVenda
-        : typeof o.numero_venda === 'number'
-          ? o.numero_venda
-          : null,
+    numeroVenda: numeroVendaRelatorio(o.numeroVenda ?? o.numero_venda),
     valorFinal: numeroRelatorioEntregas(o.valorFinal ?? o.valor_final),
     taxaEntrega: taxaValor == null || taxaValor === '' ? null : numeroRelatorioEntregas(taxaValor),
     dataFinalizacao,

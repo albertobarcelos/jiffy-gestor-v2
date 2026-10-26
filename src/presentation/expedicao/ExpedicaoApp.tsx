@@ -310,6 +310,7 @@ export function ExpedicaoApp() {
 
       {tela === 'checklist' && pedidoChecklist ? (
         <ExpedicaoChecklist
+          key={pedidoChecklist.id}
           pedido={pedidoChecklist}
           indice={indiceChecklist}
           total={pedidos.length}

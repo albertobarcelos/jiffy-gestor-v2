@@ -14,8 +14,9 @@ export function useRodadaEntregadorApp(input: {
   entregadorId: string | null
   tokenAtual: () => string | null
   onExpedida: () => Promise<void>
+  onPego: (pedidoId: string) => Promise<void>
 }) {
-  const { entregadorId, tokenAtual, onExpedida } = input
+  const { entregadorId, tokenAtual, onExpedida, onPego } = input
   const [tela, setTela] = useState<TelaApp>('abas')
   const [rodada, setRodada] = useState<PedidoLeituraExpedicao[]>([])
   const [avisosRodada, setAvisosRodada] = useState<Array<{ codigo: string; motivo: string }>>([])
@@ -36,16 +37,30 @@ export function useRodadaEntregadorApp(input: {
 
   const pegarPedido = useCallback(
     async (codigoVenda: string) => {
-      if (pegandoRef.current || !entregadorId) return
+      if (pegandoRef.current) {
+        throw new Error('Aguarde o pedido anterior.')
+      }
+      if (!entregadorId) {
+        showToast.error('Entre com a senha do entregador para pegar o pedido.')
+        throw new Error('Entregador não identificado.')
+      }
       const token = tokenAtual()
       if (!token) {
         showToast.error('Sessão da loja expirada.')
         throw new Error('Sessão da loja expirada.')
       }
-      if (rodada.some(p => p.codigoVenda === codigoVenda)) {
+      if (
+        rodada.some(
+          p => p.codigoVenda === codigoVenda || String(p.numeroVenda ?? '') === codigoVenda
+        )
+      ) {
         showToast.success('Pedido já está na lista.')
         setScannerAberto(false)
-        setTela('rodada')
+        setTela('abas')
+        const ja = rodada.find(
+          p => p.codigoVenda === codigoVenda || String(p.numeroVenda ?? '') === codigoVenda
+        )
+        if (ja) await onPego(ja.id)
         return
       }
       pegandoRef.current = true
@@ -56,14 +71,16 @@ export function useRodadaEntregadorApp(input: {
           codigoVenda,
           entregadorId,
         })
-        setRodada(prev => [...prev, pedido])
+        setRodada(prev => (prev.some(item => item.id === pedido.id) ? prev : [...prev, pedido]))
         setScannerAberto(false)
-        setTela('rodada')
+        setTela('abas')
+        showToast.success(
+          `Pedido #${pedido.numeroVenda ?? pedido.codigoVenda} pego.`
+        )
+        await onPego(pedido.id)
       } catch (error) {
         const motivo = error instanceof Error ? error.message : 'Não foi possível pegar o pedido.'
         setAvisosRodada(prev => [{ codigo: codigoVenda, motivo }, ...prev].slice(0, 6))
-        setScannerAberto(false)
-        setTela('rodada')
         showToast.error(motivo)
         throw error
       } finally {
@@ -71,7 +88,7 @@ export function useRodadaEntregadorApp(input: {
         setPegando(false)
       }
     },
-    [entregadorId, rodada, tokenAtual]
+    [entregadorId, onPego, rodada, tokenAtual]
   )
 
   const expedirRodada = useCallback(async () => {
@@ -89,7 +106,9 @@ export function useRodadaEntregadorApp(input: {
         pedidos: rodada,
       })
       if (falhas.length === 0) {
-        showToast.success(rodada.length === 1 ? 'Pedido expedido.' : `${rodada.length} pedidos expedidos.`)
+        showToast.success(
+          rodada.length === 1 ? 'Pedido saiu para entrega.' : `${rodada.length} pedidos saíram para entrega.`
+        )
         limparRodada()
         await onExpedida()
         return

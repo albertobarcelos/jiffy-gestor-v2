@@ -31,11 +31,22 @@ describe('mapPedidoAppEntregador', () => {
       codigoVenda: 'ABC',
       valorFinal: 49.4,
       totalFaltaPagar: 49.4,
-      cobrancas: [{ meioPagamento: { nome: 'Dinheiro' } }],
+      cobrancas: [
+        {
+          id: 'cob-1',
+          meioPagamentoId: 'mp-din',
+          valor: 49.4,
+          status: 'pendente',
+          meioPagamento: { nome: 'Dinheiro' },
+        },
+      ],
     })
     expect(pedido?.formaPagamento).toBe('Dinheiro')
     expect(pedido?.numeroVenda).toBe(69)
     expect(pedido?.faltaPagar).toBe(49.4)
+    expect(pedido?.cobrancas).toEqual([
+      { id: 'cob-1', meioPagamentoId: 'mp-din', valor: 49.4, pendente: true, nome: 'Dinheiro' },
+    ])
   })
 
   it('monta o endereço completo para o Waze', () => {
@@ -65,6 +76,9 @@ describe('mapPedidoAppEntregador', () => {
     })
     expect(pedido?.formaPagamento).toBeNull()
     expect(pedido?.meioPagamentoIds).toEqual(['meio-dinheiro'])
+    expect(pedido?.cobrancas).toEqual([
+      { id: '', meioPagamentoId: 'meio-dinheiro', valor: 0, pendente: true, nome: null },
+    ])
     expect(
       aplicarNomesMeiosNoPedido(pedido!, { 'meio-dinheiro': 'Dinheiro' }).formaPagamento
     ).toBe('Dinheiro')

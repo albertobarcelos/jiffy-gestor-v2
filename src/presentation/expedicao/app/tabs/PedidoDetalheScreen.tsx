@@ -27,8 +27,8 @@ export function PedidoDetalheScreen(props: {
     props.pedido.numeroVenda && props.pedido.codigoVenda ? props.pedido.codigoVenda : null
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-zinc-50">
-      <header className="flex items-center gap-3 bg-white px-4 pb-3 pt-[max(1rem,env(safe-area-inset-top))] shadow-sm ring-1 ring-black/[0.03]">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-zinc-50">
+      <header className="flex shrink-0 items-center gap-3 bg-white px-4 pb-3 pt-[max(1rem,env(safe-area-inset-top))] shadow-sm ring-1 ring-black/[0.03]">
         <button type="button" onClick={props.onVoltar} className="rounded-full p-2" aria-label="Voltar">
           <MdArrowBack className="h-6 w-6" />
         </button>
@@ -43,7 +43,10 @@ export function PedidoDetalheScreen(props: {
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
+      <div
+        data-expedicao-scroll
+        className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-y-contain px-4 py-4"
+      >
         <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/[0.04]">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Entrega</p>
           <p className="mt-2 text-sm font-semibold leading-5 text-zinc-900">
@@ -137,7 +140,7 @@ export function PedidoDetalheScreen(props: {
       </div>
 
       {props.pedido.etapa === 'EM_ROTA' ? (
-        <footer className="border-t border-black/[0.06] bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
+        <footer className="shrink-0 border-t border-black/[0.06] bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
           <button
             type="button"
             disabled={props.confirmando}

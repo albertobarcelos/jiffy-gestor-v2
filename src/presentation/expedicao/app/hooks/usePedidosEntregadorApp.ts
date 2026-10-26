@@ -3,11 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   buscarItensPedidoApp,
+  buscarPedidoResumoApp,
   confirmarEntregaPedido,
+  listarMeiosPagamentoEntregaApp,
   listarPedidosAtivosEntregador,
+  mesclarPedidoPegoNaLista,
+  type MeioPagamentoAppEntregador,
   type PedidoResumoAppEntregador,
 } from '@/src/presentation/expedicao/app/api/expedicaoAppApi'
 import type { PeriodoComissaoEntregador } from '@/src/application/expedicao/app/periodoComissaoEntregador'
+import { montarPagamentosAoTrocarMeioFinalizarApp } from '@/src/application/expedicao/app/pagamentoFinalizarEntregaApp'
 import { showToast } from '@/src/shared/utils/toast'
 
 export function usePedidosEntregadorApp(input: {
@@ -26,6 +31,7 @@ export function usePedidosEntregadorApp(input: {
   const [itensAberto, setItensAberto] = useState<Array<{ id: string; nome: string; quantidade: number }>>([])
   const [carregandoItens, setCarregandoItens] = useState(false)
   const [confirmarId, setConfirmarId] = useState<string | null>(null)
+  const [meiosPagamento, setMeiosPagamento] = useState<MeioPagamentoAppEntregador[]>([])
   const jaCarregouPedidos = useRef(false)
 
   const carregarPedidos = useCallback(
@@ -58,6 +64,33 @@ export function usePedidosEntregadorApp(input: {
     void carregarPedidos()
   }, [carregarPedidos, entregadorId])
 
+  const incluirPedidoPego = useCallback(
+    async (pedidoId: string) => {
+      const token = tokenAtual()
+      if (!token || !entregadorId) return
+      const [pego, lista] = await Promise.all([
+        buscarPedidoResumoApp({ token, pedidoId }),
+        listarPedidosAtivosEntregador({ token, entregadorId }).catch(() => [] as PedidoResumoAppEntregador[]),
+      ])
+      const pegoDoEntregador =
+        pego && (pego.entregadorId === entregadorId || !pego.entregadorId)
+          ? { ...pego, entregadorId, etapa: pego.etapa || 'EM_ROTA' }
+          : pego
+      setPedidos(mesclarPedidoPegoNaLista(lista, pegoDoEntregador))
+      jaCarregouPedidos.current = true
+    },
+    [entregadorId, tokenAtual]
+  )
+
+  useEffect(() => {
+    if (!confirmarId) return
+    const token = tokenAtual()
+    if (!token) return
+    void listarMeiosPagamentoEntregaApp(token)
+      .then(setMeiosPagamento)
+      .catch(() => setMeiosPagamento([]))
+  }, [confirmarId, tokenAtual])
+
   const abrirPedido = useCallback(async (pedidoId: string) => {
     setPedidoAbertoId(pedidoId)
     setItensAberto([])
@@ -74,16 +107,24 @@ export function usePedidosEntregadorApp(input: {
   }, [tokenAtual])
 
   const confirmarEntrega = useCallback(
-    async (pedidoId: string) => {
+    async (pedidoId: string, meioPagamentoId?: string | null) => {
       const token = tokenAtual()
       if (!token) {
         showToast.error('Sessão da loja expirada.')
         return
       }
       const pedido = pedidos.find(p => p.id === pedidoId)
+      const pagamentos = pedido
+        ? montarPagamentosAoTrocarMeioFinalizarApp({
+            cobrancas: pedido.cobrancas ?? [],
+            meioPagamentoId: meioPagamentoId ?? null,
+            valorFinal: pedido.valorFinal,
+            faltaPagar: pedido.faltaPagar,
+          })
+        : null
       setConfirmandoId(pedidoId)
       try {
-        await confirmarEntregaPedido({ token, pedidoId })
+        await confirmarEntregaPedido({ token, pedidoId, pagamentos })
         showToast.success(
           pedido && pedido.faltaPagar > 0
             ? 'Pagamento recebido e entrega confirmada.'
@@ -122,7 +163,9 @@ export function usePedidosEntregadorApp(input: {
     carregandoItens,
     confirmarId,
     setConfirmarId,
+    meiosPagamento,
     carregarPedidos,
+    incluirPedidoPego,
     abrirPedido,
     confirmarEntrega,
     resetarPedidos,

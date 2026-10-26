@@ -16,8 +16,8 @@ export function RodadaAppScreen(props: {
   const podeExpedir = props.pedidos.length > 0 && !props.ocupado
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <header className="flex items-center justify-between px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <header className="flex shrink-0 items-center justify-between px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Na porta</p>
           <h1 className="text-[28px] font-semibold tracking-tight text-zinc-900">Rodada</h1>
@@ -43,7 +43,10 @@ export function RodadaAppScreen(props: {
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+      <div
+        data-expedicao-scroll
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-4"
+      >
         {props.avisos.length > 0 ? (
           <ul className="mb-3 space-y-1">
             {props.avisos.map(aviso => (
@@ -91,7 +94,7 @@ export function RodadaAppScreen(props: {
           className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-secondary text-sm font-semibold text-white disabled:opacity-40"
         >
           {props.ocupado ? <AppSpinner tom="branco" /> : null}
-          {props.ocupado ? 'Expedindo…' : 'Expedir'}
+          {props.ocupado ? 'Em rota…' : 'Em rota'}
         </button>
       </footer>
     </div>
