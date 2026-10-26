@@ -4,6 +4,7 @@ import { TextField } from '@mui/material'
 import { ProdutoStatusSwitch } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoStatusSwitch'
 import { Button } from '@/src/presentation/components/ui/button'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
+import { cn } from '@/src/shared/utils/cn'
 import type { PizzaLinhaComplementoDraft } from './pizzaDefaults'
 import { createLocalId } from './pizzaDefaults'
 import { PizzaCurrencyTextField } from './PizzaCurrencyTextField'
@@ -14,6 +15,7 @@ interface PizzaMassaBordaTableProps {
   linhas: PizzaLinhaComplementoDraft[]
   onChange: (linhas: PizzaLinhaComplementoDraft[]) => void
   onRemover?: (linha: PizzaLinhaComplementoDraft & { id?: string }) => void
+  className?: string
 }
 
 export function PizzaMassaBordaTable({
@@ -22,6 +24,7 @@ export function PizzaMassaBordaTable({
   linhas,
   onChange,
   onRemover,
+  className,
 }: PizzaMassaBordaTableProps) {
   const atualizar = (localId: string, patch: Partial<PizzaLinhaComplementoDraft>) => {
     onChange(linhas.map(l => (l.localId === localId ? { ...l, ...patch } : l)))
@@ -44,7 +47,7 @@ export function PizzaMassaBordaTable({
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4 md:p-6">
+    <div className={cn('flex flex-col gap-4 p-4 md:p-6', className)}>
       <div className="overflow-x-auto rounded-xl border border-gray-200">
         <table className="min-w-full text-sm">
           <thead className="bg-gray-50 text-left text-secondary-text">

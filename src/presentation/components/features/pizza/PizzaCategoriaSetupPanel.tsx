@@ -16,12 +16,15 @@ import {
   type PizzaCategoriaDraft,
 } from './pizzaDefaults'
 import {
-  nextPizzaSetupTab,
-  PizzaSetupTabs,
-  prevPizzaSetupTab,
-  type PizzaSetupTabId,
-} from './PizzaSetupTabs'
-import { PizzaCategoriaDetalhesTab } from './PizzaCategoriaDetalhesTab'
+  nextPizzaCategoriaSetupStep,
+  prevPizzaCategoriaSetupStep,
+  PizzaCategoriaSetupStepper,
+  type PizzaCategoriaSetupStepId,
+} from './PizzaCategoriaSetupStepper'
+import { PizzaCategoriaInformacoesStep } from './PizzaCategoriaInformacoesStep'
+import { PizzaCategoriaRegraPrecoStep } from './PizzaCategoriaRegraPrecoStep'
+import { PizzaCategoriaSetupPlaceholderStep } from './PizzaCategoriaSetupPlaceholderStep'
+import { PizzaCategoriaSaboresStep } from './PizzaCategoriaSaboresStep'
 import { PizzaTamanhoCards } from './PizzaTamanhoCards'
 import { PizzaMassaBordaTable } from './PizzaMassaBordaTable'
 
@@ -41,7 +44,7 @@ export function PizzaCategoriaSetupPanel({
   initialNome = '',
   menuId,
 }: PizzaCategoriaSetupPanelProps) {
-  const [tab, setTab] = useState<PizzaSetupTabId>('detalhes')
+  const [step, setStep] = useState<PizzaCategoriaSetupStepId>('informacoes')
   const [draft, setDraft] = useState<PizzaCategoriaDraft>(() =>
     createDefaultPizzaCategoriaDraft(initialNome)
   )
@@ -57,7 +60,7 @@ export function PizzaCategoriaSetupPanel({
       const nextDraft = createDefaultPizzaCategoriaDraft(initialNome)
       setDraft(nextDraft)
       baselineRef.current = serializePizzaDraft(nextDraft)
-      setTab('detalhes')
+      setStep('informacoes')
       setPanelSession(s => s + 1)
     }
     prevOpenRef.current = open
@@ -68,9 +71,9 @@ export function PizzaCategoriaSetupPanel({
     [draft]
   )
 
-  const podeAvancarDetalhes = draft.nome.trim().length > 0
+  const podeAvancarInformacoes = draft.nome.trim().length > 0
   const podeAvancarTamanhos = draft.tamanhos.some(t => t.nome.trim() && t.ativo)
-  const isUltimaAba = tab === 'bordas'
+  const isUltimoPasso = step === 'adicionais'
 
   const handleRequestClose = useCallback(() => {
     if (isDirty) {
@@ -83,12 +86,12 @@ export function PizzaCategoriaSetupPanel({
   const handleSalvar = useCallback(async () => {
     if (!draft.nome.trim()) {
       showToast.error('Informe o nome da categoria')
-      setTab('detalhes')
+      setStep('informacoes')
       return
     }
     if (!draft.tamanhos.some(t => t.nome.trim() && t.ativo)) {
       showToast.error('Informe ao menos um tamanho ativo')
-      setTab('tamanhos')
+      setStep('tamanhos')
       return
     }
 
@@ -97,9 +100,11 @@ export function PizzaCategoriaSetupPanel({
       const result = await criarMutation.mutateAsync(payload)
       baselineRef.current = serializePizzaDraft(draft)
       showToast.success(
-        menuId
-          ? 'Categoria criada. Cadastre sabores para exibir no cardápio.'
-          : 'Categoria pizza criada'
+        draft.sabores.length > 0
+          ? 'Categoria pizza criada com sabores'
+          : menuId
+            ? 'Categoria criada. Cadastre sabores para exibir no cardápio.'
+            : 'Categoria pizza criada'
       )
       onSuccess?.(result.categoria.id)
       onClose()
@@ -109,7 +114,7 @@ export function PizzaCategoriaSetupPanel({
   }, [criarMutation, draft, menuId, onClose, onSuccess])
 
   const footerActions = useMemo((): JiffySidePanelFooterActions => {
-    if (isUltimaAba) {
+    if (isUltimoPasso) {
       return {
         showCancel: true,
         cancelLabel: 'Cancelar',
@@ -126,20 +131,20 @@ export function PizzaCategoriaSetupPanel({
     }
 
     return {
-      showPrevious: tab !== 'detalhes',
+      showPrevious: step !== 'informacoes',
       previousLabel: 'Anterior',
       onPrevious: () => {
-        const prev = prevPizzaSetupTab(tab)
-        if (prev) setTab(prev)
+        const prev = prevPizzaCategoriaSetupStep(step)
+        if (prev) setStep(prev)
       },
       showNext: true,
       nextLabel: 'Continuar',
       nextDisabled:
-        (tab === 'detalhes' && !podeAvancarDetalhes) ||
-        (tab === 'tamanhos' && !podeAvancarTamanhos),
+        (step === 'informacoes' && !podeAvancarInformacoes) ||
+        (step === 'tamanhos' && !podeAvancarTamanhos),
       onNext: () => {
-        const next = nextPizzaSetupTab(tab)
-        if (next) setTab(next)
+        const next = nextPizzaCategoriaSetupStep(step)
+        if (next) setStep(next)
       },
       showCancel: true,
       cancelLabel: 'Cancelar',
@@ -152,10 +157,10 @@ export function PizzaCategoriaSetupPanel({
     criarMutation.isPending,
     handleRequestClose,
     handleSalvar,
-    isUltimaAba,
-    podeAvancarDetalhes,
+    isUltimoPasso,
+    podeAvancarInformacoes,
     podeAvancarTamanhos,
-    tab,
+    step,
   ])
 
   return (
@@ -168,41 +173,88 @@ export function PizzaCategoriaSetupPanel({
           <span className="font-normal text-secondary-text">Detalhes da categoria</span>
         }
         panelClassName={MENU_WIDE_PANEL_CLASS}
+        scrollableBody={false}
         footerVariant="bar"
         footerActions={footerActions}
       >
-        <div key={panelSession} className="flex min-h-0 flex-1 flex-col">
-          <PizzaSetupTabs active={tab} onChange={setTab} />
-          {tab === 'detalhes' ? (
-            <PizzaCategoriaDetalhesTab draft={draft} onChange={setDraft} />
+        <div key={panelSession} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <PizzaCategoriaSetupStepper className="shrink-0" active={step} onChange={setStep} />
+
+          {step === 'informacoes' ? (
+            <PizzaCategoriaInformacoesStep draft={draft} onChange={setDraft} />
           ) : null}
-          {tab === 'tamanhos' ? (
-            <PizzaTamanhoCards
-              tamanhos={draft.tamanhos}
-              onChange={tamanhos => setDraft({ ...draft, tamanhos })}
-              onRemover={tamanho =>
-                setDraft(prev => ({
-                  ...prev,
-                  tamanhos: prev.tamanhos.filter(t => t.localId !== tamanho.localId),
-                }))
-              }
-            />
+
+          {step === 'regra-preco' ? (
+            <PizzaCategoriaRegraPrecoStep draft={draft} onChange={setDraft} />
           ) : null}
-          {tab === 'massas' ? (
-            <PizzaMassaBordaTable
-              labelNome="Massa"
-              labelAdicionar="+ Adicionar massa"
-              linhas={draft.massas}
-              onChange={massas => setDraft({ ...draft, massas })}
-            />
+
+          {step === 'tamanhos' ? (
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <PizzaTamanhoCards
+                tamanhos={draft.tamanhos}
+                onChange={tamanhos => setDraft({ ...draft, tamanhos })}
+                onRemover={tamanho =>
+                  setDraft(prev => ({
+                    ...prev,
+                    tamanhos: prev.tamanhos.filter(t => t.localId !== tamanho.localId),
+                    sabores: prev.sabores.map(sabor => {
+                      if (!(tamanho.localId in sabor.precosPorTamanhoLocalId)) return sabor
+                      const nextPrecos = { ...sabor.precosPorTamanhoLocalId }
+                      delete nextPrecos[tamanho.localId]
+                      return { ...sabor, precosPorTamanhoLocalId: nextPrecos }
+                    }),
+                  }))
+                }
+              />
+            </div>
           ) : null}
-          {tab === 'bordas' ? (
-            <PizzaMassaBordaTable
-              labelNome="Borda"
-              labelAdicionar="+ Adicionar borda"
-              linhas={draft.bordas}
-              onChange={bordas => setDraft({ ...draft, bordas })}
-            />
+
+          {step === 'sabores' ? (
+            <PizzaCategoriaSaboresStep draft={draft} onChange={setDraft} />
+          ) : null}
+
+          {step === 'massas-bordas' ? (
+            <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4 md:p-6">
+              <section className="space-y-3">
+                <div>
+                  <h2 className="text-base font-semibold text-primary-text">Massas</h2>
+                  <p className="text-sm text-secondary-text">
+                    Cadastre as massas disponíveis nesta categoria.
+                  </p>
+                </div>
+                <PizzaMassaBordaTable
+                  className="p-0"
+                  labelNome="Massa"
+                  labelAdicionar="+ Adicionar massa"
+                  linhas={draft.massas}
+                  onChange={massas => setDraft({ ...draft, massas })}
+                />
+              </section>
+              <section className="space-y-3">
+                <div>
+                  <h2 className="text-base font-semibold text-primary-text">Bordas</h2>
+                  <p className="text-sm text-secondary-text">
+                    Cadastre as bordas disponíveis nesta categoria.
+                  </p>
+                </div>
+                <PizzaMassaBordaTable
+                  className="p-0"
+                  labelNome="Borda"
+                  labelAdicionar="+ Adicionar borda"
+                  linhas={draft.bordas}
+                  onChange={bordas => setDraft({ ...draft, bordas })}
+                />
+              </section>
+            </div>
+          ) : null}
+
+          {step === 'adicionais' ? (
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <PizzaCategoriaSetupPlaceholderStep
+                titulo="Adicionais"
+                descricao="Os adicionais poderão ser vinculados após salvar a categoria. Salve para concluir a criação."
+              />
+            </div>
           ) : null}
         </div>
       </JiffySidePanelModal>

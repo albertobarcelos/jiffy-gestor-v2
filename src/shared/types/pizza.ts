@@ -178,6 +178,8 @@ export interface CreateCategoriaPizzaCompletoInput {
   imagemUrl?: string | null
   corHex?: string
   iconName?: string
+  /** IDs das impressoras vinculadas à categoria na criação. */
+  impressorasIds?: string[]
   config?: GrupoPizzaConfigInput
   tamanhos?: PizzaTamanhoInput[]
   sabores?: Array<{

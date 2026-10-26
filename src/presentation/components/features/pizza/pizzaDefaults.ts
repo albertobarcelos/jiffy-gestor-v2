@@ -19,13 +19,31 @@ export type PizzaTamanhoDraft = {
   ativo: boolean
 }
 
+export type PizzaSaborPrecoDraft = {
+  enabled: boolean
+  valor: number
+}
+
+export type PizzaSaborDraft = {
+  localId: string
+  nome: string
+  descricao: string
+  ativo: boolean
+  /** Preços indexados pelo localId do tamanho no draft. */
+  precosPorTamanhoLocalId: Record<string, PizzaSaborPrecoDraft>
+}
+
 export type PizzaCategoriaDraft = {
   nome: string
   corHex: string
   iconName: string
   ativo: boolean
   regraPrecoMultiplosSabores: RegraPrecoMultiplosSabores
+  permiteDesconto: boolean
+  permiteAcrescimo: boolean
+  impressorasIds: string[]
   tamanhos: PizzaTamanhoDraft[]
+  sabores: PizzaSaborDraft[]
   massas: PizzaLinhaComplementoDraft[]
   bordas: PizzaLinhaComplementoDraft[]
 }
@@ -41,7 +59,11 @@ export function createDefaultPizzaCategoriaDraft(nome = ''): PizzaCategoriaDraft
     iconName: 'pizza',
     ativo: true,
     regraPrecoMultiplosSabores: 'proporcional',
+    permiteDesconto: true,
+    permiteAcrescimo: true,
+    impressorasIds: [],
     tamanhos: DEFAULT_TAMANHOS.map(t => ({ ...t, localId: createLocalId() })),
+    sabores: [],
     massas: DEFAULT_MASSAS.map(m => ({ ...m, localId: createLocalId() })),
     bordas: DEFAULT_BORDAS.map(b => ({ ...b, localId: createLocalId() })),
   }
@@ -69,13 +91,39 @@ export function buildCreateCompletoPayload(
     .filter(t => t.nome.trim() && t.ativo)
     .map(t => ({
       nome: t.nome.trim(),
-      quantidadePedacos: t.quantidadePedacos,
-      quantidadeMaximaDivisoes: t.quantidadeMaximaDivisoes,
+      quantidadePedacos: Math.max(1, t.quantidadePedacos || 1),
+      quantidadeMaximaDivisoes: Math.min(4, Math.max(1, t.quantidadeMaximaDivisoes || 1)),
       ativo: t.ativo,
     }))
 
   const massasValidas = draft.massas.filter(m => m.nome.trim())
   const bordasValidas = draft.bordas.filter(b => b.nome.trim())
+  const tamanhoNomeByLocalId = new Map(
+    draft.tamanhos
+      .filter(t => t.nome.trim() && t.ativo)
+      .map(t => [t.localId, t.nome.trim()] as const)
+  )
+
+  const sabores = draft.sabores
+    .filter(s => s.nome.trim())
+    .map(sabor => {
+      const precosTamanho = Object.entries(sabor.precosPorTamanhoLocalId)
+        .filter(([, cfg]) => cfg.enabled && cfg.valor > 0)
+        .map(([tamanhoLocalId, cfg]) => {
+          const nomeTamanho = tamanhoNomeByLocalId.get(tamanhoLocalId)
+          if (!nomeTamanho) return null
+          return { nome: nomeTamanho, precoCheio: cfg.valor }
+        })
+        .filter((item): item is { nome: string; precoCheio: number } => item != null)
+
+      return {
+        nome: sabor.nome.trim(),
+        descricao: sabor.descricao.trim() || null,
+        ativo: sabor.ativo,
+        precosTamanho,
+      }
+    })
+    .filter(sabor => sabor.precosTamanho.length > 0)
 
   const mapComplemento = (item: PizzaLinhaComplementoDraft) => ({
     nome: item.nome.trim(),
@@ -89,16 +137,17 @@ export function buildCreateCompletoPayload(
     corHex: draft.corHex,
     iconName: draft.iconName,
     ativo: draft.ativo,
+    impressorasIds: draft.impressorasIds,
     config: {
       menuId: options?.menuId ?? null,
       regraPrecoMultiplosSabores: draft.regraPrecoMultiplosSabores,
       imprimir: true,
-      permiteDesconto: true,
-      permiteAcrescimo: true,
+      permiteDesconto: draft.permiteDesconto,
+      permiteAcrescimo: draft.permiteAcrescimo,
       ativo: true,
     },
     tamanhos,
-    sabores: [],
+    sabores,
     gruposMassas:
       massasValidas.length > 0
         ? [
