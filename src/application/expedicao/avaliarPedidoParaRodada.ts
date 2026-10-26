@@ -6,9 +6,13 @@ export type PedidoLeituraExpedicao = {
   numeroVenda: number | null
   clienteNome: string
   bairro: string | null
+  endereco: string | null
   etapa: string | null
   entregadorId: string | null
   entregadorNome: string | null
+  formaPagamento: string | null
+  valorFinal: number
+  faltaPagar: number
   itens: Array<{ id: string; nome: string; quantidade: number }>
 }
 

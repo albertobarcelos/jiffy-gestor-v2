@@ -6,7 +6,7 @@ import {
   adicionarPedidoNaRodada,
   expedirPedidosDaRodada,
 } from '@/src/presentation/expedicao/app/api/expedicaoAppApi'
-import { showToast } from '@/src/shared/utils/toast'
+import { avisoApp } from '@/src/presentation/expedicao/app/avisoApp'
 
 export type TelaApp = 'abas' | 'rodada' | 'checklist'
 
@@ -41,12 +41,12 @@ export function useRodadaEntregadorApp(input: {
         throw new Error('Aguarde o pedido anterior.')
       }
       if (!entregadorId) {
-        showToast.error('Entre com a senha do entregador para pegar o pedido.')
+        avisoApp.error('Entre com a senha do entregador para pegar o pedido.')
         throw new Error('Entregador não identificado.')
       }
       const token = tokenAtual()
       if (!token) {
-        showToast.error('Sessão da loja expirada.')
+        avisoApp.error('Sessão da loja expirada.')
         throw new Error('Sessão da loja expirada.')
       }
       if (
@@ -54,7 +54,7 @@ export function useRodadaEntregadorApp(input: {
           p => p.codigoVenda === codigoVenda || String(p.numeroVenda ?? '') === codigoVenda
         )
       ) {
-        showToast.success('Pedido já está na lista.')
+        avisoApp.success('Pedido já está na lista.')
         setScannerAberto(false)
         setTela('rodada')
         const ja = rodada.find(
@@ -74,14 +74,14 @@ export function useRodadaEntregadorApp(input: {
         setRodada(prev => (prev.some(item => item.id === pedido.id) ? prev : [...prev, pedido]))
         setScannerAberto(false)
         setTela('rodada')
-        showToast.success(
+        avisoApp.success(
           `Pedido #${pedido.numeroVenda ?? pedido.codigoVenda} pego.`
         )
         void onPego(pedido.id)
       } catch (error) {
         const motivo = error instanceof Error ? error.message : 'Não foi possível pegar o pedido.'
         setAvisosRodada(prev => [{ codigo: codigoVenda, motivo }, ...prev].slice(0, 6))
-        showToast.error(motivo)
+        avisoApp.error(motivo)
         throw error
       } finally {
         pegandoRef.current = false
@@ -95,7 +95,7 @@ export function useRodadaEntregadorApp(input: {
     if (!entregadorId || rodada.length === 0) return
     const token = tokenAtual()
     if (!token) {
-      showToast.error('Sessão da loja expirada.')
+      avisoApp.error('Sessão da loja expirada.')
       return
     }
     setExpedindo(true)
@@ -106,7 +106,7 @@ export function useRodadaEntregadorApp(input: {
         pedidos: rodada,
       })
       if (falhas.length === 0) {
-        showToast.success(
+        avisoApp.success(
           rodada.length === 1 ? 'Pedido saiu para entrega.' : `${rodada.length} pedidos saíram para entrega.`
         )
         limparRodada()
@@ -119,7 +119,7 @@ export function useRodadaEntregadorApp(input: {
       setRodada(prev => prev.filter(p => !okIds.has(p.id)))
       setAvisosRodada(falhas)
       setTela('rodada')
-      showToast.error('Alguns pedidos não saíram. Veja o aviso na lista.')
+      avisoApp.error('Alguns pedidos não saíram. Veja o aviso na lista.')
     } finally {
       setExpedindo(false)
     }

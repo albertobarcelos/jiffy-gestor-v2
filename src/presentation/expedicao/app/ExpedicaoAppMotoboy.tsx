@@ -34,7 +34,7 @@ import {
 import type { AbaExpedicaoApp } from '@/src/presentation/expedicao/app/tipos'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useExpedicaoAppRealtime } from '@/src/presentation/expedicao/app/realtime/useExpedicaoAppRealtime'
-import { showToast } from '@/src/shared/utils/toast'
+import { avisoApp } from '@/src/presentation/expedicao/app/avisoApp'
 import { useSessaoEntregadorApp } from '@/src/presentation/expedicao/app/hooks/useSessaoEntregadorApp'
 import { useComissaoEntregadorApp } from '@/src/presentation/expedicao/app/hooks/useComissaoEntregadorApp'
 import { usePedidosEntregadorApp } from '@/src/presentation/expedicao/app/hooks/usePedidosEntregadorApp'
@@ -189,9 +189,9 @@ export function ExpedicaoAppMotoboy() {
         return
       }
       await navigator.clipboard.writeText(texto)
-      showToast.success('Logs copiados.')
+      avisoApp.success('Logs copiados.')
     } catch {
-      showToast.error('Não foi possível compartilhar os logs.')
+      avisoApp.error('Não foi possível compartilhar os logs.')
     } finally {
       setCompartilhandoLogs(false)
     }
@@ -201,7 +201,7 @@ export function ExpedicaoAppMotoboy() {
     async (value: boolean) => {
       if (value && typeof Notification !== 'undefined') {
         if (Notification.permission === 'denied') {
-          showToast.error('O navegador bloqueou os avisos. Libere nas configurações do aparelho.')
+          avisoApp.error('O navegador bloqueou os avisos. Libere nas configurações do aparelho.')
           atualizarPrefs({ ...prefs, avisosPedidoNovo: false })
           return
         }
@@ -210,7 +210,7 @@ export function ExpedicaoAppMotoboy() {
           try {
             const resultado = await Notification.requestPermission()
             if (resultado !== 'granted') {
-              showToast.error('Permissão de aviso negada.')
+              avisoApp.error('Permissão de aviso negada.')
               atualizarPrefs({ ...prefs, avisosPedidoNovo: false })
               return
             }
@@ -347,8 +347,8 @@ export function ExpedicaoAppMotoboy() {
             onToggle={itemId =>
               rodada.setMarcados(prev => ({ ...prev, [itemId]: !prev[itemId] }))
             }
-            rotuloFinal="Em rota"
-            rotuloFinalOcupado="Em rota…"
+            rotuloFinal="Para Entrega"
+            rotuloFinalOcupado="Saindo…"
             onContinuar={() => {
               if (rodada.indiceChecklist + 1 >= rodada.rodada.length) {
                 void rodada.expedirRodada()

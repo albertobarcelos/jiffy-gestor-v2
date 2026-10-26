@@ -1,3 +1,4 @@
+import { mapPedidoAppEntregador } from '@/src/application/expedicao/app/mapPedidoAppEntregador'
 import type { PedidoLeituraExpedicao } from '@/src/application/expedicao/avaliarPedidoParaRodada'
 
 function texto(valor: unknown): string {
@@ -44,6 +45,7 @@ export function mapPedidoLeituraExpedicao(raw: unknown): PedidoLeituraExpedicao 
       : []
 
   const numero = Number(row.numeroVenda)
+  const resumo = mapPedidoAppEntregador(raw)
   return {
     id,
     codigoVenda: texto(row.codigoVenda).toUpperCase(),
@@ -52,10 +54,14 @@ export function mapPedidoLeituraExpedicao(raw: unknown): PedidoLeituraExpedicao 
       texto(cliente.nome) ||
       texto(contexto.destinatarioNome) ||
       'Cliente',
-    bairro: texto(endereco.bairro) || null,
+    bairro: texto(endereco.bairro) || resumo?.bairro || null,
+    endereco: resumo?.endereco ?? null,
     etapa: texto(row.statusDelivery ?? row.statusEtapaOperacional ?? row.statusOperacional) || null,
     entregadorId: texto(entregador.id ?? row.entregadorId) || null,
     entregadorNome: texto(entregador.nome) || null,
+    formaPagamento: resumo?.formaPagamento ?? null,
+    valorFinal: resumo?.valorFinal ?? 0,
+    faltaPagar: resumo?.faltaPagar ?? 0,
     itens: produtos
       .map(itemDoProduto)
       .filter((item): item is PedidoLeituraExpedicao['itens'][number] => item !== null),

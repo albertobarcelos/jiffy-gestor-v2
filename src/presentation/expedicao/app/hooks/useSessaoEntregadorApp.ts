@@ -28,7 +28,7 @@ import { buildEmpresaUrlParam, getEmpresaSlugParam } from '@/src/shared/utils/ta
 import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapshot'
 import { fetchAccessTokenEscolherEmpresa } from '@/src/presentation/utils/escolherEmpresaApi'
 import { ensureHubBearerToken } from '@/src/presentation/utils/ensureHubBearerToken'
-import { showToast } from '@/src/shared/utils/toast'
+import { avisoApp } from '@/src/presentation/expedicao/app/avisoApp'
 
 export function useSessaoEntregadorApp() {
   const [senha, setSenha] = useState('')
@@ -157,7 +157,7 @@ export function useSessaoEntregadorApp() {
         )
       } catch (error) {
         setTrocandoLojaId(null)
-        showToast.error(error instanceof Error ? error.message : 'Não foi possível trocar de loja.')
+        avisoApp.error(error instanceof Error ? error.message : 'Não foi possível trocar de loja.')
       }
     },
     [trocandoLojaId]

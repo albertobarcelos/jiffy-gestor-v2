@@ -16,7 +16,7 @@ import {
   montarPagamentosDasLinhasFinalizarApp,
   type LinhaPagamentoFinalizarApp,
 } from '@/src/application/expedicao/app/pagamentoFinalizarEntregaApp'
-import { showToast } from '@/src/shared/utils/toast'
+import { avisoApp } from '@/src/presentation/expedicao/app/avisoApp'
 
 export function usePedidosEntregadorApp(input: {
   entregadorId: string | null
@@ -52,7 +52,7 @@ export function usePedidosEntregadorApp(input: {
         const mensagem = error instanceof Error ? error.message : 'Não foi possível carregar os pedidos.'
         setErroPedidos(mensagem)
         if (!jaCarregouPedidos.current) {
-          showToast.error(mensagem)
+          avisoApp.error(mensagem)
         }
       } finally {
         setCarregandoPedidos(false)
@@ -83,13 +83,23 @@ export function usePedidosEntregadorApp(input: {
   )
 
   useEffect(() => {
-    if (!confirmarId) return
     const token = tokenAtual()
-    if (!token) return
+    if (!token || !entregadorId) {
+      setMeiosPagamento([])
+      return
+    }
+    let cancelado = false
     void listarMeiosPagamentoEntregaApp(token)
-      .then(setMeiosPagamento)
-      .catch(() => setMeiosPagamento([]))
-  }, [confirmarId, tokenAtual])
+      .then(lista => {
+        if (!cancelado) setMeiosPagamento(lista)
+      })
+      .catch(() => {
+        if (!cancelado) setMeiosPagamento([])
+      })
+    return () => {
+      cancelado = true
+    }
+  }, [entregadorId, tokenAtual])
 
   const abrirPedido = useCallback(async (pedidoId: string) => {
     setPedidoAbertoId(pedidoId)
@@ -100,7 +110,7 @@ export function usePedidosEntregadorApp(input: {
     try {
       setItensAberto(await buscarItensPedidoApp({ token, pedidoId }))
     } catch (error) {
-      showToast.error(error instanceof Error ? error.message : 'Não foi possível carregar os itens.')
+      avisoApp.error(error instanceof Error ? error.message : 'Não foi possível carregar os itens.')
     } finally {
       setCarregandoItens(false)
     }
@@ -110,7 +120,7 @@ export function usePedidosEntregadorApp(input: {
     async (pedidoId: string, linhas?: LinhaPagamentoFinalizarApp[]) => {
       const token = tokenAtual()
       if (!token) {
-        showToast.error('Sessão da loja expirada.')
+        avisoApp.error('Sessão da loja expirada.')
         return false
       }
       const pedido = pedidos.find(p => p.id === pedidoId)
@@ -131,7 +141,7 @@ export function usePedidosEntregadorApp(input: {
         setPedidoAbertoId(null)
         return true
       } catch (error) {
-        showToast.error(error instanceof Error ? error.message : 'Não foi possível confirmar a entrega.')
+        avisoApp.error(error instanceof Error ? error.message : 'Não foi possível confirmar a entrega.')
         return false
       } finally {
         setConfirmandoId(null)

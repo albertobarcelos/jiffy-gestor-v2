@@ -18,6 +18,20 @@ export type LinhaPagamentoFinalizarApp = {
   valor: number
 }
 
+/** Na porta o motoboy registra o meio, mesmo que a loja use TEF no PDV. */
+export function filtrarMeiosPagamentoNaPortaApp(
+  items: Array<{ id?: string; nome?: string; ativo?: boolean }>
+): MeioPagamentoAppEntregador[] {
+  const meios: MeioPagamentoAppEntregador[] = []
+  for (const item of items) {
+    const id = String(item.id ?? '').trim()
+    const nome = String(item.nome ?? '').trim()
+    if (!id || !nome || item.ativo === false) continue
+    meios.push({ id, nome })
+  }
+  return meios
+}
+
 function arredondar(valor: number): number {
   return Math.round(valor * 100) / 100
 }
@@ -164,9 +178,12 @@ export function alternarMeioNasLinhasFinalizarApp(input: {
     const resto = input.linhas.filter(linha => linha.meioPagamentoId !== id)
     return encaixarLinhasNoAlvo(resto, input.valorAlvo)
   }
-  const soma = somaLinhasPagamentoFinalizarApp(input.linhas)
-  const resto = arredondar(input.valorAlvo - soma)
-  return [...input.linhas, { meioPagamentoId: id, valor: resto > 0 ? resto : 0 }]
+  const next = [...input.linhas, { meioPagamentoId: id, valor: 0 }]
+  const parte = arredondar(input.valorAlvo / next.length)
+  return encaixarLinhasNoAlvo(
+    next.map((linha, indice) => (indice === next.length - 1 ? linha : { ...linha, valor: parte })),
+    input.valorAlvo
+  )
 }
 
 export function atualizarValorLinhaFinalizarApp(input: {
