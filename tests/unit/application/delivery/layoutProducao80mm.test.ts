@@ -135,6 +135,28 @@ describe('layoutProducao80mm', () => {
     expect(identidadePrimariaEhTipoAvulso('MESA 12')).toBe(false)
   })
 
+  it('código do pedido some só na via unitária; single e conferência levam', () => {
+    const conferencia = montarModeloProducao80mm({
+      codigoVenda: '1842',
+      via: { kind: 'conference' },
+    })
+    expect(conferencia.codigoBarras).toBe('P1842')
+    expect(conferencia.conferencia).toBe(true)
+
+    const unitaria = montarModeloProducao80mm({
+      codigoVenda: '1842',
+      via: { kind: 'unit', unitIndex: 1, unitTotal: 6 },
+    })
+    expect(unitaria.codigoBarras).toBeNull()
+    expect(unitaria.conferencia).toBe(false)
+
+    const agrupada = montarModeloProducao80mm({
+      codigoVenda: '1842',
+      via: { kind: 'single' },
+    })
+    expect(agrupada.codigoBarras).toBe('P1842')
+  })
+
   it('pílula por unidade é o código, sem a palavra PEDIDO', () => {
     const modelo = montarModeloProducao80mm({
       tipoVenda: 'entrega',

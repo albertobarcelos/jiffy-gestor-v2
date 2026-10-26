@@ -8,7 +8,20 @@ export function printAgentBaseUrl(): string {
   return (fromEnv || DEFAULT_PRINT_AGENT_URL).replace(/\/+$/, '')
 }
 
-export function mensagemJiffyPrintIndisponivel(): string {
+function hostnameDeOrigin(origin: string | null | undefined): string {
+  const bruto = String(origin ?? '').trim()
+  if (!bruto) return ''
+  try {
+    return new URL(bruto.includes('://') ? bruto : `https://${bruto}`).hostname.toLowerCase()
+  } catch {
+    return ''
+  }
+}
+
+export function mensagemJiffyPrintIndisponivel(origin?: string | null): string {
+  if (hostnameDeOrigin(origin).endsWith('.vercel.app')) {
+    return 'O Jiffy Print não aceita o endereço de preview da Vercel. Abra o Gestor em http://localhost:5552 neste computador.'
+  }
   return 'O Jiffy Print não está aberto neste computador. Se ainda não instalou, baixe e instale. Se já tem, abra pelo atalho ou pelo ícone ao lado do relógio.'
 }
 

@@ -2,7 +2,12 @@
 
 import { useCallback, useMemo } from 'react'
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { requireGestorConfig } from '@/src/infrastructure/api/gestorConfigRequest'
+import {
+  listarEntregadoresDeliveryPagina,
+  listarMeiosPagamentoPagina,
+} from '@/src/infrastructure/api/deliveryConfigApi'
+import { listarImpressorasPagina } from '@/src/infrastructure/api/terminaisConfigApi'
 import {
   contarItensListaHub,
   type DeliveryHubPassosExtras,
@@ -12,31 +17,31 @@ export const HUB_ENTREGADORES_COUNT_QUERY_KEY = ['delivery', 'hub', 'entregadore
 export const HUB_MEIOS_COUNT_QUERY_KEY = ['delivery', 'hub', 'meios-count'] as const
 export const HUB_IMPRESSORAS_COUNT_QUERY_KEY = ['delivery', 'hub', 'impressoras-count'] as const
 
-async function buscarContagemLista(token: string, path: string): Promise<number> {
-  const res = await fetchGestorApi(path, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-  })
-  if (!res.ok) {
-    throw new Error(`Erro HTTP ${res.status}`)
-  }
-  const raw: unknown = await res.json().catch(() => ({}))
-  return contarItensListaHub(raw)
-}
-
 export function useDeliveryHubCadastrosRecomendados(enabled: boolean) {
   const entregadoresQuery = useSecureTenantQuery<number>(
     HUB_ENTREGADORES_COUNT_QUERY_KEY,
-    ({ token }) => buscarContagemLista(token, '/api/delivery/entregadores?limit=1&offset=0'),
+    async ({ token }) =>
+      contarItensListaHub(
+        requireGestorConfig(
+          await listarEntregadoresDeliveryPagina(token, { limit: 1, offset: 0 })
+        )
+      ),
     { enabled, staleTime: 1000 * 15, refetchOnWindowFocus: false, retry: 1 }
   )
   const meiosQuery = useSecureTenantQuery<number>(
     HUB_MEIOS_COUNT_QUERY_KEY,
-    ({ token }) => buscarContagemLista(token, '/api/meios-pagamentos?limit=1&offset=0'),
+    async ({ token }) =>
+      contarItensListaHub(
+        requireGestorConfig(await listarMeiosPagamentoPagina(token, { limit: 1, offset: 0 }))
+      ),
     { enabled, staleTime: 1000 * 15, refetchOnWindowFocus: false, retry: 1 }
   )
   const impressorasQuery = useSecureTenantQuery<number>(
     HUB_IMPRESSORAS_COUNT_QUERY_KEY,
-    ({ token }) => buscarContagemLista(token, '/api/impressoras?limit=1&offset=0'),
+    async ({ token }) =>
+      contarItensListaHub(
+        requireGestorConfig(await listarImpressorasPagina(token, { limit: 1, offset: 0 }))
+      ),
     { enabled, staleTime: 1000 * 15, refetchOnWindowFocus: false, retry: 1 }
   )
 

@@ -25,6 +25,13 @@ import {
   TOKEN_USER_AGENT_FREDY,
   TOKEN_USER_AGENT_JIFFY_FLOW,
 } from '@/src/presentation/gestor-pedidos/constantes'
+import {
+  EXPEDICAO_APP_PATH,
+  EXPEDICAO_APP_PATH_CURTO,
+  QUERY_EXPEDICAO,
+  QUERY_EXPEDICAO_APP,
+} from '@/src/application/expedicao/app/constantesSuperficie'
+import { isHostEntregadorApp } from '@/src/application/expedicao/app/detectarSuperficieExpedicao'
 import { isRotaPermitidaNoJiffyFlow } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 import {
   isCardapioPublicRedirectEnabled,
@@ -40,8 +47,27 @@ function urlListaEmpresasFlow(request: NextRequest): URL {
   return new URL(`${PEDIDOS_PATH}/empresas?${QUERY_GESTOR}`, request.url)
 }
 
+function veioDoAppEntregador(request: NextRequest): boolean {
+  const path = request.nextUrl.pathname
+  return (
+    path === EXPEDICAO_APP_PATH ||
+    path.startsWith(`${EXPEDICAO_APP_PATH}/`) ||
+    path === EXPEDICAO_APP_PATH_CURTO ||
+    path.startsWith(`${EXPEDICAO_APP_PATH_CURTO}/`) ||
+    isHostEntregadorApp(request.headers.get('host')) ||
+    request.nextUrl.searchParams.has(QUERY_EXPEDICAO_APP)
+  )
+}
+
 function urlLoginPreservandoGestor(request: NextRequest): URL {
   const dest = new URL('/login', request.url)
+  if (veioDoAppEntregador(request) || request.nextUrl.searchParams.has(QUERY_EXPEDICAO)) {
+    dest.searchParams.set(QUERY_EXPEDICAO, request.nextUrl.searchParams.get(QUERY_EXPEDICAO) ?? '')
+    if (veioDoAppEntregador(request)) {
+      dest.searchParams.set(QUERY_EXPEDICAO_APP, '')
+    }
+    return dest
+  }
   if (
     request.nextUrl.searchParams.has(QUERY_GESTOR) ||
     pedidoVeioDoAppJiffyFlow(request)
@@ -65,6 +91,21 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  if (isHostEntregadorApp(request.headers.get('host')) && pathname === '/') {
+    const tokenCurto =
+      request.cookies.get(AUTH_COOKIE_TENANT)?.value ||
+      request.cookies.get(AUTH_COOKIE_IDENTITY)?.value ||
+      request.cookies.get(AUTH_COOKIE_LEGACY)?.value
+    if (!tokenCurto) {
+      return NextResponse.redirect(urlLoginPreservandoGestor(request))
+    }
+    const dest = request.nextUrl.clone()
+    dest.pathname = EXPEDICAO_APP_PATH
+    dest.searchParams.set(QUERY_EXPEDICAO, '')
+    dest.searchParams.set(QUERY_EXPEDICAO_APP, '')
+    return NextResponse.rewrite(dest)
+  }
+
   /** O .exe não abre hub, dashboard nem o resto do Gestor web. */
   if (noAppFlow && !pathname.startsWith('/api/') && !isRotaPermitidaNoJiffyFlow(pathname)) {
     return NextResponse.redirect(urlListaEmpresasFlow(request))
@@ -81,6 +122,15 @@ export function middleware(request: NextRequest) {
     if (q) {
       const dest = new URL('/registro', request.url)
       dest.search = q.toString()
+      return NextResponse.redirect(dest)
+    }
+    if (
+      isHostEntregadorApp(request.headers.get('host')) &&
+      !request.nextUrl.searchParams.has(QUERY_EXPEDICAO_APP)
+    ) {
+      const dest = request.nextUrl.clone()
+      dest.searchParams.set(QUERY_EXPEDICAO, '')
+      dest.searchParams.set(QUERY_EXPEDICAO_APP, '')
       return NextResponse.redirect(dest)
     }
   }
@@ -117,7 +167,9 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/api/consulta-cep') ||
     pathname.startsWith('/api/geolocalizacao/') ||
     pathname.startsWith('/notas-fiscais') ||
-    pathname.startsWith('/api/public/notas-fiscais-consumidor')
+    pathname.startsWith('/api/public/notas-fiscais-consumidor') ||
+    pathname === '/sw-expedicao-app.js' ||
+    pathname === '/expedicao-app/manifest.webmanifest'
   ) {
     return NextResponse.next()
   }
@@ -218,6 +270,21 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  if (
+    (pathname === '/expedicao' ||
+      pathname.startsWith('/expedicao/') ||
+      pathname === EXPEDICAO_APP_PATH_CURTO ||
+      pathname.startsWith(`${EXPEDICAO_APP_PATH_CURTO}/`) ||
+      isHostEntregadorApp(request.headers.get('host'))) &&
+    (request.nextUrl.searchParams.has(QUERY_EXPEDICAO) ||
+      pathname === EXPEDICAO_APP_PATH ||
+      pathname.startsWith(`${EXPEDICAO_APP_PATH}/`) ||
+      pathname === EXPEDICAO_APP_PATH_CURTO ||
+      isHostEntregadorApp(request.headers.get('host')))
+  ) {
+    return NextResponse.next()
+  }
+
   const tenantTok = request.cookies.get(AUTH_COOKIE_TENANT)?.value
   const identityTok = request.cookies.get(AUTH_COOKIE_IDENTITY)?.value
   const legacyTok = request.cookies.get(AUTH_COOKIE_LEGACY)?.value
@@ -256,7 +323,7 @@ export const config = {
      * - images (image files)
      * - public files
      */
-    '/((?!_next/static|_next/image|favicon.ico|videos|images|ws(?:/|$)|jiffy-flow-bolha\\.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|videos|images|ws(?:/|$)|jiffy-flow-bolha\\.html|sw-expedicao-app\\.js|expedicao-app/manifest\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
 

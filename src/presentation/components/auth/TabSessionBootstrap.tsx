@@ -34,6 +34,7 @@ import { isSinalKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kio
 import { lerUltimaEmpresaKiosk } from '@/src/presentation/gestor-pedidos/kiosk/ultimaEmpresaKiosk'
 import { extractTokenInfo } from '@/src/shared/utils/validateToken'
 import { decideTabSessionBootstrap } from '@/src/presentation/utils/decideTabSessionBootstrap'
+import { isSuperficieExpedicaoApp } from '@/src/application/expedicao/app/detectarSuperficieExpedicao'
 
 type RebindPending = { empresaId: string; empParam: string }
 
@@ -212,6 +213,16 @@ export function TabSessionBootstrap() {
     })
 
     if (decision.type === 'wait') {
+      const appEntregador = isSuperficieExpedicaoApp({
+        pathname: pathNow,
+        search: window.location.search,
+        host: window.location.host,
+      })
+      if (appEntregador) {
+        didRunRef.current = true
+        setTabVerified(true)
+        return
+      }
       const identity = useAuthStore.getState().identityAuth
       if (!identity || identity.isExpired()) {
         didRunRef.current = true

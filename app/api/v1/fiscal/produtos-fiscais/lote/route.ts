@@ -6,7 +6,7 @@ import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
  * PATCH /api/v1/fiscal/produtos-fiscais/lote
  * Atualiza informações fiscais de múltiplos produtos em uma única chamada.
  * Frontend → Next BFF → jiffy-backend → FiscalGateway → FiscalService
- * (o gateway sincroniza o NCM denormalizado na tabela de produtos do cardápio).
+ * (atualiza apenas produtos_fiscais no microserviço fiscal; produto.ncm legado não é sincronizado).
  *
  * Body: { produtoIds: string[], alteracoes: { ncm?, cest?, origemMercadoria?, tipoProduto?, indicadorProducaoEscala? } }
  */

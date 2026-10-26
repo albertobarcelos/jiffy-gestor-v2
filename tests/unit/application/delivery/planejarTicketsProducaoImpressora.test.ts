@@ -185,6 +185,39 @@ describe('planejarTicketsProducaoImpressora', () => {
       expect(tickets[2].items[0].quantidade).toBe(2)
     })
 
+    it('reparte o adicional na mesma proporção da unidade', () => {
+      const items = [
+        item({
+          lancadoId: '1',
+          produtoId: 'xb',
+          nome: 'X Bacon',
+          quantidade: 6,
+          complementos: [
+            {
+              complementoId: 'h',
+              nome: 'Hamburguer',
+              quantidade: 6,
+              tipoImpactoPreco: 'aumenta',
+              impressao: { quantidade: 6 },
+            },
+          ],
+        }),
+      ]
+
+      const tickets = planejarTicketsProducaoImpressora(items, 'porUnidade')
+      const units = tickets.filter(t => t.kind === 'unit')
+      const conference = tickets.find(t => t.kind === 'conference')
+
+      expect(units).toHaveLength(6)
+      for (const via of units) {
+        expect(via.items[0].quantidade).toBe(1)
+        expect(via.items[0].complementos?.[0]?.quantidade).toBe(1)
+        expect(via.items[0].complementos?.[0]?.impressao?.quantidade).toBe(1)
+      }
+      expect(conference?.items[0].quantidade).toBe(6)
+      expect(conference?.items[0].complementos?.[0]?.quantidade).toBe(6)
+    })
+
     it('não gera conferência quando há somente uma via', () => {
       const items = [
         item({ lancadoId: '1', produtoId: 'p', nome: 'Pastel Carne', quantidade: 1 }),

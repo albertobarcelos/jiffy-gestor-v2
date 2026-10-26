@@ -1,0 +1,25 @@
+{
+  "name": "JiffyGO",
+  "short_name": "JiffyGO",
+  "description": "Pedidos, rota e comissão do entregador Jiffy.",
+  "start_url": "/e",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#5b21b6",
+  "theme_color": "#5b21b6",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/images/expedicao/logo_app.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/expedicao/logo_app.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

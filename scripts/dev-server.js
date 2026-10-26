@@ -30,10 +30,41 @@ if (portArgIndex !== -1 && args[portArgIndex + 1]) {
   port = parseInt(args[portArgIndex + 1], 10)
 }
 
-console.log(`🚀 Iniciando servidor Next.js na porta ${port}...`)
+function ipv4Lan() {
+  try {
+    const os = require('os')
+    const nets = os.networkInterfaces()
+    const candidatos = []
+    for (const entries of Object.values(nets)) {
+      for (const net of entries || []) {
+        if (net.family !== 'IPv4' && net.family !== 4) continue
+        if (net.internal) continue
+        candidatos.push(net.address)
+      }
+    }
+    // Preferir Wi‑Fi/Ethernet doméstico; Hyper-V/WSL costumam ser 172.x
+    return (
+      candidatos.find(ip => ip.startsWith('192.168.')) ||
+      candidatos.find(ip => ip.startsWith('10.')) ||
+      candidatos.find(ip => /^172\.(1[6-9]|2\d|3[0-1])\./.test(ip)) ||
+      candidatos[0] ||
+      null
+    )
+  } catch {
+    return null
+  }
+}
 
-// Executa o Next.js com a porta
-const nextProcess = spawn('npx', ['next', 'dev', '-p', port.toString()], {
+const lan = ipv4Lan()
+console.log(`🚀 Iniciando servidor Next.js na porta ${port}...`)
+console.log(`   PC:     http://localhost:${port}`)
+if (lan) {
+  console.log(`   Celular (mesma Wi‑Fi): http://${lan}:${port}/expedicao/app?expedicao&app`)
+  console.log(`   Se não abrir no celular: Firewall do Windows → permitir porta TCP ${port} (rede privada).`)
+}
+
+// Executa o Next.js na porta e em todas as interfaces (LAN)
+const nextProcess = spawn('npx', ['next', 'dev', '-H', '0.0.0.0', '-p', port.toString()], {
   stdio: 'inherit',
   shell: true,
   env: { ...process.env },

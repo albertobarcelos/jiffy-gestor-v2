@@ -13,7 +13,8 @@ import { useRouter } from 'next/navigation'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { FormControl, InputLabel, MenuItem, Select } from '@mui/material'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { criarTaxa, getTaxa, patchTaxa } from '@/src/infrastructure/api/taxasConfigApi'
+import { listarTerminaisPagina } from '@/src/infrastructure/api/terminaisConfigApi'
 import { Input } from '@/src/presentation/components/ui/input'
 import { UppercaseLocaleInput } from '@/src/presentation/components/ui/UppercaseLocaleInput'
 import { Button } from '@/src/presentation/components/ui/button'
@@ -21,7 +22,7 @@ import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitc
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
 import { cn } from '@/src/shared/utils/cn'
-import { MdPhone, MdSearch } from 'react-icons/md'
+import { MdPointOfSale, MdSearch } from 'react-icons/md'
 
 /** Labels outlined em preto — igual NovoComplemento / NovaImpressora */
 const sxOutlinedLabelTextoEscuro = {
@@ -105,7 +106,7 @@ interface NovaTaxaProps {
   onCancel?: () => void
 }
 
-type TipoTaxaForm = 'percentual' | 'fixo' | 'entrega'
+type TipoTaxaForm = 'percentual' | 'fixo'
 
 type ConfigTerminal = {
   ativo: boolean
@@ -131,11 +132,10 @@ function parsePercentualDigitadoParaApi(texto: string): number {
   return n / 100
 }
 
-/** Normaliza tipo retornado pela API (ex.: valor_fixo). */
+/** Normaliza tipo retornado pela API (ex.: valor_fixo). Taxas de entrega ficam fora deste fluxo. */
 function normalizeTipoTaxaApi(raw: unknown): TipoTaxaForm {
   const t = String(raw ?? '').toLowerCase()
   if (t === 'fixo' || t === 'valor_fixo') return 'fixo'
-  if (t === 'entrega') return 'entrega'
   return 'percentual'
 }
 
@@ -270,31 +270,25 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
 
     while (hasMore && iterations < maxIterations) {
       iterations++
-      const params = new URLSearchParams({
-        limit: String(PAGE_SIZE_TERMINAIS),
-        offset: String(offset),
-      })
-      if (q) {
-        params.set('q', q)
-      }
-
-      const response = await fetchGestorApi(`/api/terminais?${params.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${bearerToken}`,
-          'Content-Type': 'application/json',
-        },
+      const response = await listarTerminaisPagina(bearerToken, {
+        limit: PAGE_SIZE_TERMINAIS,
+        offset,
+        q: q || undefined,
       })
 
       if (!response.ok) break
-
-      const data = await response.json()
+      const data = response.data
       const items = data.items || []
       for (const terminal of items) {
-        const id = String(terminal.id || terminal._id || '')
+        const id = String(terminal.id ?? terminal._id ?? '')
         if (!id) continue
+        const nome =
+          [terminal.nome, terminal.name, terminal.codigoInterno].find(
+            (valor): valor is string => typeof valor === 'string' && valor.trim().length > 0
+          ) ?? 'Terminal sem nome'
         acumulado.push({
           terminalId: id,
-          nome: terminal.nome || terminal.name || terminal.codigoInterno || 'Terminal sem nome',
+          nome,
         })
       }
 
@@ -364,24 +358,14 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
       try {
         const [lista, taxaRes] = await Promise.all([
           fetchListaTerminais(t),
-          fetchGestorApi(`/api/taxas/${encodeURIComponent(editId)}`, {
-            headers: {
-              Authorization: `Bearer ${t}`,
-              'Content-Type': 'application/json',
-            },
-          }),
+          getTaxa(t, editId),
         ])
 
         if (!taxaRes.ok) {
-          const err = await taxaRes.json().catch(() => ({}))
-          const msg =
-            (typeof err.error === 'string' && err.error) ||
-            (typeof err.message === 'string' && err.message) ||
-            'Taxa não encontrada'
-          throw new Error(msg)
+          throw new Error(taxaRes.error)
         }
 
-        const detalhe = (await taxaRes.json()) as Record<string, unknown>
+        const detalhe = taxaRes.data
 
         setTerminaisLista(lista)
 
@@ -566,13 +550,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
     setEnviando(true)
     try {
       if (taxaEditId) {
-        const response = await fetchGestorApi(`/api/taxas/${encodeURIComponent(taxaEditId)}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
+        const response = await patchTaxa(token, taxaEditId, {
             nome: nomeTrim,
             valor: valorApi,
             tipo,
@@ -581,33 +559,17 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
             ncm: ncmNorm ? ncmNorm : null,
             dataAtualizacao,
             terminaisConfig: terminaisConfig.length > 0 ? terminaisConfig : undefined,
-          }),
-        })
+          })
         if (!response.ok) {
-          const err = await response.json().catch(() => ({}))
-          const msg =
-            (typeof err.error === 'string' && err.error) ||
-            (typeof err.message === 'string' && err.message) ||
-            'Erro ao atualizar taxa'
-          showToast.error(msg)
+          showToast.error(response.error)
           return
         }
-        const atualizado = (await response.json().catch(() => null)) as Record<
-          string,
-          unknown
-        > | null
-        if (atualizado && typeof atualizado.dataAtualizacao === 'string') {
-          dataAtualizacaoServidorRef.current = atualizado.dataAtualizacao
+        if (typeof response.data.dataAtualizacao === 'string') {
+          dataAtualizacaoServidorRef.current = response.data.dataAtualizacao
         }
         showToast.success('Taxa atualizada com sucesso!')
       } else {
-        const response = await fetchGestorApi('/api/taxas', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
+        const response = await criarTaxa(token, {
             nome: nomeTrim,
             valor: valorApi,
             tipo,
@@ -615,14 +577,9 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
             tributado,
             ncm: ncmNorm ? ncmNorm : null,
             terminaisConfig: terminaisConfig.length > 0 ? terminaisConfig : undefined,
-          }),
-        })
+          })
         if (!response.ok) {
-          const err = await response.json().catch(() => ({}))
-          const msg =
-            (typeof err.error === 'string' && err.error) ||
-            (typeof err.message === 'string' && err.message) ||
-            'Erro ao criar taxa'
+          const msg = response.error || 'Erro ao criar taxa'
           showToast.error(msg)
           return
         }
@@ -708,7 +665,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
       />
     ) : (
       <Input
-        label={tipo === 'entrega' ? 'Valor da entrega (R$)' : 'Valor (R$)'}
+        label="Valor (R$)"
         value={valorMoeda}
         onChange={e => setValorMoeda(formatValorInput(e.target.value))}
         size="small"
@@ -817,7 +774,6 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
                   >
                     <MenuItem value="percentual">PERCENTUAL</MenuItem>
                     <MenuItem value="fixo">FIXO (R$)</MenuItem>
-                    <MenuItem value="entrega">ENTREGA</MenuItem>
                   </Select>
                 </FormControl>
 
@@ -1008,7 +964,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
               hasLoadedTerminaisRef.current &&
               terminaisLista.length === 0 ? (
                 <div className="flex flex-col items-center justify-center gap-4 py-12">
-                  <MdPhone className="text-secondary-text" size={48} />
+                  <MdPointOfSale className="text-secondary-text" size={48} />
                   <p className="text-lg font-semibold text-primary-text">Nenhum terminal cadastrado</p>
                   <p className="max-w-xs text-center text-sm text-secondary-text">
                     Cadastre terminais em Configurações para vincular esta taxa aos PDVs.

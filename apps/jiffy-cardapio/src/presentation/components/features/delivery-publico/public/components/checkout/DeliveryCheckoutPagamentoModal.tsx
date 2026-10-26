@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { MdDelete } from 'react-icons/md'
 import type { MeioPagamentoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import { filtrarMeiosPagamentoPorTipoEntrega } from '@/src/domain/policies/FiltrarMeiosPagamentoPorTipoEntrega'
 import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPreferenciaEntregaStore'
 import type { CheckoutPagamentoItem } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
 import {
@@ -95,9 +96,14 @@ export function DeliveryCheckoutPagamentoModal({
     return map
   }, [meiosPagamento])
 
+  const meiosDisponiveis = useMemo(
+    () => filtrarMeiosPagamentoPorTipoEntrega(meiosPagamento, tipoEntrega),
+    [meiosPagamento, tipoEntrega]
+  )
+
   const meiosOrdenados = useMemo(
-    () => ordenarMeioDinheiroPrimeiro(meiosPagamento),
-    [meiosPagamento]
+    () => ordenarMeioDinheiroPrimeiro(meiosDisponiveis),
+    [meiosDisponiveis]
   )
 
   const isEntrega = tipoEntrega === 'entrega'
@@ -138,12 +144,18 @@ export function DeliveryCheckoutPagamentoModal({
     [total, pagamentos, meiosById]
   )
 
-  const limparSelecao = () => {
+  const limparSelecao = useCallback(() => {
     setMeioSelecionadoId(null)
     setValorInput('')
     setPrecisaTroco(null)
     setCedulaInput('')
-  }
+  }, [])
+
+  useEffect(() => {
+    if (meioSelecionadoId && !meiosDisponiveis.some(meio => meio.id === meioSelecionadoId)) {
+      limparSelecao()
+    }
+  }, [meioSelecionadoId, meiosDisponiveis, limparSelecao])
 
   const handleSelecionarMeio = (meioPagamentoId: string) => {
     if (hasMovedRef.current || isDragging) return
@@ -297,7 +309,7 @@ export function DeliveryCheckoutPagamentoModal({
     cotacaoLoading || !cotacaoPronta || pagamentoInconsistente
 
   /** Duas linhas só com mais de 4 meios; com 4 ou menos, uma linha. */
-  const quantidadeMeios = meiosPagamento.length
+  const quantidadeMeios = meiosDisponiveis.length
   const usarDuasLinhasMeios = quantidadeMeios > 4
   /** Preenche por linha (4 por linha). Com >8, amplia colunas e usa scroll. */
   const colunasMeios = usarDuasLinhasMeios
@@ -375,7 +387,7 @@ export function DeliveryCheckoutPagamentoModal({
           </p>
           {loadingMeios ? (
             <p className="text-sm delivery-text-secondary">Carregando meios de pagamento...</p>
-          ) : meiosPagamento.length === 0 ? (
+          ) : meiosDisponiveis.length === 0 ? (
             <p className="text-sm delivery-text-secondary">
               Nenhuma forma de pagamento disponível no momento.
             </p>

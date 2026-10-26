@@ -8,6 +8,8 @@ import {
 } from '@/src/application/delivery/deliveryProdutoSemImpressoraAvisos'
 import { warningRedundanteMapeamentoImpressoraWindows } from '@/src/application/delivery/deliveryTicketWarningUtils'
 import { ticketPrintKey } from '@/src/application/delivery/ticketPrintKey'
+import type { DesenharCodigoBarrasPedido } from '@/src/application/ports/IDesenharCodigoBarrasPedido'
+import type { DesenharSimboloPedidoLinha } from '@/src/application/ports/IDesenharSimboloPedidoLinha'
 import type {
   DesenharMolduraIdentidade,
   DesenharPilulaProducao,
@@ -78,6 +80,8 @@ export type ImprimirTicketsApiGestorDeps = {
   desenharPilula: DesenharPilulaProducao
   desenharMolduraIdentidade?: DesenharMolduraIdentidade
   desenharSeparador?: () => string | null
+  desenharCodigoBarras?: DesenharCodigoBarrasPedido
+  desenharSimboloPedidoLinha?: DesenharSimboloPedidoLinha
   mapTicketToGraphicPrintDocument: MapTicketToGraphicPrintDocument
   enviarCupom: EnviarCupomPrintJob
   gerarJobId: GerarPrintJobId
@@ -188,9 +192,12 @@ export function criarImprimirTicketsApiGestor(
             versao: versaoJiffyPrint,
             nomeEmpresa,
             mostrarLogoTexto: cupomTemplate?.mostrarLogoTexto,
+            simboloPedido: cupomTemplate?.simboloPedido,
             desenharPilula: deps.desenharPilula,
             desenharMolduraIdentidade: deps.desenharMolduraIdentidade,
             desenharSeparador: deps.desenharSeparador,
+            desenharCodigoBarras: deps.desenharCodigoBarras,
+            desenharSimboloPedidoLinha: deps.desenharSimboloPedidoLinha,
           })
         } else if (cupomTemplate?.modoPapel === 'grafico') {
           document = await deps.mapTicketToGraphicPrintDocument(response, ticket, {

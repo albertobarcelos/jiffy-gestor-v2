@@ -1,4 +1,7 @@
-import { parseImagemUrlProdutoIndex } from '@/src/shared/utils/catalogoProdutoIndex'
+import {
+  parseImageIdProdutoIndex,
+  parseImagemUrlProdutoIndex,
+} from '@/src/shared/utils/catalogoProdutoIndex'
 
 /**
  * Entidade de domínio representando um Grupo de Complementos
@@ -13,7 +16,8 @@ export class GrupoComplemento {
     private readonly ordem?: number,
     private readonly complementosIds?: string[],
     private readonly complementos?: any[],
-    private readonly imagemUrl?: string | null
+    private readonly imagemUrl?: string | null,
+    private readonly imageId?: string | null
   ) {}
 
   static create(
@@ -25,7 +29,8 @@ export class GrupoComplemento {
     ordem?: number,
     complementosIds?: string[],
     complementos?: any[],
-    imagemUrl?: string | null
+    imagemUrl?: string | null,
+    imageId?: string | null
   ): GrupoComplemento {
     if (!id || !nome) {
       throw new Error('ID e nome são obrigatórios')
@@ -48,7 +53,8 @@ export class GrupoComplemento {
       ordem,
       complementosIds,
       complementos,
-      imagemUrl
+      imagemUrl,
+      imageId
     )
   }
 
@@ -86,6 +92,11 @@ export class GrupoComplemento {
         : undefined,
       data.complementos,
       parseImagemUrlProdutoIndex(
+        data && typeof data === 'object' && !Array.isArray(data)
+          ? (data as Record<string, unknown>)
+          : {}
+      ),
+      parseImageIdProdutoIndex(
         data && typeof data === 'object' && !Array.isArray(data)
           ? (data as Record<string, unknown>)
           : {}
@@ -129,11 +140,21 @@ export class GrupoComplemento {
     return this.imagemUrl
   }
 
+  getImageId(): string | null {
+    const id = this.imageId?.trim()
+    return id || null
+  }
+
   /** Cópia imutável com a URL persistida da foto — mesma identidade de negócio. */
-  withImagemUrl(imagemUrl: string | null): GrupoComplemento {
+  withImagemUrl(imagemUrl: string | null, imageId?: string | null): GrupoComplemento {
     const next = imagemUrl?.trim() || null
+    const nextImageId = next
+      ? imageId === undefined
+        ? this.getImageId()
+        : imageId?.trim() || null
+      : null
     const current = this.imagemUrl?.trim() || null
-    if (next === current) return this
+    if (next === current && nextImageId === this.getImageId()) return this
     return new GrupoComplemento(
       this.id,
       this.nome,
@@ -143,7 +164,8 @@ export class GrupoComplemento {
       this.ordem,
       this.complementosIds,
       this.complementos,
-      next
+      next,
+      nextImageId
     )
   }
 
@@ -158,6 +180,7 @@ export class GrupoComplemento {
       complementosIds: this.complementosIds,
       complementos: this.complementos,
       imagemUrl: this.imagemUrl ?? null,
+      imageId: this.getImageId(),
     }
   }
 }

@@ -10,6 +10,8 @@ import {
   desenharMolduraIdentidadePng,
   desenharPilulaProducaoPng,
 } from '@/src/infrastructure/printing/pilulaProducaoPng'
+import { desenharCodigoBarras128Png } from '@/src/infrastructure/printing/codigoBarras128Png'
+import { desenharSimboloPedidoLinhaPng } from '@/src/infrastructure/printing/simboloPedidoLinhaPng'
 import { desenharSeparadorTracejadoPng } from '@/src/shared/printing/receiptBitmaps'
 import { showToast } from '@/src/shared/utils/toast'
 import { DeliveryConfigCollapsibleSection } from './DeliveryConfigCollapsibleSection'
@@ -26,6 +28,10 @@ import {
   DeliveryModoPapelInfoTooltip,
   DeliveryModoPapelToggle,
 } from './DeliveryModoPapelToggle'
+import {
+  DeliverySimboloPedidoInfoTooltip,
+  DeliverySimboloPedidoToggle,
+} from './DeliverySimboloPedidoToggle'
 import type {
   VendaGestorTicket,
   VendaGestorTicketsResponse,
@@ -460,9 +466,12 @@ export function DeliveryCupomTemplateEditor({
       const document =
         modeloSelecionado === 'producao'
           ? mapTicketToProducaoHibridoDocument(sample.root, sample.ticket, {
+              simboloPedido: value.simboloPedido,
               desenharPilula: desenharPilulaProducaoPng,
               desenharMolduraIdentidade: desenharMolduraIdentidadePng,
               desenharSeparador: desenharSeparadorTracejadoPng,
+              desenharCodigoBarras: desenharCodigoBarras128Png,
+              desenharSimboloPedidoLinha: desenharSimboloPedidoLinhaPng,
             })
           : value.modoPapel === 'grafico'
             ? await mapTicketToGraphicPrintDocument(sample.root, sample.ticket, {
@@ -511,6 +520,17 @@ export function DeliveryCupomTemplateEditor({
               value={value.modoPapel ?? 'grafico'}
               disabled={disabled}
               onChange={next => onChange(update(value, 'modoPapel', next))}
+            />
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-semibold text-primary-text">Código do pedido no papel</label>
+              <DeliverySimboloPedidoInfoTooltip />
+            </div>
+            <DeliverySimboloPedidoToggle
+              value={value.simboloPedido ?? 'nenhum'}
+              disabled={disabled}
+              onChange={next => onChange(update(value, 'simboloPedido', next))}
             />
           </div>
           <div className="space-y-1">

@@ -178,9 +178,11 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
           onAviso: m => showToast.warning(m),
           omitirAvisoSemVinculoPc: opcoes?.omitirAvisoSemVinculoPc,
         })
-        if (acao === 'iniciar_preparo') {
-          marcarImpressaoDeliveryRecente(venda.id)
-        }
+        marcarImpressaoDeliveryRecente(
+          venda.id,
+          Date.now(),
+          acao === 'marcar_pronto' ? 'expedicao' : 'comando'
+        )
         logImpressao('hook.imprimir_tickets_concluido', { vendaId: venda.id })
       }
     },
@@ -209,6 +211,29 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
         prefs: preferenciasImpressaoDelivery,
         empresa,
         cupomTemplate: deliveryCupomTemplate,
+        onMensagem: m => showToast.info(m),
+        onErro: m => showToast.error(m),
+        onAviso: m => showToast.warning(m),
+        imprimirTickets: imprimirTicketsApiGestor,
+        carregarPayload: carregarPayloadTicketsImpressaoDelivery,
+      })
+    },
+    [deliveryCupomTemplate, empresa, preferenciasImpressaoDelivery]
+  )
+
+  const imprimirCupomExpedicaoPorPronto = useCallback(
+    async (vendaId: string, estacaoImpressaoId?: string | null) => {
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      return imprimirPorComandoRealtimeApp({
+        vendaId,
+        accessToken: token,
+        prefs: preferenciasImpressaoDelivery,
+        empresa,
+        cupomTemplate: deliveryCupomTemplate,
+        tipoCupom: tipoCupomParaReimpressao(preferenciasImpressaoDelivery.modo, 'EM_ROTA'),
+        tipoDedupe: 'expedicao',
+        jobNamePrefix: 'Expedição',
+        estacaoImpressaoId,
         onMensagem: m => showToast.info(m),
         onErro: m => showToast.error(m),
         onAviso: m => showToast.warning(m),
@@ -321,6 +346,7 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
     processarAposTransicoes,
     processarAposTransicaoVendaGestorId,
     imprimirPorComandoRealtime,
+    imprimirCupomExpedicaoPorPronto,
     reimprimirCupomEntrega,
   }
 }

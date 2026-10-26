@@ -17,21 +17,30 @@ import { UppercaseLocaleInput } from '@/src/presentation/components/ui/Uppercase
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { useMenuMutations } from '@/src/presentation/hooks/menus/useMenuMutations'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { mensagemLegivelDeliveryMediaError } from '@/src/infrastructure/api/deliveryMediaApi'
+import { removerImagemUseCase } from '@/src/presentation/hooks/media/criarImagemMediaUseCases'
+import { previewImagemEhLocal } from '@/src/presentation/utils/previewImagemLocal'
 import { usePropagarAlteracaoProduto } from '@/src/presentation/hooks/produtos/usePropagarAlteracaoProduto'
 import { showToast } from '@/src/shared/utils/toast'
 import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
+import type { SnapshotProdutoPropagavel } from '@/src/shared/types/propagarAlteracaoProduto'
 import { MENU_PRODUTO_FORM_ID } from './menuPanelConstants'
 import {
   MenuCategoriaNesteCardapioCampos,
   type MenuCategoriaNesteCardapioHandle,
 } from './MenuCategoriaNesteCardapioCampos'
 import { MenuProdutoPromocaoControl } from './MenuProdutoPromocaoControl'
+import { deveTravarPrecoNormal } from '@/src/domain/policies/menu/atualizarPrecoNormalSnapshot'
 import {
   VALOR_PROMOCIONAL_MINIMO,
   descontoPercentualFromPrecos,
   isValorPromocionalValido,
   produtoTemPromocaoPreenchida,
+  promocaoSnapshotVigente,
   valorPromocionalFromDesconto,
+  type SnapshotPrecoMenu,
 } from '@/src/domain/policies/menu/precoVigenteSnapshot'
 import { ProdutoFormWithPreviewLayout } from '@/src/presentation/components/features/produtos/preview/ProdutoFormWithPreviewLayout'
 import { parsePrecoPreviewFromInput } from '@/src/presentation/components/features/produtos/preview/produtoPreviewModel'
@@ -74,15 +83,41 @@ function parseCurrency(value: string): number {
   return parseFloat(digits) / 100
 }
 
+function snapshotPrecoDoForm(
+  valor: string,
+  valorPromocional: string,
+  promocaoAtiva: boolean,
+  modoPromocao: boolean
+): SnapshotPrecoMenu {
+  return {
+    valor: parseCurrency(valor),
+    valorPromocional: parseCurrency(valorPromocional),
+    promocaoAtiva: modoPromocao && promocaoAtiva,
+  }
+}
+
 function formatDescontoPct(value: number | null): string {
   if (value == null || !Number.isFinite(value)) return ''
-  return String(value).replace('.', ',')
+  // Inteiro sem casas; senão 1 casa (passo 0,1%).
+  if (Number.isInteger(value)) return String(value)
+  return value.toFixed(1).replace('.', ',')
 }
 
 function parseDescontoPct(value: string): number {
   const normalized = value.replace('%', '').trim().replace(',', '.')
   if (!normalized) return NaN
   return Number(normalized)
+}
+
+/** Aceita só dígitos e no máximo 1 casa decimal (vírgula ou ponto). */
+function sanitizeDescontoPctInput(raw: string): string {
+  const cleaned = raw.replace(/[^\d.,]/g, '').replace(',', '.')
+  const match = cleaned.match(/^(\d{0,3})(?:\.(\d{0,1}))?/)
+  if (!match) return ''
+  const inteiro = match[1] ?? ''
+  if (match[2] !== undefined) return `${inteiro},${match[2]}`
+  if (cleaned.includes('.')) return `${inteiro},`
+  return inteiro
 }
 
 /** Props do input nativo: seleciona o conteúdo ao focar/clicar. */
@@ -123,9 +158,12 @@ export const MenuProdutoSnapshotForm = forwardRef<
   ref
 ) {
   const { updateProduto, uploadImagemProduto } = useMenuMutations(menuId)
+  const invalidate = useInvalidateTenantQueries()
+  const { auth } = useAuthStore()
   const categoriaRef = useRef<MenuCategoriaNesteCardapioHandle>(null)
   const [categoriaDirty, setCategoriaDirty] = useState(false)
   const [imagemPreviewOverride, setImagemPreviewOverride] = useState<string | null>(null)
+  const [imageIdOculto, setImageIdOculto] = useState<string | null>(null)
   const { pedirConfirmacao, aplicarNosDestinos, aplicarImagemNosDestinos, dialog: dialogPropagacao } =
     usePropagarAlteracaoProduto()
   const [nome, setNome] = useState(produto.nome)
@@ -141,6 +179,11 @@ export const MenuProdutoSnapshotForm = forwardRef<
   )
   const [ativo, setAtivo] = useState(produto.ativo)
   const [favorito, setFavorito] = useState(produto.favorito)
+  const snapshotPreco = useMemo(
+    () => snapshotPrecoDoForm(valor, valorPromocional, promocaoAtiva, modoPromocao),
+    [valor, valorPromocional, promocaoAtiva, modoPromocao]
+  )
+  const precoNormalTravado = deveTravarPrecoNormal(snapshotPreco)
 
   const syncFromProduto = useCallback((next: MenuProduto) => {
     setNome(next.nome)
@@ -231,15 +274,45 @@ export const MenuProdutoSnapshotForm = forwardRef<
     [uploadImagemProduto, produto.produtoId, menuId, pedirConfirmacao, aplicarImagemNosDestinos]
   )
 
+  const handleRemoverImagem = useCallback(async () => {
+    if (previewImagemEhLocal(imagemPreviewOverride)) {
+      setImagemPreviewOverride(prev => {
+        if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+        return null
+      })
+      return
+    }
+    const idImagem = produto.image?.imageId?.trim()
+    if (!idImagem) {
+      showToast.error('Não foi possível identificar a imagem para remover.')
+      return
+    }
+    const token = auth?.getAccessToken()
+    if (!token) {
+      showToast.error('Token não encontrado')
+      return
+    }
+    const toastId = showToast.loading('Removendo imagem...')
+    try {
+      await removerImagemUseCase().execute({ imageId: idImagem, token })
+      setImageIdOculto(idImagem)
+      setImagemPreviewOverride(null)
+      await invalidate(['menu-produtos', menuId])
+      showToast.successLoading(toastId, 'Imagem removida deste cardápio.')
+    } catch (error) {
+      showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+    }
+  }, [auth, imagemPreviewOverride, invalidate, menuId, produto.image?.imageId])
+
   const handleValorNormalChange = (raw: string) => {
+    if (precoNormalTravado) return
     const next = formatCurrency(raw)
     setValor(next)
     if (!modoPromocao) return
-    const normal = parseCurrency(next)
-    const promo = parseCurrency(valorPromocional)
-    if (Number.isFinite(normal) && normal > 0 && Number.isFinite(promo) && promo >= 0) {
-      setDescontoPct(formatDescontoPct(descontoPercentualFromPrecos(normal, promo)))
-    }
+    const pct = parseDescontoPct(descontoPct)
+    const promo = valorPromocionalFromDesconto(parseCurrency(next), pct)
+    if (promo == null) return
+    setValorPromocional(formatCurrencyFromNumber(promo))
   }
 
   const handleValorPromocionalChange = (raw: string) => {
@@ -253,7 +326,7 @@ export const MenuProdutoSnapshotForm = forwardRef<
   }
 
   const handleDescontoPctChange = (raw: string) => {
-    const cleaned = raw.replace(/[^\d.,]/g, '')
+    const cleaned = sanitizeDescontoPctInput(raw)
     setDescontoPct(cleaned)
     const normal = parseCurrency(valor)
     const pct = parseDescontoPct(cleaned)
@@ -314,15 +387,13 @@ export const MenuProdutoSnapshotForm = forwardRef<
       showToast.error('Informe um preço válido')
       return false
     }
-    if (modoPromocao) {
+    if (modoPromocao && !isValorPromocionalValido(promoNum, valorNum)) {
       if (!Number.isFinite(promoNum) || promoNum <= VALOR_PROMOCIONAL_MINIMO) {
         showToast.error('Informe um preço promocional maior que R$ 1,00')
         return false
       }
-      if (promoNum >= valorNum) {
-        showToast.error('O preço promocional precisa ser menor que o preço normal')
-        return false
-      }
+      showToast.error('O preço promocional precisa ser menor que o preço normal')
+      return false
     }
 
     const destinos = await pedirConfirmacao({
@@ -340,7 +411,7 @@ export const MenuProdutoSnapshotForm = forwardRef<
       Boolean(grupoProdutoIdSelecionado) &&
       grupoProdutoIdSelecionado !== grupo?.grupoBase.id
 
-    const snapshot = {
+    const snapshot: SnapshotProdutoPropagavel = {
       nome: nomeTrim,
       descricao: descricao.trim() || null,
       valor: valorNum,
@@ -348,6 +419,9 @@ export const MenuProdutoSnapshotForm = forwardRef<
       promocaoAtiva: promoAtivaEfetiva,
       ativo,
       favorito,
+      ...(grupoMudou && grupoProdutoIdSelecionado
+        ? { grupoProdutoId: grupoProdutoIdSelecionado }
+        : {}),
     }
 
     onSavingChange?.(true)
@@ -400,12 +474,7 @@ export const MenuProdutoSnapshotForm = forwardRef<
   const precoNormalPreview = parsePrecoPreviewFromInput(valor)
   const precoPromoPreview = parsePrecoPreviewFromInput(valorPromocional)
   const previewProduto = useMemo(() => {
-    const promoVigente =
-      modoPromocao &&
-      promocaoAtiva &&
-      precoPromoPreview != null &&
-      precoNormalPreview != null &&
-      isValorPromocionalValido(precoPromoPreview, precoNormalPreview)
+    const promoVigente = promocaoSnapshotVigente(snapshotPreco)
     const descontoNum = parseDescontoPct(descontoPct)
 
     return {
@@ -416,17 +485,21 @@ export const MenuProdutoSnapshotForm = forwardRef<
       descontoPercentual:
         promoVigente && Number.isFinite(descontoNum) && descontoNum > 0 ? descontoNum : null,
       descricao,
-      imagemUrl: imagemPreviewOverride ?? produto.image?.imageUrl ?? null,
+      imagemUrl:
+        imageIdOculto && produto.image?.imageId === imageIdOculto
+          ? null
+          : imagemPreviewOverride ?? produto.image?.imageUrl ?? null,
     }
   }, [
     nome,
     precoNormalPreview,
     precoPromoPreview,
-    modoPromocao,
-    promocaoAtiva,
+    snapshotPreco,
     descontoPct,
     descricao,
     imagemPreviewOverride,
+    imageIdOculto,
+    produto.image?.imageId,
     produto.image?.imageUrl,
   ])
 
@@ -436,8 +509,18 @@ export const MenuProdutoSnapshotForm = forwardRef<
       busy: uploadImagemProduto.isPending,
       hint: 'Arraste ou clique para recortar e enviar',
       onUpload: handlePreviewImageUpload,
+      onClear:
+        imagemPreviewOverride || produto.image?.imageId
+          ? handleRemoverImagem
+          : undefined,
     }),
-    [handlePreviewImageUpload, uploadImagemProduto.isPending]
+    [
+      handlePreviewImageUpload,
+      handleRemoverImagem,
+      imagemPreviewOverride,
+      produto.image?.imageId,
+      uploadImagemProduto.isPending,
+    ]
   )
 
   return (
@@ -489,6 +572,12 @@ export const MenuProdutoSnapshotForm = forwardRef<
                       placeholder="R$ 0,00"
                       className="bg-white"
                       sx={sxEntradaCompactaProduto}
+                      disabled={precoNormalTravado}
+                      title={
+                        precoNormalTravado
+                          ? 'Pause ou remova a promoção para alterar o preço normal'
+                          : undefined
+                      }
                       inputProps={inputPropsSelecionarConteudo}
                     />
                     <Input

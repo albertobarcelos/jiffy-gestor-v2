@@ -364,7 +364,9 @@ h6 {
 
   .catalog-row-base-categoria {
     grid-template-areas: 'nome codigo acoes categ meta';
-    grid-template-columns: 25ch 4.75rem auto 12rem auto;
+    /* Ações: 7×2rem + 6×0.75rem (gap-3). Largura fixa para o cabeçalho
+       e as linhas caírem na mesma coluna; o espaço livre fica só no valor. */
+    grid-template-columns: 25ch 4.75rem 18.5rem 12rem minmax(0, 1fr);
   }
 
   .catalog-row-area-foto {
@@ -398,4 +400,119 @@ h6 {
 body.jiffy-mapa-google-indisponivel .dismissButton,
 body.jiffy-mapa-google-indisponivel .gm-err-container {
   display: none !important;
+}
+
+@keyframes jiffy-scan-line {
+  0%,
+  100% {
+    top: 12%;
+    opacity: 0.35;
+  }
+  50% {
+    top: 82%;
+    opacity: 1;
+  }
+}
+
+.jiffy-scan-line {
+  animation: jiffy-scan-line 1.35s ease-in-out infinite;
+}
+
+/**
+ * Login do app do entregador: fonte estática.
+ * General Sans variável e Segoe UI Variable (system-ui no Windows 11)
+ * colapsam o avanço das letras — "Entrar" vira "Entrerrtrar".
+ */
+.expedicao-app-login {
+  transform: translateZ(0);
+  isolation: isolate;
+  transition: transform 320ms ease-out, opacity 320ms ease-out;
+}
+
+.expedicao-app-login.expedicao-app-login-sair {
+  transform: translateX(100%);
+  opacity: 0;
+}
+
+@keyframes expedicao-slide-direita {
+  from {
+    transform: translateX(18%);
+    opacity: 0.35;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.expedicao-slide-direita {
+  animation: expedicao-slide-direita 280ms ease-out;
+  isolation: isolate;
+  z-index: 0;
+}
+
+@keyframes expedicao-estouro {
+  0% {
+    transform: scale(0.72);
+    opacity: 0;
+  }
+  14% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+  24% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  78% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+}
+
+.expedicao-estouro {
+  animation: expedicao-estouro 1.7s ease-out forwards;
+}
+
+/**
+ * PWA do entregador: o documento não pode rubber-band.
+ * Header e tab bar ficam no shell; só [data-expedicao-scroll] rola.
+ */
+html.expedicao-app-viewport,
+html.expedicao-app-viewport body {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+html.expedicao-app-viewport body {
+  position: fixed;
+  inset: 0;
+  touch-action: manipulation;
+}
+
+html.expedicao-app-viewport .expedicao-app-shell {
+  height: 100%;
+  max-height: 100%;
+}
+
+.expedicao-app-login,
+.expedicao-app-login button,
+.expedicao-app-login input,
+.expedicao-app-login a,
+.expedicao-app-login p,
+.expedicao-app-login h1,
+.expedicao-app-login label {
+  font-family: Arial, Helvetica, sans-serif;
+  font-optical-sizing: none;
+  font-variation-settings: normal;
+  letter-spacing: 0.06em;
+  word-spacing: 0.04em;
+  -webkit-font-smoothing: auto;
 }

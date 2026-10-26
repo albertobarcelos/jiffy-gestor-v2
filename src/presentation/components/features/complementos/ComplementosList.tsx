@@ -3,10 +3,13 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { Complemento } from '@/src/domain/entities/Complemento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { criarPersistirCadastroComplementoUseCase } from '@/src/presentation/hooks/complementos/criarPersistirCadastroComplementoUseCase'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { MdImageNotSupported, MdPhotoCamera, MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
+import { alteracaoValorAtivo } from '@/src/domain/policies/complemento/propagarAlteracaoComplemento'
+import type { VinculoComplementoOverride } from '@/src/domain/repositories/IComplementoOverrideRepository'
+import { usePropagarAlteracaoComplemento } from '@/src/presentation/hooks/complementos/usePropagarAlteracaoComplemento'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import {
@@ -251,6 +254,12 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const invalidate = useInvalidateTenantQueries()
+  const {
+    pedirConfirmacao: pedirPropagacao,
+    aplicarVinculos: aplicarPropagacao,
+    dialog: dialogPropagacao,
+  } = usePropagarAlteracaoComplemento()
+  const savingValorIdsRef = useRef<Set<string>>(new Set())
 
   const ativoFilter = useMemo<boolean | null>(() => {
     return filterStatus === 'Ativo' ? true : filterStatus === 'Inativo' ? false : null
@@ -427,9 +436,19 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
   }, [])
 
   const handleActionsReload = useCallback(async () => {
-    await refetch()
+    const resultado = await refetch()
+    const complementosAtualizados = resultado.data?.pages.flatMap(page => page.complementos)
+    if (complementosAtualizados) {
+      setValorInputs(prev => {
+        const next = { ...prev }
+        for (const complemento of complementosAtualizados) {
+          next[complemento.getId()] = formatValorFromNumber(complemento.getValor())
+        }
+        return next
+      })
+    }
     onReload?.()
-  }, [refetch, onReload])
+  }, [refetch, onReload, formatValorFromNumber])
 
   const clearValorDebounceTimer = useCallback((complementoId: string) => {
     const timer = valorDebounceTimersRef.current.get(complementoId)
@@ -483,26 +502,50 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         return
       }
 
+      if (savingValorIdsRef.current.has(complementoId)) return
+      savingValorIdsRef.current.add(complementoId)
       setSavingValorMap(prev => ({ ...prev, [complementoId]: true }))
 
       try {
-        const response = await fetchGestorApi(`/api/complementos/${complementoId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ valor: novoValor }),
+        const alteracao = alteracaoValorAtivo({
+          valorAnterior: complementoAtual.getValor(),
+          ativoAnterior: complementoAtual.isAtivo(),
+          valorNovo: novoValor,
+          ativoNovo: complementoAtual.isAtivo(),
         })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.message || 'Erro ao atualizar valor')
+        let vinculosParaCopiar: VinculoComplementoOverride[] = []
+        if (alteracao) {
+          const decisao = await pedirPropagacao({ complementoId, alteracao })
+          if (decisao.tipo === 'cancelado') {
+            setValorInputs(prev => ({
+              ...prev,
+              [complementoId]: formatValorFromNumber(complementoAtual.getValor()),
+            }))
+            return
+          }
+          if (decisao.tipo === 'aplicar') vinculosParaCopiar = decisao.vinculos
         }
 
+        await criarPersistirCadastroComplementoUseCase().atualizar({
+          token,
+          id: complementoId,
+          dados: { valor: novoValor },
+        })
+
         showToast.success('Valor atualizado com sucesso!')
-        await refetch()
-        onReload?.()
+        if (vinculosParaCopiar.length > 0) {
+          try {
+            await aplicarPropagacao(vinculosParaCopiar)
+            showToast.success('Alteração aplicada nos cardápios marcados.')
+          } catch (error) {
+            showToast.error(
+              error instanceof Error
+                ? error.message
+                : 'Valor salvo, mas não foi possível copiar para os outros cardápios.'
+            )
+          }
+        }
+        await handleActionsReload()
       } catch (err: unknown) {
         console.error('Erro ao atualizar valor do complemento:', err)
         const message = err instanceof Error ? err.message : 'Erro ao atualizar valor do complemento'
@@ -512,6 +555,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
           [complementoId]: formatValorFromNumber(complementoAtual.getValor()),
         }))
       } finally {
+        savingValorIdsRef.current.delete(complementoId)
         setSavingValorMap(prev => {
           const { [complementoId]: _, ...rest } = prev
           return rest
@@ -524,8 +568,9 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
       complementos,
       formatValorFromNumber,
       clearValorDebounceTimer,
-      refetch,
-      onReload,
+      pedirPropagacao,
+      aplicarPropagacao,
+      handleActionsReload,
     ]
   )
 
@@ -545,19 +590,11 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
       setTogglingStatus(prev => ({ ...prev, [complementoId]: true }))
 
       try {
-        const response = await fetchGestorApi(`/api/complementos/${complementoId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ ativo: novoStatus }),
+        await criarPersistirCadastroComplementoUseCase().atualizar({
+          token,
+          id: complementoId,
+          dados: { ativo: novoStatus },
         })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.message || 'Erro ao atualizar complemento')
-        }
 
         showToast.success(
           novoStatus ? 'Complemento ativado com sucesso!' : 'Complemento desativado com sucesso!'
@@ -761,6 +798,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         onReload={handleTabsModalReload}
         onTabChange={handleTabsModalTabChange}
       />
+      {dialogPropagacao}
       {complementoCropModal}
       </CadastroListShell>
     </div>

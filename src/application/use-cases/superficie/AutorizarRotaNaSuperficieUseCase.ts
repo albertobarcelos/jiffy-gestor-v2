@@ -2,6 +2,7 @@ import type { ContextoAcessoSuperficie } from '@/src/domain/superficie/ContextoA
 import { Superficie } from '@/src/domain/superficie/Superficie'
 import { PodeAcessarSuperficie } from '@/src/domain/superficie/policies/PodeAcessarSuperficie'
 import {
+  isRotaExpedicaoBancada,
   isRotaQuadroPedidos,
   isRotaPublicaAuth,
   isRotaSessaoHub,
@@ -28,6 +29,15 @@ export class AutorizarRotaNaSuperficieUseCase {
         permitido: true,
         pathModulo,
         destinoSeNegado: destino.pathModulo,
+        superficie: destino.superficie,
+      }
+    }
+
+    if (isRotaExpedicaoBancada(pathModulo)) {
+      return {
+        permitido: true,
+        pathModulo,
+        destinoSeNegado: pathModulo,
         superficie: destino.superficie,
       }
     }
