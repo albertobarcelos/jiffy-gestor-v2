@@ -103,94 +103,65 @@ export function ConfirmarEntregaDialog(props: ConfirmarEntregaDialogProps) {
           </p>
         </div>
         <TrocoLevarAppAviso valor={props.pedido.trocoLevar} className="mt-3" />
-        <p className="mt-3 text-sm text-zinc-700">
-          {valorAlvo > 0
-            ? 'A soma das formas abaixo precisa fechar só o restante. Lançamento para receber não é pagamento efetivado.'
-            : 'Nada em aberto. Confirme a entrega.'}
-        </p>
 
         {valorAlvo > 0 ? (
-        <div className="mt-4">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Como o cliente pagou agora?</p>
-          <p className="mt-1 text-sm leading-snug text-zinc-600">
-            Toque nas formas usadas neste restante. Para dividir (PIX + dinheiro), marque as duas e ajuste o valor.
-          </p>
-          <ul className="mt-3 space-y-2">
-            {opcoes.map(opcao => {
-              const marcado = selecionados.has(opcao.id)
-              const indice = linhas.findIndex(linha => linha.meioPagamentoId === opcao.id)
-              const linha = indice >= 0 ? linhas[indice] : null
-              return (
-                <li key={opcao.id}>
-                  <button
-                    type="button"
-                    disabled={props.ocupado}
-                    onClick={() =>
-                      setLinhas(prev =>
-                        alternarMeioNasLinhasFinalizarApp({
-                          linhas: prev,
-                          meioPagamentoId: opcao.id,
-                          valorAlvo,
-                        })
-                      )
-                    }
-                    className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left ${
-                      marcado ? 'border-secondary bg-secondary/5' : 'border-zinc-200 bg-white'
+        <ul className="mt-4 space-y-2">
+          {opcoes.map(opcao => {
+            const marcado = selecionados.has(opcao.id)
+            const indice = linhas.findIndex(linha => linha.meioPagamentoId === opcao.id)
+            const linha = indice >= 0 ? linhas[indice] : null
+            return (
+              <li key={opcao.id}>
+                <button
+                  type="button"
+                  disabled={props.ocupado}
+                  onClick={() =>
+                    setLinhas(prev =>
+                      alternarMeioNasLinhasFinalizarApp({
+                        linhas: prev,
+                        meioPagamentoId: opcao.id,
+                        valorAlvo,
+                      })
+                    )
+                  }
+                  className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left ${
+                    marcado ? 'border-secondary bg-secondary/5' : 'border-zinc-200 bg-white'
+                  }`}
+                >
+                  <span
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${
+                      marcado ? 'bg-secondary text-white' : 'border border-zinc-300 bg-white text-transparent'
                     }`}
                   >
-                    <span
-                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${
-                        marcado ? 'bg-secondary text-white' : 'border border-zinc-300 bg-white text-transparent'
-                      }`}
-                    >
-                      <MdCheck className="h-4 w-4" aria-hidden />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold text-zinc-900">{opcao.nome}</span>
-                      {opcao.jaPago ? (
-                        <span className="text-[11px] font-medium uppercase tracking-wide text-emerald-700">
-                          Já efetivado
-                        </span>
-                      ) : opcao.noPedido ? (
-                        <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-                          Lançado para receber
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-zinc-400">Toque para somar</span>
-                      )}
-                    </span>
-                    {marcado && linha && !podeDividir ? (
-                      <span className="text-sm font-bold text-zinc-900">{formatarMoedaApp(linha.valor)}</span>
-                    ) : null}
-                  </button>
-                  {marcado && linha && podeDividir ? (
-                    <label className="mt-1.5 flex items-center justify-between gap-3 rounded-2xl bg-zinc-50 px-3 py-2">
-                      <span className="text-xs font-medium text-zinc-500">Valor neste meio</span>
-                      <ValorLinhaPagamentoInput
-                        valor={linha.valor}
-                        onValor={valor =>
-                          setLinhas(prev =>
-                            atualizarValorLinhaFinalizarApp({
-                              linhas: prev,
-                              indice,
-                              valor,
-                              valorAlvo,
-                            })
-                          )
-                        }
-                      />
-                    </label>
+                    <MdCheck className="h-4 w-4" aria-hidden />
+                  </span>
+                  <span className="min-w-0 flex-1 text-sm font-semibold text-zinc-900">{opcao.nome}</span>
+                  {marcado && linha && !podeDividir ? (
+                    <span className="text-sm font-bold text-zinc-900">{formatarMoedaApp(linha.valor)}</span>
                   ) : null}
-                </li>
-              )
-            })}
-          </ul>
-          {opcoes.length <= 1 ? (
-            <p className="mt-2 text-xs text-zinc-500">
-              Se outras formas não aparecerem, puxe a lista de novo ao abrir a entrega.
-            </p>
-          ) : null}
-        </div>
+                </button>
+                {marcado && linha && podeDividir ? (
+                  <label className="mt-1.5 flex items-center justify-between gap-3 rounded-2xl bg-zinc-50 px-3 py-2">
+                    <span className="text-xs font-medium text-zinc-500">Valor</span>
+                    <ValorLinhaPagamentoInput
+                      valor={linha.valor}
+                      onValor={valor =>
+                        setLinhas(prev =>
+                          atualizarValorLinhaFinalizarApp({
+                            linhas: prev,
+                            indice,
+                            valor,
+                            valorAlvo,
+                          })
+                        )
+                      }
+                    />
+                  </label>
+                ) : null}
+              </li>
+            )
+          })}
+        </ul>
         ) : null}
 
         {valorAlvo > 0 ? (
