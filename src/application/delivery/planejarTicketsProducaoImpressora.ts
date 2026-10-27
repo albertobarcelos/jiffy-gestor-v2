@@ -1,3 +1,4 @@
+import { kindSlipPorUnidade } from '@/src/domain/policies/impressao/viaProducaoPedido'
 import type { ModoImpressaoImpressora } from '@/src/domain/types/modoImpressaoImpressora'
 import type {
   VendaGestorTicketItem,
@@ -211,20 +212,20 @@ export function dividirItensProducaoPorUnidade(items: VendaGestorTicketItem[]): 
 function planPorUnidade(items: VendaGestorTicketItem[]): ProductionTicketVia[] {
   const units = dividirItensProducaoPorUnidade(items)
   const total = units.length
+  if (kindSlipPorUnidade(total) === 'single') {
+    return [{ kind: 'single', items }]
+  }
+
   const tickets: ProductionTicketVia[] = units.map((unit, i) => ({
     kind: 'unit' as const,
     items: [unit],
     unitIndex: i + 1,
     unitTotal: total,
   }))
-
-  if (total > 1) {
-    tickets.push({
-      kind: 'conference',
-      items: agruparItensProducaoEquivalentes(items),
-    })
-  }
-
+  tickets.push({
+    kind: 'conference',
+    items: agruparItensProducaoEquivalentes(items),
+  })
   return tickets
 }
 

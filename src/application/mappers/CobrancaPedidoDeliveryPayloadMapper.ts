@@ -3,12 +3,17 @@ import type {
   CobrancaPedidoDeliveryApi,
   MomentoCobrancaDeliveryApi,
 } from '@/src/application/dto/api/pedidoDeliveryApi'
-import type { FluxoPagamentoEntrega } from '@/src/domain/types/vendaDetalhe'
+import {
+  cobrancaRawAntecipadaPendenteConfirmacao,
+  cobrancaRawEstaCancelada,
+  cobrancaRawEstaEfetivada,
+} from '@/src/application/mappers/situacaoCobrancaDelivery'
 import {
   pagamentoEstaCancelado,
   pagamentoPendenteNaEntrega,
 } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
+import type { FluxoPagamentoEntrega } from '@/src/domain/types/vendaDetalhe'
 
 export function cobrancaPedidoFromPagamento(
   pagamento: PagamentoSelecionado
@@ -32,27 +37,13 @@ export type PagamentoCobrancaPatchItem = {
   valor: number
 }
 
-function cobrancaDeliveryCancelada(c: Record<string, unknown>): boolean {
-  const status = String(c.status ?? '').trim().toLowerCase()
-  if (status === 'cancelada') return true
-  const dataCancelamento = c.dataCancelamento
-  return dataCancelamento != null && String(dataCancelamento).trim() !== ''
-}
-
-function cobrancaDeliveryPaga(c: Record<string, unknown>): boolean {
-  const status = String(c.status ?? '').trim().toLowerCase()
-  if (status === 'paga') return true
-  if (status === 'pendente' || status === 'cancelada') return false
-  return c.pagamentoEfetivado != null && typeof c.pagamentoEfetivado === 'object'
-}
-
 export function extrairIdsCobrancasAtivasPedidoDelivery(
   pedido: Record<string, unknown>
 ): string[] {
   const cobrancas = Array.isArray(pedido.cobrancas) ? pedido.cobrancas : []
   return cobrancas
     .filter((raw): raw is Record<string, unknown> => raw != null && typeof raw === 'object')
-    .filter(c => !cobrancaDeliveryCancelada(c))
+    .filter(c => !cobrancaRawEstaCancelada(c))
     .filter(c => String(c.id ?? '').trim().length > 0)
     .map(c => String(c.id))
 }
@@ -63,7 +54,18 @@ export function extrairIdsCobrancasPendentesPedidoDelivery(
   const cobrancas = Array.isArray(pedido.cobrancas) ? pedido.cobrancas : []
   return cobrancas
     .filter((raw): raw is Record<string, unknown> => raw != null && typeof raw === 'object')
-    .filter(c => !cobrancaDeliveryCancelada(c) && !cobrancaDeliveryPaga(c))
+    .filter(c => !cobrancaRawEstaCancelada(c) && !cobrancaRawEstaEfetivada(c))
+    .filter(c => String(c.id ?? '').trim().length > 0)
+    .map(c => String(c.id))
+}
+
+export function extrairIdsCobrancasAntecipadasAConfirmarPedidoDelivery(
+  pedido: Record<string, unknown>
+): string[] {
+  const cobrancas = Array.isArray(pedido.cobrancas) ? pedido.cobrancas : []
+  return cobrancas
+    .filter((raw): raw is Record<string, unknown> => raw != null && typeof raw === 'object')
+    .filter(c => cobrancaRawAntecipadaPendenteConfirmacao(c))
     .filter(c => String(c.id ?? '').trim().length > 0)
     .map(c => String(c.id))
 }

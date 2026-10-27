@@ -11,6 +11,7 @@ export type OpcaoMeioPagamentoFinalizarApp = {
   id: string
   nome: string
   noPedido: boolean
+  jaPago: boolean
 }
 
 export type LinhaPagamentoFinalizarApp = {
@@ -36,6 +37,30 @@ function arredondar(valor: number): number {
   return Math.round(valor * 100) / 100
 }
 
+/** Campo vazio fica vazio — não prende um 0 no final enquanto o motoboy redigita. */
+export function textoValorLinhaFinalizarApp(valor: number): string {
+  if (!Number.isFinite(valor) || valor === 0) return ''
+  return arredondar(valor).toString().replace('.', ',')
+}
+
+export function sanitizarTextoValorFinalizarApp(texto: string): string {
+  let t = texto.replace(/[^\d.,]/g, '').replace('.', ',')
+  const virgula = t.indexOf(',')
+  if (virgula >= 0) {
+    t = `${t.slice(0, virgula + 1)}${t.slice(virgula + 1).replace(/,/g, '').slice(0, 2)}`
+  }
+  const [inteiro, decimal] = t.split(',')
+  const inteiroLimpo = inteiro.replace(/^0+(?=\d)/, '')
+  return decimal !== undefined ? `${inteiroLimpo},${decimal}` : inteiroLimpo
+}
+
+export function parseValorDigitadoFinalizarApp(texto: string): number | null {
+  const t = sanitizarTextoValorFinalizarApp(texto).replace(',', '.')
+  if (!t || t === '.') return null
+  const n = Number(t)
+  return Number.isFinite(n) && n >= 0 ? n : null
+}
+
 /** Meio que o pedido já trouxe — pendência na porta tem prioridade. */
 export function idMeioPagamentoPadraoFinalizarApp(
   cobrancas: CobrancaAppEntregador[]
@@ -52,6 +77,16 @@ export function montarOpcoesMeioPagamentoFinalizarApp(input: {
   const idsNoPedido = new Set(
     input.cobrancas.map(cobranca => cobranca.meioPagamentoId).filter(Boolean)
   )
+  const idsPagos = new Set(
+    input.cobrancas
+      .filter(cobranca => !cobranca.pendente && cobranca.meioPagamentoId)
+      .map(cobranca => cobranca.meioPagamentoId)
+  )
+  const idsPendentes = new Set(
+    input.cobrancas
+      .filter(cobranca => cobranca.pendente && cobranca.meioPagamentoId)
+      .map(cobranca => cobranca.meioPagamentoId)
+  )
   const porId = new Map<string, OpcaoMeioPagamentoFinalizarApp>()
 
   for (const cobranca of input.cobrancas) {
@@ -63,6 +98,7 @@ export function montarOpcoesMeioPagamentoFinalizarApp(input: {
           ? cobranca.nome
           : cobranca.meioPagamentoId,
       noPedido: true,
+      jaPago: idsPagos.has(cobranca.meioPagamentoId) && !idsPendentes.has(cobranca.meioPagamentoId),
     })
   }
 
@@ -75,6 +111,7 @@ export function montarOpcoesMeioPagamentoFinalizarApp(input: {
       id,
       nome: nome || anterior?.nome || id,
       noPedido: idsNoPedido.has(id),
+      jaPago: idsPagos.has(id) && !idsPendentes.has(id),
     })
   }
 
@@ -126,20 +163,32 @@ export function montarPagamentosAoTrocarMeioFinalizarApp(input: {
   return [{ meioPagamentoId: escolhido, valor: valorPago }]
 }
 
+export function valorJaPagoFinalizarApp(cobrancas: CobrancaAppEntregador[]): number {
+  return arredondar(
+    cobrancas.filter(cobranca => !cobranca.pendente).reduce((soma, cobranca) => soma + cobranca.valor, 0)
+  )
+}
+
+/**
+ * Total a fechar na porta: o restante líquido (cédula − troco).
+ * Se `faltaPagar` já veio descontado do mapper, usa ele; senão a soma das pendentes.
+ */
 export function valorACobrirFinalizarApp(input: {
   cobrancas: CobrancaAppEntregador[]
   valorFinal: number
   faltaPagar: number
 }): number {
-  const pendentes = input.cobrancas.filter(cobranca => cobranca.pendente)
-  if (pendentes.length > 0 || input.faltaPagar > 0) {
-    return arredondar(
-      pendentes.reduce((soma, cobranca) => soma + cobranca.valor, 0) ||
-        input.faltaPagar ||
-        input.valorFinal
+  if (input.cobrancas.length > 0) {
+    const soma = arredondar(
+      input.cobrancas
+        .filter(cobranca => cobranca.pendente)
+        .reduce((acc, cobranca) => acc + cobranca.valor, 0)
     )
+    const falta = arredondar(Math.max(0, input.faltaPagar))
+    if (falta > 0 && falta < soma - 0.009) return falta
+    return soma
   }
-  return arredondar(input.valorFinal)
+  return arredondar(Math.max(0, input.faltaPagar))
 }
 
 export function montarLinhasIniciaisFinalizarApp(input: {
@@ -148,6 +197,7 @@ export function montarLinhasIniciaisFinalizarApp(input: {
   faltaPagar: number
 }): LinhaPagamentoFinalizarApp[] {
   const alvo = valorACobrirFinalizarApp(input)
+  if (alvo <= 0) return []
   const fonte =
     input.faltaPagar > 0 || input.cobrancas.some(cobranca => cobranca.pendente)
       ? input.cobrancas.filter(cobranca => cobranca.pendente && cobranca.meioPagamentoId)

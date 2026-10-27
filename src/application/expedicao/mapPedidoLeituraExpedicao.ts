@@ -62,6 +62,7 @@ export function mapPedidoLeituraExpedicao(raw: unknown): PedidoLeituraExpedicao 
     formaPagamento: resumo?.formaPagamento ?? null,
     valorFinal: resumo?.valorFinal ?? 0,
     faltaPagar: resumo?.faltaPagar ?? 0,
+    trocoLevar: resumo?.trocoLevar ?? 0,
     itens: produtos
       .map(itemDoProduto)
       .filter((item): item is PedidoLeituraExpedicao['itens'][number] => item !== null),

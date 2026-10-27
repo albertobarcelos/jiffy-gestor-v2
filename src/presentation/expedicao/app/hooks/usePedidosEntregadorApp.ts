@@ -34,6 +34,7 @@ export function usePedidosEntregadorApp(input: {
   const [confirmarId, setConfirmarId] = useState<string | null>(null)
   const [meiosPagamento, setMeiosPagamento] = useState<MeioPagamentoAppEntregador[]>([])
   const jaCarregouPedidos = useRef(false)
+  const confirmandoRef = useRef(false)
 
   const carregarPedidos = useCallback(
     async (opcoes?: { silencioso?: boolean }) => {
@@ -106,7 +107,14 @@ export function usePedidosEntregadorApp(input: {
     if (!token) return
     setCarregandoItens(true)
     try {
-      setItensAberto(await buscarItensPedidoApp({ token, pedidoId }))
+      const [itens, resumo] = await Promise.all([
+        buscarItensPedidoApp({ token, pedidoId }),
+        buscarPedidoResumoApp({ token, pedidoId }),
+      ])
+      setItensAberto(itens)
+      if (resumo) {
+        setPedidos(prev => prev.map(pedido => (pedido.id === pedidoId ? { ...pedido, ...resumo } : pedido)))
+      }
     } catch (error) {
       avisoApp.error(error instanceof Error ? error.message : 'Não foi possível carregar os itens.')
     } finally {
@@ -122,32 +130,30 @@ export function usePedidosEntregadorApp(input: {
         return false
       }
       const pedido = pedidos.find(p => p.id === pedidoId)
-      if (!pedido) return false
+      if (!pedido || confirmandoRef.current) return false
       const pagamentos = montarPagamentosDasLinhasFinalizarApp({
         cobrancas: pedido.cobrancas ?? [],
         linhas: linhas ?? [],
         valorFinal: pedido.valorFinal,
         faltaPagar: pedido.faltaPagar,
       })
-      const snapshot = pedido
-      setConfirmarId(null)
-      setPedidoAbertoId(null)
-      setPedidos(prev => prev.filter(p => p.id !== pedidoId))
+      confirmandoRef.current = true
       setConfirmandoId(pedidoId)
       try {
         await confirmarEntregaPedido({ token, pedidoId, pagamentos })
+        setConfirmarId(null)
+        setPedidoAbertoId(null)
+        setPedidos(prev => prev.filter(p => p.id !== pedidoId))
         void carregarPedidos({ silencioso: true })
         void onEntregaConfirmada()
         return true
       } catch (error) {
-        setPedidos(prev => mesclarPedidoPegoNaLista(prev, snapshot))
-        setPedidoAbertoId(pedidoId)
-        setConfirmarId(pedidoId)
         avisoApp.error(
           error instanceof Error ? error.message : 'Não foi possível confirmar a entrega.'
         )
         return false
       } finally {
+        confirmandoRef.current = false
         setConfirmandoId(null)
       }
     },
@@ -159,6 +165,8 @@ export function usePedidosEntregadorApp(input: {
     setErroPedidos(null)
     setPedidoAbertoId(null)
     setConfirmarId(null)
+    setConfirmandoId(null)
+    confirmandoRef.current = false
     jaCarregouPedidos.current = false
   }, [])
 

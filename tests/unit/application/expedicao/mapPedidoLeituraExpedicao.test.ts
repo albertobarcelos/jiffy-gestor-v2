@@ -57,7 +57,47 @@ describe('mapPedidoLeituraExpedicao', () => {
       formaPagamento: 'PIX',
       valorFinal: 284.79,
       faltaPagar: 284.79,
+      trocoLevar: 0,
     })
     expect(pedido?.itens).toHaveLength(1)
+  })
+
+  it('traz o troco para levar no card da rodada', () => {
+    const pedido = mapPedidoLeituraExpedicao({
+      id: 'p1',
+      valorFinal: 39.9,
+      troco: 10.1,
+      cobrancas: [
+        {
+          id: 'c1',
+          meioPagamentoId: 'mp-din',
+          valor: 50,
+          status: 'pendente',
+          meioPagamento: { nome: 'Dinheiro' },
+        },
+      ],
+    })
+    expect(pedido?.trocoLevar).toBe(10.1)
+    expect(pedido?.faltaPagar).toBe(39.9)
+  })
+
+  it('na rodada não trata a cédula de 500 como valor a cobrar', () => {
+    const pedido = mapPedidoLeituraExpedicao({
+      id: 'p466',
+      numeroVenda: 466,
+      valorFinal: 300,
+      totalFaltaPagar: 500,
+      cobrancas: [
+        {
+          id: 'c1',
+          meioPagamentoId: 'mp-din',
+          valor: 500,
+          momentoCobranca: 'na_entrega',
+          status: 'pendente',
+        },
+      ],
+    })
+    expect(pedido?.trocoLevar).toBe(200)
+    expect(pedido?.faltaPagar).toBe(300)
   })
 })

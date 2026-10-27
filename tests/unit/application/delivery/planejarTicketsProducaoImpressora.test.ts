@@ -218,7 +218,7 @@ describe('planejarTicketsProducaoImpressora', () => {
       expect(conference?.items[0].complementos?.[0]?.quantidade).toBe(6)
     })
 
-    it('não gera conferência quando há somente uma via', () => {
+    it('uma via vira single — leva o símbolo do pedido, sem conferência', () => {
       const items = [
         item({ lancadoId: '1', produtoId: 'p', nome: 'Pastel Carne', quantidade: 1 }),
       ]
@@ -226,9 +226,8 @@ describe('planejarTicketsProducaoImpressora', () => {
       const tickets = planejarTicketsProducaoImpressora(items, 'porUnidade')
 
       expect(tickets).toHaveLength(1)
-      expect(tickets[0].kind).toBe('unit')
-      expect(tickets[0].unitIndex).toBe(1)
-      expect(tickets[0].unitTotal).toBe(1)
+      expect(tickets[0].kind).toBe('single')
+      expect(tickets[0].unitIndex).toBeUndefined()
     })
 
     it('contagem 1 DE N é local à lista da impressora', () => {

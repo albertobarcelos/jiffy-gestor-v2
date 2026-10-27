@@ -5,7 +5,7 @@ import type { DeliveryCupomSimboloPedido } from '@/src/shared/types/deliveryCupo
 import { CupomCampoInfo } from './DeliveryModoPapelToggle'
 
 export const DESCRICAO_SIMBOLO_PEDIDO =
-  'No cupom de produção (cozinha). No modo por unidade, só a via de conferência leva o símbolo — cada papel unitário fica sem. Padrão: nenhum. A via do entregador nunca leva símbolo.'
+  'No cupom de produção (cozinha). No modo por unidade, cada papel unitário fica sem símbolo; o símbolo vai na via de conferência. Com uma só unidade não há conferência — esse papel é o do pedido e leva o símbolo. Padrão: nenhum. A via do entregador nunca leva símbolo.'
 
 const OPCOES: Array<{
   valor: DeliveryCupomSimboloPedido
