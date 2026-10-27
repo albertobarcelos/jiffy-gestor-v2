@@ -54,7 +54,7 @@ Reimpressão: `** REIMPRESSAO **` no topo, negrito, tamanho normal (sem pílula)
 O planner (`planejarTicketsProducaoImpressora`) decide as vias:
 
 - `normal` / `agrupado` → uma via (`kind: single`)
-- `porUnidade` → uma via por unidade + conferência se houver mais de uma
+- `porUnidade` → uma via por unidade + conferência se houver mais de uma; uma unidade sai como `single` (símbolo do pedido)
 - `ficha` no delivery vira `normal`
 
 ## Expedição

@@ -1,3 +1,5 @@
+import { viaProducaoLevaSimboloPedido } from '@/src/domain/policies/impressao/viaProducaoPedido'
+
 /** Layout 80 mm ESC/POS da via de produção (espelha o print order do POS). */
 
 export const PRODUCAO_80MM = {
@@ -459,6 +461,6 @@ export function montarModeloProducao80mm(origem: OrigemModeloProducao80mm): Mode
       versao: origem.versao,
       codigoTerminal: origem.codigoTerminal,
     }),
-    codigoBarras: viaKind === 'unit' || !codigo ? null : `P${codigo}`,
+    codigoBarras: viaProducaoLevaSimboloPedido(viaKind) && codigo ? `P${codigo}` : null,
   }
 }
