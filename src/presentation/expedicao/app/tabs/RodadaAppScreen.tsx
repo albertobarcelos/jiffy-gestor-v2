@@ -3,6 +3,7 @@
 import { MdQrCodeScanner } from 'react-icons/md'
 import type { PedidoLeituraExpedicao } from '@/src/application/expedicao/avaliarPedidoParaRodada'
 import { formatarMoedaApp } from '@/src/presentation/expedicao/app/format'
+import { TrocoLevarAppAviso } from '@/src/presentation/expedicao/app/tabs/TrocoLevarAppAviso'
 
 type RodadaAppScreenProps = {
   pedidos: PedidoLeituraExpedicao[]
@@ -103,6 +104,7 @@ export function RodadaAppScreen(props: RodadaAppScreenProps) {
                   </p>
                 </div>
               </div>
+              <TrocoLevarAppAviso valor={pedido.trocoLevar} className="mt-2" />
               {itens ? <p className="mt-3 text-xs font-medium text-zinc-500">{itens}</p> : null}
             </li>
           )

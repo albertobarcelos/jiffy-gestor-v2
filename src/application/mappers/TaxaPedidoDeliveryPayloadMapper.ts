@@ -74,9 +74,11 @@ function listarCobrancas(pedido: Record<string, unknown>): Record<string, unknow
   )
 }
 
-/** Pedido já pago: existe ao menos uma cobrança quitada (não cancelada). */
+/** Pedido quitado: toda cobrança ativa já foi efetivada. */
 export function pedidoDeliveryEstaPago(pedido: Record<string, unknown>): boolean {
-  return listarCobrancas(pedido).some(c => !cobrancaRawEstaCancelada(c) && cobrancaRawEstaEfetivada(c))
+  const ativas = listarCobrancas(pedido).filter(c => !cobrancaRawEstaCancelada(c))
+  if (ativas.length === 0) return false
+  return ativas.every(c => cobrancaRawEstaEfetivada(c))
 }
 
 /** Cobranças pendentes `na_entrega` (não cancelada e não paga) com valor/meio para reemissão. */

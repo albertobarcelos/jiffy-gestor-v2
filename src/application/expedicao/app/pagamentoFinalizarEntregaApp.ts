@@ -170,21 +170,22 @@ export function valorJaPagoFinalizarApp(cobrancas: CobrancaAppEntregador[]): num
 }
 
 /**
- * Total a fechar na porta: o que o pedido ainda deve (`faltaPagar`).
- * Pagamento já efetivado não entra no alvo — só o restante em aberto.
+ * Total a fechar na porta: soma do que ainda está pendente nas cobranças.
+ * `faltaPagar` da API só entra quando não há cobrança para ler.
  */
 export function valorACobrirFinalizarApp(input: {
   cobrancas: CobrancaAppEntregador[]
   valorFinal: number
   faltaPagar: number
 }): number {
-  const falta = arredondar(Math.max(0, input.faltaPagar))
-  if (falta > 0) return falta
-  const somaPendentes = arredondar(
-    input.cobrancas.filter(cobranca => cobranca.pendente).reduce((soma, cobranca) => soma + cobranca.valor, 0)
-  )
-  if (somaPendentes > 0) return somaPendentes
-  return 0
+  if (input.cobrancas.length > 0) {
+    return arredondar(
+      input.cobrancas
+        .filter(cobranca => cobranca.pendente)
+        .reduce((soma, cobranca) => soma + cobranca.valor, 0)
+    )
+  }
+  return arredondar(Math.max(0, input.faltaPagar))
 }
 
 export function montarLinhasIniciaisFinalizarApp(input: {

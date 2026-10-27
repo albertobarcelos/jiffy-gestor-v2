@@ -4,6 +4,7 @@ import type {
 } from '@/src/application/expedicao/app/filtrarPedidosDoEntregador'
 import { montarEnderecoNavegacaoApp } from '@/src/application/expedicao/app/navegacaoEntregadorApp'
 import { extrairNomeMeioPagamentoDeCobranca } from '@/src/application/mappers/CobrancaDeliveryPagamentoMapper'
+import { resolverTrocoLevarPedidoEntrega } from '@/src/application/mappers/resolverTrocoLevarPedidoEntrega'
 import {
   cobrancaRawEstaCancelada,
   cobrancaRawEstaEfetivada,
@@ -161,6 +162,10 @@ export function mapPedidoAppEntregador(raw: unknown): PedidoResumoAppEntregador 
       ? (contexto.enderecoEntrega as Record<string, unknown>)
       : {}
   const numeroVenda = Number(row.numeroVenda)
+  const cobrancas = cobrancasPedidoApp(row)
+  const faltaDasCobrancas = cobrancas
+    .filter(cobranca => cobranca.pendente)
+    .reduce((soma, cobranca) => soma + cobranca.valor, 0)
   const observacoesRaw = Array.isArray(row.observacoes) ? row.observacoes : []
   const observacao = observacoesRaw
     .map(item => {
@@ -191,10 +196,11 @@ export function mapPedidoAppEntregador(raw: unknown): PedidoResumoAppEntregador 
     valorFinal: numero(row.valorFinal),
     taxaEntrega: row.taxaEntrega == null ? null : numero(row.taxaEntrega),
     entregadorId: texto(entregador.id ?? row.entregadorId) || null,
-    faltaPagar: numero(row.totalFaltaPagar),
+    faltaPagar: cobrancas.length > 0 ? faltaDasCobrancas : numero(row.totalFaltaPagar),
+    trocoLevar: resolverTrocoLevarPedidoEntrega(row),
     observacao: observacao || null,
     formaPagamento: rotuloPagamentoPedidoApp(row),
     meioPagamentoIds: idsMeioPagamentoPedidoApp(row),
-    cobrancas: cobrancasPedidoApp(row),
+    cobrancas,
   }
 }

@@ -4,6 +4,7 @@ import type {
   MomentoCobrancaDeliveryApi,
 } from '@/src/application/dto/api/pedidoDeliveryApi'
 import {
+  cobrancaRawAntecipadaPendenteConfirmacao,
   cobrancaRawEstaCancelada,
   cobrancaRawEstaEfetivada,
 } from '@/src/application/mappers/situacaoCobrancaDelivery'
@@ -54,6 +55,17 @@ export function extrairIdsCobrancasPendentesPedidoDelivery(
   return cobrancas
     .filter((raw): raw is Record<string, unknown> => raw != null && typeof raw === 'object')
     .filter(c => !cobrancaRawEstaCancelada(c) && !cobrancaRawEstaEfetivada(c))
+    .filter(c => String(c.id ?? '').trim().length > 0)
+    .map(c => String(c.id))
+}
+
+export function extrairIdsCobrancasAntecipadasAConfirmarPedidoDelivery(
+  pedido: Record<string, unknown>
+): string[] {
+  const cobrancas = Array.isArray(pedido.cobrancas) ? pedido.cobrancas : []
+  return cobrancas
+    .filter((raw): raw is Record<string, unknown> => raw != null && typeof raw === 'object')
+    .filter(c => cobrancaRawAntecipadaPendenteConfirmacao(c))
     .filter(c => String(c.id ?? '').trim().length > 0)
     .map(c => String(c.id))
 }

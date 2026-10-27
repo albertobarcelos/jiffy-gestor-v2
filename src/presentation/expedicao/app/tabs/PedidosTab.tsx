@@ -11,6 +11,7 @@ import { formatarMoedaApp } from '@/src/presentation/expedicao/app/format'
 import { AppSpinner } from '@/src/presentation/expedicao/app/shell/AppSpinner'
 import { hrefWazeNavegacaoApp } from '@/src/application/expedicao/app/navegacaoEntregadorApp'
 import { hrefWhatsAppApp } from '@/src/application/expedicao/app/telefoneEntregadorApp'
+import { TrocoLevarAppAviso } from '@/src/presentation/expedicao/app/tabs/TrocoLevarAppAviso'
 
 const LIMIAR_PUXAR_PX = 64
 
@@ -184,6 +185,7 @@ export function PedidosTab(props: {
                         </p>
                       </div>
                     </div>
+                    <TrocoLevarAppAviso valor={pedido.trocoLevar} className="mt-2" />
                   </button>
                   {waze || whats ? (
                     <div className="mt-3 grid grid-cols-2 gap-2">
