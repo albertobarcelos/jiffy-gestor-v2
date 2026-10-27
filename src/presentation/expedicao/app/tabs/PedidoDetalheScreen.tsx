@@ -97,7 +97,8 @@ export function PedidoDetalheScreen(props: {
 
         <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/[0.04]">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Pagamento</p>
-          <p className="mt-2 text-lg font-extrabold text-zinc-900">
+          <TrocoLevarAppAviso valor={props.pedido.trocoLevar} className="mt-3" />
+          <p className="mt-3 text-lg font-extrabold text-zinc-900">
             {props.pedido.formaPagamento || (props.pedido.faltaPagar > 0 ? 'Na entrega' : 'Pago')}
           </p>
           <p className="mt-1 text-sm font-semibold text-zinc-500">
@@ -110,7 +111,6 @@ export function PedidoDetalheScreen(props: {
           ) : (
             <p className="mt-1 text-sm text-zinc-500">Pago</p>
           )}
-          <TrocoLevarAppAviso valor={props.pedido.trocoLevar} className="mt-3" />
         </section>
 
         {props.pedido.observacao ? (
