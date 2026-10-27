@@ -7,7 +7,6 @@ import { ComplementoGruposTab } from './ComplementoGruposTab'
 import { ComplementoOndeUsadoTab } from './ComplementoOndeUsadoTab'
 import { NovoComplemento, type NovoComplementoHandle } from './NovoComplemento'
 import { MENU_WIDE_PANEL_CLASS } from '@/src/presentation/components/features/menus/menuPanelConstants'
-import { showToast } from '@/src/shared/utils/toast'
 
 const COMPLEMENTO_TABS_FORM_ID = 'complemento-tabs-modal-form'
 
@@ -83,10 +82,7 @@ export function ComplementosTabsModal({
   })
 
   const handleSaveAndCloseFromConfirm = useCallback(() => {
-    if (!embedFormState.canSubmit) {
-      showToast.error('Informe o nome do complemento')
-      return
-    }
+    if (!embedFormState.canSubmit) return
     setConfirmExitOpen(false)
     void ncRef.current?.saveComplementoAndClose?.()
   }, [embedFormState.canSubmit])

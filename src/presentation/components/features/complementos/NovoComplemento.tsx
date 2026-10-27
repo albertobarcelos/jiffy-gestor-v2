@@ -12,12 +12,14 @@ import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { criarPersistirCadastroComplementoUseCase } from '@/src/presentation/hooks/complementos/criarPersistirCadastroComplementoUseCase'
 import { FormControl, InputLabel, MenuItem, Select } from '@mui/material'
+import { Z_INDEX_SOBRE_PAINEL_LATERAL } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { DeliveryImageUploadField } from '@/src/presentation/components/ui/DeliveryImageUploadField'
 import { DELIVERY_COMPLEMENTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
+import { mensagemLegivelErro } from '@/src/infrastructure/api/apiClient'
 import { showToast } from '@/src/shared/utils/toast'
 import { alteracaoValorAtivo } from '@/src/domain/policies/complemento/propagarAlteracaoComplemento'
 import type { VinculoComplementoOverride } from '@/src/domain/repositories/IComplementoOverrideRepository'
@@ -456,17 +458,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
         router.push('/complementos')
       }
     } catch (error) {
-      const raw = error instanceof Error ? error.message : 'Erro ao salvar complemento'
-      let mensagem = raw
-      try {
-        const parsed = JSON.parse(raw) as unknown
-        if (Array.isArray(parsed) && parsed[0] && typeof parsed[0] === 'object' && parsed[0] !== null && 'message' in parsed[0]) {
-          mensagem = String((parsed[0] as { message: unknown }).message)
-        }
-      } catch {
-        /* mensagem já é texto simples */
-      }
-      showToast.error(mensagem || 'Erro ao salvar complemento')
+      showToast.error(mensagemLegivelErro(error, 'Erro ao salvar complemento'))
     } finally {
       setIsLoading(false)
     }
@@ -655,9 +647,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
                         )
                       }}
                       MenuProps={{
-                        // Acima do JiffySidePanelModal (zIndex padrão 1300); sem isso o menu
-                        // fica atrás do painel e bloqueia a interação.
-                        sx: { zIndex: 2100 },
+                        sx: { zIndex: Z_INDEX_SOBRE_PAINEL_LATERAL },
                       }}
                     >
                       <MenuItem value="nenhum">Nenhum</MenuItem>
