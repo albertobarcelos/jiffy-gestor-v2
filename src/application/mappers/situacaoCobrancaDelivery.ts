@@ -1,4 +1,5 @@
 import {
+  cobrancaDeliveryAntecipadaPendenteConfirmacao,
   cobrancaDeliveryCobraNaEntrega,
   cobrancaDeliveryEstaCancelada,
   cobrancaDeliveryEstaEfetivada,
@@ -32,4 +33,8 @@ export function cobrancaRawEstaEfetivada(raw: unknown): boolean {
 
 export function cobrancaRawCobraNaEntrega(raw: unknown): boolean {
   return cobrancaDeliveryCobraNaEntrega(situacaoCobrancaDeliveryDeRaw(raw))
+}
+
+export function cobrancaRawAntecipadaPendenteConfirmacao(raw: unknown): boolean {
+  return cobrancaDeliveryAntecipadaPendenteConfirmacao(situacaoCobrancaDeliveryDeRaw(raw))
 }

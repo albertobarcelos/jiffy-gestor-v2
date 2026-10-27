@@ -15,6 +15,8 @@ import {
   type MeioPagamentoAppEntregador,
 } from '@/src/application/expedicao/app/pagamentoFinalizarEntregaApp'
 import { formatarMoedaApp } from '@/src/presentation/expedicao/app/format'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { TrocoLevarAppAviso } from '@/src/presentation/expedicao/app/tabs/TrocoLevarAppAviso'
 import { ValorLinhaPagamentoInput } from '@/src/presentation/expedicao/app/tabs/ValorLinhaPagamentoInput'
 
 type ConfirmarEntregaDialogProps = {
@@ -63,7 +65,19 @@ export function ConfirmarEntregaDialog(props: ConfirmarEntregaDialogProps) {
 
   return (
     <div className="fixed inset-0 z-[45] flex items-end justify-center bg-black/40 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-      <div className="flex max-h-[min(88dvh,100%)] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-white shadow-xl">
+      <div
+        className="relative flex max-h-[min(88dvh,100%)] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-white shadow-xl"
+        aria-busy={props.ocupado}
+      >
+        {props.ocupado ? (
+          <div
+            className="absolute inset-0 z-10 flex items-center justify-center bg-white/90"
+            role="status"
+            aria-live="polite"
+          >
+            <JiffyLoading text="Registrando entrega…" />
+          </div>
+        ) : null}
         <div
           data-expedicao-scroll
           className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-y-contain p-5"
@@ -88,6 +102,7 @@ export function ConfirmarEntregaDialog(props: ConfirmarEntregaDialogProps) {
             <span className="font-bold text-zinc-900">{formatarMoedaApp(valorAlvo)}</span>
           </p>
         </div>
+        <TrocoLevarAppAviso valor={props.pedido.trocoLevar} className="mt-3" />
         <p className="mt-3 text-sm text-zinc-700">
           {valorAlvo > 0
             ? 'A soma das formas abaixo precisa fechar só o restante. Lançamento para receber não é pagamento efetivado.'
@@ -109,6 +124,7 @@ export function ConfirmarEntregaDialog(props: ConfirmarEntregaDialogProps) {
                 <li key={opcao.id}>
                   <button
                     type="button"
+                    disabled={props.ocupado}
                     onClick={() =>
                       setLinhas(prev =>
                         alternarMeioNasLinhasFinalizarApp({

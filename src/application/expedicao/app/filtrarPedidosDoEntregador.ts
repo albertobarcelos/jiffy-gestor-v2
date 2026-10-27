@@ -22,6 +22,8 @@ export type PedidoResumoAppEntregador = {
   taxaEntrega: number | null
   entregadorId: string | null
   faltaPagar: number
+  /** Troco que o motoboy precisa levar — mesma regra do cupom. */
+  trocoLevar: number
   observacao: string | null
   formaPagamento: string | null
   meioPagamentoIds: string[]

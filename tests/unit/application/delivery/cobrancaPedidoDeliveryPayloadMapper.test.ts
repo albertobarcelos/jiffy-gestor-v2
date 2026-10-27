@@ -3,6 +3,7 @@ import {
   buildAtualizarCobrancasPedidoDeliveryPatch,
   buildConfirmarCobrancasPendentesPedidoDeliveryPatch,
   cobrancasPatchTemOperacao,
+  extrairIdsCobrancasAntecipadasAConfirmarPedidoDelivery,
   extrairIdsCobrancasPendentesPedidoDelivery,
 } from '@/src/application/mappers/CobrancaPedidoDeliveryPayloadMapper'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
@@ -33,6 +34,17 @@ describe('CobrancaPedidoDeliveryPayloadMapper', () => {
       ],
     }
     expect(extrairIdsCobrancasPendentesPedidoDelivery(pedido)).toEqual(['cob-1'])
+  })
+
+  it('lista antecipada ainda pendente para confirm, sem a na_entrega', () => {
+    const pedido = {
+      cobrancas: [
+        { id: 'cob-din', status: 'pendente', momentoCobranca: 'antecipado' },
+        { id: 'cob-pix', status: 'pendente', momentoCobranca: 'na_entrega' },
+        { id: 'cob-ok', status: 'paga', momentoCobranca: 'antecipado' },
+      ],
+    }
+    expect(extrairIdsCobrancasAntecipadasAConfirmarPedidoDelivery(pedido)).toEqual(['cob-din'])
   })
 
   it('não trata lançamento na_entrega como pago só por pagamentoEfetivado', () => {

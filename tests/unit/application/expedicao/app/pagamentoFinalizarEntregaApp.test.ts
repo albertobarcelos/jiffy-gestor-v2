@@ -88,6 +88,37 @@ describe('pagamentoFinalizarEntregaApp', () => {
     ).toEqual([{ meioPagamentoId: 'mp-din', valor: 20 }])
   })
 
+  it('ignora faltaPagar da API quando as cobranças já separam o restante', () => {
+    const dinheiroPago: CobrancaAppEntregador = {
+      id: 'cob-din-pago',
+      meioPagamentoId: 'mp-din',
+      valor: 15,
+      pendente: false,
+      nome: 'Dinheiro',
+    }
+    const pixPorta: CobrancaAppEntregador = {
+      id: 'cob-pix-porta',
+      meioPagamentoId: 'mp-pix',
+      valor: 285,
+      pendente: true,
+      nome: 'Pix',
+    }
+    expect(
+      valorACobrirFinalizarApp({
+        cobrancas: [dinheiroPago, pixPorta],
+        valorFinal: 300,
+        faltaPagar: 300,
+      })
+    ).toBe(285)
+    expect(
+      montarLinhasIniciaisFinalizarApp({
+        cobrancas: [dinheiroPago, pixPorta],
+        valorFinal: 300,
+        faltaPagar: 300,
+      })
+    ).toEqual([{ meioPagamentoId: 'mp-pix', valor: 285 }])
+  })
+
   it('alvo da porta é o restante do pedido, não o pagamento já efetivado', () => {
     expect(
       valorACobrirFinalizarApp({

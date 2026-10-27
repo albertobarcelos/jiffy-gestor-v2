@@ -13,6 +13,8 @@ export type PedidoLeituraExpedicao = {
   formaPagamento: string | null
   valorFinal: number
   faltaPagar: number
+  /** Troco que o motoboy precisa levar — mesma regra do cupom. */
+  trocoLevar: number
   itens: Array<{ id: string; nome: string; quantidade: number }>
 }
 

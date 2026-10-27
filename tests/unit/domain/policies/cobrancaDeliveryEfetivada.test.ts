@@ -32,4 +32,19 @@ describe('cobrancaDeliveryEstaEfetivada', () => {
       false
     )
   })
+
+  it('antecipado pendente na API já foi pago na loja', () => {
+    expect(
+      cobrancaDeliveryEstaEfetivada({
+        status: 'pendente',
+        momentoCobranca: 'antecipado',
+      })
+    ).toBe(true)
+    expect(
+      cobrancaDeliveryCobraNaEntrega({
+        status: 'pendente',
+        momentoCobranca: 'antecipado',
+      })
+    ).toBe(false)
+  })
 })

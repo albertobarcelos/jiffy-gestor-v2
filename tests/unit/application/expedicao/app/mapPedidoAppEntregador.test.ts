@@ -52,11 +52,45 @@ describe('cobrancaPedidoAppEstaPaga', () => {
   it('só marca pago quando a cobrança foi efetivada', () => {
     expect(cobrancaPedidoAppEstaPaga({ status: 'paga', momentoCobranca: 'na_entrega' })).toBe(true)
     expect(cobrancaPedidoAppEstaPaga({ status: 'paga', momentoCobranca: 'antecipado' })).toBe(true)
+    expect(cobrancaPedidoAppEstaPaga({ status: 'pendente', momentoCobranca: 'antecipado' })).toBe(
+      true
+    )
     expect(cobrancaPedidoAppEstaPaga({ pagamentoEfetivado: { id: 'pe-1' } })).toBe(true)
   })
 })
 
 describe('mapPedidoAppEntregador', () => {
+  it('cobra na porta só o PIX quando o dinheiro já foi antecipado', () => {
+    const pedido = mapPedidoAppEntregador({
+      id: 'p1',
+      valorFinal: 300,
+      totalFaltaPagar: 300,
+      cobrancas: [
+        {
+          id: 'cob-din',
+          meioPagamentoId: 'mp-din',
+          valor: 15,
+          status: 'pendente',
+          momentoCobranca: 'antecipado',
+          meioPagamento: { nome: 'Dinheiro' },
+        },
+        {
+          id: 'cob-pix',
+          meioPagamentoId: 'mp-pix',
+          valor: 285,
+          status: 'pendente',
+          momentoCobranca: 'na_entrega',
+          meioPagamento: { nome: 'Pix' },
+        },
+      ],
+    })
+    expect(pedido?.faltaPagar).toBe(285)
+    expect(pedido?.cobrancas).toEqual([
+      { id: 'cob-din', meioPagamentoId: 'mp-din', valor: 15, pendente: false, nome: 'Dinheiro' },
+      { id: 'cob-pix', meioPagamentoId: 'mp-pix', valor: 285, pendente: true, nome: 'Pix' },
+    ])
+  })
+
   it('leva forma de pagamento no resumo', () => {
     const pedido = mapPedidoAppEntregador({
       id: 'p1',
@@ -115,6 +149,33 @@ describe('mapPedidoAppEntregador', () => {
     expect(
       aplicarNomesMeiosNoPedido(pedido!, { 'meio-dinheiro': 'Dinheiro' }).formaPagamento
     ).toBe('Dinheiro')
+  })
+
+  it('leva o troco da mesma regra do cupom', () => {
+    const peloCampo = mapPedidoAppEntregador({
+      id: 'p1',
+      valorFinal: 39.9,
+      troco: 10.1,
+    })
+    expect(peloCampo?.trocoLevar).toBe(10.1)
+
+    const pelaCedula = mapPedidoAppEntregador({
+      id: 'p2',
+      valorFinal: 39.9,
+      troco: 0,
+      cobrancas: [
+        {
+          id: 'cob-1',
+          meioPagamentoId: 'mp-dinheiro',
+          valor: 50,
+          momentoCobranca: 'na_entrega',
+          status: 'pendente',
+          meioPagamento: { nome: 'Dinheiro' },
+        },
+      ],
+    })
+    expect(pelaCedula?.trocoLevar).toBe(10.1)
+    expect(pelaCedula?.faltaPagar).toBe(50)
   })
 
   it('troca UUID já gravado no resumo pelo nome do catálogo', () => {
