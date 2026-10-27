@@ -214,31 +214,31 @@ export function PizzaCategoriaSetupPanel({
           ) : null}
 
           {step === 'massas-bordas' ? (
-            <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4 md:p-6">
-              <section className="space-y-3">
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 md:p-4">
+              <section className="space-y-1.5">
                 <div>
-                  <h2 className="text-base font-semibold text-primary-text">Massas</h2>
-                  <p className="text-sm text-secondary-text">
+                  <h2 className="text-sm font-semibold text-primary-text">Massas</h2>
+                  <p className="text-xs text-secondary-text">
                     Cadastre as massas disponíveis nesta categoria.
                   </p>
                 </div>
                 <PizzaMassaBordaTable
-                  className="p-0"
+                  className="gap-2 p-0"
                   labelNome="Massa"
                   labelAdicionar="+ Adicionar massa"
                   linhas={draft.massas}
                   onChange={massas => setDraft({ ...draft, massas })}
                 />
               </section>
-              <section className="space-y-3">
+              <section className="space-y-1.5">
                 <div>
-                  <h2 className="text-base font-semibold text-primary-text">Bordas</h2>
-                  <p className="text-sm text-secondary-text">
+                  <h2 className="text-sm font-semibold text-primary-text">Bordas</h2>
+                  <p className="text-xs text-secondary-text">
                     Cadastre as bordas disponíveis nesta categoria.
                   </p>
                 </div>
                 <PizzaMassaBordaTable
-                  className="p-0"
+                  className="gap-2 p-0"
                   labelNome="Borda"
                   labelAdicionar="+ Adicionar borda"
                   linhas={draft.bordas}

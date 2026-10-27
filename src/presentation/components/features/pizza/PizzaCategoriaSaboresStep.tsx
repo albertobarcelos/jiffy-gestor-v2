@@ -4,7 +4,12 @@ import { useMemo, useState } from 'react'
 import { MdAdd, MdDeleteOutline } from 'react-icons/md'
 import { Button } from '@/src/presentation/components/ui/button'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
-import { formatPizzaMoney, type PizzaCategoriaDraft, type PizzaSaborDraft } from './pizzaDefaults'
+import {
+  formatPizzaMoney,
+  type PizzaCategoriaDraft,
+  type PizzaSaborDraft,
+  type PizzaTamanhoDraft,
+} from './pizzaDefaults'
 import { PizzaSaborDraftModal } from './PizzaSaborDraftModal'
 
 interface PizzaCategoriaSaboresStepProps {
@@ -12,15 +17,18 @@ interface PizzaCategoriaSaboresStepProps {
   onChange: (draft: PizzaCategoriaDraft) => void
 }
 
-function resumoPrecos(sabor: PizzaSaborDraft) {
-  const valores = Object.values(sabor.precosPorTamanhoLocalId)
-    .filter(cfg => cfg.enabled && cfg.valor > 0)
-    .map(cfg => cfg.valor)
-  if (valores.length === 0) return 'Sem preço'
-  const min = Math.min(...valores)
-  const max = Math.max(...valores)
-  if (min === max) return formatPizzaMoney(min)
-  return `A partir de ${formatPizzaMoney(min)}`
+function resumoPrecosPorTamanho(sabor: PizzaSaborDraft, tamanhos: PizzaTamanhoDraft[]) {
+  const partes = tamanhos
+    .map(tamanho => {
+      const cfg = sabor.precosPorTamanhoLocalId[tamanho.localId]
+      if (!cfg?.enabled || cfg.valor <= 0) return null
+      const nome = tamanho.nome.trim() || 'Tamanho'
+      return `${nome} ${formatPizzaMoney(cfg.valor)}`
+    })
+    .filter((parte): parte is string => parte != null)
+
+  if (partes.length === 0) return 'Sem preço'
+  return partes.join('  -  ')
 }
 
 export function PizzaCategoriaSaboresStep({ draft, onChange }: PizzaCategoriaSaboresStepProps) {
@@ -90,7 +98,9 @@ export function PizzaCategoriaSaboresStep({ draft, onChange }: PizzaCategoriaSab
                 onClick={() => abrirEdicao(sabor)}
               >
                 <p className="truncate text-sm font-semibold text-primary-text">{sabor.nome}</p>
-                <p className="text-xs text-secondary-text">{resumoPrecos(sabor)}</p>
+                <p className="truncate text-xs text-secondary-text">
+                  {resumoPrecosPorTamanho(sabor, tamanhosAtivos)}
+                </p>
               </button>
               <JiffyIconSwitch
                 checked={sabor.ativo}
@@ -122,10 +132,23 @@ export function PizzaCategoriaSaboresStep({ draft, onChange }: PizzaCategoriaSab
 
       <Button
         type="button"
-        variant="outlined"
-        className="self-start border-primary text-primary"
+        variant="contained"
+        fullWidth
         onClick={abrirNovo}
         disabled={tamanhosAtivos.length === 0}
+        sx={{
+          backgroundColor: 'var(--color-primary)',
+          color: '#fff',
+          '&:hover': {
+            backgroundColor: 'var(--color-primary)',
+            filter: 'brightness(0.92)',
+          },
+          '&.Mui-disabled': {
+            backgroundColor: 'var(--color-primary)',
+            color: '#fff',
+            opacity: 0.5,
+          },
+        }}
       >
         <MdAdd className="mr-1" /> Novo sabor
       </Button>
