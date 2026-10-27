@@ -189,6 +189,12 @@ export interface CreateCategoriaPizzaCompletoInput {
     ativo?: boolean
     precosTamanho?: Array<{ nome: string; precoCheio: number }>
   }>
+  /** Adicionais (complementos) vinculados na criação, com preços por nome do tamanho. */
+  complementos?: Array<{
+    complementoId: string
+    ativo?: boolean
+    precos?: Array<{ nome: string; valor: number }>
+  }>
   gruposBordas?: GrupoBordasPizzaNestedInput[]
   gruposMassas?: GrupoMassasPizzaNestedInput[]
 }

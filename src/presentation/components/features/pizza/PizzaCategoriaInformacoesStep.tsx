@@ -5,7 +5,7 @@ import { TextField } from '@mui/material'
 import { MdCheck } from 'react-icons/md'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
-import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { Shimmer, ShimmerRepeat } from '@/src/presentation/components/ui/shimmer'
 import { IconPickerPanel } from '@/src/presentation/components/features/grupos-produtos/IconPickerPanel'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { cn } from '@/src/shared/utils/cn'
@@ -13,6 +13,36 @@ import type { PizzaCategoriaDraft } from './pizzaDefaults'
 
 const SCROLLBAR_BRANCA =
   '[scrollbar-color:white_white] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-white [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white [&::-webkit-scrollbar-thumb:hover]:bg-white'
+
+const CORES_SKELETON_ITENS = 15
+
+function CoresGridSkeleton() {
+  return (
+    <div
+      className="min-h-0 flex-1 overflow-hidden"
+      aria-busy="true"
+      aria-label="Carregando cores"
+    >
+      <div className="grid grid-cols-4 gap-3 sm:grid-cols-5">
+        <ShimmerRepeat count={CORES_SKELETON_ITENS}>
+          {index => (
+            <div
+              key={index}
+              className="relative mx-auto aspect-square w-full max-w-[4.5rem] overflow-hidden rounded-xl"
+            >
+              <Shimmer
+                variant="rectangular"
+                width="100%"
+                height="100%"
+                sx={{ position: 'absolute', inset: 0, borderRadius: '0.75rem' }}
+              />
+            </div>
+          )}
+        </ShimmerRepeat>
+      </div>
+    </div>
+  )
+}
 
 interface PizzaCategoriaInformacoesStepProps {
   draft: PizzaCategoriaDraft
@@ -40,7 +70,7 @@ export function PizzaCategoriaInformacoesStep({
   onChange,
 }: PizzaCategoriaInformacoesStepProps) {
   const [colors, setColors] = useState<string[]>([])
-  const [loadingColors, setLoadingColors] = useState(false)
+  const [loadingColors, setLoadingColors] = useState(true)
   const [colorsError, setColorsError] = useState<string | null>(null)
 
   const fetchColors = useCallback(async () => {
@@ -112,9 +142,7 @@ export function PizzaCategoriaInformacoesStep({
         <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-2 lg:grid-rows-1">
           <div className="flex min-h-[220px] flex-col rounded-xl border border-gray-200 bg-white p-3 md:p-4 lg:min-h-0">
             {loadingColors ? (
-              <div className="flex min-h-0 flex-1 items-center justify-center">
-                <JiffyLoading />
-              </div>
+              <CoresGridSkeleton />
             ) : colorsError ? (
               <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2">
                 <p className="text-center text-sm text-error">{colorsError}</p>
@@ -164,6 +192,7 @@ export function PizzaCategoriaInformacoesStep({
               enabled
               dense
               fillAvailable
+              loadingUI="skeleton"
               gridClassName="grid grid-cols-5 gap-1 md:gap-2"
               scrollAreaClassName={SCROLLBAR_BRANCA}
               selectedColor={draft.corHex}

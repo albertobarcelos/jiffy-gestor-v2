@@ -35,23 +35,24 @@ interface PizzaCategoriaAdicionaisTabProps {
   tamanhos: Array<{ id?: string; nome: string; ativo: boolean }>
 }
 
-interface PizzaComplementoPrecoEditorProps {
+export interface PizzaComplementoPrecoEditorProps {
   tamanhos: PizzaComplementoTamanhoOption[]
   precos: PrecoComplementoPizza[]
   tipoImpactoPreco: TipoImpactoPreco
   valorInicial?: number
   iniciarTodosSelecionados?: boolean
   pending: boolean
-  onSave: (precos: PrecoComplementoPizza[]) => Promise<void>
+  onSave: (precos: PrecoComplementoPizza[]) => void | Promise<void>
+  saveLabel?: string
 }
 
-function nomeImpacto(tipoImpactoPreco: TipoImpactoPreco) {
+export function nomeImpactoPizzaComplemento(tipoImpactoPreco: TipoImpactoPreco) {
   if (tipoImpactoPreco === 'aumenta') return 'Acréscimo'
   if (tipoImpactoPreco === 'diminui') return 'Desconto'
   return 'Sem impacto de preço'
 }
 
-function PizzaComplementoPrecoEditor({
+export function PizzaComplementoPrecoEditor({
   tamanhos,
   precos,
   tipoImpactoPreco,
@@ -59,6 +60,7 @@ function PizzaComplementoPrecoEditor({
   iniciarTodosSelecionados = false,
   pending,
   onSave,
+  saveLabel = 'Salvar preços',
 }: PizzaComplementoPrecoEditorProps) {
   const [valores, setValores] = useState(() => {
     const existentes = new Map(precos.map(preco => [preco.pizzaTamanhoId, preco.valor]))
@@ -166,7 +168,7 @@ function PizzaComplementoPrecoEditor({
         disabled={pending || tamanhos.length === 0}
         className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {pending ? 'Salvando...' : 'Salvar preços'}
+        {pending ? 'Salvando...' : saveLabel}
       </button>
     </div>
   )
@@ -431,7 +433,7 @@ export function PizzaCategoriaAdicionaisTab({
                           </p>
                         ) : null}
                         <p className="mt-1 text-sm text-secondary-text">
-                          Impacto: {nomeImpacto(tipoImpactoPendente)}
+                          Impacto: {nomeImpactoPizzaComplemento(tipoImpactoPendente)}
                         </p>
                       </div>
                       <button
@@ -478,7 +480,7 @@ export function PizzaCategoriaAdicionaisTab({
                             <p className="mt-1 text-sm text-secondary-text">{vinculado.descricao}</p>
                           ) : null}
                           <p className="mt-1 text-sm text-secondary-text">
-                            Impacto: {nomeImpacto(vinculado.tipoImpactoPreco)}
+                            Impacto: {nomeImpactoPizzaComplemento(vinculado.tipoImpactoPreco)}
                           </p>
                         </div>
                         <div className="flex items-center gap-3">
@@ -569,7 +571,7 @@ export function PizzaCategoriaAdicionaisTab({
                               ) : null}
                             </div>
                             <span className="block text-center text-[11px] text-secondary-text">
-                              {nomeImpacto(tipo)}
+                              {nomeImpactoPizzaComplemento(tipo)}
                             </span>
                             <div className="flex justify-center">
                               <JiffyIconSwitch
@@ -601,7 +603,9 @@ export function PizzaCategoriaAdicionaisTab({
                               {descricao ? (
                                 <p className="truncate text-xs text-secondary-text">{descricao}</p>
                               ) : null}
-                              <p className="mt-1 text-xs text-secondary-text">{nomeImpacto(tipo)}</p>
+                              <p className="mt-1 text-xs text-secondary-text">
+                                {nomeImpactoPizzaComplemento(tipo)}
+                              </p>
                               {isPendente ? (
                                 <p className="text-xs font-medium text-primary">
                                   Aguardando preços em Nesta categoria

@@ -4,7 +4,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { FormControlLabel, Radio, RadioGroup } from '@mui/material'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
-import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import {
+  ShimmerLine,
+  ShimmerRect,
+  ShimmerRepeat,
+} from '@/src/presentation/components/ui/shimmer'
 import { cn } from '@/src/shared/utils/cn'
 import type { PizzaCategoriaDraft } from './pizzaDefaults'
 
@@ -21,12 +25,39 @@ type ImpressoraCatalogItem = {
 const SCROLLBAR_BRANCA =
   '[scrollbar-color:white_white] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-white [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white [&::-webkit-scrollbar-thumb:hover]:bg-white'
 
+const IMPRESSORAS_SKELETON_ITENS = 6
+
+function ImpressorasListSkeleton() {
+  return (
+    <div
+      className="min-h-0 flex-1 overflow-hidden"
+      aria-busy="true"
+      aria-label="Carregando impressoras"
+    >
+      <ul className="flex flex-col gap-1">
+        <ShimmerRepeat count={IMPRESSORAS_SKELETON_ITENS}>
+          {index => (
+            <li
+              key={index}
+              className="flex w-full items-center justify-between gap-3 py-0.5"
+              aria-hidden
+            >
+              <ShimmerLine width={`${48 + (index % 3) * 12}%`} height={16} />
+              <ShimmerRect width={36} height={20} radius={999} />
+            </li>
+          )}
+        </ShimmerRepeat>
+      </ul>
+    </div>
+  )
+}
+
 export function PizzaCategoriaRegraPrecoStep({
   draft,
   onChange,
 }: PizzaCategoriaRegraPrecoStepProps) {
   const [impressoras, setImpressoras] = useState<ImpressoraCatalogItem[]>([])
-  const [loadingImpressoras, setLoadingImpressoras] = useState(false)
+  const [loadingImpressoras, setLoadingImpressoras] = useState(true)
   const [impressorasError, setImpressorasError] = useState<string | null>(null)
 
   const fetchImpressoras = useCallback(async () => {
@@ -170,9 +201,7 @@ export function PizzaCategoriaRegraPrecoStep({
         </h2>
 
         {loadingImpressoras ? (
-          <div className="flex min-h-0 flex-1 items-center justify-center py-6">
-            <JiffyLoading />
-          </div>
+          <ImpressorasListSkeleton />
         ) : impressorasError ? (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 py-6">
             <p className="text-center text-sm text-error">{impressorasError}</p>

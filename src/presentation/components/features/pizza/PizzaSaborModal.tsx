@@ -390,7 +390,7 @@ export function PizzaSaborModal({
                     Configure os tamanhos da categoria antes de cadastrar sabores.
                   </p>
                 ) : (
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     {tamanhos.map(tamanho => {
                       const cfg = precos[tamanho.id] ?? { enabled: false, valor: 0 }
                       return (

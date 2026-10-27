@@ -6,7 +6,10 @@ import { mdiMagnify } from '@mdi/js'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { Shimmer, ShimmerRepeat } from '@/src/presentation/components/ui/shimmer'
 import { cn } from '@/src/shared/utils/cn'
+
+const ICONES_SKELETON_ITENS = 20
 
 export interface IconData {
   name: string
@@ -32,6 +35,8 @@ export type IconPickerPanelProps = {
   scrollAreaClassName?: string
   /** Ícones menores e mais por linha (útil em painéis side-by-side). */
   dense?: boolean
+  /** `skeleton` para grade shimmer; `brand` mantém o GIF Jiffy. */
+  loadingUI?: 'brand' | 'skeleton'
   className?: string
   onSelect: (iconName: string) => void
 }
@@ -47,6 +52,7 @@ export function IconPickerPanel({
   gridClassName: gridClassNameProp,
   scrollAreaClassName,
   dense = false,
+  loadingUI = 'brand',
   className,
   onSelect,
 }: IconPickerPanelProps) {
@@ -54,7 +60,7 @@ export function IconPickerPanel({
   const [filteredIcons, setFilteredIcons] = useState<IconData[]>([])
   const [searchText, setSearchText] = useState('')
   const [activeTab, setActiveTab] = useState(0)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(enabled)
   const [error, setError] = useState<string | null>(null)
   const [groups, setGroups] = useState<string[]>([])
   const { auth } = useAuthStore()
@@ -211,14 +217,40 @@ export function IconPickerPanel({
 
       <div className={scrollAreaClasses}>
         {isLoading ? (
-          <div
-            className={cn(
-              emptyStateMinHeight,
-              'flex flex-col items-center justify-center gap-2 py-8'
-            )}
-          >
-            <JiffyLoading />
-          </div>
+          loadingUI === 'skeleton' ? (
+            <div
+              className={cn(emptyStateMinHeight, 'py-1')}
+              aria-busy="true"
+              aria-label="Carregando ícones"
+            >
+              <div className={gridClassName}>
+                <ShimmerRepeat count={ICONES_SKELETON_ITENS}>
+                  {index => (
+                    <div
+                      key={index}
+                      className="relative aspect-square overflow-hidden rounded-lg"
+                    >
+                      <Shimmer
+                        variant="rectangular"
+                        width="100%"
+                        height="100%"
+                        sx={{ position: 'absolute', inset: 0, borderRadius: '0.5rem' }}
+                      />
+                    </div>
+                  )}
+                </ShimmerRepeat>
+              </div>
+            </div>
+          ) : (
+            <div
+              className={cn(
+                emptyStateMinHeight,
+                'flex flex-col items-center justify-center gap-2 py-8'
+              )}
+            >
+              <JiffyLoading />
+            </div>
+          )
         ) : error ? (
           <div
             className={cn(

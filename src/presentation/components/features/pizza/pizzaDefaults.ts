@@ -33,6 +33,14 @@ export type PizzaSaborDraft = {
   precosPorTamanhoLocalId: Record<string, PizzaSaborPrecoDraft>
 }
 
+export type PizzaAdicionalDraft = {
+  localId: string
+  complementoId: string
+  ativo: boolean
+  /** Preços indexados pelo localId do tamanho no draft. */
+  precosPorTamanhoLocalId: Record<string, PizzaSaborPrecoDraft>
+}
+
 export type PizzaCategoriaDraft = {
   nome: string
   corHex: string
@@ -44,6 +52,7 @@ export type PizzaCategoriaDraft = {
   impressorasIds: string[]
   tamanhos: PizzaTamanhoDraft[]
   sabores: PizzaSaborDraft[]
+  adicionais: PizzaAdicionalDraft[]
   massas: PizzaLinhaComplementoDraft[]
   bordas: PizzaLinhaComplementoDraft[]
 }
@@ -64,6 +73,7 @@ export function createDefaultPizzaCategoriaDraft(nome = ''): PizzaCategoriaDraft
     impressorasIds: [],
     tamanhos: DEFAULT_TAMANHOS.map(t => ({ ...t, localId: createLocalId() })),
     sabores: [],
+    adicionais: [],
     massas: DEFAULT_MASSAS.map(m => ({ ...m, localId: createLocalId() })),
     bordas: DEFAULT_BORDAS.map(b => ({ ...b, localId: createLocalId() })),
   }
@@ -125,6 +135,29 @@ export function buildCreateCompletoPayload(
     })
     .filter(sabor => sabor.precosTamanho.length > 0)
 
+  const complementos = draft.adicionais
+    .filter(item => item.complementoId.trim())
+    .map(item => {
+      const precos = Object.entries(item.precosPorTamanhoLocalId)
+        .filter(([, cfg]) => cfg.enabled)
+        .map(([tamanhoLocalId, cfg]) => {
+          const nomeTamanho = tamanhoNomeByLocalId.get(tamanhoLocalId)
+          if (!nomeTamanho) return null
+          return {
+            nome: nomeTamanho,
+            valor: Math.max(0, cfg.valor || 0),
+          }
+        })
+        .filter((preco): preco is { nome: string; valor: number } => preco != null)
+
+      return {
+        complementoId: item.complementoId,
+        ativo: item.ativo,
+        precos,
+      }
+    })
+    .filter(item => item.precos.length > 0)
+
   const mapComplemento = (item: PizzaLinhaComplementoDraft) => ({
     nome: item.nome.trim(),
     valor: item.valor,
@@ -148,6 +181,7 @@ export function buildCreateCompletoPayload(
     },
     tamanhos,
     sabores,
+    complementos,
     gruposMassas:
       massasValidas.length > 0
         ? [

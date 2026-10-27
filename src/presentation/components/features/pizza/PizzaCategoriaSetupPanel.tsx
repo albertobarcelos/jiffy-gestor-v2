@@ -23,8 +23,8 @@ import {
 } from './PizzaCategoriaSetupStepper'
 import { PizzaCategoriaInformacoesStep } from './PizzaCategoriaInformacoesStep'
 import { PizzaCategoriaRegraPrecoStep } from './PizzaCategoriaRegraPrecoStep'
-import { PizzaCategoriaSetupPlaceholderStep } from './PizzaCategoriaSetupPlaceholderStep'
 import { PizzaCategoriaSaboresStep } from './PizzaCategoriaSaboresStep'
+import { PizzaCategoriaAdicionaisStep } from './PizzaCategoriaAdicionaisStep'
 import { PizzaTamanhoCards } from './PizzaTamanhoCards'
 import { PizzaMassaBordaTable } from './PizzaMassaBordaTable'
 
@@ -99,9 +99,12 @@ export function PizzaCategoriaSetupPanel({
       const payload = buildCreateCompletoPayload(draft, { menuId })
       const result = await criarMutation.mutateAsync(payload)
       baselineRef.current = serializePizzaDraft(draft)
+      const partes: string[] = []
+      if (draft.sabores.length > 0) partes.push('sabores')
+      if (draft.adicionais.length > 0) partes.push('adicionais')
       showToast.success(
-        draft.sabores.length > 0
-          ? 'Categoria pizza criada com sabores'
+        partes.length > 0
+          ? `Categoria pizza criada com ${partes.join(' e ')}`
           : menuId
             ? 'Categoria criada. Cadastre sabores para exibir no cardápio.'
             : 'Categoria pizza criada'
@@ -203,6 +206,14 @@ export function PizzaCategoriaSetupPanel({
                       delete nextPrecos[tamanho.localId]
                       return { ...sabor, precosPorTamanhoLocalId: nextPrecos }
                     }),
+                    adicionais: prev.adicionais.map(adicional => {
+                      if (!(tamanho.localId in adicional.precosPorTamanhoLocalId)) {
+                        return adicional
+                      }
+                      const nextPrecos = { ...adicional.precosPorTamanhoLocalId }
+                      delete nextPrecos[tamanho.localId]
+                      return { ...adicional, precosPorTamanhoLocalId: nextPrecos }
+                    }),
                   }))
                 }
               />
@@ -249,12 +260,7 @@ export function PizzaCategoriaSetupPanel({
           ) : null}
 
           {step === 'adicionais' ? (
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              <PizzaCategoriaSetupPlaceholderStep
-                titulo="Adicionais"
-                descricao="Os adicionais poderão ser vinculados após salvar a categoria. Salve para concluir a criação."
-              />
-            </div>
+            <PizzaCategoriaAdicionaisStep draft={draft} onChange={setDraft} />
           ) : null}
         </div>
       </JiffySidePanelModal>

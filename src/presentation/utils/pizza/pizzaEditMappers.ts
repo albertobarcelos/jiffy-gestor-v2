@@ -96,6 +96,7 @@ export function buildEditDraftFromLoaded(params: {
     impressorasIds: [],
     tamanhos: tamanhos.map(mapTamanhoToEditDraft),
     sabores: [],
+    adicionais: [],
     massas: grupoMassas?.massas?.map(mapMassaToEditDraft) ?? [],
     bordas: grupoBordas?.bordas?.map(mapBordaToEditDraft) ?? [],
     tamanhosRemovidosIds: [],

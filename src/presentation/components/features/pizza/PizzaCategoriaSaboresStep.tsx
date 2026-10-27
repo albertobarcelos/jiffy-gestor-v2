@@ -10,12 +10,14 @@ import {
   type PizzaSaborDraft,
   type PizzaTamanhoDraft,
 } from './pizzaDefaults'
-import { PizzaSaborDraftModal } from './PizzaSaborDraftModal'
+import { PizzaSaborDraftFormCard } from './PizzaSaborDraftFormCard'
 
 interface PizzaCategoriaSaboresStepProps {
   draft: PizzaCategoriaDraft
   onChange: (draft: PizzaCategoriaDraft) => void
 }
+
+type FormMode = 'closed' | 'create' | 'edit'
 
 function resumoPrecosPorTamanho(sabor: PizzaSaborDraft, tamanhos: PizzaTamanhoDraft[]) {
   const partes = tamanhos
@@ -32,22 +34,35 @@ function resumoPrecosPorTamanho(sabor: PizzaSaborDraft, tamanhos: PizzaTamanhoDr
 }
 
 export function PizzaCategoriaSaboresStep({ draft, onChange }: PizzaCategoriaSaboresStepProps) {
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editing, setEditing] = useState<PizzaSaborDraft | null>(null)
+  const [formMode, setFormMode] = useState<FormMode>('closed')
+  const [editingLocalId, setEditingLocalId] = useState<string | null>(null)
 
   const tamanhosAtivos = useMemo(
     () => draft.tamanhos.filter(t => t.nome.trim() && t.ativo),
     [draft.tamanhos]
   )
 
+  const editingSabor = useMemo(
+    () =>
+      formMode === 'edit' && editingLocalId
+        ? (draft.sabores.find(item => item.localId === editingLocalId) ?? null)
+        : null,
+    [draft.sabores, editingLocalId, formMode]
+  )
+
   const abrirNovo = () => {
-    setEditing(null)
-    setModalOpen(true)
+    setEditingLocalId(null)
+    setFormMode('create')
   }
 
   const abrirEdicao = (sabor: PizzaSaborDraft) => {
-    setEditing(sabor)
-    setModalOpen(true)
+    setEditingLocalId(sabor.localId)
+    setFormMode('edit')
+  }
+
+  const fecharForm = () => {
+    setFormMode('closed')
+    setEditingLocalId(null)
   }
 
   const handleSaveSabor = (sabor: PizzaSaborDraft) => {
@@ -56,11 +71,15 @@ export function PizzaCategoriaSaboresStep({ draft, onChange }: PizzaCategoriaSab
       ...draft,
       sabores: exists
         ? draft.sabores.map(item => (item.localId === sabor.localId ? sabor : item))
-        : [...draft.sabores, sabor],
+        : [sabor, ...draft.sabores],
     })
+    fecharForm()
   }
 
   const removerSabor = (localId: string) => {
+    if (editingLocalId === localId) {
+      fecharForm()
+    }
     onChange({
       ...draft,
       sabores: draft.sabores.filter(item => item.localId !== localId),
@@ -69,19 +88,46 @@ export function PizzaCategoriaSaboresStep({ draft, onChange }: PizzaCategoriaSab
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-6">
-      <div>
-        <h2 className="text-base font-semibold text-primary-text">Sabores</h2>
-        <p className="mt-1 text-sm text-secondary-text">
-          Cadastre os sabores e os preços por tamanho. Tudo será salvo junto com a categoria no
-          final.
-        </p>
-      </div>
+      <h2 className="text-base font-semibold text-primary-text">Sabores</h2>
 
       {tamanhosAtivos.length === 0 ? (
         <p className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-sm text-secondary-text">
           Configure ao menos um tamanho ativo no passo anterior para cadastrar sabores com preço.
         </p>
       ) : null}
+
+      {formMode === 'create' || (formMode === 'edit' && editingSabor) ? (
+        <PizzaSaborDraftFormCard
+          key={editingSabor?.localId ?? 'novo'}
+          tamanhos={draft.tamanhos}
+          initial={editingSabor}
+          onSave={handleSaveSabor}
+          onCancel={fecharForm}
+        />
+      ) : (
+        <Button
+          type="button"
+          variant="contained"
+          fullWidth
+          onClick={abrirNovo}
+          disabled={tamanhosAtivos.length === 0}
+          sx={{
+            backgroundColor: 'var(--color-primary)',
+            color: '#fff',
+            '&:hover': {
+              backgroundColor: 'var(--color-primary)',
+              filter: 'brightness(0.92)',
+            },
+            '&.Mui-disabled': {
+              backgroundColor: 'var(--color-primary)',
+              color: '#fff',
+              opacity: 0.5,
+            },
+          }}
+        >
+          <MdAdd className="mr-1" /> Novo sabor
+        </Button>
+      )}
 
       {draft.sabores.length === 0 ? (
         <p className="text-sm text-secondary-text">Nenhum sabor adicionado ainda.</p>
@@ -98,6 +144,11 @@ export function PizzaCategoriaSaboresStep({ draft, onChange }: PizzaCategoriaSab
                 onClick={() => abrirEdicao(sabor)}
               >
                 <p className="truncate text-sm font-semibold text-primary-text">{sabor.nome}</p>
+                {sabor.descricao.trim() ? (
+                  <p className="truncate text-[11px] leading-tight text-secondary-text">
+                    {sabor.descricao.trim()}
+                  </p>
+                ) : null}
                 <p className="truncate text-xs text-secondary-text">
                   {resumoPrecosPorTamanho(sabor, tamanhosAtivos)}
                 </p>
@@ -129,41 +180,6 @@ export function PizzaCategoriaSaboresStep({ draft, onChange }: PizzaCategoriaSab
           ))}
         </ul>
       )}
-
-      <Button
-        type="button"
-        variant="contained"
-        fullWidth
-        onClick={abrirNovo}
-        disabled={tamanhosAtivos.length === 0}
-        sx={{
-          backgroundColor: 'var(--color-primary)',
-          color: '#fff',
-          '&:hover': {
-            backgroundColor: 'var(--color-primary)',
-            filter: 'brightness(0.92)',
-          },
-          '&.Mui-disabled': {
-            backgroundColor: 'var(--color-primary)',
-            color: '#fff',
-            opacity: 0.5,
-          },
-        }}
-      >
-        <MdAdd className="mr-1" /> Novo sabor
-      </Button>
-
-      <PizzaSaborDraftModal
-        open={modalOpen}
-        categoriaNome={draft.nome.trim() || 'Nova categoria pizza'}
-        tamanhos={draft.tamanhos}
-        initial={editing}
-        onClose={() => {
-          setModalOpen(false)
-          setEditing(null)
-        }}
-        onSave={handleSaveSabor}
-      />
     </div>
   )
 }
