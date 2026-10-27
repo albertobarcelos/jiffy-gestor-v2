@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { MdAdd, MdDeleteOutline } from 'react-icons/md'
 import { Button } from '@/src/presentation/components/ui/button'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
@@ -10,11 +10,19 @@ import {
   type PizzaSaborDraft,
   type PizzaTamanhoDraft,
 } from './pizzaDefaults'
-import { PizzaSaborDraftFormCard } from './PizzaSaborDraftFormCard'
+import {
+  PizzaSaborDraftFormCard,
+  type PizzaSaborDraftFormCardHandle,
+} from './PizzaSaborDraftFormCard'
 
 interface PizzaCategoriaSaboresStepProps {
   draft: PizzaCategoriaDraft
   onChange: (draft: PizzaCategoriaDraft) => void
+}
+
+export interface PizzaCategoriaSaboresStepHandle {
+  /** Retorna true se pode sair do passo (auto-adiciona sabor completo se houver). */
+  tryFlushBeforeLeave: () => boolean
 }
 
 type FormMode = 'closed' | 'create' | 'edit'
@@ -33,9 +41,13 @@ function resumoPrecosPorTamanho(sabor: PizzaSaborDraft, tamanhos: PizzaTamanhoDr
   return partes.join('  -  ')
 }
 
-export function PizzaCategoriaSaboresStep({ draft, onChange }: PizzaCategoriaSaboresStepProps) {
+export const PizzaCategoriaSaboresStep = forwardRef<
+  PizzaCategoriaSaboresStepHandle,
+  PizzaCategoriaSaboresStepProps
+>(function PizzaCategoriaSaboresStep({ draft, onChange }, ref) {
   const [formMode, setFormMode] = useState<FormMode>('closed')
   const [editingLocalId, setEditingLocalId] = useState<string | null>(null)
+  const formCardRef = useRef<PizzaSaborDraftFormCardHandle>(null)
 
   const tamanhosAtivos = useMemo(
     () => draft.tamanhos.filter(t => t.nome.trim() && t.ativo),
@@ -49,6 +61,8 @@ export function PizzaCategoriaSaboresStep({ draft, onChange }: PizzaCategoriaSab
         : null,
     [draft.sabores, editingLocalId, formMode]
   )
+
+  const formAberto = formMode === 'create' || (formMode === 'edit' && editingSabor != null)
 
   const abrirNovo = () => {
     setEditingLocalId(null)
@@ -86,6 +100,22 @@ export function PizzaCategoriaSaboresStep({ draft, onChange }: PizzaCategoriaSab
     })
   }
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      tryFlushBeforeLeave: () => {
+        if (!formAberto) return true
+        const result = formCardRef.current?.tryCommitOnLeave() ?? 'idle'
+        if (result === 'incomplete') return false
+        if (result === 'idle') {
+          fecharForm()
+        }
+        return true
+      },
+    }),
+    [formAberto]
+  )
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-6">
       <h2 className="text-base font-semibold text-primary-text">Sabores</h2>
@@ -99,6 +129,7 @@ export function PizzaCategoriaSaboresStep({ draft, onChange }: PizzaCategoriaSab
       {formMode === 'create' || (formMode === 'edit' && editingSabor) ? (
         <PizzaSaborDraftFormCard
           key={editingSabor?.localId ?? 'novo'}
+          ref={formCardRef}
           tamanhos={draft.tamanhos}
           initial={editingSabor}
           onSave={handleSaveSabor}
@@ -182,4 +213,4 @@ export function PizzaCategoriaSaboresStep({ draft, onChange }: PizzaCategoriaSab
       )}
     </div>
   )
-}
+})

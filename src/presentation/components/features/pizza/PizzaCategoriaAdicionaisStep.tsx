@@ -15,7 +15,7 @@ import {
   type PizzaSaborPrecoDraft,
 } from './pizzaDefaults'
 import {
-  nomeImpactoPizzaComplemento,
+  PizzaComplementoNomeComDescricao,
   PizzaComplementoPrecoEditor,
 } from './PizzaCategoriaAdicionaisTab'
 
@@ -62,13 +62,22 @@ export function PizzaCategoriaAdicionaisStep({
   const cadastroQuery = useComplementos({ limit: 2000 })
   const [searchTerm, setSearchTerm] = useState('')
   const [filterTab, setFilterTab] = useState<FilterTab>('vinculados')
-  const [pendenteComplementoId, setPendenteComplementoId] = useState<string | null>(null)
+  const [pendentesComplementoIds, setPendentesComplementoIds] = useState<string[]>([])
 
   const catalogo = cadastroQuery.data ?? EMPTY_COMPLEMENTOS
   const idsVinculados = useMemo(
     () => new Set(draft.adicionais.map(item => item.complementoId)),
     [draft.adicionais]
   )
+  const idsPendentes = useMemo(
+    () => new Set(pendentesComplementoIds),
+    [pendentesComplementoIds]
+  )
+  const idsSelecionados = useMemo(() => {
+    const set = new Set(idsVinculados)
+    for (const id of pendentesComplementoIds) set.add(id)
+    return set
+  }, [idsVinculados, pendentesComplementoIds])
   const adicionaisByComplementoId = useMemo(() => {
     const map = new Map<string, PizzaAdicionalDraft>()
     for (const item of draft.adicionais) {
@@ -77,28 +86,29 @@ export function PizzaCategoriaAdicionaisStep({
     return map
   }, [draft.adicionais])
 
-  const complementoPendente = useMemo(
+  const complementosPendentes = useMemo(
     () =>
-      pendenteComplementoId
-        ? (catalogo.find(item => item.getId() === pendenteComplementoId) ?? null)
-        : null,
-    [catalogo, pendenteComplementoId]
+      pendentesComplementoIds
+        .map(id => catalogo.find(item => item.getId() === id) ?? null)
+        .filter((item): item is Complemento => item != null),
+    [catalogo, pendentesComplementoIds]
   )
 
   const filterCounts = useMemo(() => {
     let vinculados = 0
     let catalogoAtivos = 0
     for (const item of catalogo) {
-      const linked = idsVinculados.has(item.getId())
-      if (linked && item.isAtivo()) vinculados += 1
-      if (!linked && item.isAtivo()) catalogoAtivos += 1
+      const id = item.getId()
+      const selecionado = idsSelecionados.has(id)
+      if (selecionado && item.isAtivo()) vinculados += 1
+      if (!selecionado && item.isAtivo()) catalogoAtivos += 1
     }
     return {
       vinculados,
       catalogo: catalogoAtivos,
       todos: catalogo.length,
     }
-  }, [catalogo, idsVinculados])
+  }, [catalogo, idsSelecionados])
 
   const listaFiltrada = useMemo(() => {
     const term = searchTerm.trim().toLowerCase()
@@ -114,30 +124,31 @@ export function PizzaCategoriaAdicionaisStep({
       return bySearch.filter(item => idsVinculados.has(item.getId()) && item.isAtivo())
     }
     if (filterTab === 'catalogo') {
-      return bySearch.filter(item => !idsVinculados.has(item.getId()) && item.isAtivo())
+      return bySearch.filter(item => !idsSelecionados.has(item.getId()) && item.isAtivo())
     }
 
     const vinculados: Complemento[] = []
     const naoVinculados: Complemento[] = []
     for (const item of bySearch) {
-      if (idsVinculados.has(item.getId())) vinculados.push(item)
+      if (idsSelecionados.has(item.getId())) vinculados.push(item)
       else naoVinculados.push(item)
     }
     return [...vinculados, ...naoVinculados]
-  }, [catalogo, searchTerm, filterTab, idsVinculados])
-
-  const tipoImpactoPendente = normalizarTipoImpactoPreco(
-    complementoPendente?.getTipoImpactoPreco()
-  )
+  }, [catalogo, searchTerm, filterTab, idsVinculados, idsSelecionados])
 
   const iniciarVinculo = (complementoId: string) => {
     if (tamanhosDisponiveis.length === 0) {
       showToast.error('Configure ao menos um tamanho ativo antes de vincular adicionais')
       return
     }
-    if (idsVinculados.has(complementoId)) return
-    setPendenteComplementoId(complementoId)
-    setFilterTab('vinculados')
+    if (idsSelecionados.has(complementoId)) return
+    setPendentesComplementoIds(prev =>
+      prev.includes(complementoId) ? prev : [...prev, complementoId]
+    )
+  }
+
+  const cancelarPendente = (complementoId: string) => {
+    setPendentesComplementoIds(prev => prev.filter(id => id !== complementoId))
   }
 
   const removerAdicional = (complementoId: string) => {
@@ -153,8 +164,8 @@ export function PizzaCategoriaAdicionaisStep({
       return
     }
 
-    if (pendenteComplementoId === complementoId) {
-      setPendenteComplementoId(null)
+    if (idsPendentes.has(complementoId)) {
+      cancelarPendente(complementoId)
       return
     }
 
@@ -163,22 +174,20 @@ export function PizzaCategoriaAdicionaisStep({
     removerAdicional(complementoId)
   }
 
-  const confirmarPendente = (precos: PrecoComplementoPizza[]) => {
-    if (!complementoPendente) return
+  const confirmarPendente = (complemento: Complemento, precos: PrecoComplementoPizza[]) => {
     onChange({
       ...draft,
       adicionais: [
         ...draft.adicionais,
         {
           localId: createLocalId(),
-          complementoId: complementoPendente.getId(),
+          complementoId: complemento.getId(),
           ativo: true,
           precosPorTamanhoLocalId: precosEditorParaDraft(precos),
         },
       ],
     })
-    setPendenteComplementoId(null)
-    setFilterTab('vinculados')
+    cancelarPendente(complemento.getId())
     showToast.success('Adicional incluído (será salvo com a categoria)')
   }
 
@@ -208,8 +217,8 @@ export function PizzaCategoriaAdicionaisStep({
       <header className="mb-3 shrink-0">
         <h2 className="text-lg font-semibold text-primary-text">Adicionais da pizza</h2>
         <p className="mt-1 text-sm text-secondary-text">
-          Selecione em Disponíveis e defina o preço por tamanho. Tudo será salvo junto com a
-          categoria no final.
+          Selecione em Disponíveis e depois vá em Nesta categoria para definir o preço por
+          tamanho. Tudo será salvo junto com a categoria no final.
         </p>
       </header>
 
@@ -276,50 +285,49 @@ export function PizzaCategoriaAdicionaisStep({
           <>
             {filterTab === 'vinculados' ? (
               <div className="space-y-3">
-                {complementoPendente ? (
-                  <article className="space-y-4 rounded-xl border border-primary/40 bg-primary/5 p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-                          Novo vínculo — defina os preços por tamanho
-                        </p>
-                        <h4 className="mt-1 font-medium text-primary-text">
-                          {complementoPendente.getNome()}
-                        </h4>
-                        {complementoPendente.getDescricao()?.trim() ? (
-                          <p className="mt-1 text-sm text-secondary-text">
-                            {complementoPendente.getDescricao()}
+                {complementosPendentes.map(complemento => {
+                  const tipo = normalizarTipoImpactoPreco(complemento.getTipoImpactoPreco())
+                  return (
+                    <article
+                      key={`pendente-${complemento.getId()}`}
+                      className="space-y-4 rounded-xl border border-primary/40 bg-primary/5 p-4"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+                            Novo vínculo — defina os preços por tamanho
                           </p>
-                        ) : null}
-                        <p className="mt-1 text-sm text-secondary-text">
-                          Impacto: {nomeImpactoPizzaComplemento(tipoImpactoPendente)}
-                        </p>
+                          <div className="mt-1">
+                            <PizzaComplementoNomeComDescricao
+                              nome={complemento.getNome()}
+                              descricao={complemento.getDescricao()}
+                            />
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => cancelarPendente(complemento.getId())}
+                          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-secondary-text hover:bg-white"
+                        >
+                          Cancelar
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setPendenteComplementoId(null)}
-                        className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-secondary-text hover:bg-white"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                    <PizzaComplementoPrecoEditor
-                      key={`pendente-${complementoPendente.getId()}`}
-                      tamanhos={tamanhosDisponiveis}
-                      precos={[]}
-                      tipoImpactoPreco={tipoImpactoPendente}
-                      valorInicial={
-                        tipoImpactoPendente === 'nenhum' ? 0 : complementoPendente.getValor()
-                      }
-                      iniciarTodosSelecionados
-                      pending={false}
-                      saveLabel="Confirmar adicional"
-                      onSave={confirmarPendente}
-                    />
-                  </article>
-                ) : null}
+                      <PizzaComplementoPrecoEditor
+                        key={`pendente-editor-${complemento.getId()}`}
+                        tamanhos={tamanhosDisponiveis}
+                        precos={[]}
+                        tipoImpactoPreco={tipo}
+                        valorInicial={tipo === 'nenhum' ? 0 : complemento.getValor()}
+                        iniciarTodosSelecionados
+                        pending={false}
+                        saveLabel="Confirmar adicional"
+                        onSave={precos => confirmarPendente(complemento, precos)}
+                      />
+                    </article>
+                  )
+                })}
 
-                {listaFiltrada.length === 0 && !complementoPendente ? (
+                {listaFiltrada.length === 0 && complementosPendentes.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-gray-300 p-4 text-center text-sm text-secondary-text">
                     Nenhum adicional nesta categoria. Selecione em Disponíveis para vincular.
                   </p>
@@ -335,17 +343,10 @@ export function PizzaCategoriaAdicionaisStep({
                       className="space-y-4 rounded-xl border border-gray-200 p-4"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <h4 className="font-medium text-primary-text">{item.getNome()}</h4>
-                          {item.getDescricao()?.trim() ? (
-                            <p className="mt-1 text-sm text-secondary-text">
-                              {item.getDescricao()}
-                            </p>
-                          ) : null}
-                          <p className="mt-1 text-sm text-secondary-text">
-                            Impacto: {nomeImpactoPizzaComplemento(tipo)}
-                          </p>
-                        </div>
+                        <PizzaComplementoNomeComDescricao
+                          nome={item.getNome()}
+                          descricao={item.getDescricao()}
+                        />
                         <div className="flex items-center gap-3">
                           <JiffyIconSwitch
                             checked={adicional.ativo}
@@ -405,12 +406,9 @@ export function PizzaCategoriaAdicionaisStep({
                   <>
                     <div
                       className="sticky top-0 z-10 mb-1 hidden items-center gap-3 border-b border-gray-200 bg-white px-2 py-1.5 sm:grid"
-                      style={{ gridTemplateColumns: 'minmax(0,1fr) 7rem 3.25rem' }}
+                      style={{ gridTemplateColumns: 'minmax(0,1fr) 3.25rem' }}
                     >
                       <span className="text-xs font-semibold text-secondary-text">Complemento</span>
-                      <span className="text-center text-xs font-semibold text-secondary-text">
-                        Impacto
-                      </span>
                       <span className="text-center text-xs font-semibold text-secondary-text">
                         Vínculo
                       </span>
@@ -418,19 +416,19 @@ export function PizzaCategoriaAdicionaisStep({
                     {listaFiltrada.map(item => {
                       const id = item.getId()
                       const isLinked = idsVinculados.has(id)
-                      const isPendente = pendenteComplementoId === id
-                      const tipo = normalizarTipoImpactoPreco(item.getTipoImpactoPreco())
+                      const isPendente = idsPendentes.has(id)
+                      const isSelecionado = isLinked || isPendente
                       const descricao = item.getDescricao()?.trim()
                       return (
                         <div
                           key={id}
                           className={`border-b border-gray-100 px-2 py-2 transition-colors hover:bg-primary-bg/40 ${
-                            isLinked || isPendente ? '' : 'opacity-80'
+                            isSelecionado ? '' : 'opacity-80'
                           }`}
                         >
                           <div
                             className="hidden items-center gap-3 sm:grid"
-                            style={{ gridTemplateColumns: 'minmax(0,1fr) 7rem 3.25rem' }}
+                            style={{ gridTemplateColumns: 'minmax(0,1fr) 3.25rem' }}
                           >
                             <div className="min-w-0">
                               <p className="truncate text-sm font-medium text-primary-text">
@@ -448,22 +446,18 @@ export function PizzaCategoriaAdicionaisStep({
                                 </p>
                               ) : null}
                             </div>
-                            <span className="block text-center text-[11px] text-secondary-text">
-                              {nomeImpactoPizzaComplemento(tipo)}
-                            </span>
                             <div className="flex justify-center">
                               <JiffyIconSwitch
-                                checked={isLinked || isPendente}
+                                checked={isSelecionado}
                                 onChange={event => {
                                   event.stopPropagation()
                                   handleToggleVinculo(id, event.target.checked)
                                 }}
-                                disabled={!isLinked && !isPendente && !item.isAtivo()}
+                                disabled={!isSelecionado && !item.isAtivo()}
                                 bordered={false}
                                 size="sm"
                                 inputProps={{
-                                  'aria-label':
-                                    isLinked || isPendente ? 'Remover' : 'Vincular',
+                                  'aria-label': isSelecionado ? 'Remover' : 'Vincular',
                                 }}
                               />
                             </div>
@@ -477,9 +471,6 @@ export function PizzaCategoriaAdicionaisStep({
                               {descricao ? (
                                 <p className="truncate text-xs text-secondary-text">{descricao}</p>
                               ) : null}
-                              <p className="mt-1 text-xs text-secondary-text">
-                                {nomeImpactoPizzaComplemento(tipo)}
-                              </p>
                               {isPendente ? (
                                 <p className="text-xs font-medium text-primary">
                                   Aguardando preços em Nesta categoria
@@ -487,17 +478,16 @@ export function PizzaCategoriaAdicionaisStep({
                               ) : null}
                             </div>
                             <JiffyIconSwitch
-                              checked={isLinked || isPendente}
+                              checked={isSelecionado}
                               onChange={event => {
                                 event.stopPropagation()
                                 handleToggleVinculo(id, event.target.checked)
                               }}
-                              disabled={!isLinked && !isPendente && !item.isAtivo()}
+                              disabled={!isSelecionado && !item.isAtivo()}
                               bordered={false}
                               size="sm"
                               inputProps={{
-                                'aria-label':
-                                  isLinked || isPendente ? 'Remover' : 'Vincular',
+                                'aria-label': isSelecionado ? 'Remover' : 'Vincular',
                               }}
                             />
                           </div>

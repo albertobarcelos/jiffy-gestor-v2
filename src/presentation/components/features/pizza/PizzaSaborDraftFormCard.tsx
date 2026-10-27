@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from 'react'
 import { Checkbox, TextField } from '@mui/material'
 import { Button } from '@/src/presentation/components/ui/button'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
@@ -44,6 +44,12 @@ const sxBotaoCardSabor = {
   boxSizing: 'border-box',
 } as const
 
+export type PizzaSaborFormLeaveResult = 'idle' | 'committed' | 'incomplete'
+
+export interface PizzaSaborDraftFormCardHandle {
+  tryCommitOnLeave: () => PizzaSaborFormLeaveResult
+}
+
 interface PizzaSaborDraftFormCardProps {
   tamanhos: PizzaTamanhoDraft[]
   initial?: PizzaSaborDraft | null
@@ -55,12 +61,32 @@ function buildPrecosSelecionados(precos: Record<string, PizzaSaborPrecoDraft>) {
   return Object.entries(precos).filter(([, cfg]) => cfg.enabled && cfg.valor > 0)
 }
 
-export function PizzaSaborDraftFormCard({
-  tamanhos,
-  initial = null,
-  onSave,
-  onCancel,
-}: PizzaSaborDraftFormCardProps) {
+function isFormVazio(
+  nome: string,
+  descricao: string,
+  precos: Record<string, PizzaSaborPrecoDraft>,
+  tamanhosAtivos: PizzaTamanhoDraft[]
+) {
+  if (nome.trim() || descricao.trim()) return false
+  return tamanhosAtivos.every(t => (precos[t.localId]?.valor ?? 0) <= 0)
+}
+
+function isFormCompletoParaContinuar(
+  nome: string,
+  precos: Record<string, PizzaSaborPrecoDraft>,
+  tamanhosAtivos: PizzaTamanhoDraft[]
+) {
+  if (!nome.trim() || tamanhosAtivos.length === 0) return false
+  return tamanhosAtivos.every(t => {
+    const cfg = precos[t.localId]
+    return Boolean(cfg?.enabled && cfg.valor > 0)
+  })
+}
+
+export const PizzaSaborDraftFormCard = forwardRef<
+  PizzaSaborDraftFormCardHandle,
+  PizzaSaborDraftFormCardProps
+>(function PizzaSaborDraftFormCard({ tamanhos, initial = null, onSave, onCancel }, ref) {
   const isEdit = Boolean(initial)
   const [nome, setNome] = useState('')
   const [descricao, setDescricao] = useState('')
@@ -120,6 +146,16 @@ export function PizzaSaborDraftFormCard({
     []
   )
 
+  const buildSabor = useCallback((): PizzaSaborDraft => {
+    return {
+      localId: initial?.localId ?? createLocalId(),
+      nome: nome.trim().toUpperCase(),
+      descricao: descricao.trim(),
+      ativo,
+      precosPorTamanhoLocalId: precos,
+    }
+  }, [ativo, descricao, initial?.localId, nome, precos])
+
   const podeSalvar =
     nome.trim().length > 0 && buildPrecosSelecionados(precos).length > 0
 
@@ -129,14 +165,28 @@ export function PizzaSaborDraftFormCard({
       return
     }
 
-    onSave({
-      localId: initial?.localId ?? createLocalId(),
-      nome: nome.trim().toUpperCase(),
-      descricao: descricao.trim(),
-      ativo,
-      precosPorTamanhoLocalId: precos,
-    })
+    onSave(buildSabor())
   }
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      tryCommitOnLeave: () => {
+        if (isFormVazio(nome, descricao, precos, tamanhosAtivos)) {
+          return 'idle'
+        }
+        if (!isFormCompletoParaContinuar(nome, precos, tamanhosAtivos)) {
+          showToast.error(
+            'Preencha o nome do sabor e o preço de todos os tamanhos antes de continuar'
+          )
+          return 'incomplete'
+        }
+        onSave(buildSabor())
+        return 'committed'
+      },
+    }),
+    [buildSabor, descricao, nome, onSave, precos, tamanhosAtivos]
+  )
 
   return (
     <div className="rounded-xl border border-primary/30 bg-white p-3 shadow-sm">
@@ -248,4 +298,4 @@ export function PizzaSaborDraftFormCard({
       </div>
     </div>
   )
-}
+})

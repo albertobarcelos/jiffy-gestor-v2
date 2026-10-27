@@ -17,13 +17,17 @@ import {
 } from './pizzaDefaults'
 import {
   nextPizzaCategoriaSetupStep,
+  PIZZA_CATEGORIA_SETUP_STEPS,
   prevPizzaCategoriaSetupStep,
   PizzaCategoriaSetupStepper,
   type PizzaCategoriaSetupStepId,
 } from './PizzaCategoriaSetupStepper'
 import { PizzaCategoriaInformacoesStep } from './PizzaCategoriaInformacoesStep'
 import { PizzaCategoriaRegraPrecoStep } from './PizzaCategoriaRegraPrecoStep'
-import { PizzaCategoriaSaboresStep } from './PizzaCategoriaSaboresStep'
+import {
+  PizzaCategoriaSaboresStep,
+  type PizzaCategoriaSaboresStepHandle,
+} from './PizzaCategoriaSaboresStep'
 import { PizzaCategoriaAdicionaisStep } from './PizzaCategoriaAdicionaisStep'
 import { PizzaTamanhoCards } from './PizzaTamanhoCards'
 import { PizzaMassaBordaTable } from './PizzaMassaBordaTable'
@@ -49,9 +53,21 @@ export function PizzaCategoriaSetupPanel({
     createDefaultPizzaCategoriaDraft(initialNome)
   )
   const baselineRef = useRef(serializePizzaDraft(createDefaultPizzaCategoriaDraft(initialNome)))
+  const saboresStepRef = useRef<PizzaCategoriaSaboresStepHandle>(null)
   const [confirmExitOpen, setConfirmExitOpen] = useState(false)
   const [panelSession, setPanelSession] = useState(0)
   const prevOpenRef = useRef(false)
+
+  const goToStep = useCallback((next: PizzaCategoriaSetupStepId) => {
+    if (step === 'sabores' && next !== 'sabores') {
+      const fromIdx = PIZZA_CATEGORIA_SETUP_STEPS.findIndex(item => item.id === step)
+      const toIdx = PIZZA_CATEGORIA_SETUP_STEPS.findIndex(item => item.id === next)
+      if (toIdx > fromIdx && !(saboresStepRef.current?.tryFlushBeforeLeave() ?? true)) {
+        return
+      }
+    }
+    setStep(next)
+  }, [step])
 
   const criarMutation = useCriarPizzaCategoriaCompletoMutation()
 
@@ -123,13 +139,19 @@ export function PizzaCategoriaSetupPanel({
         cancelLabel: 'Cancelar',
         cancelVariant: 'dangerOutline',
         onCancel: handleRequestClose,
+        showPrevious: true,
+        previousLabel: 'Anterior',
+        onPrevious: () => {
+          const prev = prevPizzaCategoriaSetupStep(step)
+          if (prev) goToStep(prev)
+        },
         showSave: true,
         saveLabel: 'Salvar',
         saveLoading: criarMutation.isPending,
         saveDisabled: criarMutation.isPending,
         onSave: () => void handleSalvar(),
         barSecondaryTone: 'primary',
-        barActionOrder: ['cancel', 'save'],
+        barActionOrder: ['cancel', 'prev', 'save'],
       }
     }
 
@@ -138,7 +160,7 @@ export function PizzaCategoriaSetupPanel({
       previousLabel: 'Anterior',
       onPrevious: () => {
         const prev = prevPizzaCategoriaSetupStep(step)
-        if (prev) setStep(prev)
+        if (prev) goToStep(prev)
       },
       showNext: true,
       nextLabel: 'Continuar',
@@ -147,7 +169,7 @@ export function PizzaCategoriaSetupPanel({
         (step === 'tamanhos' && !podeAvancarTamanhos),
       onNext: () => {
         const next = nextPizzaCategoriaSetupStep(step)
-        if (next) setStep(next)
+        if (next) goToStep(next)
       },
       showCancel: true,
       cancelLabel: 'Cancelar',
@@ -158,6 +180,7 @@ export function PizzaCategoriaSetupPanel({
     }
   }, [
     criarMutation.isPending,
+    goToStep,
     handleRequestClose,
     handleSalvar,
     isUltimoPasso,
@@ -181,7 +204,7 @@ export function PizzaCategoriaSetupPanel({
         footerActions={footerActions}
       >
         <div key={panelSession} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <PizzaCategoriaSetupStepper className="shrink-0" active={step} onChange={setStep} />
+          <PizzaCategoriaSetupStepper className="shrink-0" active={step} onChange={goToStep} />
 
           {step === 'informacoes' ? (
             <PizzaCategoriaInformacoesStep draft={draft} onChange={setDraft} />
@@ -221,7 +244,11 @@ export function PizzaCategoriaSetupPanel({
           ) : null}
 
           {step === 'sabores' ? (
-            <PizzaCategoriaSaboresStep draft={draft} onChange={setDraft} />
+            <PizzaCategoriaSaboresStep
+              ref={saboresStepRef}
+              draft={draft}
+              onChange={setDraft}
+            />
           ) : null}
 
           {step === 'massas-bordas' ? (
