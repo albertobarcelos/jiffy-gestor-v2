@@ -107,7 +107,14 @@ export function usePedidosEntregadorApp(input: {
     if (!token) return
     setCarregandoItens(true)
     try {
-      setItensAberto(await buscarItensPedidoApp({ token, pedidoId }))
+      const [itens, resumo] = await Promise.all([
+        buscarItensPedidoApp({ token, pedidoId }),
+        buscarPedidoResumoApp({ token, pedidoId }),
+      ])
+      setItensAberto(itens)
+      if (resumo) {
+        setPedidos(prev => prev.map(pedido => (pedido.id === pedidoId ? { ...pedido, ...resumo } : pedido)))
+      }
     } catch (error) {
       avisoApp.error(error instanceof Error ? error.message : 'Não foi possível carregar os itens.')
     } finally {

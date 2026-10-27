@@ -175,7 +175,27 @@ describe('mapPedidoAppEntregador', () => {
       ],
     })
     expect(pelaCedula?.trocoLevar).toBe(10.1)
-    expect(pelaCedula?.faltaPagar).toBe(50)
+    expect(pelaCedula?.faltaPagar).toBe(39.9)
+  })
+
+  it('na rodada cobra o pedido e mostra o troco da cédula, não os 500 lançados', () => {
+    const pedido = mapPedidoAppEntregador({
+      id: 'p466',
+      numeroVenda: 466,
+      valorFinal: 300,
+      totalFaltaPagar: 500,
+      cobrancas: [
+        {
+          id: 'cob-din',
+          meioPagamentoId: 'mp-din',
+          valor: 500,
+          momentoCobranca: 'na_entrega',
+          status: 'pendente',
+        },
+      ],
+    })
+    expect(pedido?.trocoLevar).toBe(200)
+    expect(pedido?.faltaPagar).toBe(300)
   })
 
   it('troca UUID já gravado no resumo pelo nome do catálogo', () => {

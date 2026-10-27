@@ -78,5 +78,26 @@ describe('mapPedidoLeituraExpedicao', () => {
       ],
     })
     expect(pedido?.trocoLevar).toBe(10.1)
+    expect(pedido?.faltaPagar).toBe(39.9)
+  })
+
+  it('na rodada não trata a cédula de 500 como valor a cobrar', () => {
+    const pedido = mapPedidoLeituraExpedicao({
+      id: 'p466',
+      numeroVenda: 466,
+      valorFinal: 300,
+      totalFaltaPagar: 500,
+      cobrancas: [
+        {
+          id: 'c1',
+          meioPagamentoId: 'mp-din',
+          valor: 500,
+          momentoCobranca: 'na_entrega',
+          status: 'pendente',
+        },
+      ],
+    })
+    expect(pedido?.trocoLevar).toBe(200)
+    expect(pedido?.faltaPagar).toBe(300)
   })
 })

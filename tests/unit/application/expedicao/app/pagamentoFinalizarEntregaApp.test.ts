@@ -88,6 +88,30 @@ describe('pagamentoFinalizarEntregaApp', () => {
     ).toEqual([{ meioPagamentoId: 'mp-din', valor: 20 }])
   })
 
+  it('na porta cobra o pedido, não a cédula, quando há troco', () => {
+    const dinheiro: CobrancaAppEntregador = {
+      id: 'cob-din',
+      meioPagamentoId: 'mp-din',
+      valor: 500,
+      pendente: true,
+      nome: 'Dinheiro',
+    }
+    expect(
+      valorACobrirFinalizarApp({
+        cobrancas: [dinheiro],
+        valorFinal: 300,
+        faltaPagar: 300,
+      })
+    ).toBe(300)
+    expect(
+      montarLinhasIniciaisFinalizarApp({
+        cobrancas: [dinheiro],
+        valorFinal: 300,
+        faltaPagar: 300,
+      })
+    ).toEqual([{ meioPagamentoId: 'mp-din', valor: 300 }])
+  })
+
   it('ignora faltaPagar da API quando as cobranças já separam o restante', () => {
     const dinheiroPago: CobrancaAppEntregador = {
       id: 'cob-din-pago',

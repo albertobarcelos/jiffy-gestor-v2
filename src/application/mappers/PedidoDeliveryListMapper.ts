@@ -239,6 +239,8 @@ export function normalizarPedidoDeliverySummaryJson(raw: unknown): PedidoDeliver
     troco: resolverTrocoLevarPedidoEntrega({
       valorFinal: parseNumero(o.valorFinal, 0),
       troco: o.troco,
+      trocoPara: (o as { trocoPara?: unknown }).trocoPara,
+      pagamento: (o as { pagamento?: unknown }).pagamento,
       cobrancas,
     }),
     totalPago: parseNumero(o.totalPago, 0),
