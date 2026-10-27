@@ -383,6 +383,11 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
       return
     }
 
+    if (!nome.trim()) {
+      showToast.error('Informe o nome do complemento')
+      return
+    }
+
     setIsLoading(true)
 
     try {
@@ -451,8 +456,17 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
         router.push('/complementos')
       }
     } catch (error) {
-      console.error('Erro ao salvar complemento:', error)
-      showToast.error(error instanceof Error ? error.message : 'Erro ao salvar complemento')
+      const raw = error instanceof Error ? error.message : 'Erro ao salvar complemento'
+      let mensagem = raw
+      try {
+        const parsed = JSON.parse(raw) as unknown
+        if (Array.isArray(parsed) && parsed[0] && typeof parsed[0] === 'object' && parsed[0] !== null && 'message' in parsed[0]) {
+          mensagem = String((parsed[0] as { message: unknown }).message)
+        }
+      } catch {
+        /* mensagem já é texto simples */
+      }
+      showToast.error(mensagem || 'Erro ao salvar complemento')
     } finally {
       setIsLoading(false)
     }
@@ -639,6 +653,11 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
                         setTipoImpactoPreco(
                           value === 'aumenta' || value === 'diminui' ? value : 'nenhum'
                         )
+                      }}
+                      MenuProps={{
+                        // Acima do JiffySidePanelModal (zIndex padrão 1300); sem isso o menu
+                        // fica atrás do painel e bloqueia a interação.
+                        sx: { zIndex: 2100 },
                       }}
                     >
                       <MenuItem value="nenhum">Nenhum</MenuItem>
