@@ -38,6 +38,11 @@ import {
   meioNomeEhDinheiro,
   valorCobrancaDeCedula,
 } from '@/src/domain/services/pedido/CalculadoraPagamentoPedido'
+import {
+  cobrancaRawCobraNaEntrega,
+  cobrancaRawEstaCancelada,
+  cobrancaRawEstaEfetivada,
+} from '@/src/application/mappers/situacaoCobrancaDelivery'
 
 function asRecord(v: unknown): Record<string, unknown> | null {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return null
@@ -82,10 +87,7 @@ function taxaEntregaDoPedidoParaTicket(
 }
 
 function cobrancaAtivaNoCupom(r: Record<string, unknown>): boolean {
-  const status = asStr(r.status).toLowerCase()
-  if (status === 'cancelada') return false
-  if (r.dataCancelamento != null && asStr(r.dataCancelamento)) return false
-  return true
+  return !cobrancaRawEstaCancelada(r)
 }
 
 function fontesPagamentoCupom(pedido: Record<string, unknown>): Record<string, unknown>[] {
@@ -98,13 +100,12 @@ function fontesPagamentoCupom(pedido: Record<string, unknown>): Record<string, u
 }
 
 function cobrancaPendenteNaEntregaNoCupom(r: Record<string, unknown>): boolean {
-  if (!cobrancaAtivaNoCupom(r)) return false
+  if (!cobrancaAtivaNoCupom(r) || cobrancaRawEstaEfetivada(r)) return false
+  if (r.cobrarNaEntrega === true || r.naoEfetivo === true) return true
+  if (cobrancaRawCobraNaEntrega(r)) return true
   const status = asStr(r.status).toLowerCase()
   const momento = asStr(r.momentoCobranca || r.momento_cobranca).toLowerCase()
-  if (status === 'paga' || asRecord(r.pagamentoEfetivado)) return false
-  if (r.cobrarNaEntrega === true || r.naoEfetivo === true) return true
   if (momento === 'antecipado') return false
-  if (momento === 'na_entrega') return true
   return status === 'pendente'
 }
 

@@ -4,6 +4,10 @@ import type {
 } from '@/src/application/expedicao/app/filtrarPedidosDoEntregador'
 import { montarEnderecoNavegacaoApp } from '@/src/application/expedicao/app/navegacaoEntregadorApp'
 import { extrairNomeMeioPagamentoDeCobranca } from '@/src/application/mappers/CobrancaDeliveryPagamentoMapper'
+import {
+  cobrancaRawEstaCancelada,
+  cobrancaRawEstaEfetivada,
+} from '@/src/application/mappers/situacaoCobrancaDelivery'
 
 export type { PedidoResumoAppEntregador }
 
@@ -12,17 +16,17 @@ function cobrancasAtivas(row: Record<string, unknown>): Record<string, unknown>[
   return cobrancas.flatMap(raw => {
     if (!raw || typeof raw !== 'object') return []
     const cobranca = raw as Record<string, unknown>
-    const status = String(cobranca.status ?? '').toLowerCase()
-    if (status === 'cancelada' || cobranca.dataCancelamento) return []
+    if (cobrancaRawEstaCancelada(cobranca)) return []
     return [cobranca]
   })
 }
 
-function cobrancaPaga(cobranca: Record<string, unknown>): boolean {
-  const status = String(cobranca.status ?? '').toLowerCase()
-  if (status === 'paga') return true
-  if (status === 'pendente' || status === 'cancelada') return false
-  return cobranca.pagamentoEfetivado != null && typeof cobranca.pagamentoEfetivado === 'object'
+/**
+ * Só o que já foi efetivado. Lançar “para o entregador receber” (`na_entrega` +
+ * pendente) não é pago — é o restante em aberto na porta.
+ */
+export function cobrancaPedidoAppEstaPaga(cobranca: Record<string, unknown>): boolean {
+  return cobrancaRawEstaEfetivada(cobranca)
 }
 
 function idMeioDaCobranca(cobranca: Record<string, unknown>): string {
@@ -42,7 +46,7 @@ export function cobrancasPedidoApp(row: Record<string, unknown>): CobrancaAppEnt
         id: texto(cobranca.id),
         meioPagamentoId,
         valor: numero(cobranca.valor),
-        pendente: !cobrancaPaga(cobranca),
+        pendente: !cobrancaPedidoAppEstaPaga(cobranca),
         nome: nomeMeioVisivel(extrairNomeMeioPagamentoDeCobranca(cobranca)),
       },
     ]

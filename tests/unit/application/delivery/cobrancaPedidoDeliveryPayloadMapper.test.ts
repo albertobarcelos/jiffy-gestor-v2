@@ -35,6 +35,19 @@ describe('CobrancaPedidoDeliveryPayloadMapper', () => {
     expect(extrairIdsCobrancasPendentesPedidoDelivery(pedido)).toEqual(['cob-1'])
   })
 
+  it('não trata lançamento na_entrega como pago só por pagamentoEfetivado', () => {
+    const pedido = {
+      cobrancas: [
+        {
+          id: 'cob-1',
+          momentoCobranca: 'na_entrega',
+          pagamentoEfetivado: { confirmar: true },
+        },
+      ],
+    }
+    expect(extrairIdsCobrancasPendentesPedidoDelivery(pedido)).toEqual(['cob-1'])
+  })
+
   it('confirma cobrança pendente existente ao quitar (fluxo ja_pago)', () => {
     const pagamentos: PagamentoSelecionado[] = [
       {

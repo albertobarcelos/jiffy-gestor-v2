@@ -34,6 +34,15 @@ describe('TaxaPedidoDeliveryPayloadMapper', () => {
       expect(pedidoDeliveryEstaPago(pedido)).toBe(false)
     })
 
+    it('não considera pago lançamento na_entrega só por pagamentoEfetivado', () => {
+      const pedido = {
+        cobrancas: [
+          { id: 'c1', momentoCobranca: 'na_entrega', pagamentoEfetivado: { confirmar: true } },
+        ],
+      }
+      expect(pedidoDeliveryEstaPago(pedido)).toBe(false)
+    })
+
     it('ignora cobrança cancelada mesmo que paga', () => {
       const pedido = {
         cobrancas: [{ id: 'c1', status: 'cancelada', pagamentoEfetivado: {} }],

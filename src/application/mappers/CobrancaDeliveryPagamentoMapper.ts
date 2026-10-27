@@ -1,6 +1,11 @@
 import { atorUsuarioId, rotuloAtorPedido } from '@/src/application/mappers/atorPedidoDelivery'
 import type { PagamentoApiItem } from '@/src/application/dto/api/vendaGestorApi'
 import { mapearPagamentoDetalheVenda } from '@/src/application/mappers/VendaDetalhePagamentoMapper'
+import {
+  cobrancaRawCobraNaEntrega,
+  cobrancaRawEstaCancelada,
+  cobrancaRawEstaEfetivada,
+} from '@/src/application/mappers/situacaoCobrancaDelivery'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
 
 function texto(value: unknown): string {
@@ -39,15 +44,10 @@ export function mapCobrancaDeliveryToPagamento(raw: unknown): PagamentoApiItem |
   const c = asRecord(raw)
   if (!c) return null
 
-  const momento = texto(c.momentoCobranca ?? c.momento_cobranca).toLowerCase()
-  const status = texto(c.status).toLowerCase()
-  const cancelado = status === 'cancelada' || isoString(c.dataCancelamento) != null
-  const paga = status === 'paga'
-
   const pagamentoEfetivado = asRecord(c.pagamentoEfetivado)
-
-  const efetivada = paga || pagamentoEfetivado != null
-  const cobrarNaEntrega = !efetivada && !cancelado && momento === 'na_entrega'
+  const cancelado = cobrancaRawEstaCancelada(c)
+  const efetivada = cobrancaRawEstaEfetivada(c)
+  const cobrarNaEntrega = cobrancaRawCobraNaEntrega(c)
 
   const meioPagamentoNested = asRecord(c.meioPagamento)
   const meioPagamentoId = texto(

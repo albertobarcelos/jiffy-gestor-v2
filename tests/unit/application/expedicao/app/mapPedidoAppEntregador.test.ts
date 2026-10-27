@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   aplicarNomesMeiosNoPedido,
+  cobrancaPedidoAppEstaPaga,
   mapPedidoAppEntregador,
   rotuloPagamentoPedidoApp,
 } from '@/src/application/expedicao/app/mapPedidoAppEntregador'
@@ -28,6 +29,30 @@ describe('rotuloPagamentoPedidoApp', () => {
         formaPagamento: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       })
     ).toBeNull()
+  })
+})
+
+describe('cobrancaPedidoAppEstaPaga', () => {
+  it('não trata lançamento na entrega como pago', () => {
+    expect(
+      cobrancaPedidoAppEstaPaga({
+        status: 'pendente',
+        momentoCobranca: 'na_entrega',
+        pagamentoEfetivado: {},
+      })
+    ).toBe(false)
+    expect(
+      cobrancaPedidoAppEstaPaga({
+        momentoCobranca: 'na_entrega',
+        pagamentoEfetivado: { confirmar: true },
+      })
+    ).toBe(false)
+  })
+
+  it('só marca pago quando a cobrança foi efetivada', () => {
+    expect(cobrancaPedidoAppEstaPaga({ status: 'paga', momentoCobranca: 'na_entrega' })).toBe(true)
+    expect(cobrancaPedidoAppEstaPaga({ status: 'paga', momentoCobranca: 'antecipado' })).toBe(true)
+    expect(cobrancaPedidoAppEstaPaga({ pagamentoEfetivado: { id: 'pe-1' } })).toBe(true)
   })
 })
 
