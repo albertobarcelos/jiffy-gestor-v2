@@ -8,6 +8,8 @@ export class ReplicacaoStatusCategoriaFalhouError extends Error {
   }
 }
 
-export function isReplicacaoStatusCategoriaFalhou(error: unknown): boolean {
+export function isReplicacaoStatusCategoriaFalhou(
+  error: unknown
+): error is ReplicacaoStatusCategoriaFalhouError {
   return error instanceof ReplicacaoStatusCategoriaFalhouError
 }
