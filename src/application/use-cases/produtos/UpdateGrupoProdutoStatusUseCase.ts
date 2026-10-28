@@ -16,7 +16,8 @@ export class UpdateGrupoProdutoStatusUseCase {
     >
   ) {}
 
-  async execute(input: UpdateGrupoProdutoStatusInput): Promise<void> {
+  /** Atualiza só o `ativo` da categoria base (sem tocar nos cardápios). */
+  async atualizarAtivoBase(input: UpdateGrupoProdutoStatusInput): Promise<void> {
     if (!input.grupoId.trim()) {
       throw new Error('ID do grupo é obrigatório')
     }
@@ -26,6 +27,15 @@ export class UpdateGrupoProdutoStatusUseCase {
       grupoId: input.grupoId.trim(),
       ativo: input.novoStatus,
     })
+  }
+
+  /**
+   * Atualiza a categoria base e replica o status nos menus.
+   * Prefira `atualizarAtivoBase` + replicação separada quando a UI precisar
+   * refrescar a lista antes da sincronização dos cardápios.
+   */
+  async execute(input: UpdateGrupoProdutoStatusInput): Promise<void> {
+    await this.atualizarAtivoBase(input)
 
     await this.replicarNosMenus.execute({
       token: input.token,
