@@ -1,22 +1,36 @@
 import type { AcaoTransicaoGestor } from '@/src/application/dto/TransicaoKanbanDTO'
+import type { TipoDedupeImpressaoDelivery } from '@/src/application/delivery/impressaoDeliveryDedupe'
 import type {
+  AcaoImpressaoAutomatica,
   DecidirImpressaoResultado,
   PreferenciasImpressaoDelivery,
 } from '@/src/shared/types/deliveryImpressao'
 
+export function ehAcaoImpressaoAutomatica(
+  acao: AcaoTransicaoGestor
+): acao is AcaoImpressaoAutomatica {
+  return acao === 'iniciar_preparo' || acao === 'marcar_pronto'
+}
+
+/** Dedupe é só anti-duplicata. A política de “imprimir ou não” fica em `decidirImpressaoAposAcao`. */
+export function tipoDedupePorAcaoAutomatica(
+  acao: AcaoImpressaoAutomatica
+): TipoDedupeImpressaoDelivery {
+  return acao === 'marcar_pronto' ? 'expedicao' : 'comando'
+}
+
 /**
- * Define se deve imprimir automaticamente após uma transição bem-sucedida e qual cupom.
+ * Única política de cupom automático: quadro e Socket.
  *
- * Contrato de produto / backend:
- * - `imprimirAoReceber` → após `iniciar_preparo`.
- * - `imprimirAoFicarPronto` → após `marcar_pronto` (modo separado; em unificado sem efeito prático).
- * - `copiasCupomUnificado` → só cupom unificado completo; modo separado usa 1 cópia por ticket até haver campos na API.
+ * - `imprimirAoReceber` → `iniciar_preparo` (unificado = cupom completo; separado = produção).
+ * - `imprimirAoFicarPronto` → `marcar_pronto` só no modo separado.
+ * - `copiasCupomUnificado` → só o cupom unificado.
  */
 export function decidirImpressaoAposAcao(
   prefs: PreferenciasImpressaoDelivery,
   acao: AcaoTransicaoGestor
 ): DecidirImpressaoResultado {
-  if (acao !== 'iniciar_preparo' && acao !== 'marcar_pronto') {
+  if (!ehAcaoImpressaoAutomatica(acao)) {
     return { imprimir: false, tipoCupom: null, copies: 1 }
   }
 

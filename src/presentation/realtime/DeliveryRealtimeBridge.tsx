@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useImpressaoDelivery } from '@/features/delivery/hooks/useImpressaoDelivery'
+import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
 import {
   aplicarPedidoDeliveryCriadoNoKanbanCache,
   aplicarPedidoDeliveryStatusAlteradoNoKanbanCache,
@@ -50,11 +51,13 @@ export function DeliveryRealtimeBridge() {
   const empresaId = useTenantEmpresaId()
   const tenantAuth = useAuthStore(s => s.tenantAuth)
   const { imprimirPorComandoRealtime, imprimirCupomExpedicaoPorPronto } = useImpressaoDelivery()
+  const { preferenciasImpressaoDelivery } = usePreferenciasImpressaoDelivery()
   const { estacaoId } = useEstacaoDestePc()
   const estacoesQuery = useEstacoesImpressao(Boolean(empresaId))
   const socketRef = useRef<Socket | null>(null)
   const imprimirRef = useRef(imprimirPorComandoRealtime)
   const imprimirExpedicaoRef = useRef(imprimirCupomExpedicaoPorPronto)
+  const prefsRef = useRef(preferenciasImpressaoDelivery)
   const estacoesRef = useRef(estacoesQuery.data ?? [])
   const invalidateDebouncedRef = useRef(createDebouncedKanbanInvalidator())
 
@@ -65,6 +68,10 @@ export function DeliveryRealtimeBridge() {
   useEffect(() => {
     imprimirExpedicaoRef.current = imprimirCupomExpedicaoPorPronto
   }, [imprimirCupomExpedicaoPorPronto])
+
+  useEffect(() => {
+    prefsRef.current = preferenciasImpressaoDelivery
+  }, [preferenciasImpressaoDelivery])
 
   useEffect(() => {
     estacoesRef.current = estacoesQuery.data ?? []
@@ -188,6 +195,7 @@ export function DeliveryRealtimeBridge() {
           estacaoDestePcId: estacaoDestePcLocalStore.obterId(),
           estacoes,
           statusDelivery,
+          prefs: prefsRef.current,
         })
         if (!decisao.imprimir) {
           console.info('[delivery-realtime] sem cupom de expedicao', {
@@ -195,6 +203,8 @@ export function DeliveryRealtimeBridge() {
             statusDelivery,
             estacaoDestePc: estacaoDestePcLocalStore.obterId(),
             receptoraId: decisao.receptoraId,
+            modo: prefsRef.current.modo,
+            imprimirAoFicarPronto: prefsRef.current.imprimirAoFicarPronto,
           })
           return
         }

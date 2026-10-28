@@ -1,4 +1,4 @@
-import { decidirTipoCupomComandoImpressaoRealtime } from '@/src/application/delivery/decidirTipoCupomComandoImpressaoRealtime'
+import { decidirImpressaoAposAcao, tipoDedupePorAcaoAutomatica } from '@/src/application/delivery/decidirImpressaoPosTransicao'
 import { filtrarTicketsPorTipoDecidido } from '@/src/application/delivery/filtrarTicketsPorTipoDecidido'
 import { filtrarWarningsTicketsParaImpressao } from '@/src/application/delivery/filtrarWarningsTicketsParaImpressao'
 import {
@@ -8,16 +8,19 @@ import {
 import {
   jaImprimiuDeliveryRecentemente,
   marcarImpressaoDeliveryRecente,
-  type TipoDedupeImpressaoDelivery,
 } from '@/src/application/delivery/impressaoDeliveryDedupe'
 import type { CarregarPayloadTicketsImpressao } from '@/src/application/delivery/carregarPayloadTicketsImpressaoDelivery'
 import type { DeliveryCupomTemplateConfig } from '@/src/shared/types/deliveryCupomTemplate'
-import type { PreferenciasImpressaoDelivery, TipoCupomDelivery } from '@/src/shared/types/deliveryImpressao'
+import type {
+  AcaoImpressaoAutomatica,
+  PreferenciasImpressaoDelivery,
+} from '@/src/shared/types/deliveryImpressao'
 import type { EmpresaMeResumo } from '@/src/application/dto/EmpresaMeDTO'
 import { erroImpressao, logImpressao, warnImpressao } from '@/src/shared/utils/logImpressaoDelivery'
 
 export type ImprimirPorComandoRealtimeResult =
   | 'skipped_dedupe'
+  | 'skipped_pref'
   | 'sem_token'
   | 'erro_fetch'
   | 'sem_tickets'
@@ -25,6 +28,7 @@ export type ImprimirPorComandoRealtimeResult =
 
 export type ImprimirPorComandoRealtimeParams = {
   vendaId: string
+  acao: AcaoImpressaoAutomatica
   accessToken: string | undefined
   prefs: PreferenciasImpressaoDelivery
   empresa?: EmpresaMeResumo | null
@@ -34,26 +38,34 @@ export type ImprimirPorComandoRealtimeParams = {
   onAviso?: (mensagem: string) => void
   imprimirTickets: ImprimirTicketsApiGestor
   carregarPayload: CarregarPayloadTicketsImpressao
-  tipoCupom?: TipoCupomDelivery
-  tipoDedupe?: TipoDedupeImpressaoDelivery
   jobNamePrefix?: string
   estacaoImpressaoId?: string | null
 }
 
 /**
- * Impressao sob PEDIDO_DELIVERY_IMPRESSAO_SOLICITADA.
- * Nao reavalia imprimirAoReceber - o backend ja decidiu o comando.
+ * Impressão automática pedida pelo Socket. A política é a mesma do quadro.
  */
 export async function imprimirPorComandoRealtime(
   params: ImprimirPorComandoRealtimeParams
 ): Promise<ImprimirPorComandoRealtimeResult> {
   const vendaId = params.vendaId.trim()
-  logImpressao('realtime.comando.entrada', { vendaId })
+  logImpressao('realtime.comando.entrada', { vendaId, acao: params.acao })
 
   if (!vendaId) return 'erro_fetch'
-  const tipoDedupe = params.tipoDedupe ?? 'comando'
+
+  const decisao = decidirImpressaoAposAcao(params.prefs, params.acao)
+  if (!decisao.imprimir || !decisao.tipoCupom) {
+    logImpressao('realtime.comando.skipped_pref', {
+      vendaId,
+      acao: params.acao,
+      modo: params.prefs.modo,
+    })
+    return 'skipped_pref'
+  }
+
+  const tipoDedupe = tipoDedupePorAcaoAutomatica(params.acao)
   if (jaImprimiuDeliveryRecentemente(vendaId, Date.now(), tipoDedupe)) {
-    logImpressao('realtime.comando.skipped_dedupe', { vendaId, tipoDedupe })
+    logImpressao('realtime.comando.skipped_dedupe', { vendaId, tipoDedupe, acao: params.acao })
     return 'skipped_dedupe'
   }
 
@@ -80,11 +92,9 @@ export async function imprimirPorComandoRealtime(
     return 'erro_fetch'
   }
 
-  const tipoCupom =
-    params.tipoCupom ?? decidirTipoCupomComandoImpressaoRealtime(params.prefs.modo)
-  const filtrados = filtrarTicketsPorTipoDecidido(ticketsFetch.data.tickets, tipoCupom)
+  const filtrados = filtrarTicketsPorTipoDecidido(ticketsFetch.data.tickets, decisao.tipoCupom)
   if (filtrados.length === 0) {
-    warnImpressao('realtime.comando.sem_tickets', { vendaId, tipoCupom })
+    warnImpressao('realtime.comando.sem_tickets', { vendaId, tipoCupom: decisao.tipoCupom })
     return 'sem_tickets'
   }
 
@@ -114,6 +124,6 @@ export async function imprimirPorComandoRealtime(
 
   marcarImpressaoDeliveryRecente(vendaId, Date.now(), tipoDedupe)
 
-  logImpressao('realtime.comando.ok', { vendaId, qTickets: filtrados.length })
+  logImpressao('realtime.comando.ok', { vendaId, qTickets: filtrados.length, acao: params.acao })
   return 'ok'
 }

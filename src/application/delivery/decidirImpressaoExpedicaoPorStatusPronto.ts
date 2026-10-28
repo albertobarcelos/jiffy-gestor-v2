@@ -1,5 +1,7 @@
+import { decidirImpressaoAposAcao } from '@/src/application/delivery/decidirImpressaoPosTransicao'
 import { resolverEstacaoReceptoraDelivery } from '@/src/domain/caixa-estacao/estacaoReceptoraDelivery'
 import { EtapaOperacionalDelivery } from '@/src/domain/value-objects/EtapaOperacionalDelivery'
+import type { PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
 
 export type ResumoStatusDeliveryRealtime = {
   vendaId: string | null
@@ -52,18 +54,22 @@ export function deveImprimirCupomExpedicaoNesteCliente(superficieApp: boolean): 
 }
 
 /**
- * Imprime no PRONTO só se a estação deste PC for a receptora da loja.
- * Sem estação neste navegador, ou se este PC não for a principal: não imprime.
+ * Cupom de expedição no PRONTO: mesma política do quadro (`marcar_pronto`)
+ * + só neste PC se ele for a receptora.
  */
 export function decidirImpressaoExpedicaoNoPronto(input: {
   estacaoDestePcId: string | null | undefined
   estacoes: readonly { id: string; gestorDelivery: boolean; ativo?: boolean }[]
   statusDelivery: string | null | undefined
+  prefs: PreferenciasImpressaoDelivery
 }): DecisaoImpressaoExpedicaoPronto {
   const receptora = resolverEstacaoReceptoraDelivery(
     input.estacoes.filter(estacao => estacao.ativo !== false && estacao.id.trim())
   )
   const receptoraId = receptora?.id ?? null
+  if (!decidirImpressaoAposAcao(input.prefs, 'marcar_pronto').imprimir) {
+    return { imprimir: false, receptoraId }
+  }
   if (EtapaOperacionalDelivery.tryParse(input.statusDelivery)?.valor !== 'PRONTO') {
     return { imprimir: false, receptoraId }
   }

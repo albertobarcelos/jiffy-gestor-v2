@@ -4,7 +4,11 @@ import { useCallback } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
-import { decidirImpressaoAposAcao } from '@/src/application/delivery/decidirImpressaoPosTransicao'
+import {
+  decidirImpressaoAposAcao,
+  ehAcaoImpressaoAutomatica,
+  tipoDedupePorAcaoAutomatica,
+} from '@/src/application/delivery/decidirImpressaoPosTransicao'
 import { filtrarTicketsPorTipoDecidido } from '@/src/application/delivery/filtrarTicketsPorTipoDecidido'
 import { filtrarWarningsTicketsParaImpressao } from '@/src/application/delivery/filtrarWarningsTicketsParaImpressao'
 import { marcarImpressaoDeliveryRecente } from '@/src/application/delivery/impressaoDeliveryDedupe'
@@ -87,7 +91,7 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
 
       for (const acao of acoes) {
         logImpressao('hook.loop_acao', { vendaId: venda.id, acao })
-        if (acao !== 'iniciar_preparo' && acao !== 'marcar_pronto') {
+        if (!ehAcaoImpressaoAutomatica(acao)) {
           logImpressao('hook.loop_acao.ignorada_para_impressao', { acao })
           continue
         }
@@ -181,7 +185,7 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
         marcarImpressaoDeliveryRecente(
           venda.id,
           Date.now(),
-          acao === 'marcar_pronto' ? 'expedicao' : 'comando'
+          tipoDedupePorAcaoAutomatica(acao)
         )
         logImpressao('hook.imprimir_tickets_concluido', { vendaId: venda.id })
       }
@@ -207,6 +211,7 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
       const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       return imprimirPorComandoRealtimeApp({
         vendaId,
+        acao: 'iniciar_preparo',
         accessToken: token,
         prefs: preferenciasImpressaoDelivery,
         empresa,
@@ -226,12 +231,11 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
       const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       return imprimirPorComandoRealtimeApp({
         vendaId,
+        acao: 'marcar_pronto',
         accessToken: token,
         prefs: preferenciasImpressaoDelivery,
         empresa,
         cupomTemplate: deliveryCupomTemplate,
-        tipoCupom: tipoCupomParaReimpressao(preferenciasImpressaoDelivery.modo, 'EM_ROTA'),
-        tipoDedupe: 'expedicao',
         jobNamePrefix: 'Expedição',
         estacaoImpressaoId,
         onMensagem: m => showToast.info(m),
