@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { arrayMove } from '@dnd-kit/sortable'
 import type { DragEndEvent } from '@dnd-kit/core'
-import { aplicarReordenacaoPizzaUseCase } from '@/src/application/use-cases/pizza/AplicarReordenacaoPizzaUseCase'
+import { aplicarReordenacaoPizzaUseCase } from '@/src/infrastructure/composition/pizzaUseCases'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { hasReorderChanged } from '@/src/shared/utils/computeReorderPatches'

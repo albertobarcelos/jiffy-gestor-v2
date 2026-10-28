@@ -8,7 +8,7 @@ import { MENU_SIDE_PANEL_CLASS } from '@/src/presentation/components/features/me
 import { usePizzaCategorias } from '@/src/presentation/hooks/pizza/usePizza'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
-import { vincularPizzaCategoriaAoMenu } from '@/src/presentation/utils/pizza/vincularPizzaCategoriaMenus'
+import { vincularPizzaCategoriaMenusUseCase } from '@/src/infrastructure/composition/pizzaUseCases'
 import { showToast } from '@/src/shared/utils/toast'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import type { CategoriaPizza } from '@/src/shared/types/pizza'
@@ -42,7 +42,11 @@ export function VincularPizzaCategoriaMenuPanel({
 
     setSavingId(categoria.id)
     try {
-      await vincularPizzaCategoriaAoMenu(token, menuId, categoria.id)
+      await vincularPizzaCategoriaMenusUseCase.vincularPizzaCategoriaAoMenu({
+        token,
+        menuId,
+        categoriaPizzaId: categoria.id,
+      })
       await invalidate(['menu', menuId])
       await invalidate(['menu-produtos', menuId])
       await invalidate(['menu-grupos', menuId])

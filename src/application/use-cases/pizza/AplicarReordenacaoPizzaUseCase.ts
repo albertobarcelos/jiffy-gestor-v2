@@ -1,4 +1,7 @@
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import type {
+  ReordenarPizzaCategoriaViaBffUseCase,
+  ReordenarPizzaSaborViaBffUseCase,
+} from '@/src/application/use-cases/pizza/pizzaBffUseCases'
 import {
   applySequentialReorder,
   hasReorderChanged,
@@ -21,47 +24,12 @@ export type AplicarReordenacaoPizzaInput = {
   saboresPorCategoria?: PizzaReorderSaboresInput[]
 }
 
-async function reordenarCategoria(token: string, id: string, novaPosicao: number) {
-  const response = await fetchGestorApi(
-    `/api/cardapio/pizza/categorias/${encodeURIComponent(id)}/reordena-categoria`,
-    {
-      method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ novaPosicao }),
-    }
-  )
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    throw new Error(
-      (errorData as { message?: string }).message || 'Erro ao reordenar categoria pizza'
-    )
-  }
-}
-
-async function reordenarSabor(token: string, id: string, novaPosicao: number) {
-  const response = await fetchGestorApi(
-    `/api/cardapio/pizza/sabores/${encodeURIComponent(id)}/reordena-sabor`,
-    {
-      method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ novaPosicao }),
-    }
-  )
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    throw new Error(
-      (errorData as { message?: string }).message || 'Erro ao reordenar sabor de pizza'
-    )
-  }
-}
-
 export class AplicarReordenacaoPizzaUseCase {
+  constructor(
+    private readonly reordenarCategoriaUseCase: ReordenarPizzaCategoriaViaBffUseCase,
+    private readonly reordenarSaborUseCase: ReordenarPizzaSaborViaBffUseCase
+  ) {}
+
   async execute(input: AplicarReordenacaoPizzaInput): Promise<void> {
     const { token } = input
 
@@ -72,17 +40,21 @@ export class AplicarReordenacaoPizzaUseCase {
       await applySequentialReorder(
         input.categorias.initialCategoriaIds,
         input.categorias.finalCategoriaIds,
-        (id, novaPosicao) => reordenarCategoria(token, id, novaPosicao)
+        async (categoriaId, novaPosicao) => {
+          await this.reordenarCategoriaUseCase.execute({ token, categoriaId, novaPosicao })
+        }
       )
     }
 
     for (const grupo of input.saboresPorCategoria ?? []) {
       if (!hasReorderChanged(grupo.initialSaborIds, grupo.finalSaborIds)) continue
-      await applySequentialReorder(grupo.initialSaborIds, grupo.finalSaborIds, (id, novaPosicao) =>
-        reordenarSabor(token, id, novaPosicao)
+      await applySequentialReorder(
+        grupo.initialSaborIds,
+        grupo.finalSaborIds,
+        async (id, novaPosicao) => {
+          await this.reordenarSaborUseCase.execute({ token, saborId: id, novaPosicao })
+        }
       )
     }
   }
 }
-
-export const aplicarReordenacaoPizzaUseCase = new AplicarReordenacaoPizzaUseCase()

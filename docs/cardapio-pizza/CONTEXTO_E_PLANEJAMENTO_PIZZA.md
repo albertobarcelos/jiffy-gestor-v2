@@ -553,6 +553,8 @@ O vídeo também mostra fluxos de **Combo 2 Pizzas** e **grupos de complementos*
 
 ## 5. Arquitetura proposta (gestor v2)
 
+> **Refatoração Clean Architecture (gestor):** catálogo pizza alinhado ao fluxo BFF → repositório BFF → use cases → composition → presentation, com domínio mínimo para categoria/sabor. **Vendas/pedidos pizza permanecem fora de escopo** — não integrados neste ciclo.
+
 Seguindo Clean Architecture do projeto:
 
 ```
@@ -572,6 +574,16 @@ src/shared/types/pizza.ts                   ← tipos compartilhados
 - BFF valida entrada (Zod) como já feito em `MenuInputSchemas` + `menuRouteValidation`.
 - Presentation **não** chama backend externo direto — usa BFF + hooks.
 - Evitar duplicar markup de confirmação/lista — componentes compartilhados.
+
+**Checklist da refatoração do catálogo pizza:**
+
+- [x] `PizzaBffRepository` cobre criação, edição, listagem, reorder, tamanhos, grupos de massas/bordas e adicionais via BFF.
+- [x] Use cases de aplicação concentram carregar/salvar edição e vínculo de categoria/sabor com cardápios.
+- [x] Composition (`pizzaUseCases`) expõe instâncias para os componentes sem acoplar UI à infraestrutura.
+- [x] Ports `IPizzaCadastroGateway` / `IPizzaMenuVinculoGateway`: use cases dependem de contrato; adapters só no composition.
+- [x] Domínio mínimo criado para `CategoriaPizza` e `SaborPizza`, com mappers compartilhados.
+- [x] Mappers de criação/edição movidos para `application`.
+- [ ] Vendas/pedidos pizza ainda não consomem adicionais, massas/bordas ou regra de preço do catálogo.
 
 **Proxy pattern (igual menus):**
 
@@ -682,13 +694,15 @@ Para quem prefere **todas** as abas num único lugar após criação (alternativ
 
 ## 7. Matriz original de implementação por fases (referência histórica)
 
+> Status do catálogo: ver checklist da seção 5 (refatoração arquitetural). Itens abaixo são o plano original; vários já foram entregues e o checklist atualizado está na §5.
+
 ### Fase 0 — Fundação (BFF + tipos)
 
-- [ ] Tipos Zod espelhando `pizzaSchemas.ts` do backend.
-- [ ] Rotas BFF para os 23 endpoints.
-- [ ] `PizzaBffRepository` + use cases finos (Listar, Criar, Atualizar, Reordenar).
-- [ ] Hooks React Query (`usePizzaCategorias`, `usePizzaSabores`, …).
-- [ ] Testes unitários dos mappers (precosTamanho nome→id no completo).
+- [x] Tipos Zod espelhando `pizzaSchemas.ts` do backend.
+- [x] Rotas BFF para os endpoints de pizza.
+- [x] `PizzaBffRepository` + use cases finos (Listar, Criar, Atualizar, Reordenar).
+- [x] Hooks React Query (`usePizzaCategorias`, `usePizzaSabores`, …).
+- [x] Testes unitários dos mappers (precosTamanho nome→id no completo).
 
 ### Fase 1 — MVP (paridade fluxo iFood core)
 
@@ -771,6 +785,18 @@ O planejamento original das fases acima é uma referência histórica. Para os p
 ---
 
 ## 11. Estado da implementação de adicionais da pizza
+
+### Refatoração do catálogo pizza — implementada
+
+O catálogo de pizza no gestor está organizado por BFF e use cases de aplicação. A UI usa `pizzaUseCases` na composition para carregar/salvar edição de categoria, criar payload completo, vincular categoria/sabores a cardápios e manter os fluxos sem chamada direta ao backend externo.
+
+Entregue neste ciclo:
+
+- `PizzaBffRepository` ampliado para tamanhos e grupos de massas/bordas.
+- Mappers de criação/edição em `application/mappers/pizza`.
+- Entidades mínimas `CategoriaPizza` e `SaborPizza` no domínio.
+- Helpers puros de impacto/preço de adicionais em `application`.
+- Testes de mappers de pizza movidos para `tests/unit/application/pizza`.
 
 ### Configuração no gestor — implementada
 

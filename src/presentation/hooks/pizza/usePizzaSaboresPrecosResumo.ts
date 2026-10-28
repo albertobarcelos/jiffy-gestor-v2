@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import { useQueries } from '@tanstack/react-query'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { buscarPizzaSaborViaBffUseCase } from '@/src/infrastructure/composition/pizzaUseCases'
 import { buildTenantQueryKey } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
@@ -18,12 +18,7 @@ export type PizzaSaborPrecoResumo = {
 }
 
 async function fetchSaborPizza(token: string, saborId: string): Promise<SaborPizza> {
-  const response = await fetchGestorApi(`/api/cardapio/pizza/sabores/${saborId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!response.ok) throw new Error('Erro ao carregar preços do sabor')
-  const data = await response.json()
-  return (data.data ?? data) as SaborPizza
+  return buscarPizzaSaborViaBffUseCase.execute({ token, saborId })
 }
 
 /**

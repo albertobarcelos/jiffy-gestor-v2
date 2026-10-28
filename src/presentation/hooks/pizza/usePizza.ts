@@ -1,7 +1,22 @@
 'use client'
 
-import { ApiError } from '@/src/infrastructure/api/apiClient'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import {
+  atualizarPizzaCategoriaViaBffUseCase,
+  atualizarPizzaSaborViaBffUseCase,
+  buscarPizzaCategoriaViaBffUseCase,
+  buscarPizzaSaborViaBffUseCase,
+  criarPizzaCategoriaCompletoViaBffUseCase,
+  criarPizzaComplementoViaBffUseCase,
+  criarPizzaSaborViaBffUseCase,
+  desvincularPizzaComplementoViaBffUseCase,
+  listarPizzaCategoriasViaBffUseCase,
+  listarPizzaComplementosViaBffUseCase,
+  listarPizzaSaboresViaBffUseCase,
+  listarPizzaTamanhosViaBffUseCase,
+  reordenarPizzaCategoriaViaBffUseCase,
+  reordenarPizzaSaborViaBffUseCase,
+  substituirPrecosPizzaComplementoViaBffUseCase,
+} from '@/src/infrastructure/composition/pizzaUseCases'
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
@@ -16,17 +31,9 @@ import type {
   ReplaceComplementoPizzaPrecosInput,
   SaborPizza,
   SaborPizzaSummary,
+  UpdateCategoriaPizzaInput,
   UpdateSaborPizzaInput,
 } from '@/src/shared/types/pizza'
-
-async function parseError(response: Response, fallback: string) {
-  const errorData = await response.json().catch(() => ({}))
-  throw new ApiError(
-    (errorData as { message?: string }).message || fallback,
-    response.status,
-    errorData
-  )
-}
 
 export function usePizzaCategorias(params: {
   q?: string
@@ -39,21 +46,8 @@ export function usePizzaCategorias(params: {
 
   return useSecureTenantQuery<{ items: CategoriaPizza[]; count: number }>(
     ['pizza', 'categorias', q, ativo, limit, offset],
-    async ({ token }) => {
-      const searchParams = new URLSearchParams()
-      if (q.trim()) searchParams.set('q', q.trim())
-      if (ativo !== null) searchParams.set('ativo', String(ativo))
-      searchParams.set('limit', String(limit))
-      searchParams.set('offset', String(offset))
-
-      const response = await fetchGestorApi(
-        `/api/cardapio/pizza/categorias?${searchParams}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
-      if (!response.ok) await parseError(response, 'Erro ao carregar categorias pizza')
-      const data = await response.json()
-      return { items: (data.items ?? []) as CategoriaPizza[], count: data.count ?? 0 }
-    },
+    ({ token }) =>
+      listarPizzaCategoriasViaBffUseCase.execute({ token, q, ativo, limit, offset }),
     { enabled, staleTime: 1000 * 60 * 2 }
   )
 }
@@ -61,14 +55,8 @@ export function usePizzaCategorias(params: {
 export function usePizzaCategoria(categoriaId: string | undefined, enabled = true) {
   return useSecureTenantQuery<CategoriaPizza>(
     ['pizza', 'categoria', categoriaId],
-    async ({ token }) => {
-      const response = await fetchGestorApi(`/api/cardapio/pizza/categorias/${categoriaId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!response.ok) await parseError(response, 'Erro ao carregar categoria pizza')
-      const data = await response.json()
-      return data.data as CategoriaPizza
-    },
+    ({ token }) =>
+      buscarPizzaCategoriaViaBffUseCase.execute({ token, categoriaId: categoriaId! }),
     { enabled: Boolean(categoriaId) && enabled }
   )
 }
@@ -81,22 +69,15 @@ export function usePizzaSabores(
 
   return useSecureTenantQuery<{ items: SaborPizzaSummary[]; count: number }>(
     ['pizza', 'sabores', categoriaPizzaId, q, ativo, limit],
-    async ({ token }) => {
-      const searchParams = new URLSearchParams()
-      searchParams.set('categoriaPizzaId', categoriaPizzaId!)
-      if (q.trim()) searchParams.set('q', q.trim())
-      if (ativo !== null) searchParams.set('ativo', String(ativo))
-      searchParams.set('limit', String(limit))
-      searchParams.set('offset', '0')
-
-      const response = await fetchGestorApi(
-        `/api/cardapio/pizza/sabores?${searchParams}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
-      if (!response.ok) await parseError(response, 'Erro ao carregar sabores')
-      const data = await response.json()
-      return { items: (data.items ?? []) as SaborPizzaSummary[], count: data.count ?? 0 }
-    },
+    ({ token }) =>
+      listarPizzaSaboresViaBffUseCase.execute({
+        token,
+        categoriaPizzaId: categoriaPizzaId!,
+        q,
+        ativo,
+        limit,
+        offset: 0,
+      }),
     { enabled: Boolean(categoriaPizzaId) && enabled, staleTime: 1000 * 60 * 2 }
   )
 }
@@ -104,20 +85,13 @@ export function usePizzaSabores(
 export function usePizzaTamanhos(categoriaPizzaId: string | undefined, enabled = true) {
   return useSecureTenantQuery<{ items: PizzaTamanho[]; count: number }>(
     ['pizza', 'tamanhos', categoriaPizzaId],
-    async ({ token }) => {
-      const searchParams = new URLSearchParams()
-      searchParams.set('categoriaPizzaId', categoriaPizzaId!)
-      searchParams.set('limit', '50')
-      searchParams.set('offset', '0')
-
-      const response = await fetchGestorApi(
-        `/api/cardapio/pizza/tamanhos?${searchParams}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
-      if (!response.ok) await parseError(response, 'Erro ao carregar tamanhos')
-      const data = await response.json()
-      return { items: (data.items ?? []) as PizzaTamanho[], count: data.count ?? 0 }
-    },
+    ({ token }) =>
+      listarPizzaTamanhosViaBffUseCase.execute({
+        token,
+        categoriaPizzaId: categoriaPizzaId!,
+        limit: 50,
+        offset: 0,
+      }),
     { enabled: Boolean(categoriaPizzaId) && enabled, staleTime: 1000 * 60 * 2 }
   )
 }
@@ -125,16 +99,8 @@ export function usePizzaTamanhos(categoriaPizzaId: string | undefined, enabled =
 export function usePizzaComplementos(categoriaPizzaId: string | undefined, enabled = true) {
   return useSecureTenantQuery<ComplementoPizza[]>(
     ['pizza', 'complementos', categoriaPizzaId],
-    async ({ token }) => {
-      const query = new URLSearchParams({ categoriaPizzaId: categoriaPizzaId! })
-      const response = await fetchGestorApi(
-        `/api/cardapio/pizza/complementos?${query.toString()}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
-      if (!response.ok) await parseError(response, 'Erro ao carregar adicionais da pizza')
-      const data = await response.json()
-      return data.data as ComplementoPizza[]
-    },
+    ({ token }) =>
+      listarPizzaComplementosViaBffUseCase.execute({ token, categoriaPizzaId: categoriaPizzaId! }),
     { enabled: Boolean(categoriaPizzaId) && enabled, staleTime: 1000 * 60 * 2 }
   )
 }
@@ -143,19 +109,7 @@ export function useVincularPizzaComplementoMutation() {
   const invalidate = useInvalidateTenantQueries()
 
   return useSecureTenantMutation<ComplementoPizza, CreateComplementoPizzaInput>(
-    async ({ token }, input) => {
-      const response = await fetchGestorApi('/api/cardapio/pizza/complementos', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(input),
-      })
-      if (!response.ok) await parseError(response, 'Erro ao vincular adicional à categoria')
-      const data = await response.json()
-      return data.data as ComplementoPizza
-    },
+    ({ token }, input) => criarPizzaComplementoViaBffUseCase.execute({ token, data: input }),
     {
       onSuccess: async (_data, variables) => {
         await invalidate(['pizza', 'complementos', variables.categoriaPizzaId])
@@ -171,22 +125,12 @@ export function useAtualizarPrecosPizzaComplementoMutation() {
     ComplementoPizza,
     { id: string; categoriaPizzaId: string; input: ReplaceComplementoPizzaPrecosInput }
   >(
-    async ({ token }, { id, input }) => {
-      const response = await fetchGestorApi(
-        `/api/cardapio/pizza/complementos/${id}/precos`,
-        {
-          method: 'PUT',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(input),
-        }
-      )
-      if (!response.ok) await parseError(response, 'Erro ao atualizar preços do adicional')
-      const data = await response.json()
-      return data.data as ComplementoPizza
-    },
+    ({ token }, { id, input }) =>
+      substituirPrecosPizzaComplementoViaBffUseCase.execute({
+        token,
+        complementoId: id,
+        data: input,
+      }),
     {
       onSuccess: async (_data, variables) => {
         await invalidate(['pizza', 'complementos', variables.categoriaPizzaId])
@@ -199,13 +143,8 @@ export function useDesvincularPizzaComplementoMutation() {
   const invalidate = useInvalidateTenantQueries()
 
   return useSecureTenantMutation<void, { id: string; categoriaPizzaId: string }>(
-    async ({ token }, { id }) => {
-      const response = await fetchGestorApi(`/api/cardapio/pizza/complementos/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!response.ok) await parseError(response, 'Erro ao desvincular adicional da categoria')
-    },
+    ({ token }, { id }) =>
+      desvincularPizzaComplementoViaBffUseCase.execute({ token, complementoId: id }),
     {
       onSuccess: async (_data, variables) => {
         await invalidate(['pizza', 'complementos', variables.categoriaPizzaId])
@@ -218,19 +157,8 @@ export function useCriarPizzaCategoriaCompletoMutation() {
   const invalidate = useInvalidateTenantQueries()
 
   return useSecureTenantMutation<CategoriaPizzaCompletoResponse, CreateCategoriaPizzaCompletoInput>(
-    async ({ token }, input) => {
-      const response = await fetchGestorApi('/api/cardapio/pizza/categorias/completo', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(input),
-      })
-      if (!response.ok) await parseError(response, 'Erro ao criar categoria pizza')
-      const data = await response.json()
-      return data.data as CategoriaPizzaCompletoResponse
-    },
+    ({ token }, input) =>
+      criarPizzaCategoriaCompletoViaBffUseCase.execute({ token, data: input }),
     {
       onSuccess: async () => {
         await invalidate(['pizza'])
@@ -243,19 +171,7 @@ export function useCriarPizzaSaborMutation() {
   const invalidate = useInvalidateTenantQueries()
 
   return useSecureTenantMutation<SaborPizza, CreateSaborPizzaInput>(
-    async ({ token }, input) => {
-      const response = await fetchGestorApi('/api/cardapio/pizza/sabores', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(input),
-      })
-      if (!response.ok) await parseError(response, 'Erro ao criar sabor')
-      const data = await response.json()
-      return data.data as SaborPizza
-    },
+    ({ token }, input) => criarPizzaSaborViaBffUseCase.execute({ token, data: input }),
     {
       onSuccess: async (_data, variables) => {
         await invalidate(['pizza'])
@@ -274,19 +190,12 @@ export function useAtualizarPizzaCategoriaMutation() {
     CategoriaPizza,
     { id: string; patch: Partial<CategoriaPizza> }
   >(
-    async ({ token }, { id, patch }) => {
-      const response = await fetchGestorApi(`/api/cardapio/pizza/categorias/${id}`, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(patch),
-      })
-      if (!response.ok) await parseError(response, 'Erro ao atualizar categoria')
-      const data = await response.json()
-      return data.data as CategoriaPizza
-    },
+    ({ token }, { id, patch }) =>
+      atualizarPizzaCategoriaViaBffUseCase.execute({
+        token,
+        categoriaId: id,
+        data: patch as UpdateCategoriaPizzaInput,
+      }),
     {
       onSuccess: async () => {
         await invalidate(['pizza'])
@@ -298,14 +207,7 @@ export function useAtualizarPizzaCategoriaMutation() {
 export function usePizzaSabor(saborId: string | undefined, enabled = true) {
   return useSecureTenantQuery<SaborPizza>(
     ['pizza', 'sabor', saborId],
-    async ({ token }) => {
-      const response = await fetchGestorApi(`/api/cardapio/pizza/sabores/${saborId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!response.ok) await parseError(response, 'Erro ao carregar sabor')
-      const data = await response.json()
-      return data.data as SaborPizza
-    },
+    ({ token }) => buscarPizzaSaborViaBffUseCase.execute({ token, saborId: saborId! }),
     { enabled: Boolean(saborId) && enabled }
   )
 }
@@ -317,19 +219,8 @@ export function useAtualizarPizzaSaborMutation() {
     SaborPizza,
     { id: string; patch: UpdateSaborPizzaInput; categoriaPizzaId?: string }
   >(
-    async ({ token }, { id, patch }) => {
-      const response = await fetchGestorApi(`/api/cardapio/pizza/sabores/${id}`, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(patch),
-      })
-      if (!response.ok) await parseError(response, 'Erro ao atualizar sabor')
-      const data = await response.json()
-      return data.data as SaborPizza
-    },
+    ({ token }, { id, patch }) =>
+      atualizarPizzaSaborViaBffUseCase.execute({ token, saborId: id, data: patch }),
     {
       onSuccess: async (_data, variables) => {
         await invalidate(['pizza'])
@@ -346,22 +237,8 @@ export function useReordenarPizzaCategoriaMutation() {
   const invalidate = useInvalidateTenantQueries()
 
   return useSecureTenantMutation<CategoriaPizza, { id: string; novaPosicao: number }>(
-    async ({ token }, { id, novaPosicao }) => {
-      const response = await fetchGestorApi(
-        `/api/cardapio/pizza/categorias/${id}/reordena-categoria`,
-        {
-          method: 'PATCH',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ novaPosicao }),
-        }
-      )
-      if (!response.ok) await parseError(response, 'Erro ao reordenar categoria')
-      const data = await response.json()
-      return data.data as CategoriaPizza
-    },
+    ({ token }, { id, novaPosicao }) =>
+      reordenarPizzaCategoriaViaBffUseCase.execute({ token, categoriaId: id, novaPosicao }),
     {
       onSuccess: async () => {
         await invalidate(['pizza'])
@@ -377,22 +254,8 @@ export function useReordenarPizzaSaborMutation() {
     SaborPizzaSummary,
     { id: string; novaPosicao: number; categoriaPizzaId: string }
   >(
-    async ({ token }, { id, novaPosicao }) => {
-      const response = await fetchGestorApi(
-        `/api/cardapio/pizza/sabores/${id}/reordena-sabor`,
-        {
-          method: 'PATCH',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ novaPosicao }),
-        }
-      )
-      if (!response.ok) await parseError(response, 'Erro ao reordenar sabor')
-      const data = await response.json()
-      return data.data as SaborPizzaSummary
-    },
+    ({ token }, { id, novaPosicao }) =>
+      reordenarPizzaSaborViaBffUseCase.execute({ token, saborId: id, novaPosicao }),
     {
       onSuccess: async (_data, variables) => {
         await invalidate(['pizza'])

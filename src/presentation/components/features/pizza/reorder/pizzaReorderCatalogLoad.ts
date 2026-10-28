@@ -1,4 +1,8 @@
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import {
+  listarPizzaCategoriasViaBffUseCase,
+  listarPizzaSaboresViaBffUseCase,
+  listarPizzaTamanhosViaBffUseCase,
+} from '@/src/infrastructure/composition/pizzaUseCases'
 import type { CategoriaPizza, SaborPizzaSummary } from '@/src/shared/types/pizza'
 
 const PAGE_SIZE = 50
@@ -33,24 +37,12 @@ function sortByOrdemThenNome<T extends { ordem: number; nome: string }>(list: T[
 
 export async function fetchAllPizzaCategorias(token: string): Promise<CategoriaPizza[]> {
   const items = await fetchAllPages<CategoriaPizza>({
-    fetchPage: async offset => {
-      const searchParams = new URLSearchParams()
-      searchParams.set('limit', String(PAGE_SIZE))
-      searchParams.set('offset', String(offset))
-
-      const response = await fetchGestorApi(
-        `/api/cardapio/pizza/categorias?${searchParams}`,
-        { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }
-      )
-      if (!response.ok) {
-        throw new Error('Erro ao carregar categorias pizza')
-      }
-      const data = await response.json()
-      return {
-        items: (data.items ?? []) as CategoriaPizza[],
-        count: data.count ?? 0,
-      }
-    },
+    fetchPage: async offset =>
+      listarPizzaCategoriasViaBffUseCase.execute({
+        token,
+        limit: PAGE_SIZE,
+        offset,
+      }),
   })
 
   return sortByOrdemThenNome(items)
@@ -61,25 +53,13 @@ export async function fetchAllPizzaSabores(
   categoriaPizzaId?: string
 ): Promise<SaborPizzaSummary[]> {
   const items = await fetchAllPages<SaborPizzaSummary>({
-    fetchPage: async offset => {
-      const searchParams = new URLSearchParams()
-      if (categoriaPizzaId) searchParams.set('categoriaPizzaId', categoriaPizzaId)
-      searchParams.set('limit', String(PAGE_SIZE))
-      searchParams.set('offset', String(offset))
-
-      const response = await fetchGestorApi(
-        `/api/cardapio/pizza/sabores?${searchParams}`,
-        { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }
-      )
-      if (!response.ok) {
-        throw new Error('Erro ao carregar sabores')
-      }
-      const data = await response.json()
-      return {
-        items: (data.items ?? []) as SaborPizzaSummary[],
-        count: data.count ?? 0,
-      }
-    },
+    fetchPage: async offset =>
+      listarPizzaSaboresViaBffUseCase.execute({
+        token,
+        categoriaPizzaId,
+        limit: PAGE_SIZE,
+        offset,
+      }),
   })
 
   return sortByOrdemThenNome(items)
@@ -113,19 +93,12 @@ export async function fetchTamanhosCountByCategorias(
 ): Promise<Record<string, number>> {
   const entries = await Promise.all(
     categoriaIds.map(async categoriaId => {
-      const searchParams = new URLSearchParams()
-      searchParams.set('categoriaPizzaId', categoriaId)
-      searchParams.set('limit', '1')
-      searchParams.set('offset', '0')
-
-      const response = await fetchGestorApi(
-        `/api/cardapio/pizza/tamanhos?${searchParams}`,
-        { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }
-      )
-      if (!response.ok) {
-        throw new Error('Erro ao carregar tamanhos da categoria')
-      }
-      const data = await response.json()
+      const data = await listarPizzaTamanhosViaBffUseCase.execute({
+        token,
+        categoriaPizzaId: categoriaId,
+        limit: 1,
+        offset: 0,
+      })
       return [categoriaId, data.count ?? 0] as const
     })
   )

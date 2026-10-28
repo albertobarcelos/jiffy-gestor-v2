@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
-import { PizzaRepository } from '@/src/infrastructure/database/repositories/PizzaRepository'
+import { CriarPizzaCategoriaCompletoUseCase } from '@/src/application/use-cases/pizza/PizzaCrudUseCases'
+import { createPizzaRepository } from '@/src/infrastructure/api/repositories/createPizzaRepository'
 import { createCategoriaPizzaCompletoSchema } from '@/src/application/dto/pizza/PizzaInputSchemas'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { pizzaApiErrorResponse, pizzaJsonData } from '@/src/shared/utils/pizzaApiRoute'
@@ -20,8 +20,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const repo = new PizzaRepository(new ApiClient(), validation.tokenInfo.token)
-    const categoria = await repo.criarCategoriaCompleto(parsed.data)
+    const categoria = await new CriarPizzaCategoriaCompletoUseCase(
+      createPizzaRepository(validation.tokenInfo.token)
+    ).execute(parsed.data)
 
     return pizzaJsonData(categoria, 201)
   } catch (error) {

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
-import { PizzaRepository } from '@/src/infrastructure/database/repositories/PizzaRepository'
+import type { CreateGrupoBordasPizzaInput } from '@/src/domain/repositories/IPizzaRepository'
+import { createPizzaRepository } from '@/src/infrastructure/api/repositories/createPizzaRepository'
+import {
+  CriarPizzaGrupoBordasUseCase,
+  ListarPizzaGruposBordasUseCase,
+} from '@/src/application/use-cases/pizza/PizzaCrudUseCases'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import {
   parsePizzaPagination,
@@ -49,8 +53,9 @@ export async function GET(req: NextRequest) {
     const pagination = parsePizzaPagination(searchParams)
     const categoriaPizzaId = searchParams.get('categoriaPizzaId') || undefined
 
-    const repo = new PizzaRepository(new ApiClient(), validation.tokenInfo.token)
-    const result = await repo.listarGruposBordas({ ...pagination, categoriaPizzaId })
+    const result = await new ListarPizzaGruposBordasUseCase(
+      createPizzaRepository(validation.tokenInfo.token)
+    ).execute({ ...pagination, categoriaPizzaId })
 
     return pizzaJsonPaginated(result)
   } catch (error) {
@@ -68,8 +73,9 @@ export async function POST(req: NextRequest) {
     const validated = validateGrupoBody(body, { requireNome: false })
     if (!validated.ok) return validated.response
 
-    const repo = new PizzaRepository(new ApiClient(), validation.tokenInfo.token)
-    const grupo = await repo.criarGrupoBordas(validated.data)
+    const grupo = await new CriarPizzaGrupoBordasUseCase(
+      createPizzaRepository(validation.tokenInfo.token)
+    ).execute(validated.data as unknown as CreateGrupoBordasPizzaInput)
 
     return pizzaJsonData(grupo, 201)
   } catch (error) {

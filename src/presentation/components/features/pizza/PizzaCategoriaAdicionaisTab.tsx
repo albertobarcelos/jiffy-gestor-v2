@@ -16,6 +16,9 @@ import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitc
 import { PizzaCurrencyTextField } from '@/src/presentation/components/features/pizza/PizzaCurrencyTextField'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { showToast } from '@/src/shared/utils/toast'
+import {
+  buildPizzaComplementoPrecosSelecionados,
+} from '@/src/application/pizza/pizzaComplementoImpacto'
 import type {
   ComplementoPizza,
   PrecoComplementoPizza,
@@ -65,12 +68,6 @@ export interface PizzaComplementoPrecoEditorProps {
   pending: boolean
   onSave: (precos: PrecoComplementoPizza[]) => void | Promise<void>
   saveLabel?: string
-}
-
-export function nomeImpactoPizzaComplemento(tipoImpactoPreco: TipoImpactoPreco) {
-  if (tipoImpactoPreco === 'aumenta') return 'Acréscimo'
-  if (tipoImpactoPreco === 'diminui') return 'Desconto'
-  return 'Sem impacto de preço'
 }
 
 export function PizzaComplementoNomeComDescricao({
@@ -141,27 +138,17 @@ export function PizzaComplementoPrecoEditor({
   })
 
   const handleSalvar = async () => {
-    const selecionados = tamanhos.filter(tamanho => valores[tamanho.id]?.ativo)
-    if (selecionados.length === 0) {
-      showToast.error('Selecione ao menos um tamanho para disponibilizar este adicional')
+    const result = buildPizzaComplementoPrecosSelecionados({
+      tamanhos,
+      valores,
+      tipoImpactoPreco,
+    })
+    if (!result.ok) {
+      showToast.error(result.message)
       return
     }
 
-    const novosPrecos: PrecoComplementoPizza[] = []
-    for (const tamanho of selecionados) {
-      if (tipoImpactoPreco === 'nenhum') {
-        novosPrecos.push({ pizzaTamanhoId: tamanho.id, valor: 0 })
-        continue
-      }
-      const valor = valores[tamanho.id]?.valor
-      if (!Number.isFinite(valor) || valor < 0) {
-        showToast.error(`Informe um preço válido para o tamanho ${tamanho.nome}`)
-        return
-      }
-      novosPrecos.push({ pizzaTamanhoId: tamanho.id, valor })
-    }
-
-    await onSave(novosPrecos)
+    await onSave(result.precos)
   }
 
   return (

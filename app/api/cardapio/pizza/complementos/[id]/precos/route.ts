@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
-import { PizzaRepository } from '@/src/infrastructure/database/repositories/PizzaRepository'
+import { SubstituirPrecosPizzaComplementoUseCase } from '@/src/application/use-cases/pizza/PizzaCrudUseCases'
+import { createPizzaRepository } from '@/src/infrastructure/api/repositories/createPizzaRepository'
 import { replacePizzaComplementoPrecosSchema } from '@/src/application/dto/pizza/PizzaInputSchemas'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import {
@@ -30,8 +30,9 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
       )
     }
 
-    const repo = new PizzaRepository(new ApiClient(), validation.tokenInfo.token)
-    const complemento = await repo.substituirPrecosComplementoPizza(id, parsed.data)
+    const complemento = await new SubstituirPrecosPizzaComplementoUseCase(
+      createPizzaRepository(validation.tokenInfo.token)
+    ).execute(id, parsed.data)
 
     return pizzaJsonData(complemento)
   } catch (error) {

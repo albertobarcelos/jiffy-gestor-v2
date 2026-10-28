@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
-import { PizzaRepository } from '@/src/infrastructure/database/repositories/PizzaRepository'
+import { createPizzaRepository } from '@/src/infrastructure/api/repositories/createPizzaRepository'
+import {
+  CriarPizzaTamanhoUseCase,
+  ListarPizzaTamanhosUseCase,
+} from '@/src/application/use-cases/pizza/PizzaCrudUseCases'
 import { createPizzaTamanhoSchema } from '@/src/application/dto/pizza/PizzaInputSchemas'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import {
@@ -20,8 +23,9 @@ export async function GET(req: NextRequest) {
     const pagination = parsePizzaPagination(searchParams)
     const categoriaPizzaId = searchParams.get('categoriaPizzaId') || undefined
 
-    const repo = new PizzaRepository(new ApiClient(), validation.tokenInfo.token)
-    const result = await repo.listarTamanhos({ ...pagination, categoriaPizzaId })
+    const result = await new ListarPizzaTamanhosUseCase(
+      createPizzaRepository(validation.tokenInfo.token)
+    ).execute({ ...pagination, categoriaPizzaId })
 
     return pizzaJsonPaginated(result)
   } catch (error) {
@@ -44,8 +48,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const repo = new PizzaRepository(new ApiClient(), validation.tokenInfo.token)
-    const tamanho = await repo.criarTamanho(parsed.data)
+    const tamanho = await new CriarPizzaTamanhoUseCase(
+      createPizzaRepository(validation.tokenInfo.token)
+    ).execute(parsed.data)
 
     return pizzaJsonData(tamanho, 201)
   } catch (error) {

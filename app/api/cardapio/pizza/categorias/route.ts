@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
-import { PizzaRepository } from '@/src/infrastructure/database/repositories/PizzaRepository'
+import { createPizzaRepository } from '@/src/infrastructure/api/repositories/createPizzaRepository'
+import {
+  CriarPizzaCategoriaUseCase,
+  ListarPizzaCategoriasUseCase,
+} from '@/src/application/use-cases/pizza/PizzaCrudUseCases'
 import { createCategoriaPizzaSchema } from '@/src/application/dto/pizza/PizzaInputSchemas'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import {
@@ -19,8 +22,9 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const pagination = parsePizzaPagination(searchParams)
 
-    const repo = new PizzaRepository(new ApiClient(), validation.tokenInfo.token)
-    const result = await repo.listarCategorias(pagination)
+    const result = await new ListarPizzaCategoriasUseCase(
+      createPizzaRepository(validation.tokenInfo.token)
+    ).execute(pagination)
 
     return pizzaJsonPaginated(result)
   } catch (error) {
@@ -43,8 +47,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const repo = new PizzaRepository(new ApiClient(), validation.tokenInfo.token)
-    const categoria = await repo.criarCategoria(parsed.data)
+    const categoria = await new CriarPizzaCategoriaUseCase(
+      createPizzaRepository(validation.tokenInfo.token)
+    ).execute(parsed.data)
 
     return pizzaJsonData(categoria, 201)
   } catch (error) {

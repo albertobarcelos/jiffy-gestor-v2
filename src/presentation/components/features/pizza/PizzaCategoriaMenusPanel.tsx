@@ -6,12 +6,7 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useMenus } from '@/src/presentation/hooks/menus/useMenus'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import {
-  desvincularPizzaCategoriaDoMenu,
-  listarMenuIdsComPizzaCategoria,
-  listarSaboresAtivosDaCategoria,
-  vincularPizzaCategoriaAoMenu,
-} from '@/src/presentation/utils/pizza/vincularPizzaCategoriaMenus'
+import { vincularPizzaCategoriaMenusUseCase } from '@/src/infrastructure/composition/pizzaUseCases'
 import { showToast } from '@/src/shared/utils/toast'
 
 interface PizzaCategoriaMenusPanelProps {
@@ -49,8 +44,15 @@ export function PizzaCategoriaMenusPanel({
     setLoadingLinks(true)
     try {
       const [linked, sabores] = await Promise.all([
-        listarMenuIdsComPizzaCategoria(token, categoriaId, menuIds),
-        listarSaboresAtivosDaCategoria(token, categoriaId),
+        vincularPizzaCategoriaMenusUseCase.listarMenuIdsComPizzaCategoria({
+          token,
+          categoriaPizzaId: categoriaId,
+          menuIds,
+        }),
+        vincularPizzaCategoriaMenusUseCase.listarSaboresAtivosDaCategoria({
+          token,
+          categoriaPizzaId: categoriaId,
+        }),
       ])
       setLinkedMenuIds(linked)
       setSaboresCount(sabores.length)
@@ -86,10 +88,18 @@ export function PizzaCategoriaMenusPanel({
     setSavingMenuId(menuId)
     try {
       if (nextLinked) {
-        await vincularPizzaCategoriaAoMenu(token, menuId, categoriaId)
+        await vincularPizzaCategoriaMenusUseCase.vincularPizzaCategoriaAoMenu({
+          token,
+          menuId,
+          categoriaPizzaId: categoriaId,
+        })
         showToast.success('Categoria vinculada ao cardápio')
       } else {
-        await desvincularPizzaCategoriaDoMenu(token, menuId, categoriaId)
+        await vincularPizzaCategoriaMenusUseCase.desvincularPizzaCategoriaDoMenu({
+          token,
+          menuId,
+          categoriaPizzaId: categoriaId,
+        })
         showToast.success('Categoria removida do cardápio')
       }
 

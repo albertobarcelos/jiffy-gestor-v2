@@ -14,10 +14,7 @@ import { cn } from '@/src/shared/utils/cn'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useMenus } from '@/src/presentation/hooks/menus/useMenus'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
-import {
-  vincularSaboresPizzaAoMenu,
-  vincularSaborAosMenusDaCategoria,
-} from '@/src/presentation/utils/pizza/vincularPizzaCategoriaMenus'
+import { vincularPizzaCategoriaMenusUseCase } from '@/src/infrastructure/composition/pizzaUseCases'
 import {
   useAtualizarPizzaSaborMutation,
   useCriarPizzaSaborMutation,
@@ -119,7 +116,11 @@ export function PizzaSaborModal({
       if (!token || !categoriaId) return
 
       if (menuId) {
-        await vincularSaboresPizzaAoMenu(token, menuId, [novoSaborId])
+        await vincularPizzaCategoriaMenusUseCase.vincularSaboresPizzaAoMenu({
+          token,
+          menuId,
+          saborIds: [novoSaborId],
+        })
         await invalidate(['menu', menuId])
         await invalidate(['menu-produtos', menuId])
         await invalidate(['menu-grupos', menuId])
@@ -127,12 +128,12 @@ export function PizzaSaborModal({
       }
 
       if (menuIdsCandidatos.length === 0) return
-      await vincularSaborAosMenusDaCategoria(
+      await vincularPizzaCategoriaMenusUseCase.vincularSaborAosMenusDaCategoria({
         token,
-        categoriaId,
-        novoSaborId,
-        menuIdsCandidatos
-      )
+        categoriaPizzaId: categoriaId,
+        saborId: novoSaborId,
+        menuIdsCandidatos,
+      })
     },
     [categoriaId, invalidate, menuId, menuIdsCandidatos]
   )

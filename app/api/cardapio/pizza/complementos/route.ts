@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
-import { PizzaRepository } from '@/src/infrastructure/database/repositories/PizzaRepository'
+import { createPizzaRepository } from '@/src/infrastructure/api/repositories/createPizzaRepository'
+import {
+  CriarPizzaComplementoUseCase,
+  ListarPizzaComplementosUseCase,
+} from '@/src/application/use-cases/pizza/PizzaCrudUseCases'
 import { createPizzaComplementoSchema } from '@/src/application/dto/pizza/PizzaInputSchemas'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import {
@@ -22,8 +25,9 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    const repo = new PizzaRepository(new ApiClient(), validation.tokenInfo.token)
-    const complementos = await repo.listarComplementosPizza(categoriaPizzaId)
+    const complementos = await new ListarPizzaComplementosUseCase(
+      createPizzaRepository(validation.tokenInfo.token)
+    ).execute(categoriaPizzaId)
 
     return pizzaJsonData(complementos)
   } catch (error) {
@@ -46,8 +50,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const repo = new PizzaRepository(new ApiClient(), validation.tokenInfo.token)
-    const complemento = await repo.criarComplementoPizza(parsed.data)
+    const complemento = await new CriarPizzaComplementoUseCase(
+      createPizzaRepository(validation.tokenInfo.token)
+    ).execute(parsed.data)
 
     return pizzaJsonData(complemento, 201)
   } catch (error) {

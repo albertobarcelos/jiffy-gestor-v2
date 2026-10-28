@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import {
-  buildCreateCompletoPayload,
-  createDefaultPizzaCategoriaDraft,
-} from '@/src/presentation/components/features/pizza/pizzaDefaults'
+import { buildCreateCompletoPayload } from '@/src/application/mappers/pizza/buildCreateCompletoPayload'
+import { createDefaultPizzaCategoriaDraft } from '@/src/presentation/components/features/pizza/pizzaDefaults'
 
 describe('buildCreateCompletoPayload', () => {
   it('monta payload completo sem sabores', () => {

@@ -9,8 +9,8 @@ import {
 import { MENU_WIDE_PANEL_CLASS } from '@/src/presentation/components/features/menus/menuPanelConstants'
 import { showToast } from '@/src/shared/utils/toast'
 import { useCriarPizzaCategoriaCompletoMutation } from '@/src/presentation/hooks/pizza/usePizza'
+import { buildCreateCompletoPayload } from '@/src/application/mappers/pizza/buildCreateCompletoPayload'
 import {
-  buildCreateCompletoPayload,
   createDefaultPizzaCategoriaDraft,
   serializePizzaDraft,
   type PizzaCategoriaDraft,

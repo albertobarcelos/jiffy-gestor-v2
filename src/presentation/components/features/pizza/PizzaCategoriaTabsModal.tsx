@@ -12,14 +12,16 @@ import { showToast } from '@/src/shared/utils/toast'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
-import { carregarPizzaCategoriaEdicao } from '@/src/presentation/utils/pizza/carregarPizzaCategoriaEdicao'
-import { salvarPizzaCategoriaEdicao } from '@/src/presentation/utils/pizza/salvarPizzaCategoriaEdicao'
 import {
   serializePizzaEditDraft,
   type PizzaCategoriaEditDraft,
   type PizzaLinhaComplementoEditDraft,
   type PizzaTamanhoEditDraft,
-} from '@/src/presentation/utils/pizza/pizzaEditMappers'
+} from '@/src/application/mappers/pizza/pizzaEditMappers'
+import {
+  carregarEdicaoCategoriaPizzaUseCase,
+  salvarEdicaoCategoriaPizzaUseCase,
+} from '@/src/infrastructure/composition/pizzaUseCases'
 import { PizzaCategoriaEditTabs, type PizzaCategoriaEditTabId } from './PizzaCategoriaEditTabs'
 import { PizzaCategoriaDetalhesTab } from './PizzaCategoriaDetalhesTab'
 import { PizzaTamanhoCards } from './PizzaTamanhoCards'
@@ -52,7 +54,7 @@ export function PizzaCategoriaTabsModal({
 
   const salvarMutation = useSecureTenantMutation<void, PizzaCategoriaEditDraft>(
     async ({ token }, input) => {
-      await salvarPizzaCategoriaEdicao(token, input)
+      await salvarEdicaoCategoriaPizzaUseCase.execute({ token, draft: input })
     },
     {
       onSuccess: async () => {
@@ -83,7 +85,8 @@ export function PizzaCategoriaTabsModal({
     setLoading(true)
     setLoadError(null)
 
-    carregarPizzaCategoriaEdicao(token, categoriaId)
+    carregarEdicaoCategoriaPizzaUseCase
+      .execute({ token, categoriaId })
       .then(loaded => {
         if (cancelled) return
         setDraft(loaded)

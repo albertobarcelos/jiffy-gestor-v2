@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
-import { PizzaRepository } from '@/src/infrastructure/database/repositories/PizzaRepository'
+import { createPizzaRepository } from '@/src/infrastructure/api/repositories/createPizzaRepository'
+import {
+  AtualizarPizzaTamanhoUseCase,
+  BuscarPizzaTamanhoUseCase,
+  ExcluirPizzaTamanhoUseCase,
+} from '@/src/application/use-cases/pizza/PizzaCrudUseCases'
 import { updatePizzaTamanhoSchema } from '@/src/application/dto/pizza/PizzaInputSchemas'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import {
@@ -18,8 +22,9 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     if (!validation.valid || !validation.tokenInfo) return validation.error!
 
     const { id } = await params
-    const repo = new PizzaRepository(new ApiClient(), validation.tokenInfo.token)
-    const tamanho = await repo.buscarTamanhoPorId(id)
+    const tamanho = await new BuscarPizzaTamanhoUseCase(
+      createPizzaRepository(validation.tokenInfo.token)
+    ).execute(id)
 
     return pizzaJsonData(tamanho)
   } catch (error) {
@@ -43,8 +48,9 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       )
     }
 
-    const repo = new PizzaRepository(new ApiClient(), validation.tokenInfo.token)
-    const tamanho = await repo.atualizarTamanho(id, parsed.data)
+    const tamanho = await new AtualizarPizzaTamanhoUseCase(
+      createPizzaRepository(validation.tokenInfo.token)
+    ).execute(id, parsed.data)
 
     return pizzaJsonData(tamanho)
   } catch (error) {
@@ -59,8 +65,9 @@ export async function DELETE(req: NextRequest, { params }: RouteContext) {
     if (!validation.valid || !validation.tokenInfo) return validation.error!
 
     const { id } = await params
-    const repo = new PizzaRepository(new ApiClient(), validation.tokenInfo.token)
-    await repo.excluirTamanho(id)
+    await new ExcluirPizzaTamanhoUseCase(
+      createPizzaRepository(validation.tokenInfo.token)
+    ).execute(id)
 
     return pizzaJsonOk()
   } catch (error) {

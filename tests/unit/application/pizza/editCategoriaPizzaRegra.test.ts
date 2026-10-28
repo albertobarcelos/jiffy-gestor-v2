@@ -4,7 +4,7 @@ import type { CategoriaPizza } from '@/src/shared/types/pizza'
 import {
   buildEditDraftFromLoaded,
   buildUpdateCategoriaPizzaInput,
-} from '@/src/presentation/utils/pizza/pizzaEditMappers'
+} from '@/src/application/mappers/pizza/pizzaEditMappers'
 
 const categoria: CategoriaPizza = {
   id: 'categoria-1',
@@ -20,7 +20,7 @@ const categoria: CategoriaPizza = {
   dataAtualizacao: '2026-01-01T00:00:00.000Z',
 }
 
-describe('edição da regra de preço meio a meio', () => {
+describe('edicao da regra de preco meio a meio', () => {
   it('carrega a regra persistida da categoria no rascunho', () => {
     const draft = buildEditDraftFromLoaded({
       categoria,

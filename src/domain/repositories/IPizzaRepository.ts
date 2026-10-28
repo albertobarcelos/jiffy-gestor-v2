@@ -1,11 +1,20 @@
 import type {
   CategoriaPizza,
   CategoriaPizzaCompletoResponse,
+  BordaPizzaInput,
   ComplementoPizza,
   CreateComplementoPizzaInput,
   CreateCategoriaPizzaCompletoInput,
   CreateCategoriaPizzaInput,
   CreateSaborPizzaInput,
+  GrupoComplementoDelta,
+  GrupoBordasPizza,
+  GrupoBordasPizzaNestedInput,
+  GrupoBordasPizzaSummary,
+  GrupoMassasPizza,
+  GrupoMassasPizzaNestedInput,
+  GrupoMassasPizzaSummary,
+  MassaPizzaInput,
   PizzaPaginatedResponse,
   PizzaPaginationParams,
   PizzaTamanho,
@@ -14,6 +23,24 @@ import type {
   SaborPizzaSummary,
   UpdateSaborPizzaInput,
 } from '@/src/shared/types/pizza'
+
+export type CreateGrupoBordasPizzaInput = GrupoBordasPizzaNestedInput & {
+  categoriaPizzaId?: string
+  grupoPizzaConfigId?: string
+}
+
+export type UpdateGrupoBordasPizzaInput = Partial<Omit<GrupoBordasPizzaNestedInput, 'bordas'>> & {
+  bordas?: GrupoComplementoDelta<BordaPizzaInput, BordaPizzaInput & { id: string }>
+}
+
+export type CreateGrupoMassasPizzaInput = GrupoMassasPizzaNestedInput & {
+  categoriaPizzaId?: string
+  grupoPizzaConfigId?: string
+}
+
+export type UpdateGrupoMassasPizzaInput = Partial<Omit<GrupoMassasPizzaNestedInput, 'massas'>> & {
+  massas?: GrupoComplementoDelta<MassaPizzaInput, MassaPizzaInput & { id: string }>
+}
 
 export interface IPizzaRepository {
   listarCategorias(params: PizzaPaginationParams): Promise<PizzaPaginatedResponse<CategoriaPizza>>
@@ -57,18 +84,18 @@ export interface IPizzaRepository {
 
   listarGruposBordas(
     params: PizzaPaginationParams & { categoriaPizzaId?: string }
-  ): Promise<PizzaPaginatedResponse<unknown>>
-  buscarGrupoBordasPorId(id: string): Promise<unknown>
-  criarGrupoBordas(input: unknown): Promise<unknown>
-  atualizarGrupoBordas(id: string, input: unknown): Promise<unknown>
+  ): Promise<PizzaPaginatedResponse<GrupoBordasPizzaSummary>>
+  buscarGrupoBordasPorId(id: string): Promise<GrupoBordasPizza>
+  criarGrupoBordas(input: CreateGrupoBordasPizzaInput): Promise<GrupoBordasPizza>
+  atualizarGrupoBordas(id: string, input: UpdateGrupoBordasPizzaInput): Promise<GrupoBordasPizza>
   excluirGrupoBordas(id: string): Promise<void>
 
   listarGruposMassas(
     params: PizzaPaginationParams & { categoriaPizzaId?: string }
-  ): Promise<PizzaPaginatedResponse<unknown>>
-  buscarGrupoMassasPorId(id: string): Promise<unknown>
-  criarGrupoMassas(input: unknown): Promise<unknown>
-  atualizarGrupoMassas(id: string, input: unknown): Promise<unknown>
+  ): Promise<PizzaPaginatedResponse<GrupoMassasPizzaSummary>>
+  buscarGrupoMassasPorId(id: string): Promise<GrupoMassasPizza>
+  criarGrupoMassas(input: CreateGrupoMassasPizzaInput): Promise<GrupoMassasPizza>
+  atualizarGrupoMassas(id: string, input: UpdateGrupoMassasPizzaInput): Promise<GrupoMassasPizza>
   excluirGrupoMassas(id: string): Promise<void>
 
   listarComplementosPizza(categoriaPizzaId: string): Promise<ComplementoPizza[]>

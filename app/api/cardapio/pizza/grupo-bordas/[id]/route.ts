@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
-import { PizzaRepository } from '@/src/infrastructure/database/repositories/PizzaRepository'
+import type { UpdateGrupoBordasPizzaInput } from '@/src/domain/repositories/IPizzaRepository'
+import { createPizzaRepository } from '@/src/infrastructure/api/repositories/createPizzaRepository'
+import {
+  AtualizarPizzaGrupoBordasUseCase,
+  BuscarPizzaGrupoBordasUseCase,
+  ExcluirPizzaGrupoBordasUseCase,
+} from '@/src/application/use-cases/pizza/PizzaCrudUseCases'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import {
   pizzaApiErrorResponse,
@@ -38,8 +43,9 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     if (!validation.valid || !validation.tokenInfo) return validation.error!
 
     const { id } = await params
-    const repo = new PizzaRepository(new ApiClient(), validation.tokenInfo.token)
-    const grupo = await repo.buscarGrupoBordasPorId(id)
+    const grupo = await new BuscarPizzaGrupoBordasUseCase(
+      createPizzaRepository(validation.tokenInfo.token)
+    ).execute(id)
 
     return pizzaJsonData(grupo)
   } catch (error) {
@@ -58,8 +64,9 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     const validated = validateGrupoPatchBody(body)
     if (!validated.ok) return validated.response
 
-    const repo = new PizzaRepository(new ApiClient(), validation.tokenInfo.token)
-    const grupo = await repo.atualizarGrupoBordas(id, validated.data)
+    const grupo = await new AtualizarPizzaGrupoBordasUseCase(
+      createPizzaRepository(validation.tokenInfo.token)
+    ).execute(id, validated.data as UpdateGrupoBordasPizzaInput)
 
     return pizzaJsonData(grupo)
   } catch (error) {
@@ -74,8 +81,9 @@ export async function DELETE(req: NextRequest, { params }: RouteContext) {
     if (!validation.valid || !validation.tokenInfo) return validation.error!
 
     const { id } = await params
-    const repo = new PizzaRepository(new ApiClient(), validation.tokenInfo.token)
-    await repo.excluirGrupoBordas(id)
+    await new ExcluirPizzaGrupoBordasUseCase(
+      createPizzaRepository(validation.tokenInfo.token)
+    ).execute(id)
 
     return pizzaJsonOk()
   } catch (error) {

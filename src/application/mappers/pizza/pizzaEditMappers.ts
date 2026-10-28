@@ -5,12 +5,12 @@ import type {
   PizzaTamanho,
   UpdateCategoriaPizzaInput,
 } from '@/src/shared/types/pizza'
-import {
-  createLocalId,
-  type PizzaCategoriaDraft,
-  type PizzaLinhaComplementoDraft,
-  type PizzaTamanhoDraft,
-} from '@/src/presentation/components/features/pizza/pizzaDefaults'
+import type {
+  PizzaCategoriaDraft,
+  PizzaLinhaComplementoDraft,
+  PizzaTamanhoDraft,
+} from '@/src/application/dto/pizza/pizzaDraftTypes'
+import { CategoriaPizza as CategoriaPizzaEntity } from '@/src/domain/entities/pizza/CategoriaPizza'
 
 export type PizzaTamanhoEditDraft = PizzaTamanhoDraft & { id?: string }
 
@@ -32,10 +32,14 @@ export type PizzaCategoriaEditDraft = Omit<
   bordasRemovidasIds: string[]
 }
 
+function createEditLocalId(prefix: string, id?: string) {
+  return id ? `${prefix}-${id}` : `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
 export function mapTamanhoToEditDraft(t: PizzaTamanho): PizzaTamanhoEditDraft {
   return {
     id: t.id,
-    localId: createLocalId(),
+    localId: createEditLocalId('tamanho', t.id),
     nome: t.nome,
     quantidadePedacos: t.quantidadePedacos,
     quantidadeMaximaDivisoes: t.quantidadeMaximaDivisoes,
@@ -51,7 +55,7 @@ export function mapMassaToEditDraft(m: {
 }): PizzaLinhaComplementoEditDraft {
   return {
     id: m.id,
-    localId: createLocalId(),
+    localId: createEditLocalId('massa', m.id),
     nome: m.nome,
     valor: m.valor,
     ativo: m.ativo,
@@ -66,7 +70,7 @@ export function mapBordaToEditDraft(b: {
 }): PizzaLinhaComplementoEditDraft {
   return {
     id: b.id,
-    localId: createLocalId(),
+    localId: createEditLocalId('borda', b.id),
     nome: b.nome,
     valor: b.valor,
     ativo: b.ativo,
@@ -80,17 +84,18 @@ export function buildEditDraftFromLoaded(params: {
   grupoBordas?: GrupoBordasPizza | null
 }): PizzaCategoriaEditDraft {
   const { categoria, tamanhos, grupoMassas, grupoBordas } = params
+  const categoriaEntity = CategoriaPizzaEntity.fromDatabase(categoria)
 
   return {
-    categoriaId: categoria.id,
+    categoriaId: categoriaEntity.getId(),
     grupoPizzaConfigId: tamanhos[0]?.grupoPizzaConfigId,
     grupoMassasId: grupoMassas?.id,
     grupoBordasId: grupoBordas?.id,
-    nome: categoria.nome,
-    corHex: categoria.corHex,
-    iconName: categoria.iconName,
-    ativo: categoria.ativo,
-    regraPrecoMultiplosSabores: categoria.regraPrecoMultiplosSabores ?? 'proporcional',
+    nome: categoriaEntity.getNome(),
+    corHex: categoriaEntity.getCorHex(),
+    iconName: categoriaEntity.getIconName(),
+    ativo: categoriaEntity.isAtivo(),
+    regraPrecoMultiplosSabores: categoriaEntity.getRegraPrecoMultiplosSabores(),
     permiteDesconto: true,
     permiteAcrescimo: true,
     impressorasIds: [],

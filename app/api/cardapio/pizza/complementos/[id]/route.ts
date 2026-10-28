@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
-import { PizzaRepository } from '@/src/infrastructure/database/repositories/PizzaRepository'
+import { DesvincularPizzaComplementoUseCase } from '@/src/application/use-cases/pizza/PizzaCrudUseCases'
+import { createPizzaRepository } from '@/src/infrastructure/api/repositories/createPizzaRepository'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import {
   pizzaApiErrorResponse,
@@ -20,8 +20,9 @@ export async function DELETE(req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ message: 'Id obrigatório' }, { status: 400 })
     }
 
-    const repo = new PizzaRepository(new ApiClient(), validation.tokenInfo.token)
-    await repo.desvincularComplementoPizza(id)
+    await new DesvincularPizzaComplementoUseCase(
+      createPizzaRepository(validation.tokenInfo.token)
+    ).execute(id)
 
     return pizzaJsonOk()
   } catch (error) {

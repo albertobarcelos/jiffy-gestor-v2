@@ -1,6 +1,12 @@
 import { ApiClient } from '@/src/infrastructure/api/apiClient'
 import type { IPizzaRepository } from '@/src/domain/repositories/IPizzaRepository'
 import type {
+  CreateGrupoBordasPizzaInput,
+  CreateGrupoMassasPizzaInput,
+  UpdateGrupoBordasPizzaInput,
+  UpdateGrupoMassasPizzaInput,
+} from '@/src/domain/repositories/IPizzaRepository'
+import type {
   CategoriaPizza,
   CategoriaPizzaCompletoResponse,
   ComplementoPizza,
@@ -8,6 +14,10 @@ import type {
   CreateCategoriaPizzaCompletoInput,
   CreateCategoriaPizzaInput,
   CreateSaborPizzaInput,
+  GrupoBordasPizza,
+  GrupoBordasPizzaSummary,
+  GrupoMassasPizza,
+  GrupoMassasPizzaSummary,
   PizzaPaginatedResponse,
   PizzaPaginationParams,
   PizzaTamanho,
@@ -246,18 +256,18 @@ export class PizzaRepository implements IPizzaRepository {
       `${BASE}/grupo-bordas?${query.toString()}`,
       { headers: this.authHeaders() }
     )
-    return mapPaginated<unknown>(data)
+    return mapPaginated<GrupoBordasPizzaSummary>(data)
   }
 
   async buscarGrupoBordasPorId(id: string) {
-    const { data } = await this.apiClient.request<unknown>(`${BASE}/grupo-bordas/${id}`, {
+    const { data } = await this.apiClient.request<GrupoBordasPizza>(`${BASE}/grupo-bordas/${id}`, {
       headers: this.authHeaders(),
     })
     return data
   }
 
-  async criarGrupoBordas(input: unknown) {
-    const { data } = await this.apiClient.request<unknown>(`${BASE}/grupo-bordas`, {
+  async criarGrupoBordas(input: CreateGrupoBordasPizzaInput) {
+    const { data } = await this.apiClient.request<GrupoBordasPizza>(`${BASE}/grupo-bordas`, {
       method: 'POST',
       headers: this.authHeaders(true),
       body: JSON.stringify(input),
@@ -265,8 +275,8 @@ export class PizzaRepository implements IPizzaRepository {
     return data
   }
 
-  async atualizarGrupoBordas(id: string, input: unknown) {
-    const { data } = await this.apiClient.request<unknown>(`${BASE}/grupo-bordas/${id}`, {
+  async atualizarGrupoBordas(id: string, input: UpdateGrupoBordasPizzaInput) {
+    const { data } = await this.apiClient.request<GrupoBordasPizza>(`${BASE}/grupo-bordas/${id}`, {
       method: 'PATCH',
       headers: this.authHeaders(true),
       body: JSON.stringify(input),
@@ -288,18 +298,18 @@ export class PizzaRepository implements IPizzaRepository {
       `${BASE}/grupo-massas?${query.toString()}`,
       { headers: this.authHeaders() }
     )
-    return mapPaginated<unknown>(data)
+    return mapPaginated<GrupoMassasPizzaSummary>(data)
   }
 
   async buscarGrupoMassasPorId(id: string) {
-    const { data } = await this.apiClient.request<unknown>(`${BASE}/grupo-massas/${id}`, {
+    const { data } = await this.apiClient.request<GrupoMassasPizza>(`${BASE}/grupo-massas/${id}`, {
       headers: this.authHeaders(),
     })
     return data
   }
 
-  async criarGrupoMassas(input: unknown) {
-    const { data } = await this.apiClient.request<unknown>(`${BASE}/grupo-massas`, {
+  async criarGrupoMassas(input: CreateGrupoMassasPizzaInput) {
+    const { data } = await this.apiClient.request<GrupoMassasPizza>(`${BASE}/grupo-massas`, {
       method: 'POST',
       headers: this.authHeaders(true),
       body: JSON.stringify(input),
@@ -307,8 +317,8 @@ export class PizzaRepository implements IPizzaRepository {
     return data
   }
 
-  async atualizarGrupoMassas(id: string, input: unknown) {
-    const { data } = await this.apiClient.request<unknown>(`${BASE}/grupo-massas/${id}`, {
+  async atualizarGrupoMassas(id: string, input: UpdateGrupoMassasPizzaInput) {
+    const { data } = await this.apiClient.request<GrupoMassasPizza>(`${BASE}/grupo-massas/${id}`, {
       method: 'PATCH',
       headers: this.authHeaders(true),
       body: JSON.stringify(input),

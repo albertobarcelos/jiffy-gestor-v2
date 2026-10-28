@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
-import { PizzaRepository } from '@/src/infrastructure/database/repositories/PizzaRepository'
+import { ReordenarPizzaCategoriaUseCase } from '@/src/application/use-cases/pizza/PizzaCrudUseCases'
+import { createPizzaRepository } from '@/src/infrastructure/api/repositories/createPizzaRepository'
 import { reorderCategoriaPizzaSchema } from '@/src/application/dto/pizza/PizzaInputSchemas'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { pizzaApiErrorResponse, pizzaJsonData } from '@/src/shared/utils/pizzaApiRoute'
@@ -23,8 +23,9 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       )
     }
 
-    const repo = new PizzaRepository(new ApiClient(), validation.tokenInfo.token)
-    const categoria = await repo.reordenarCategoria(id, parsed.data.novaPosicao)
+    const categoria = await new ReordenarPizzaCategoriaUseCase(
+      createPizzaRepository(validation.tokenInfo.token)
+    ).execute(id, parsed.data.novaPosicao)
 
     return pizzaJsonData(categoria)
   } catch (error) {
