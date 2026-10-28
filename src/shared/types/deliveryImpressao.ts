@@ -33,6 +33,9 @@ export const DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY: PreferenciasImpressaoDeliv
   impressoraExpedicaoId: null,
 }
 
+/** Únicas transições que disparam cupom automático (quadro e Socket). */
+export type AcaoImpressaoAutomatica = 'iniciar_preparo' | 'marcar_pronto'
+
 export type DecidirImpressaoResultado = {
   imprimir: boolean
   tipoCupom: TipoCupomDelivery | null
