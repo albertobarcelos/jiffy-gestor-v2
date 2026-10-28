@@ -22,6 +22,7 @@ import { GrupoItem } from './GrupoItem'
 import { useGruposProdutosInfinite } from '@/src/presentation/hooks/useGruposProdutos'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { isReplicacaoStatusCategoriaFalhou } from '@/src/application/errors/ReplicacaoStatusCategoriaFalhouError'
 import { updateGrupoProdutoStatusUseCase } from '@/src/infrastructure/composition/categoriaStatusUseCases'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -256,7 +257,10 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       )
 
       try {
-        await updateGrupoProdutoStatusUseCase.execute({ grupoId, novoStatus, token })
+        await updateGrupoProdutoStatusUseCase.execute(
+          { grupoId, novoStatus, token },
+          { aposGravarBase: () => invalidateListas() }
+        )
         await invalidate(['menu-grupos'])
         showToast.success(
           novoStatus
@@ -264,13 +268,18 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
             : 'Categoria desativada no cadastro e em todos os cardápios'
         )
       } catch (error) {
+        if (isReplicacaoStatusCategoriaFalhou(error)) {
+          console.error('Erro ao publicar status da categoria nos cardápios:', error)
+          await invalidate(['menu-grupos'])
+          showToast.error(error.message)
+          return
+        }
         console.error('Erro ao atualizar status do grupo:', error)
-        // Reverter atualização otimista em caso de erro
         setLocalGrupos(previousState)
         showToast.error('Não foi possível atualizar o status da categoria.')
       }
     },
-    [invalidate, localGrupos]
+    [invalidate, invalidateListas, localGrupos]
   )
 
   const openTabsModal = useCallback(
