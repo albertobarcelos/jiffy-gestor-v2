@@ -125,9 +125,11 @@ export function PizzasHubPage() {
     tamanhosCountByCategoriaId,
     isLoading: isLoadingCatalog,
     isFetching: isFetchingCatalog,
+    data: catalogData,
   } = usePizzaHubCatalog(categoriaIds, categorias.length > 0)
 
-  const catalogLoading = isLoadingCatalog || isFetchingCatalog
+  // Só bloqueia a UI no 1º load; refresh após alteração usa cache até o novo dado chegar
+  const catalogLoading = isLoadingCatalog || (isFetchingCatalog && !catalogData)
 
   useEffect(() => {
     const main = document.querySelector('main')

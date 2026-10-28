@@ -1,4 +1,5 @@
-export const NOME_CATALOGO_LISTA_MAX_CHARS = 25
+/** Largura alinhada à coluna de nome do catálogo (~34ch). */
+export const NOME_CATALOGO_LISTA_MAX_CHARS = 34
 
 export function truncarNomeCatalogoLista(
   nome: string,

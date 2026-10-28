@@ -3,6 +3,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from 'react'
 import { Checkbox, TextField } from '@mui/material'
 import { Button } from '@/src/presentation/components/ui/button'
+import { UppercaseLocaleInput } from '@/src/presentation/components/ui/UppercaseLocaleInput'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { showToast } from '@/src/shared/utils/toast'
 import { PizzaCurrencyTextField } from './PizzaCurrencyTextField'
@@ -196,14 +197,14 @@ export const PizzaSaborDraftFormCard = forwardRef<
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
         <div className="grid gap-2 sm:grid-cols-2">
-          <TextField
+          <UppercaseLocaleInput
             label="Sabor"
             required
             fullWidth
             size="small"
             value={nome}
-            onChange={e => setNome(e.target.value.toUpperCase())}
-            inputProps={{ maxLength: 80 }}
+            onValueChange={setNome}
+            maxLength={80}
             sx={sxEntradaCardSabor}
           />
           <TextField

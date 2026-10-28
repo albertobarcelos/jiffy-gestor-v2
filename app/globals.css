@@ -350,7 +350,7 @@ h6 {
   .catalog-row-menu {
     grid-template-areas: 'foto nome codigo acoes meta';
     /* meta com largura mínima estável (promo + preço + pause) para alinhar ícones */
-    grid-template-columns: auto 25ch 4.75rem minmax(0, 1fr) minmax(15.5rem, auto);
+    grid-template-columns: auto 34ch 4.75rem minmax(0, 1fr) minmax(15.5rem, auto);
   }
 
   .catalog-row-menu-hidecodigo {
@@ -370,14 +370,14 @@ h6 {
 
   .catalog-row-base {
     grid-template-areas: 'nome codigo acoes spacer meta';
-    grid-template-columns: 25ch 4.75rem auto minmax(0, 1fr) auto;
+    grid-template-columns: 34ch 4.75rem auto minmax(0, 1fr) auto;
   }
 
   .catalog-row-base-categoria {
     grid-template-areas: 'nome codigo acoes categ meta';
     /* Ações: 7×2rem + 6×0.75rem (gap-3). Largura fixa para o cabeçalho
        e as linhas caírem na mesma coluna; o espaço livre fica só no valor. */
-    grid-template-columns: 25ch 4.75rem 18.5rem 12rem minmax(0, 1fr);
+    grid-template-columns: 34ch 4.75rem 18.5rem 12rem minmax(0, 1fr);
   }
 
   .catalog-row-area-foto {

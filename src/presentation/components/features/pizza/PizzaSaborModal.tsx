@@ -8,6 +8,7 @@ import {
 } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { MENU_WIDE_PANEL_CLASS } from '@/src/presentation/components/features/menus/menuPanelConstants'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
+import { UppercaseLocaleInput } from '@/src/presentation/components/ui/UppercaseLocaleInput'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
 import { cn } from '@/src/shared/utils/cn'
@@ -87,8 +88,14 @@ export function PizzaSaborModal({
     saborId ?? undefined,
     open && isEdit
   )
-  const { data: tamanhosData, isLoading: loadingTamanhos } = usePizzaTamanhos(categoriaId, open)
+  const {
+    data: tamanhosData,
+    isLoading: loadingTamanhos,
+    isFetching: fetchingTamanhos,
+  } = usePizzaTamanhos(categoriaId, open)
   const tamanhos = tamanhosData?.items ?? EMPTY_TAMANHOS
+  const tamanhosIndisponiveis =
+    !loadingTamanhos && !fetchingTamanhos && tamanhos.length === 0
   const tamanhoIdsKey = useMemo(
     () => tamanhos.map(t => t.id).join('|'),
     [tamanhos]
@@ -354,13 +361,13 @@ export function PizzaSaborModal({
                   disabled
                   sx={sxEntradaCompactaProduto}
                 />
-                <TextField
+                <UppercaseLocaleInput
                   label="Sabor"
                   required
                   fullWidth
                   value={nome}
-                  onChange={e => setNome(e.target.value.toUpperCase())}
-                  inputProps={{ maxLength: 80 }}
+                  onValueChange={setNome}
+                  maxLength={80}
                   helperText={`${nome.length}/80 caracteres`}
                   sx={sxEntradaCompactaProduto}
                 />
@@ -384,9 +391,9 @@ export function PizzaSaborModal({
                 <p className="text-sm text-secondary-text">
                   Selecione os tamanhos disponíveis e informe o preço de cada um.
                 </p>
-                {loadingTamanhos ? (
+                {loadingTamanhos || (fetchingTamanhos && tamanhos.length === 0) ? (
                   <p className="text-sm text-secondary-text">Carregando tamanhos...</p>
-                ) : tamanhos.length === 0 ? (
+                ) : tamanhosIndisponiveis ? (
                   <p className="text-sm text-error">
                     Configure os tamanhos da categoria antes de cadastrar sabores.
                   </p>

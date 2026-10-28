@@ -71,7 +71,7 @@ export function CatalogProductColumnHeader({
       )}
     >
       {isMenu ? <span className="catalog-row-area-foto h-14 w-14 md:h-16 md:w-16" aria-hidden /> : null}
-      <Rotulo className="catalog-row-area-nome min-w-0 max-w-[25ch] text-left">Nome</Rotulo>
+      <Rotulo className="catalog-row-area-nome min-w-0 max-w-[34ch] text-left">Nome</Rotulo>
       <Rotulo className="catalog-row-area-codigo w-[4.75rem]">Cód.</Rotulo>
       <div className="catalog-row-area-acoes w-full">
         <AcoesHeader incluirCopiar={!isMenu} />

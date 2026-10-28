@@ -92,7 +92,12 @@ export function usePizzaTamanhos(categoriaPizzaId: string | undefined, enabled =
         limit: 50,
         offset: 0,
       }),
-    { enabled: Boolean(categoriaPizzaId) && enabled, staleTime: 1000 * 60 * 2 }
+    {
+      enabled: Boolean(categoriaPizzaId) && enabled,
+      staleTime: 1000 * 60 * 2,
+      // Mantém lista anterior no refetch (evita flash vazio na aba Preço ao salvar sabor)
+      placeholderData: previous => previous,
+    }
   )
 }
 
@@ -173,10 +178,13 @@ export function useCriarPizzaSaborMutation() {
   return useSecureTenantMutation<SaborPizza, CreateSaborPizzaInput>(
     ({ token }, input) => criarPizzaSaborViaBffUseCase.execute({ token, data: input }),
     {
-      onSuccess: async (_data, variables) => {
-        await invalidate(['pizza'])
+      onSuccess: (_data, variables) => {
+        // Invalidação estreita e em background: evita refetch de tamanhos/categorias
+        // no meio do modal e não bloqueia o mutateAsync.
+        // Hub catalog precisa invalidar para a lista da página Pizzas atualizar.
+        void invalidate(['pizza', 'hub'])
         if (variables.categoriaPizzaId) {
-          await invalidate(['pizza', 'sabores', variables.categoriaPizzaId])
+          void invalidate(['pizza', 'sabores', variables.categoriaPizzaId])
         }
       },
     }
@@ -222,11 +230,14 @@ export function useAtualizarPizzaSaborMutation() {
     ({ token }, { id, patch }) =>
       atualizarPizzaSaborViaBffUseCase.execute({ token, saborId: id, data: patch }),
     {
-      onSuccess: async (_data, variables) => {
-        await invalidate(['pizza'])
-        await invalidate(['pizza', 'sabor', variables.id])
+      onSuccess: (_data, variables) => {
+        // Sem invalidate(['pizza']): isso refetchava tamanhos e sumia a aba Preço
+        // com o erro "Configure os tamanhos..." antes do modal fechar.
+        // Invalida só o hub + detalhe/lista do sabor (refresh sob alteração).
+        void invalidate(['pizza', 'hub'])
+        void invalidate(['pizza', 'sabor', variables.id])
         if (variables.categoriaPizzaId) {
-          await invalidate(['pizza', 'sabores', variables.categoriaPizzaId])
+          void invalidate(['pizza', 'sabores', variables.categoriaPizzaId])
         }
       },
     }

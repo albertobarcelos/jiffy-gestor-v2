@@ -28,7 +28,7 @@ import {
 import type { CatalogListVariant } from './types'
 
 const FOTO_BOX = 'h-14 w-14 shrink-0 self-start md:h-16 md:w-16 md:self-auto'
-const NOME_COL = 'min-w-0 max-w-none justify-self-start md:max-w-[25ch]'
+const NOME_COL = 'min-w-0 max-w-none justify-self-start md:max-w-[34ch]'
 const AREA_FOTO = 'catalog-row-area-foto'
 const AREA_NOME = 'catalog-row-area-nome'
 const AREA_CODIGO = 'catalog-row-area-codigo'
