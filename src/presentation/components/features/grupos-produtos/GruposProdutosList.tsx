@@ -22,10 +22,8 @@ import { GrupoItem } from './GrupoItem'
 import { useGruposProdutosInfinite } from '@/src/presentation/hooks/useGruposProdutos'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import {
-  replicarStatusCategoriaBaseNosMenusUseCase,
-  updateGrupoProdutoStatusUseCase,
-} from '@/src/infrastructure/composition/categoriaStatusUseCases'
+import { isReplicacaoStatusCategoriaFalhou } from '@/src/application/errors/ReplicacaoStatusCategoriaFalhouError'
+import { updateGrupoProdutoStatusUseCase } from '@/src/infrastructure/composition/categoriaStatusUseCases'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
@@ -259,26 +257,10 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       )
 
       try {
-        await updateGrupoProdutoStatusUseCase.atualizarAtivoBase({
-          grupoId,
-          novoStatus,
-          token,
-        })
-        // Refetch da lista filtrada assim que a base gravar — não espera os cardápios.
-        await invalidateListas()
-      } catch (error) {
-        console.error('Erro ao atualizar status do grupo:', error)
-        setLocalGrupos(previousState)
-        showToast.error('Não foi possível atualizar o status da categoria.')
-        return
-      }
-
-      try {
-        await replicarStatusCategoriaBaseNosMenusUseCase.execute({
-          token,
-          grupoProdutoId: grupoId,
-          ativo: novoStatus,
-        })
+        await updateGrupoProdutoStatusUseCase.execute(
+          { grupoId, novoStatus, token },
+          { aposGravarBase: () => invalidateListas() }
+        )
         await invalidate(['menu-grupos'])
         showToast.success(
           novoStatus
@@ -286,11 +268,15 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
             : 'Categoria desativada no cadastro e em todos os cardápios'
         )
       } catch (error) {
-        console.error('Erro ao replicar status da categoria nos cardápios:', error)
-        await invalidate(['menu-grupos'])
-        showToast.error(
-          'Categoria atualizada no cadastro, mas não foi possível sincronizar todos os cardápios.'
-        )
+        if (isReplicacaoStatusCategoriaFalhou(error)) {
+          console.error('Erro ao publicar status da categoria nos cardápios:', error)
+          await invalidate(['menu-grupos'])
+          showToast.error(error.message)
+          return
+        }
+        console.error('Erro ao atualizar status do grupo:', error)
+        setLocalGrupos(previousState)
+        showToast.error('Não foi possível atualizar o status da categoria.')
       }
     },
     [invalidate, invalidateListas, localGrupos]
