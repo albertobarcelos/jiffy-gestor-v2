@@ -96,8 +96,8 @@ export function buildEditDraftFromLoaded(params: {
     iconName: categoriaEntity.getIconName(),
     ativo: categoriaEntity.isAtivo(),
     regraPrecoMultiplosSabores: categoriaEntity.getRegraPrecoMultiplosSabores(),
-    permiteDesconto: true,
-    permiteAcrescimo: true,
+    permiteDesconto: categoriaEntity.permiteDescontoAtivo(),
+    permiteAcrescimo: categoriaEntity.permiteAcrescimoAtivo(),
     impressorasIds: [],
     tamanhos: tamanhos.map(mapTamanhoToEditDraft),
     sabores: [],
@@ -119,6 +119,8 @@ export function buildUpdateCategoriaPizzaInput(
     iconName: draft.iconName,
     ativo: draft.ativo,
     regraPrecoMultiplosSabores: draft.regraPrecoMultiplosSabores,
+    permiteDesconto: draft.permiteDesconto,
+    permiteAcrescimo: draft.permiteAcrescimo,
   }
 }
 

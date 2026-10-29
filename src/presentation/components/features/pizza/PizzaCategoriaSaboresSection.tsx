@@ -100,34 +100,38 @@ export function PizzaCategoriaSaboresSection({
         const resumo = precosPorSaborId.get(sabor.id)
         const saving = savingSaborId === sabor.id
         return (
-          <CatalogProductRow
+          <div
             key={sabor.id}
-            variant="menu"
-            id={sabor.id}
-            nome={sabor.nome}
-            valor={0}
-            hideCodigo
-            centerActions
-            valorSomenteLeitura
-            valorExibicao={formatarPrecoAPartirDe(resumo?.precoMinimo)}
-            ativo={sabor.ativo}
-            imagemUrl={sabor.imagemUrl}
-            isSavingStatus={saving && atualizarSabor.isPending}
-            onValorChange={() => false}
-            onSwitchToggle={handleToggleAtivo}
-            onEdit={onEditarSabor}
-            actionsSlot={
-              <PizzaSaborRowQuickActions
-                sabor={sabor}
-                categoriaPizzaId={categoria.id}
-                tamanhosComPreco={resumo?.tamanhosComPreco ?? 0}
-                tamanhosTotal={tamanhosTotal}
-                disabled={saving}
-                onPatchDescricao={handlePatchDescricao}
-                onPatchPrecosTamanho={handlePatchPrecosTamanho}
-              />
-            }
-          />
+            className="relative z-0 overflow-visible has-[.tooltip-hover-above:hover]:z-[200] has-[.tooltip-hover-below:hover]:z-[200]"
+          >
+            <CatalogProductRow
+              variant="menu"
+              id={sabor.id}
+              nome={sabor.nome}
+              valor={0}
+              hideCodigo
+              centerActions
+              valorSomenteLeitura
+              valorExibicao={formatarPrecoAPartirDe(resumo?.precoMinimo)}
+              ativo={sabor.ativo}
+              imagemUrl={sabor.imagemUrl}
+              isSavingStatus={saving && atualizarSabor.isPending}
+              onValorChange={() => false}
+              onSwitchToggle={handleToggleAtivo}
+              onEdit={onEditarSabor}
+              actionsSlot={
+                <PizzaSaborRowQuickActions
+                  sabor={sabor}
+                  categoriaPizzaId={categoria.id}
+                  tamanhosComPreco={resumo?.tamanhosComPreco ?? 0}
+                  tamanhosTotal={tamanhosTotal}
+                  disabled={saving}
+                  onPatchDescricao={handlePatchDescricao}
+                  onPatchPrecosTamanho={handlePatchPrecosTamanho}
+                />
+              }
+            />
+          </div>
         )
       })}
     </div>

@@ -16,6 +16,10 @@ import { PizzaCategoriaSetupPanel } from './PizzaCategoriaSetupPanel'
 import { PizzaCategoriaTabsModal } from './PizzaCategoriaTabsModal'
 import { PizzaSaborModal } from './PizzaSaborModal'
 import { PizzaCategoriaSaboresSection } from './PizzaCategoriaSaboresSection'
+import {
+  PizzaCategoriaPermissaoQuickActions,
+  type PizzaCategoriaPermissaoField,
+} from './PizzaCategoriaPermissaoQuickActions'
 import { PizzaReorderModal } from './reorder/PizzaReorderModal'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import type { CategoriaPizza, SaborPizzaSummary } from '@/src/shared/types/pizza'
@@ -26,28 +30,36 @@ function PizzaCategoriaBlock({
   sabores,
   tamanhosTotal,
   catalogLoading,
+  savingPermissao,
   onToggleExpand,
   onEditar,
   onAdicionarSabor,
   onEditarSabor,
   onToggleAtivo,
+  onTogglePermissao,
 }: {
   categoria: CategoriaPizza
   isExpanded: boolean
   sabores: SaborPizzaSummary[]
   tamanhosTotal: number
   catalogLoading: boolean
+  savingPermissao: boolean
   onToggleExpand: (categoriaId: string) => void
   onEditar: (categoria: CategoriaPizza) => void
   onAdicionarSabor: (categoria: CategoriaPizza) => void
   onEditarSabor: (categoria: CategoriaPizza, saborId: string) => void
   onToggleAtivo: (categoria: CategoriaPizza, ativo: boolean) => void
+  onTogglePermissao: (
+    categoriaId: string,
+    field: PizzaCategoriaPermissaoField,
+    value: boolean
+  ) => boolean | Promise<boolean>
 }) {
   const saboresCount = sabores.length
 
   return (
     <div className="space-y-1">
-      <div className="sticky top-0 z-20 -mx-1 bg-gray-50 py-1">
+      <div className="sticky top-0 z-20 -mx-1 bg-gray-50">
         <CatalogGroupHeader
           grupo={categoria.nome}
           grupoId={categoria.id}
@@ -62,6 +74,13 @@ function PizzaCategoriaBlock({
           }
           isExpanded={isExpanded}
           addProdutoLabel="Adicionar item"
+          actionsSlot={
+            <PizzaCategoriaPermissaoQuickActions
+              categoria={categoria}
+              disabled={savingPermissao}
+              onToggle={onTogglePermissao}
+            />
+          }
           onToggleExpand={onToggleExpand}
           onEditGrupo={() => onEditar(categoria)}
           onToggleGrupoStatus={() => onToggleAtivo(categoria, !categoria.ativo)}
@@ -91,12 +110,14 @@ function PizzaCategoriaBlock({
       ) : catalogLoading ? (
         <p className="px-2 py-3 text-sm text-secondary-text md:px-4">Carregando sabores…</p>
       ) : (
-        <PizzaCategoriaSaboresSection
-          categoria={categoria}
-          sabores={sabores}
-          tamanhosTotal={tamanhosTotal}
-          onEditarSabor={saborId => onEditarSabor(categoria, saborId)}
-        />
+        <div className="overflow-visible rounded-lg bg-white">
+          <PizzaCategoriaSaboresSection
+            categoria={categoria}
+            sabores={sabores}
+            tamanhosTotal={tamanhosTotal}
+            onEditarSabor={saborId => onEditarSabor(categoria, saborId)}
+          />
+        </div>
       )}
     </div>
   )
@@ -154,6 +175,33 @@ export function PizzasHubPage() {
       showToast.error(error instanceof Error ? error.message : 'Erro ao atualizar categoria')
     }
   }
+
+  const handleTogglePermissao = useCallback(
+    async (categoriaId: string, field: PizzaCategoriaPermissaoField, value: boolean) => {
+      try {
+        await atualizarCategoria.mutateAsync({
+          id: categoriaId,
+          patch: { [field]: value },
+        })
+        showToast.success(
+          field === 'permiteAcrescimo'
+            ? value
+              ? 'Acréscimo habilitado para a categoria!'
+              : 'Acréscimo desabilitado para a categoria!'
+            : value
+              ? 'Desconto habilitado para a categoria!'
+              : 'Desconto desabilitado para a categoria!'
+        )
+        return true
+      } catch (error) {
+        showToast.error(
+          error instanceof Error ? error.message : 'Erro ao atualizar permissão da categoria'
+        )
+        return false
+      }
+    },
+    [atualizarCategoria]
+  )
 
   const abrirNovoSabor = (categoria: CategoriaPizza) => {
     setCategoriaSabor(categoria)
@@ -242,8 +290,10 @@ export function PizzasHubPage() {
                   sabores={saboresByCategoriaId[categoria.id] ?? []}
                   tamanhosTotal={tamanhosCountByCategoriaId[categoria.id] ?? 0}
                   catalogLoading={catalogLoading}
+                  savingPermissao={atualizarCategoria.isPending}
                   onToggleExpand={handleToggleExpand}
                   onToggleAtivo={handleToggleAtivo}
+                  onTogglePermissao={handleTogglePermissao}
                   onEditar={cat => {
                     setEditCategoriaId(cat.id)
                     setEditOpen(true)

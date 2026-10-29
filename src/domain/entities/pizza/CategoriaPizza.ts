@@ -14,6 +14,8 @@ export class CategoriaPizza {
     private readonly ativoDelivery: boolean,
     private readonly ativoLocal: boolean,
     private readonly ativo: boolean,
+    private readonly permiteDesconto: boolean,
+    private readonly permiteAcrescimo: boolean,
     private readonly imagemUrl: string | null,
     private readonly dataCriacao: string,
     private readonly dataAtualizacao: string
@@ -34,6 +36,8 @@ export class CategoriaPizza {
       input.ativoDelivery,
       input.ativoLocal,
       input.ativo,
+      input.permiteDesconto ?? true,
+      input.permiteAcrescimo ?? true,
       input.imagemUrl ?? null,
       input.dataCriacao,
       input.dataAtualizacao
@@ -80,6 +84,14 @@ export class CategoriaPizza {
     return this.ativo
   }
 
+  permiteDescontoAtivo(): boolean {
+    return this.permiteDesconto
+  }
+
+  permiteAcrescimoAtivo(): boolean {
+    return this.permiteAcrescimo
+  }
+
   getImagemUrl(): string | null {
     return this.imagemUrl
   }
@@ -103,6 +115,8 @@ export class CategoriaPizza {
       ativoDelivery: this.ativoDelivery,
       ativoLocal: this.ativoLocal,
       ativo: this.ativo,
+      permiteDesconto: this.permiteDesconto,
+      permiteAcrescimo: this.permiteAcrescimo,
       imagemUrl: this.imagemUrl,
       dataCriacao: this.dataCriacao,
       dataAtualizacao: this.dataAtualizacao,

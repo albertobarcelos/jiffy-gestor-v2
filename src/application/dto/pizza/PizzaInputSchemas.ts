@@ -99,6 +99,8 @@ export const updateCategoriaPizzaSchema = z
     corHex: z.string().optional(),
     iconName: z.string().optional(),
     regraPrecoMultiplosSabores: regraPrecoMultiplosSaboresSchema.optional(),
+    permiteDesconto: z.boolean().optional(),
+    permiteAcrescimo: z.boolean().optional(),
   })
   .strict()
 

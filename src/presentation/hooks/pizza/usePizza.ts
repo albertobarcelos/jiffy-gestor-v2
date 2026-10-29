@@ -196,17 +196,19 @@ export function useAtualizarPizzaCategoriaMutation() {
 
   return useSecureTenantMutation<
     CategoriaPizza,
-    { id: string; patch: Partial<CategoriaPizza> }
+    { id: string; patch: UpdateCategoriaPizzaInput }
   >(
     ({ token }, { id, patch }) =>
       atualizarPizzaCategoriaViaBffUseCase.execute({
         token,
         categoriaId: id,
-        data: patch as UpdateCategoriaPizzaInput,
+        data: patch,
       }),
     {
-      onSuccess: async () => {
-        await invalidate(['pizza'])
+      onSuccess: (_data, variables) => {
+        void invalidate(['pizza', 'categorias'])
+        void invalidate(['pizza', 'categoria', variables.id])
+        void invalidate(['pizza', 'hub'])
       },
     }
   )

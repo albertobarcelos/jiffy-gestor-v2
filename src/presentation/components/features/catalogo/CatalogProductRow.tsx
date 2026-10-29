@@ -28,6 +28,7 @@ import {
 import type { CatalogListVariant } from './types'
 
 const FOTO_BOX = 'h-14 w-14 shrink-0 self-start md:h-16 md:w-16 md:self-auto'
+const FOTO_BOX_COMPACT = 'h-10 w-10 shrink-0 self-start md:h-11 md:w-11 md:self-auto'
 const NOME_COL = 'min-w-0 max-w-none justify-self-start md:max-w-[34ch]'
 const AREA_FOTO = 'catalog-row-area-foto'
 const AREA_NOME = 'catalog-row-area-nome'
@@ -96,6 +97,8 @@ export interface CatalogProductRowProps {
   centerActions?: boolean
   /** Nome em cinza quando a categoria está desativada neste cardápio. */
   nomeInativo?: boolean
+  /** Linha mais baixa (foto e padding menores) — ex.: hub de pizzas. */
+  compact?: boolean
 }
 
 function CatalogProductRowInner({
@@ -127,9 +130,11 @@ function CatalogProductRowInner({
   hideCodigo = false,
   centerActions = false,
   nomeInativo = false,
+  compact = false,
 }: CatalogProductRowProps) {
   const [imagemExpandida, setImagemExpandida] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const fotoBox = compact ? FOTO_BOX_COMPACT : FOTO_BOX
   const { exibicao: nomeExibicao, truncado: nomeTruncado } = truncarNomeCatalogoLista(
     nome,
     NOME_CATALOGO_LISTA_MAX_CHARS
@@ -211,7 +216,7 @@ function CatalogProductRowInner({
     <span
       className={cn(
         'flex items-center justify-center rounded-lg border border-dashed',
-        FOTO_BOX,
+        fotoBox,
         podeTrocarImagem
           ? 'border-primary/40 bg-primary/5 text-primary hover:bg-primary/10'
           : 'border-gray-300 bg-gray-50 text-secondary-text'
@@ -219,7 +224,9 @@ function CatalogProductRowInner({
       aria-hidden={!podeTrocarImagem}
       title={podeTrocarImagem ? undefined : 'Sem imagem'}
     >
-      <MdImageNotSupported className="h-7 w-7 md:h-8 md:w-8" />
+      <MdImageNotSupported
+        className={compact ? 'h-5 w-5 md:h-6 md:w-6' : 'h-7 w-7 md:h-8 md:w-8'}
+      />
     </span>
   )
 
@@ -228,7 +235,8 @@ function CatalogProductRowInner({
       <div
         onClick={() => onEdit(id)}
         className={cn(
-          'grid cursor-pointer items-start gap-x-2 gap-y-1.5 px-2 py-2 md:items-center md:gap-x-2 md:gap-y-2 md:px-4',
+          'grid cursor-pointer items-start gap-x-2 px-2 md:items-center md:gap-x-2 md:px-4',
+          compact ? 'gap-y-1 py-1 md:gap-y-1' : 'gap-y-1.5 py-2 md:gap-y-2',
           'relative z-0 has-[.tooltip-hover-above:hover]:z-[100] has-[.tooltip-hover-below:hover]:z-[100]',
           isMenu ? 'border border-gray-200' : null,
           pausadoNoMenu
@@ -258,7 +266,7 @@ function CatalogProductRowInner({
             }}
             className={cn(
               'group relative overflow-hidden rounded-lg border border-gray-200 bg-white disabled:opacity-60',
-              FOTO_BOX,
+              fotoBox,
               AREA_FOTO
             )}
           >
@@ -537,7 +545,8 @@ function arePropsEqual(prev: CatalogProductRowProps, next: CatalogProductRowProp
     prev.hidePauseAndPrice === next.hidePauseAndPrice &&
     prev.hideCodigo === next.hideCodigo &&
     prev.centerActions === next.centerActions &&
-    prev.nomeInativo === next.nomeInativo
+    prev.nomeInativo === next.nomeInativo &&
+    prev.compact === next.compact
   )
 }
 

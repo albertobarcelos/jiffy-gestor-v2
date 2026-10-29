@@ -365,7 +365,8 @@ h6 {
 
   .catalog-row-menu-hidecodigo-actions-centered {
     grid-template-areas: 'foto nome acoes meta';
-    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto;
+    /* nome fixo (34ch) + meta com piso estável: coluna de ações alinha entre cabeçalho e linhas */
+    grid-template-columns: auto 34ch minmax(0, 1fr) minmax(15.5rem, auto);
   }
 
   .catalog-row-base {

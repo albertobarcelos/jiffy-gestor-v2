@@ -29,6 +29,10 @@ export interface CategoriaPizza {
   ativoDelivery: boolean
   ativoLocal: boolean
   ativo: boolean
+  /** Config da categoria (grupo_pizza_config) — default true na API. */
+  permiteDesconto?: boolean
+  /** Config da categoria (grupo_pizza_config) — default true na API. */
+  permiteAcrescimo?: boolean
   imagemUrl?: string | null
   dataCriacao: string
   dataAtualizacao: string
@@ -139,6 +143,8 @@ export interface UpdateCategoriaPizzaInput {
   corHex?: string
   iconName?: string
   regraPrecoMultiplosSabores?: RegraPrecoMultiplosSabores
+  permiteDesconto?: boolean
+  permiteAcrescimo?: boolean
 }
 
 export interface PrecoComplementoPizza {

@@ -54,7 +54,6 @@ function RowIconButton({
   active,
   onClick,
   disabled,
-  borderless = false,
   className,
   children,
 }: {
@@ -62,37 +61,39 @@ function RowIconButton({
   active?: boolean
   onClick: (e: MouseEvent<HTMLButtonElement>) => void
   disabled?: boolean
-  borderless?: boolean
   className?: string
   children: ReactNode
 }) {
   return (
-    <Tooltip title={title} arrow placement="top">
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={e => {
-          e.stopPropagation()
-          onClick(e)
-        }}
-        className={cn(
-          borderless
-            ? 'flex h-8 w-9 shrink-0 items-center justify-center bg-transparent transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50'
-            : ROW_ICON_BTN,
-          !borderless && active && 'border-secondary bg-secondary text-white hover:bg-secondary',
-          className
-        )}
-      >
-        {children}
-      </button>
-    </Tooltip>
+    <div className="flex h-8 w-8 items-center justify-center">
+      <Tooltip title={title} arrow placement="top" enterDelay={400} enterNextDelay={400}>
+        <button
+          type="button"
+          disabled={disabled}
+          aria-pressed={active}
+          onClick={e => {
+            e.stopPropagation()
+            onClick(e)
+          }}
+          className={cn(
+            ROW_ICON_BTN,
+            'text-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-secondary/80',
+            active && 'border-secondary bg-secondary text-white hover:bg-secondary',
+            disabled && 'cursor-not-allowed opacity-50',
+            className
+          )}
+        >
+          {children}
+        </button>
+      </Tooltip>
+    </div>
   )
 }
 
 function PizzaTamanhosIcon({ active }: { active?: boolean }) {
   return (
     <GiFullPizza
-      className={cn('h-8 w-8 shrink-0', active ? 'text-secondary' : 'text-secondary/85')}
+      className={cn('h-[1.05em] w-[1.05em] shrink-0', active ? 'text-inherit' : 'text-inherit')}
       aria-hidden
     />
   )
@@ -248,26 +249,25 @@ export function PizzaSaborRowQuickActions({
 
   return (
     <>
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="flex w-full flex-nowrap items-center justify-start gap-1 md:w-auto md:gap-3">
         <RowIconButton
           title={descricao.trim() ? 'Editar descrição' : 'Adicionar descrição'}
           active={Boolean(descricao.trim())}
           disabled={disabled}
           onClick={e => setDescAnchor(e.currentTarget)}
         >
-          <MdNotes className="text-lg" />
+          <MdNotes className="h-[1.05em] w-[1.05em]" />
         </RowIconButton>
         <RowIconButton
           title={tamanhosLabel}
           active={badgeCount > 0}
           disabled={disabled || tamanhosTotal === 0}
-          borderless
           onClick={e => setTamanhosAnchor(e.currentTarget)}
         >
-          <span className="relative flex items-center justify-center">
+          <span className="relative flex items-center justify-center text-lg">
             <PizzaTamanhosIcon active={badgeCount > 0} />
             {tamanhosTotal > 0 ? (
-              <span className="absolute -right-0.5 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-secondary px-0.5 text-[9px] font-bold leading-none text-white">
+              <span className="absolute -right-1.5 -top-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-secondary px-0.5 text-[9px] font-bold leading-none text-white">
                 {badgeCount}
               </span>
             ) : null}
