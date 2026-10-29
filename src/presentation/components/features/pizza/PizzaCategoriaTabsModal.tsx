@@ -26,7 +26,6 @@ import { PizzaCategoriaEditTabs, type PizzaCategoriaEditTabId } from './PizzaCat
 import { PizzaCategoriaDetalhesTab } from './PizzaCategoriaDetalhesTab'
 import { PizzaTamanhoCards } from './PizzaTamanhoCards'
 import { PizzaMassaBordaTable } from './PizzaMassaBordaTable'
-import { PizzaCategoriaMenusPanel } from './PizzaCategoriaMenusPanel'
 import { PizzaCategoriaAdicionaisTab } from './PizzaCategoriaAdicionaisTab'
 
 interface PizzaCategoriaTabsModalProps {
@@ -172,7 +171,7 @@ export function PizzaCategoriaTabsModal({
   }, [])
 
   const footerActions = useMemo((): JiffySidePanelFooterActions => {
-    if (tab === 'cardapios' || tab === 'adicionais') {
+    if (tab === 'adicionais') {
       return {
         showCancel: true,
         cancelLabel: 'Fechar',
@@ -217,8 +216,15 @@ export function PizzaCategoriaTabsModal({
             <div className="p-6 text-center text-sm text-error">{loadError}</div>
           ) : draft ? (
             <>
-              <PizzaCategoriaEditTabs active={tab} onChange={setTab} />
-              {tab === 'detalhes' ? (
+              <PizzaCategoriaEditTabs
+                active={tab === 'cardapios' ? 'detalhes' : tab}
+                onChange={next => {
+                  // Cardápios desabilitado até existir venda pizza
+                  if (next === 'cardapios') return
+                  setTab(next)
+                }}
+              />
+              {tab === 'detalhes' || tab === 'cardapios' ? (
                 <>
                   <PizzaCategoriaDetalhesTab
                     draft={draft}
@@ -249,12 +255,6 @@ export function PizzaCategoriaTabsModal({
                   linhas={draft.bordas}
                   onChange={bordas => setDraft({ ...draft, bordas })}
                   onRemover={handleRemoverBorda}
-                />
-              ) : null}
-              {tab === 'cardapios' && categoriaId ? (
-                <PizzaCategoriaMenusPanel
-                  categoriaId={categoriaId}
-                  categoriaNome={draft.nome}
                 />
               ) : null}
               {tab === 'adicionais' && categoriaId ? (

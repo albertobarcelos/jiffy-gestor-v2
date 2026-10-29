@@ -16,7 +16,6 @@ import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplem
 import { useIsMobile } from '@/src/presentation/hooks/useIsMobile'
 import { AddProdutosToMenuPanel } from './AddProdutosToMenuPanel'
 import { MenuNovoProdutoWizard } from './MenuNovoProdutoWizard'
-import { MenuPizzaFlowPanel } from './MenuPizzaFlowPanel'
 import { MenuReorderCardapioModal } from './reorder/MenuReorderCardapioModal'
 import { MenuCardapioAcoes } from './MenuCardapioAcoes'
 import { MenuCardapioChrome } from './MenuCardapioChrome'
@@ -93,21 +92,14 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   const [addOpen, setAddOpen] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardCategoriaId, setWizardCategoriaId] = useState<string | undefined>()
-  const [menuPizzaFlowOpen, setMenuPizzaFlowOpen] = useState(false)
-  const [pizzaFlowCategoriaId, setPizzaFlowCategoriaId] = useState<string | undefined>()
-  const [pizzaFlowAction, setPizzaFlowAction] = useState<'sabor' | undefined>()
   const [pizzaSaborModalOpen, setPizzaSaborModalOpen] = useState(false)
   const [pizzaSaborEditId, setPizzaSaborEditId] = useState<string | null>(null)
   const [pizzaSaborCategoria, setPizzaSaborCategoria] = useState<CategoriaPizza | null>(null)
   const [pizzaCategoriaEditOpen, setPizzaCategoriaEditOpen] = useState(false)
   const [pizzaCategoriaEditId, setPizzaCategoriaEditId] = useState<string | null>(null)
   const [reorderOpen, setReorderOpen] = useState(false)
-  const abrirPizzaNoMenu = useCallback(() => {
-    setPizzaFlowCategoriaId(undefined)
-    setPizzaFlowAction(undefined)
-    setMenuPizzaFlowOpen(true)
-  }, [])
-  const tipoCadastro = useEscolherTipoProdutoCadastro({ onPizza: abrirPizzaNoMenu })
+  // Fluxo de vincular/criar pizza no menu oculto até existir venda pizza
+  const tipoCadastro = useEscolherTipoProdutoCadastro()
   const { data: pizzaCategoriasData } = usePizzaCategorias({ limit: 100 })
   const pizzaCategoriaIds = useMemo(
     () => new Set((pizzaCategoriasData?.items ?? []).map(categoria => categoria.id)),
@@ -231,7 +223,6 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
           cor && icon ? { corHex: cor, iconName: icon } : undefined,
         grupoAtivo: categoriaAtivaNoSnapshot(grupo),
         ordem: ordemSnapshotCategoria(grupo),
-        addProdutoLabel: pizzaCategoriaIds.has(baseId) ? 'Adicionar sabor' : undefined,
         items: produtosPorGrupo.get(baseId) ?? [],
       }
     })
@@ -244,7 +235,6 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         grupoId: baseId,
         grupoAtivo: true,
         ordem: Number.MAX_SAFE_INTEGER,
-        addProdutoLabel: pizzaCategoriaIds.has(baseId) ? 'Adicionar sabor' : undefined,
         items,
       })
     }
@@ -261,7 +251,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     }
 
     return groups.sort((a, b) => (a.ordem ?? Number.MAX_SAFE_INTEGER) - (b.ordem ?? Number.MAX_SAFE_INTEGER))
-  }, [grupos, produtosPorGrupo, pizzaCategoriaIds])
+  }, [grupos, produtosPorGrupo])
 
   const catalogGroupsVisiveis = useMemo(() => {
     if (!temFiltroAtivo) return catalogGroups
@@ -428,9 +418,9 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   const handleAddProduto = useCallback(
     (_grupoNome: string, grupoId: string | undefined) => {
       if (grupoId && pizzaCategoriaIds.has(grupoId)) {
-        setPizzaFlowCategoriaId(grupoId)
-        setPizzaFlowAction('sabor')
-        setMenuPizzaFlowOpen(true)
+        showToast.error(
+          'Vínculo de pizza ao cardápio temporariamente indisponível até o fluxo de venda pizza.'
+        )
         return
       }
       tipoCadastro.pedirTipo(() => openWizardCadastro(grupoId))
@@ -654,6 +644,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         onClose={tipoCadastro.fechar}
         onContinuar={tipoCadastro.continuar}
         cancelVariant={MENU_MODAL_CANCEL_VARIANT}
+        ocultarPizza
       />
       <MenuNovoProdutoWizard
         open={wizardOpen}
@@ -662,24 +653,10 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         initialCategoriaId={wizardCategoriaId}
         onClose={closeWizardCadastro}
       />
-      <MenuPizzaFlowPanel
-        open={menuPizzaFlowOpen}
-        menuId={menuId}
-        menuNome={menu.nome}
-        initialCategoriaId={pizzaFlowCategoriaId}
-        initialAction={pizzaFlowAction}
-        onClose={() => {
-          setMenuPizzaFlowOpen(false)
-          setPizzaFlowCategoriaId(undefined)
-          setPizzaFlowAction(undefined)
-        }}
-        onSuccess={() => void handlePizzaMenuSuccess()}
-      />
       <PizzaSaborModal
         open={pizzaSaborModalOpen}
         categoria={pizzaSaborCategoria}
         saborId={pizzaSaborEditId}
-        menuId={menuId}
         onClose={closePizzaSaborModal}
         onSuccess={() => void handlePizzaItemEditSuccess()}
       />

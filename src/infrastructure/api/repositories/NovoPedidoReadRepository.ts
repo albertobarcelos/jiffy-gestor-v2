@@ -151,7 +151,8 @@ export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
     const snapshots = await fetchAllMenuProdutos(menuId, token, {
       grupoProdutoId: grupoId,
       ativo: true,
-      tipo: 'all',
+      // Sem venda pizza ainda: não listar sabores (tipoProduto=pizza) no catálogo
+      tipo: 'padrao',
     })
     const produtos = snapshots
       .filter(item => item.ativo !== false)
@@ -180,7 +181,8 @@ export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
       grupoProdutoId: params.grupoProdutoId,
       q: params.q,
       ativo: true,
-      tipo: 'all',
+      // Sem venda pizza ainda: não listar sabores (tipoProduto=pizza) no catálogo
+      tipo: 'padrao',
       limit: params.limit,
       offset: params.offset,
     })
@@ -200,7 +202,10 @@ export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
   ): Promise<Set<string>> {
     if (!menuId) return new Set()
 
-    const snapshots = await fetchAllMenuProdutos(menuId, token, { ativo: true, tipo: 'all' })
+    const snapshots = await fetchAllMenuProdutos(menuId, token, {
+      ativo: true,
+      tipo: 'padrao',
+    })
     const grupoIds = new Set<string>()
     for (const item of snapshots) {
       if (item.ativo === false) continue
@@ -221,7 +226,8 @@ export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
     const snapshots = await fetchAllMenuProdutos(menuId, token, {
       q: filtro,
       ativo: true,
-      tipo: 'all',
+      // Sem venda pizza ainda: busca não deve retornar sabores pizza
+      tipo: 'padrao',
     })
 
     return snapshots

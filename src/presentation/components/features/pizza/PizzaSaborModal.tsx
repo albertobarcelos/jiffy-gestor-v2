@@ -12,10 +12,6 @@ import { UppercaseLocaleInput } from '@/src/presentation/components/ui/Uppercase
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
 import { cn } from '@/src/shared/utils/cn'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { useMenus } from '@/src/presentation/hooks/menus/useMenus'
-import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
-import { vincularPizzaCategoriaMenusUseCase } from '@/src/infrastructure/composition/pizzaUseCases'
 import {
   useAtualizarPizzaSaborMutation,
   useCriarPizzaSaborMutation,
@@ -69,7 +65,6 @@ export function PizzaSaborModal({
   open,
   categoria,
   saborId = null,
-  menuId,
   initialTab = 'detalhes',
   onClose,
   onSuccess,
@@ -110,40 +105,6 @@ export function PizzaSaborModal({
   )
   const criarMutation = useCriarPizzaSaborMutation()
   const atualizarMutation = useAtualizarPizzaSaborMutation()
-  const invalidate = useInvalidateTenantQueries()
-  const { data: menusData } = useMenus({ limit: 100, ativo: true, enabled: open && !menuId })
-  const menuIdsCandidatos = useMemo(
-    () => (menusData?.items ?? []).map(menu => menu.id),
-    [menusData?.items]
-  )
-
-  const sincronizarSaborComMenus = useCallback(
-    async (novoSaborId: string) => {
-      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-      if (!token || !categoriaId) return
-
-      if (menuId) {
-        await vincularPizzaCategoriaMenusUseCase.vincularSaboresPizzaAoMenu({
-          token,
-          menuId,
-          saborIds: [novoSaborId],
-        })
-        await invalidate(['menu', menuId])
-        await invalidate(['menu-produtos', menuId])
-        await invalidate(['menu-grupos', menuId])
-        return
-      }
-
-      if (menuIdsCandidatos.length === 0) return
-      await vincularPizzaCategoriaMenusUseCase.vincularSaborAosMenusDaCategoria({
-        token,
-        categoriaPizzaId: categoriaId,
-        saborId: novoSaborId,
-        menuIdsCandidatos,
-      })
-    },
-    [categoriaId, invalidate, menuId, menuIdsCandidatos]
-  )
 
   useEffect(() => {
     if (!open) return
@@ -244,16 +205,14 @@ export function PizzaSaborModal({
 
         showToast.success('Sabor atualizado')
       } else {
-        const criado = await criarMutation.mutateAsync({
+        await criarMutation.mutateAsync({
           nome: nome.trim(),
           descricao: descricao.trim() || null,
           ativo,
           categoriaPizzaId: categoriaId,
           precosTamanho: selecionados,
         })
-        if (criado.id) {
-          await sincronizarSaborComMenus(criado.id)
-        }
+        // Vínculo automático a menus desativado até existir fluxo de venda pizza
         showToast.success('Sabor criado')
       }
       onSuccess?.()
@@ -273,7 +232,6 @@ export function PizzaSaborModal({
     onSuccess,
     precos,
     saborId,
-    sincronizarSaborComMenus,
   ])
 
   const footerActions = useMemo((): JiffySidePanelFooterActions => {

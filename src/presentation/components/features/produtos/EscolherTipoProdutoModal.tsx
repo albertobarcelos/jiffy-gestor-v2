@@ -50,6 +50,8 @@ interface EscolherTipoProdutoModalProps {
   onClose: () => void
   onContinuar: (tipo: TipoCadastroProduto) => void
   cancelVariant?: JiffySidePanelFooterActions['cancelVariant']
+  /** Oculta a opção Pizza (ex.: cadastro a partir do menu, sem vínculo pizza ainda). */
+  ocultarPizza?: boolean
 }
 
 export function EscolherTipoProdutoModal({
@@ -57,14 +59,19 @@ export function EscolherTipoProdutoModal({
   onClose,
   onContinuar,
   cancelVariant = 'primaryTint10',
+  ocultarPizza = false,
 }: EscolherTipoProdutoModalProps) {
   const [tipo, setTipo] = useState<TipoCadastroProduto>('preparado')
+  const opcoes = useMemo(
+    () => (ocultarPizza ? OPCOES.filter(o => o.id !== 'pizza') : OPCOES),
+    [ocultarPizza]
+  )
 
   useEffect(() => {
     if (open) setTipo('preparado')
   }, [open])
 
-  const podeContinuar = OPCOES.some(o => o.id === tipo && o.disponivel)
+  const podeContinuar = opcoes.some(o => o.id === tipo && o.disponivel)
 
   const handleContinuar = useCallback(() => {
     if (!podeContinuar) return
@@ -96,7 +103,7 @@ export function EscolherTipoProdutoModal({
       footerActions={footerActions}
     >
       <div role="radiogroup" aria-label="Tipo de produto" className="flex flex-col gap-3 p-4 md:p-6">
-        {OPCOES.map(opcao => {
+        {opcoes.map(opcao => {
           const selecionado = tipo === opcao.id
           return (
             <button
