@@ -180,6 +180,7 @@ export function PizzaComplementoPrecoEditor({
                 fullWidth
                 label={tamanho.nome}
                 value={valor?.valor ?? 0}
+                tipoImpactoPreco={tipoImpactoPreco}
                 disabled={!valor?.ativo || tipoImpactoPreco === 'nenhum'}
                 onChange={novoValor =>
                   setValores(current => {
