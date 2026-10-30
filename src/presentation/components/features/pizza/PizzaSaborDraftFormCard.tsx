@@ -78,7 +78,8 @@ function isFormCompletoParaContinuar(
   tamanhosAtivos: PizzaTamanhoDraft[]
 ) {
   if (!nome.trim() || tamanhosAtivos.length === 0) return false
-  return tamanhosAtivos.every(t => {
+  // Basta 1 tamanho com preço; tamanhos novos podem ficar desmarcados de propósito
+  return tamanhosAtivos.some(t => {
     const cfg = precos[t.localId]
     return Boolean(cfg?.enabled && cfg.valor > 0)
   })
@@ -125,9 +126,17 @@ export const PizzaSaborDraftFormCard = forwardRef<
       let changed = false
       const next = { ...prev }
       for (const localId of tamanhoIdsKey.split('|')) {
-        if (!localId || next[localId]) continue
-        next[localId] = { enabled: true, valor: 0 }
-        changed = true
+        if (!localId) continue
+        if (!next[localId]) {
+          // Tamanho novo: desmarcado para não ir à venda com preço zero
+          next[localId] = { enabled: false, valor: 0 }
+          changed = true
+          continue
+        }
+        if (next[localId].valor <= 0 && next[localId].enabled) {
+          next[localId] = { enabled: false, valor: 0 }
+          changed = true
+        }
       }
       return changed ? next : prev
     })
@@ -135,27 +144,39 @@ export const PizzaSaborDraftFormCard = forwardRef<
 
   const atualizarPreco = useCallback(
     (tamanhoLocalId: string, patch: Partial<PizzaSaborPrecoDraft>) => {
-      setPrecos(prev => ({
-        ...prev,
-        [tamanhoLocalId]: {
-          enabled: prev[tamanhoLocalId]?.enabled ?? true,
+      setPrecos(prev => {
+        const merged: PizzaSaborPrecoDraft = {
+          enabled: prev[tamanhoLocalId]?.enabled ?? false,
           valor: prev[tamanhoLocalId]?.valor ?? 0,
           ...patch,
-        },
-      }))
+        }
+        // Valor 0 (digitado ou deixado) desmarca automaticamente
+        if ('valor' in patch && merged.valor <= 0) {
+          merged.enabled = false
+          merged.valor = 0
+        }
+        return { ...prev, [tamanhoLocalId]: merged }
+      })
     },
     []
   )
 
   const buildSabor = useCallback((): PizzaSaborDraft => {
+    const precosNormalizados = Object.fromEntries(
+      Object.entries(precos).map(([localId, cfg]) => [
+        localId,
+        cfg.valor <= 0 ? { enabled: false, valor: 0 } : cfg,
+      ])
+    )
     return {
       localId: initial?.localId ?? createLocalId(),
+      id: initial?.id,
       nome: nome.trim().toUpperCase(),
       descricao: descricao.trim(),
       ativo,
-      precosPorTamanhoLocalId: precos,
+      precosPorTamanhoLocalId: precosNormalizados,
     }
-  }, [ativo, descricao, initial?.localId, nome, precos])
+  }, [ativo, descricao, initial?.id, initial?.localId, nome, precos])
 
   const podeSalvar =
     nome.trim().length > 0 && buildPrecosSelecionados(precos).length > 0
@@ -178,7 +199,7 @@ export const PizzaSaborDraftFormCard = forwardRef<
         }
         if (!isFormCompletoParaContinuar(nome, precos, tamanhosAtivos)) {
           showToast.error(
-            'Preencha o nome do sabor e o preço de todos os tamanhos antes de continuar'
+            'Preencha o nome do sabor e o preço de ao menos um tamanho antes de continuar'
           )
           return 'incomplete'
         }

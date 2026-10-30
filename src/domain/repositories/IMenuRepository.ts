@@ -53,6 +53,8 @@ export interface BuscarMenuGruposParams {
   offset?: number
   ativo?: boolean | null
   grupoProdutoId?: string
+  /** `all` | `padrao` | `pizza` — omitir no backend equivale a só `padrao`. */
+  tipo?: MenuProdutoTipoFiltro
 }
 
 export interface IMenuRepository {

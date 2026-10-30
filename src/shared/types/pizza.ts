@@ -33,6 +33,8 @@ export interface CategoriaPizza {
   permiteDesconto?: boolean
   /** Config da categoria (grupo_pizza_config) — default true na API. */
   permiteAcrescimo?: boolean
+  /** IDs das impressoras vinculadas (GET categoria / create completo). */
+  impressorasIds?: string[]
   imagemUrl?: string | null
   dataCriacao: string
   dataAtualizacao: string
@@ -145,6 +147,8 @@ export interface UpdateCategoriaPizzaInput {
   regraPrecoMultiplosSabores?: RegraPrecoMultiplosSabores
   permiteDesconto?: boolean
   permiteAcrescimo?: boolean
+  /** Substitui integralmente a lista de impressoras vinculadas. */
+  impressorasIds?: string[]
 }
 
 export interface PrecoComplementoPizza {

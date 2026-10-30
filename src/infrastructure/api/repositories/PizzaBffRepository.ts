@@ -177,6 +177,10 @@ export class PizzaBffRepository implements IPizzaCadastroGateway {
     return unwrapData(data)
   }
 
+  async excluirSabor(token: string, saborId: string): Promise<void> {
+    await fetchBffDelete(`${BASE}/sabores/${encodeURIComponent(saborId)}`, token)
+  }
+
   async reordenarSabor(
     token: string,
     saborId: string,

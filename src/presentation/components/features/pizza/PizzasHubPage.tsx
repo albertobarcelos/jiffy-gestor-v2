@@ -13,7 +13,6 @@ import {
 } from '@/src/presentation/hooks/pizza/usePizza'
 import { usePizzaHubCatalog } from '@/src/presentation/hooks/pizza/usePizzaHubCatalog'
 import { PizzaCategoriaSetupPanel } from './PizzaCategoriaSetupPanel'
-import { PizzaCategoriaTabsModal } from './PizzaCategoriaTabsModal'
 import { PizzaSaborModal } from './PizzaSaborModal'
 import { PizzaCategoriaSaboresSection } from './PizzaCategoriaSaboresSection'
 import {
@@ -315,8 +314,9 @@ export function PizzasHubPage() {
 
       <PizzaReorderModal open={reorderOpen} onClose={() => setReorderOpen(false)} />
 
-      <PizzaCategoriaTabsModal
+      <PizzaCategoriaSetupPanel
         open={editOpen}
+        mode="edit"
         categoriaId={editCategoriaId}
         onClose={() => {
           setEditOpen(false)

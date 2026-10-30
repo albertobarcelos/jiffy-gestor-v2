@@ -101,6 +101,7 @@ export const updateCategoriaPizzaSchema = z
     regraPrecoMultiplosSabores: regraPrecoMultiplosSaboresSchema.optional(),
     permiteDesconto: z.boolean().optional(),
     permiteAcrescimo: z.boolean().optional(),
+    impressorasIds: z.array(z.string().min(1)).optional(),
   })
   .strict()
 

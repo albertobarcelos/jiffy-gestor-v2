@@ -126,12 +126,12 @@ export const PizzaCategoriaSaboresStep = forwardRef<
         </p>
       ) : null}
 
-      {formMode === 'create' || (formMode === 'edit' && editingSabor) ? (
+      {formMode === 'create' ? (
         <PizzaSaborDraftFormCard
-          key={editingSabor?.localId ?? 'novo'}
+          key="novo"
           ref={formCardRef}
           tamanhos={draft.tamanhos}
-          initial={editingSabor}
+          initial={null}
           onSave={handleSaveSabor}
           onCancel={fecharForm}
         />
@@ -141,7 +141,7 @@ export const PizzaCategoriaSaboresStep = forwardRef<
           variant="contained"
           fullWidth
           onClick={abrirNovo}
-          disabled={tamanhosAtivos.length === 0}
+          disabled={tamanhosAtivos.length === 0 || formMode === 'edit'}
           sx={{
             backgroundColor: 'var(--color-primary)',
             color: '#fff',
@@ -164,51 +164,72 @@ export const PizzaCategoriaSaboresStep = forwardRef<
         <p className="text-sm text-secondary-text">Nenhum sabor adicionado ainda.</p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {draft.sabores.map(sabor => (
-            <li
-              key={sabor.localId}
-              className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2.5"
-            >
-              <button
-                type="button"
-                className="min-w-0 flex-1 text-left"
-                onClick={() => abrirEdicao(sabor)}
+          {draft.sabores.map(sabor => {
+            const editandoEstaLinha =
+              formMode === 'edit' && editingLocalId === sabor.localId && editingSabor != null
+
+            if (editandoEstaLinha) {
+              return (
+                <li key={sabor.localId}>
+                  <PizzaSaborDraftFormCard
+                    key={sabor.localId}
+                    ref={formCardRef}
+                    tamanhos={draft.tamanhos}
+                    initial={editingSabor}
+                    onSave={handleSaveSabor}
+                    onCancel={fecharForm}
+                  />
+                </li>
+              )
+            }
+
+            return (
+              <li
+                key={sabor.localId}
+                className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2.5"
               >
-                <p className="truncate text-sm font-semibold text-primary-text">{sabor.nome}</p>
-                {sabor.descricao.trim() ? (
-                  <p className="truncate text-[11px] leading-tight text-secondary-text">
-                    {sabor.descricao.trim()}
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 text-left"
+                  onClick={() => abrirEdicao(sabor)}
+                  disabled={formMode === 'create'}
+                >
+                  <p className="truncate text-sm font-semibold text-primary-text">{sabor.nome}</p>
+                  {sabor.descricao.trim() ? (
+                    <p className="truncate text-[11px] leading-tight text-secondary-text">
+                      {sabor.descricao.trim()}
+                    </p>
+                  ) : null}
+                  <p className="truncate text-xs text-secondary-text">
+                    {resumoPrecosPorTamanho(sabor, tamanhosAtivos)}
                   </p>
-                ) : null}
-                <p className="truncate text-xs text-secondary-text">
-                  {resumoPrecosPorTamanho(sabor, tamanhosAtivos)}
-                </p>
-              </button>
-              <JiffyIconSwitch
-                checked={sabor.ativo}
-                onChange={e =>
-                  onChange({
-                    ...draft,
-                    sabores: draft.sabores.map(item =>
-                      item.localId === sabor.localId
-                        ? { ...item, ativo: e.target.checked }
-                        : item
-                    ),
-                  })
-                }
-                size="sm"
-                inputProps={{ 'aria-label': `Status do sabor ${sabor.nome}` }}
-              />
-              <button
-                type="button"
-                className="rounded p-1 text-error hover:bg-error/10"
-                aria-label={`Remover sabor ${sabor.nome}`}
-                onClick={() => removerSabor(sabor.localId)}
-              >
-                <MdDeleteOutline size={18} />
-              </button>
-            </li>
-          ))}
+                </button>
+                <JiffyIconSwitch
+                  checked={sabor.ativo}
+                  onChange={e =>
+                    onChange({
+                      ...draft,
+                      sabores: draft.sabores.map(item =>
+                        item.localId === sabor.localId
+                          ? { ...item, ativo: e.target.checked }
+                          : item
+                      ),
+                    })
+                  }
+                  size="sm"
+                  inputProps={{ 'aria-label': `Status do sabor ${sabor.nome}` }}
+                />
+                <button
+                  type="button"
+                  className="rounded p-1 text-error hover:bg-error/10"
+                  aria-label={`Remover sabor ${sabor.nome}`}
+                  onClick={() => removerSabor(sabor.localId)}
+                >
+                  <MdDeleteOutline size={18} />
+                </button>
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>

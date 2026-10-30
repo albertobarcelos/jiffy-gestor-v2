@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { MdSearch } from 'react-icons/md'
+import { MdDeleteOutline, MdSearch } from 'react-icons/md'
 import { Complemento } from '@/src/domain/entities/Complemento'
 import { normalizarTipoImpactoPreco } from '@/src/domain/complemento/tipos'
 import { useComplementos } from '@/src/presentation/hooks/useComplementos'
@@ -43,7 +43,13 @@ function precosEditorParaDraft(
   precos: PrecoComplementoPizza[]
 ): Record<string, PizzaSaborPrecoDraft> {
   return Object.fromEntries(
-    precos.map(preco => [preco.pizzaTamanhoId, { enabled: true, valor: preco.valor }])
+    precos.map(preco => [
+      preco.pizzaTamanhoId,
+      {
+        enabled: preco.valor > 0,
+        valor: Math.max(0, preco.valor),
+      },
+    ])
   )
 }
 
@@ -377,9 +383,10 @@ export function PizzaCategoriaAdicionaisStep({
                               }
                               removerAdicional(item.getId())
                             }}
-                            className="rounded-lg border border-error px-3 py-1.5 text-sm font-medium text-error"
+                            className="rounded p-1 text-error hover:bg-error/10"
+                            aria-label={`Remover adicional ${item.getNome()}`}
                           >
-                            Remover
+                            <MdDeleteOutline size={18} />
                           </button>
                         </div>
                       </div>

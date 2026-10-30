@@ -8,6 +8,9 @@ import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalida
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { vincularPizzaCategoriaMenusUseCase } from '@/src/infrastructure/composition/pizzaUseCases'
 import { showToast } from '@/src/shared/utils/toast'
+import type { Menu } from '@/src/shared/types/menus'
+
+const MENUS_VAZIOS: Menu[] = []
 
 interface PizzaCategoriaMenusPanelProps {
   categoriaId: string
@@ -25,47 +28,62 @@ export function PizzaCategoriaMenusPanel({
 }: PizzaCategoriaMenusPanelProps) {
   const invalidate = useInvalidateTenantQueries()
   const { data: menusData, isLoading: loadingMenus } = useMenus({ limit: 100, ativo: true })
-  const menus = menusData?.items ?? []
+  const menus = menusData?.items ?? MENUS_VAZIOS
   const menuIds = useMemo(() => menus.map(m => m.id), [menus])
+  const menuIdsKey = menuIds.join(',')
 
   const [linkedMenuIds, setLinkedMenuIds] = useState<string[]>([])
   const [loadingLinks, setLoadingLinks] = useState(true)
   const [savingMenuId, setSavingMenuId] = useState<string | null>(null)
   const [saboresCount, setSaboresCount] = useState(0)
 
-  const refreshLinks = useCallback(async () => {
-    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-    if (!token || menuIds.length === 0) {
-      setLinkedMenuIds([])
-      setLoadingLinks(false)
-      return
-    }
-
-    setLoadingLinks(true)
-    try {
-      const [linked, sabores] = await Promise.all([
-        vincularPizzaCategoriaMenusUseCase.listarMenuIdsComPizzaCategoria({
-          token,
-          categoriaPizzaId: categoriaId,
-          menuIds,
-        }),
-        vincularPizzaCategoriaMenusUseCase.listarSaboresAtivosDaCategoria({
-          token,
-          categoriaPizzaId: categoriaId,
-        }),
-      ])
-      setLinkedMenuIds(linked)
-      setSaboresCount(sabores.length)
-    } catch (error) {
-      showToast.error(error instanceof Error ? error.message : 'Erro ao carregar cardápios')
-    } finally {
-      setLoadingLinks(false)
-    }
-  }, [categoriaId, menuIds])
-
   useEffect(() => {
+    if (loadingMenus) return
+
+    let cancelled = false
+
+    async function refreshLinks() {
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!token || menuIds.length === 0) {
+        if (!cancelled) {
+          setLinkedMenuIds(prev => (prev.length === 0 ? prev : []))
+          setLoadingLinks(false)
+        }
+        return
+      }
+
+      setLoadingLinks(true)
+      try {
+        const [linked, sabores] = await Promise.all([
+          vincularPizzaCategoriaMenusUseCase.listarMenuIdsComPizzaCategoria({
+            token,
+            categoriaPizzaId: categoriaId,
+            menuIds,
+          }),
+          vincularPizzaCategoriaMenusUseCase.listarSaboresAtivosDaCategoria({
+            token,
+            categoriaPizzaId: categoriaId,
+          }),
+        ])
+        if (cancelled) return
+        setLinkedMenuIds(linked)
+        setSaboresCount(sabores.length)
+      } catch (error) {
+        if (!cancelled) {
+          showToast.error(error instanceof Error ? error.message : 'Erro ao carregar cardápios')
+        }
+      } finally {
+        if (!cancelled) setLoadingLinks(false)
+      }
+    }
+
     void refreshLinks()
-  }, [refreshLinks])
+    return () => {
+      cancelled = true
+    }
+    // menuIdsKey estabiliza a lista; menuIds é lido do closure atual.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- menuIds derivado de menuIdsKey
+  }, [categoriaId, loadingMenus, menuIdsKey])
 
   const invalidateMenuQueries = useCallback(
     async (menuId: string) => {
@@ -165,7 +183,6 @@ export function PizzaCategoriaMenusPanel({
                 checked={linked}
                 disabled={disabled}
                 onChange={e => void handleToggle(menu.id, e.target.checked)}
-                bordered
                 aria-label={
                   linked
                     ? `Remover ${categoriaNome ?? 'categoria'} do cardápio ${menu.nome}`

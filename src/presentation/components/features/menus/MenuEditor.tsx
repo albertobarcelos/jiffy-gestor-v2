@@ -45,7 +45,7 @@ import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalida
 import { usePizzaCategorias } from '@/src/presentation/hooks/pizza/usePizza'
 import { usePizzaSaboresPrecosResumo } from '@/src/presentation/hooks/pizza/usePizzaSaboresPrecosResumo'
 import { PizzaSaborModal } from '@/src/presentation/components/features/pizza/PizzaSaborModal'
-import { PizzaCategoriaTabsModal } from '@/src/presentation/components/features/pizza/PizzaCategoriaTabsModal'
+import { PizzaCategoriaSetupPanel } from '@/src/presentation/components/features/pizza/PizzaCategoriaSetupPanel'
 import {
   formatarPrecoAPartirDe,
   isPizzaGrupoProdutoId,
@@ -660,8 +660,9 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         onClose={closePizzaSaborModal}
         onSuccess={() => void handlePizzaItemEditSuccess()}
       />
-      <PizzaCategoriaTabsModal
+      <PizzaCategoriaSetupPanel
         open={pizzaCategoriaEditOpen}
+        mode="edit"
         categoriaId={pizzaCategoriaEditId}
         onClose={closePizzaCategoriaModal}
         onSuccess={() => void handlePizzaItemEditSuccess()}

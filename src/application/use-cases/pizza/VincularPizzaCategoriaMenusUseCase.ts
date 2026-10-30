@@ -57,19 +57,34 @@ export class VincularPizzaCategoriaMenusUseCase {
     return items.filter(s => mapSaborPizzaSummaryToEntity(s).isAtivo())
   }
 
-  listarSaboresPizzaNoMenu(input: {
+  /**
+   * Sabores da categoria no menu.
+   * Usa `tipo=all` + `grupoProdutoId` (o backend defaulta `padrao` se omitir tipo)
+   * e faz fallback varrendo `tipo=pizza` filtrando pelo grupo no cliente.
+   */
+  async listarSaboresPizzaNoMenu(input: {
     token: string
     menuId: string
     categoriaPizzaId: string
   }): Promise<MenuProduto[]> {
-    return listarTodasPaginas<MenuProduto>((offset, limit) =>
+    const porGrupo = await listarTodasPaginas<MenuProduto>((offset, limit) =>
       this.menuGateway.listarProdutos(input.token, input.menuId, {
         grupoProdutoId: input.categoriaPizzaId,
+        tipo: 'all',
+        limit,
+        offset,
+      })
+    )
+    if (porGrupo.length > 0) return porGrupo
+
+    const pizzasNoMenu = await listarTodasPaginas<MenuProduto>((offset, limit) =>
+      this.menuGateway.listarProdutos(input.token, input.menuId, {
         tipo: 'pizza',
         limit,
         offset,
       })
     )
+    return pizzasNoMenu.filter(p => p.grupoProduto?.id === input.categoriaPizzaId)
   }
 
   async menuTemPizzaCategoria(input: {
@@ -77,13 +92,33 @@ export class VincularPizzaCategoriaMenusUseCase {
     menuId: string
     categoriaPizzaId: string
   }): Promise<boolean> {
-    const data = await this.menuGateway.listarProdutos(input.token, input.menuId, {
+    // 1) Snapshot da categoria no cardápio (precisa tipo=all/pizza — default do backend é padrao)
+    const grupos = await this.menuGateway.listarGrupos(input.token, input.menuId, {
       grupoProdutoId: input.categoriaPizzaId,
-      tipo: 'pizza',
+      tipo: 'all',
       limit: 1,
       offset: 0,
     })
-    return Number(data.count ?? data.items.length) > 0
+    if (Number(grupos.count ?? grupos.items.length) > 0) return true
+
+    // 2) Qualquer produto da categoria no menu
+    const porGrupo = await this.menuGateway.listarProdutos(input.token, input.menuId, {
+      grupoProdutoId: input.categoriaPizzaId,
+      tipo: 'all',
+      limit: 1,
+      offset: 0,
+    })
+    if (Number(porGrupo.count ?? porGrupo.items.length) > 0) return true
+
+    // 3) Fallback: pizza no menu cujo grupo bate com a categoria
+    const pizzasNoMenu = await listarTodasPaginas<MenuProduto>((offset, limit) =>
+      this.menuGateway.listarProdutos(input.token, input.menuId, {
+        tipo: 'pizza',
+        limit,
+        offset,
+      })
+    )
+    return pizzasNoMenu.some(p => p.grupoProduto?.id === input.categoriaPizzaId)
   }
 
   async listarMenuIdsComPizzaCategoria(input: {

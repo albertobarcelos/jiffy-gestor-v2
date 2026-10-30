@@ -1,10 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { TextField } from '@mui/material'
 import { MdCheck } from 'react-icons/md'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
+import { UppercaseLocaleInput } from '@/src/presentation/components/ui/UppercaseLocaleInput'
 import { Shimmer, ShimmerRepeat } from '@/src/presentation/components/ui/shimmer'
 import { IconPickerPanel } from '@/src/presentation/components/features/grupos-produtos/IconPickerPanel'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
@@ -111,12 +111,12 @@ export function PizzaCategoriaInformacoesStep({
 
       <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-end">
         <div className="min-w-0 flex-1">
-          <TextField
+          <UppercaseLocaleInput
             label="Nome da categoria"
             required
             fullWidth
             value={draft.nome}
-            onChange={e => onChange({ ...draft, nome: e.target.value.toUpperCase() })}
+            onValueChange={nome => onChange({ ...draft, nome })}
             sx={sxEntradaCompactaProduto}
           />
         </div>

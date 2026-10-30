@@ -7,9 +7,12 @@ import type {
 } from '@/src/domain/repositories/IPizzaRepository'
 import {
   buildUpdateCategoriaPizzaInput,
+  type PizzaAdicionalEditDraft,
   type PizzaCategoriaEditDraft,
   type PizzaLinhaComplementoEditDraft,
+  type PizzaSaborEditDraft,
 } from '@/src/application/mappers/pizza/pizzaEditMappers'
+import type { PrecoComplementoPizza, PrecoSaborTamanhoInput } from '@/src/shared/types/pizza'
 
 function mapComplementoInput(item: PizzaLinhaComplementoEditDraft) {
   return {
@@ -42,6 +45,34 @@ function buildComplementoDelta(
   }
 }
 
+function precosSaborParaApi(
+  sabor: PizzaSaborEditDraft,
+  tamanhoIdByLocalId: Map<string, string>
+): PrecoSaborTamanhoInput[] {
+  return Object.entries(sabor.precosPorTamanhoLocalId)
+    .filter(([, cfg]) => cfg.enabled && cfg.valor > 0)
+    .map(([localId, cfg]) => {
+      const pizzaTamanhoId = tamanhoIdByLocalId.get(localId)
+      if (!pizzaTamanhoId) return null
+      return { pizzaTamanhoId, precoCheio: cfg.valor }
+    })
+    .filter((item): item is PrecoSaborTamanhoInput => item != null)
+}
+
+function precosAdicionalParaApi(
+  adicional: PizzaAdicionalEditDraft,
+  tamanhoIdByLocalId: Map<string, string>
+): PrecoComplementoPizza[] {
+  return Object.entries(adicional.precosPorTamanhoLocalId)
+    .filter(([, cfg]) => cfg.enabled)
+    .map(([localId, cfg]) => {
+      const pizzaTamanhoId = tamanhoIdByLocalId.get(localId)
+      if (!pizzaTamanhoId) return null
+      return { pizzaTamanhoId, valor: Math.max(0, cfg.valor || 0) }
+    })
+    .filter((item): item is PrecoComplementoPizza => item != null)
+}
+
 export class SalvarEdicaoCategoriaPizzaUseCase {
   constructor(private readonly pizzaGateway: IPizzaCadastroGateway) {}
 
@@ -68,6 +99,7 @@ export class SalvarEdicaoCategoriaPizzaUseCase {
     }
 
     let grupoPizzaConfigId = draft.grupoPizzaConfigId
+    const tamanhoIdByLocalId = new Map<string, string>()
 
     for (const tamanho of draft.tamanhos) {
       if (!tamanho.nome.trim()) continue
@@ -81,11 +113,13 @@ export class SalvarEdicaoCategoriaPizzaUseCase {
 
       if (tamanho.id) {
         await this.pizzaGateway.atualizarTamanho(token, tamanho.id, tamanhoInput)
+        tamanhoIdByLocalId.set(tamanho.localId, tamanho.id)
       } else if (grupoPizzaConfigId) {
         const created = await this.pizzaGateway.criarTamanho(token, {
           grupoPizzaConfigId,
           ...tamanhoInput,
         })
+        tamanhoIdByLocalId.set(tamanho.localId, created.id)
         grupoPizzaConfigId = created.grupoPizzaConfigId ?? grupoPizzaConfigId
       }
     }
@@ -127,6 +161,58 @@ export class SalvarEdicaoCategoriaPizzaUseCase {
           ativo: true,
           bordas: bordasValidas.map(mapComplementoInput),
         } as CreateGrupoBordasPizzaInput)
+      }
+    }
+
+    for (const saborId of draft.saboresRemovidosIds) {
+      await this.pizzaGateway.excluirSabor(token, saborId)
+    }
+
+    for (const sabor of draft.sabores) {
+      if (!sabor.nome.trim()) continue
+      const precosTamanho = precosSaborParaApi(sabor, tamanhoIdByLocalId)
+      if (precosTamanho.length === 0) {
+        throw new Error(`Informe preço em ao menos um tamanho para o sabor "${sabor.nome.trim()}"`)
+      }
+
+      if (sabor.id) {
+        await this.pizzaGateway.atualizarSabor(token, sabor.id, {
+          nome: sabor.nome.trim(),
+          descricao: sabor.descricao.trim() || null,
+          ativo: sabor.ativo,
+          precosTamanho,
+        })
+      } else {
+        await this.pizzaGateway.criarSabor(token, {
+          nome: sabor.nome.trim(),
+          descricao: sabor.descricao.trim() || null,
+          ativo: sabor.ativo,
+          categoriaPizzaId: draft.categoriaId,
+          precosTamanho,
+        })
+      }
+    }
+
+    for (const vinculoId of draft.adicionaisRemovidosVinculoIds) {
+      await this.pizzaGateway.desvincularComplemento(token, vinculoId)
+    }
+
+    for (const adicional of draft.adicionais) {
+      if (!adicional.complementoId.trim()) continue
+      const precos = precosAdicionalParaApi(adicional, tamanhoIdByLocalId)
+      if (precos.length === 0) {
+        throw new Error('Configure preço em ao menos um tamanho para cada adicional vinculado')
+      }
+
+      if (adicional.vinculoId) {
+        await this.pizzaGateway.substituirPrecosComplemento(token, adicional.vinculoId, { precos })
+      } else {
+        await this.pizzaGateway.criarComplemento(token, {
+          categoriaPizzaId: draft.categoriaId,
+          complementoId: adicional.complementoId,
+          ativo: adicional.ativo,
+          precos,
+        })
       }
     }
   }

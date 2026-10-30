@@ -69,6 +69,8 @@ export interface IPizzaCadastroGateway {
     input: UpdateSaborPizzaInput
   ): Promise<SaborPizza>
 
+  excluirSabor(token: string, saborId: string): Promise<void>
+
   reordenarSabor(
     token: string,
     saborId: string,

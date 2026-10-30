@@ -182,13 +182,18 @@ export function PizzaComplementoPrecoEditor({
                 value={valor?.valor ?? 0}
                 disabled={!valor?.ativo || tipoImpactoPreco === 'nenhum'}
                 onChange={novoValor =>
-                  setValores(current => ({
-                    ...current,
-                    [tamanho.id]: {
-                      ...current[tamanho.id],
-                      valor: Math.max(0, novoValor),
-                    },
-                  }))
+                  setValores(current => {
+                    const valor = Math.max(0, novoValor)
+                    return {
+                      ...current,
+                      [tamanho.id]: {
+                        ...current[tamanho.id],
+                        valor,
+                        // Valor 0 desmarca o tamanho (não vai à venda zerado)
+                        ativo: valor > 0 ? (current[tamanho.id]?.ativo ?? false) : false,
+                      },
+                    }
+                  })
                 }
                 sx={sxEntradaPrecoTamanho}
               />

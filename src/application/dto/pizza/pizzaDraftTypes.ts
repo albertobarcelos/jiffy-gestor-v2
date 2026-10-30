@@ -22,6 +22,8 @@ export type PizzaSaborPrecoDraft = {
 
 export type PizzaSaborDraft = {
   localId: string
+  /** Presente quando o sabor já existe no backend (edição). */
+  id?: string
   nome: string
   descricao: string
   ativo: boolean
@@ -31,6 +33,8 @@ export type PizzaSaborDraft = {
 
 export type PizzaAdicionalDraft = {
   localId: string
+  /** Id do vínculo complemento↔categoria quando já persistido. */
+  vinculoId?: string
   complementoId: string
   ativo: boolean
   /** Precos indexados pelo localId do tamanho no draft. */
