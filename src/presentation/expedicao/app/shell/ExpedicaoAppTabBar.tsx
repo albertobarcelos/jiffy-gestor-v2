@@ -44,7 +44,7 @@ export function ExpedicaoAppTabBar(props: {
 }) {
   return (
     <nav
-      className="grid shrink-0 grid-cols-5 items-end border-t border-black/[0.06] bg-white px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-2"
+      className="relative z-40 grid shrink-0 grid-cols-5 items-end overflow-visible border-t border-black/[0.06] bg-white px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-2"
       aria-label="Navegação do entregador"
     >
       {ABAS_ESQ.map(item => (
@@ -64,7 +64,7 @@ export function ExpedicaoAppTabBar(props: {
           onClick={props.onColetar}
           disabled={props.ocupado}
           aria-label="Coletar pedido"
-          className="-mt-8 mb-0.5 flex h-14 w-14 items-center justify-center rounded-full bg-secondary text-white transition-transform hover:scale-105 active:scale-95 disabled:pointer-events-none disabled:opacity-60"
+          className="relative z-10 -mt-8 mb-0.5 flex h-14 w-14 items-center justify-center rounded-full bg-secondary text-white shadow-[0_8px_20px_rgba(91,33,182,0.35)] transition-transform hover:scale-105 active:scale-95 disabled:pointer-events-none disabled:opacity-60"
         >
           <MdQrCodeScanner className="h-7 w-7" aria-hidden />
         </button>

@@ -1,6 +1,8 @@
 export {
   JiffySidePanelModal,
   JiffyPainelSlide,
+  Z_INDEX_PAINEL_LATERAL,
+  Z_INDEX_SOBRE_PAINEL_LATERAL,
   footerSavePrimaryBarSx,
   footerBarPrimaryMutedSx,
   footerBarGrayBarSx,

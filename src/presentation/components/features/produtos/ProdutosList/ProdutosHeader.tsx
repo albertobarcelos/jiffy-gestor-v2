@@ -42,7 +42,7 @@ export function ProdutosHeader({
               value={searchText}
               onChange={e => onSearchChange(e.target.value)}
               label="Pesquisar"
-              placeholder="Nome ou código"
+              placeholder="Nome"
               InputLabelProps={{ shrink: true }}
               sx={{
                 ...sxEntradaCompactaProduto,

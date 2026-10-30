@@ -11,6 +11,7 @@ import { formatarMoedaApp } from '@/src/presentation/expedicao/app/format'
 import { AppSpinner } from '@/src/presentation/expedicao/app/shell/AppSpinner'
 import { hrefWazeNavegacaoApp } from '@/src/application/expedicao/app/navegacaoEntregadorApp'
 import { hrefWhatsAppApp } from '@/src/application/expedicao/app/telefoneEntregadorApp'
+import { TrocoLevarAppAviso } from '@/src/presentation/expedicao/app/tabs/TrocoLevarAppAviso'
 
 const LIMIAR_PUXAR_PX = 64
 
@@ -70,7 +71,7 @@ export function PedidosTab(props: {
       <div
         ref={puxar.scrollRef}
         data-expedicao-scroll
-        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-4 pt-4"
+        className="relative z-0 min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-4 pt-4"
         onTouchStart={puxar.onTouchStart}
         onTouchMove={puxar.onTouchMove}
         onTouchEnd={() => void puxar.onTouchEnd()}
@@ -107,7 +108,7 @@ export function PedidosTab(props: {
               alt=""
               width={420}
               height={420}
-              className="h-auto w-[min(92vw,420px)]"
+              className="h-auto max-h-[38vh] w-[min(92vw,420px)] object-contain"
               priority
             />
             <p className="mt-2 text-xl font-bold text-zinc-900">Tudo entregue!</p>
@@ -118,7 +119,7 @@ export function PedidosTab(props: {
         ) : null}
 
         {!props.carregando ? (
-          <ul className="space-y-3 pb-6">
+          <ul className="space-y-3 pb-16">
             {props.pedidos.map(pedido => {
               const confirmando = props.confirmandoId === pedido.id
               const bloqueado = props.confirmandoId != null
@@ -184,6 +185,7 @@ export function PedidosTab(props: {
                         </p>
                       </div>
                     </div>
+                    <TrocoLevarAppAviso valor={pedido.trocoLevar} className="mt-2" />
                   </button>
                   {waze || whats ? (
                     <div className="mt-3 grid grid-cols-2 gap-2">

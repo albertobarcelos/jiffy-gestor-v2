@@ -75,7 +75,7 @@ export function ComissaoSerieDiariaChart(props: ComissaoSerieDiariaChartProps) {
         </div>
         {!temValor ? <p className="text-[11px] font-medium text-zinc-400">Sem entregas neste recorte</p> : null}
       </div>
-      <div className="mt-3 h-40 w-full outline-none [-webkit-tap-highlight-color:transparent] [&_*]:outline-none [&_.recharts-rectangle.recharts-tooltip-cursor]:hidden [&_.recharts-tooltip-cursor]:hidden [&_.recharts-surface]:outline-none [&_.recharts-wrapper]:outline-none [&_svg]:outline-none [&_svg:focus]:outline-none">
+      <div className="relative z-0 mt-3 h-40 w-full overflow-hidden outline-none [-webkit-tap-highlight-color:transparent] [&_*]:outline-none [&_.recharts-rectangle.recharts-tooltip-cursor]:hidden [&_.recharts-tooltip-cursor]:hidden [&_.recharts-surface]:outline-none [&_.recharts-wrapper]:outline-none [&_svg]:outline-none [&_svg:focus]:outline-none">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} barCategoryGap={data.length > 10 ? '18%' : '28%'}>
             <XAxis

@@ -24,4 +24,17 @@ describe('mapCobrancaDeliveryToPagamento', () => {
       sourceReference: '65999745637',
     })
   })
+
+  it('não marca efetivado o lançamento na_entrega só por pagamentoEfetivado', () => {
+    const mapped = mapCobrancaDeliveryToPagamento({
+      id: 'cob-1',
+      valor: 50,
+      meioPagamentoId: 'mp-1',
+      momentoCobranca: 'na_entrega',
+      pagamentoEfetivado: { confirmar: true },
+    })
+
+    expect(mapped?.efetivado).toBe(false)
+    expect(mapped?.cobrarNaEntrega).toBe(true)
+  })
 })

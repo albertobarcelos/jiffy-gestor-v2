@@ -8,6 +8,11 @@ import {
   taxaLancadaPedidoEstaAtiva,
 } from '@/src/application/mappers/VendaDetalheMapper'
 import { cobrancaPedidoFromPagamento } from '@/src/application/mappers/CobrancaPedidoDeliveryPayloadMapper'
+import {
+  cobrancaRawCobraNaEntrega,
+  cobrancaRawEstaCancelada,
+  cobrancaRawEstaEfetivada,
+} from '@/src/application/mappers/situacaoCobrancaDelivery'
 import { pagamentoEstaCancelado } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
 import type { FluxoPagamentoEntrega } from '@/src/domain/types/vendaDetalhe'
@@ -62,20 +67,6 @@ function arredondar2(valor: number): number {
   return Math.round((valor + Number.EPSILON) * 100) / 100
 }
 
-function cobrancaCancelada(c: Record<string, unknown>): boolean {
-  const status = String(c.status ?? '').trim().toLowerCase()
-  if (status === 'cancelada') return true
-  const dataCancelamento = c.dataCancelamento
-  return dataCancelamento != null && String(dataCancelamento).trim() !== ''
-}
-
-function cobrancaPaga(c: Record<string, unknown>): boolean {
-  const status = String(c.status ?? '').trim().toLowerCase()
-  if (status === 'paga') return true
-  if (status === 'pendente' || status === 'cancelada') return false
-  return c.pagamentoEfetivado != null && typeof c.pagamentoEfetivado === 'object'
-}
-
 function listarCobrancas(pedido: Record<string, unknown>): Record<string, unknown>[] {
   const cobrancas = Array.isArray(pedido.cobrancas) ? pedido.cobrancas : []
   return cobrancas.filter(
@@ -83,9 +74,11 @@ function listarCobrancas(pedido: Record<string, unknown>): Record<string, unknow
   )
 }
 
-/** Pedido já pago: existe ao menos uma cobrança quitada (não cancelada). */
+/** Pedido quitado: toda cobrança ativa já foi efetivada. */
 export function pedidoDeliveryEstaPago(pedido: Record<string, unknown>): boolean {
-  return listarCobrancas(pedido).some(c => !cobrancaCancelada(c) && cobrancaPaga(c))
+  const ativas = listarCobrancas(pedido).filter(c => !cobrancaRawEstaCancelada(c))
+  if (ativas.length === 0) return false
+  return ativas.every(c => cobrancaRawEstaEfetivada(c))
 }
 
 /** Cobranças pendentes `na_entrega` (não cancelada e não paga) com valor/meio para reemissão. */
@@ -93,8 +86,7 @@ export function extrairCobrancasPendentesNaEntregaPedidoDelivery(
   pedido: Record<string, unknown>
 ): CobrancaPendenteNaEntregaRef[] {
   return listarCobrancas(pedido)
-    .filter(c => !cobrancaCancelada(c) && !cobrancaPaga(c))
-    .filter(c => String(c.momentoCobranca ?? '').trim().toLowerCase() === 'na_entrega')
+    .filter(c => cobrancaRawCobraNaEntrega(c))
     .map(c => ({
       id: String(c.id ?? '').trim(),
       valor: Number(c.valor ?? 0),

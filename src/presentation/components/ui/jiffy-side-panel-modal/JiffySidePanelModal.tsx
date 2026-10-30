@@ -19,6 +19,10 @@ import { PainelPedidoBackdrop } from './PainelPedidoBackdrop'
 
 const PANEL_MS = { enter: 420, exit: 380 } as const
 
+/** Padrão do painel. Select/Dialog do MUI precisa ficar acima disto e do overlay de saída (2000). */
+export const Z_INDEX_PAINEL_LATERAL = 1300
+export const Z_INDEX_SOBRE_PAINEL_LATERAL = 2100
+
 /** Raio dos cantos superiores/inferiores esquerdos do painel e do 1º botão da barra (Tailwind `rounded-xl`) */
 const PANEL_RADIUS_LEFT = '0.75rem'
 
@@ -589,7 +593,7 @@ export interface JiffySidePanelModalProps {
   open: boolean
   onClose: () => void
   onAfterClose?: () => void
-  /** Empilha acima de outros modais (ex.: Dialog 1300) — padrão 1300 */
+  /** Empilha acima de outros modais. Padrão: `Z_INDEX_PAINEL_LATERAL`. */
   zIndex?: number
   title: React.ReactNode
   subtitle?: React.ReactNode
@@ -650,7 +654,7 @@ export function JiffySidePanelModal({
   open,
   onClose,
   onAfterClose,
-  zIndex = 1300,
+  zIndex = Z_INDEX_PAINEL_LATERAL,
   title,
   subtitle,
   headerExtra,

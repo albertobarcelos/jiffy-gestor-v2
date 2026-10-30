@@ -1,11 +1,11 @@
 import type { INovoPedidoReadRepository } from '@/src/domain/repositories/INovoPedidoReadRepository'
 import type { FluxoPagamentoEntrega } from '@/src/domain/types/vendaDetalhe'
-import { pagamentoPendenteNaEntrega } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
 import {
   buildAtualizarCobrancasPedidoDeliveryPatch,
   buildConfirmarCobrancasPendentesPedidoDeliveryPatch,
   cobrancasPatchTemOperacao,
+  extrairIdsCobrancasAntecipadasAConfirmarPedidoDelivery,
   extrairIdsCobrancasAtivasPedidoDelivery,
   extrairIdsCobrancasPendentesPedidoDelivery,
 } from '@/src/application/mappers/CobrancaPedidoDeliveryPayloadMapper'
@@ -28,31 +28,28 @@ export class AtualizarCobrancasPedidoDeliveryUseCase {
       pagamentos,
       fluxoPagamentoEntrega,
     })
-    if (!cobrancasPatchTemOperacao(patch)) {
-      return false
-    }
-    await this.repo.patchPedidoDelivery(
-      pedidoId,
-      token,
-      patch as unknown as Record<string, unknown>
-    )
-
-    const todosAntecipados = pagamentos.every(p => !pagamentoPendenteNaEntrega(p))
-    if (todosAntecipados) {
-      const pedidoAposPatch = await this.repo.buscarPedidoDelivery(pedidoId, token)
-      const cobrancaIdsPendentesApos = extrairIdsCobrancasPendentesPedidoDelivery(pedidoAposPatch)
-      if (cobrancaIdsPendentesApos.length > 0) {
-        const confirmPatch = buildConfirmarCobrancasPendentesPedidoDeliveryPatch(
-          cobrancaIdsPendentesApos
-        )
-        await this.repo.patchPedidoDelivery(
-          pedidoId,
-          token,
-          confirmPatch as unknown as Record<string, unknown>
-        )
-      }
+    const temPatch = cobrancasPatchTemOperacao(patch)
+    if (temPatch) {
+      await this.repo.patchPedidoDelivery(
+        pedidoId,
+        token,
+        patch as unknown as Record<string, unknown>
+      )
     }
 
-    return true
+    const pedidoApos = temPatch ? await this.repo.buscarPedidoDelivery(pedidoId, token) : pedido
+    const antecipadasAConfirmar = extrairIdsCobrancasAntecipadasAConfirmarPedidoDelivery(pedidoApos)
+    if (antecipadasAConfirmar.length > 0) {
+      await this.repo.patchPedidoDelivery(
+        pedidoId,
+        token,
+        buildConfirmarCobrancasPendentesPedidoDeliveryPatch(
+          antecipadasAConfirmar
+        ) as unknown as Record<string, unknown>
+      )
+      return true
+    }
+
+    return temPatch
   }
 }

@@ -4,6 +4,12 @@ import type {
 } from '@/src/application/expedicao/app/filtrarPedidosDoEntregador'
 import { montarEnderecoNavegacaoApp } from '@/src/application/expedicao/app/navegacaoEntregadorApp'
 import { extrairNomeMeioPagamentoDeCobranca } from '@/src/application/mappers/CobrancaDeliveryPagamentoMapper'
+import { resolverTrocoLevarPedidoEntrega } from '@/src/application/mappers/resolverTrocoLevarPedidoEntrega'
+import { valorCobrancaDeCedula } from '@/src/domain/services/pedido/CalculadoraPagamentoPedido'
+import {
+  cobrancaRawEstaCancelada,
+  cobrancaRawEstaEfetivada,
+} from '@/src/application/mappers/situacaoCobrancaDelivery'
 
 export type { PedidoResumoAppEntregador }
 
@@ -12,17 +18,17 @@ function cobrancasAtivas(row: Record<string, unknown>): Record<string, unknown>[
   return cobrancas.flatMap(raw => {
     if (!raw || typeof raw !== 'object') return []
     const cobranca = raw as Record<string, unknown>
-    const status = String(cobranca.status ?? '').toLowerCase()
-    if (status === 'cancelada' || cobranca.dataCancelamento) return []
+    if (cobrancaRawEstaCancelada(cobranca)) return []
     return [cobranca]
   })
 }
 
-function cobrancaPaga(cobranca: Record<string, unknown>): boolean {
-  const status = String(cobranca.status ?? '').toLowerCase()
-  if (status === 'paga') return true
-  if (status === 'pendente' || status === 'cancelada') return false
-  return cobranca.pagamentoEfetivado != null && typeof cobranca.pagamentoEfetivado === 'object'
+/**
+ * Só o que já foi efetivado. Lançar “para o entregador receber” (`na_entrega` +
+ * pendente) não é pago — é o restante em aberto na porta.
+ */
+export function cobrancaPedidoAppEstaPaga(cobranca: Record<string, unknown>): boolean {
+  return cobrancaRawEstaEfetivada(cobranca)
 }
 
 function idMeioDaCobranca(cobranca: Record<string, unknown>): string {
@@ -42,7 +48,7 @@ export function cobrancasPedidoApp(row: Record<string, unknown>): CobrancaAppEnt
         id: texto(cobranca.id),
         meioPagamentoId,
         valor: numero(cobranca.valor),
-        pendente: !cobrancaPaga(cobranca),
+        pendente: !cobrancaPedidoAppEstaPaga(cobranca),
         nome: nomeMeioVisivel(extrairNomeMeioPagamentoDeCobranca(cobranca)),
       },
     ]
@@ -72,7 +78,11 @@ export function rotuloPagamentoPedidoApp(row: Record<string, unknown>): string |
     .map(cobranca => nomeMeioVisivel(extrairNomeMeioPagamentoDeCobranca(cobranca)))
     .filter((nome): nome is string => Boolean(nome))
   if (nomes.length > 0) return [...new Set(nomes)].join(' + ')
-  return nomeMeioVisivel(texto(row.formaPagamento ?? row.meioPagamentoNome))
+  const pagamento =
+    row.pagamento && typeof row.pagamento === 'object' ? (row.pagamento as Record<string, unknown>) : null
+  return nomeMeioVisivel(
+    texto(row.formaPagamento ?? row.meioPagamentoNome ?? pagamento?.meioPagamento ?? pagamento?.formaPagamento)
+  )
 }
 
 export function aplicarNomesMeiosNoPedido(
@@ -157,6 +167,12 @@ export function mapPedidoAppEntregador(raw: unknown): PedidoResumoAppEntregador 
       ? (contexto.enderecoEntrega as Record<string, unknown>)
       : {}
   const numeroVenda = Number(row.numeroVenda)
+  const cobrancas = cobrancasPedidoApp(row)
+  const faltaDasCobrancas = cobrancas
+    .filter(cobranca => cobranca.pendente)
+    .reduce((soma, cobranca) => soma + cobranca.valor, 0)
+  const trocoLevar = resolverTrocoLevarPedidoEntrega(row)
+  const faltaBruta = cobrancas.length > 0 ? faltaDasCobrancas : numero(row.totalFaltaPagar)
   const observacoesRaw = Array.isArray(row.observacoes) ? row.observacoes : []
   const observacao = observacoesRaw
     .map(item => {
@@ -187,10 +203,11 @@ export function mapPedidoAppEntregador(raw: unknown): PedidoResumoAppEntregador 
     valorFinal: numero(row.valorFinal),
     taxaEntrega: row.taxaEntrega == null ? null : numero(row.taxaEntrega),
     entregadorId: texto(entregador.id ?? row.entregadorId) || null,
-    faltaPagar: numero(row.totalFaltaPagar),
+    faltaPagar: valorCobrancaDeCedula(faltaBruta, trocoLevar),
+    trocoLevar,
     observacao: observacao || null,
     formaPagamento: rotuloPagamentoPedidoApp(row),
     meioPagamentoIds: idsMeioPagamentoPedidoApp(row),
-    cobrancas: cobrancasPedidoApp(row),
+    cobrancas,
   }
 }

@@ -21,7 +21,7 @@ export function ConfigTab(props: {
       </header>
       <div
         data-expedicao-scroll
-        className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-y-contain px-4 pb-4"
+        className="relative z-0 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-y-contain px-4 pb-16"
       >
         <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/[0.04]">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Notificações</p>

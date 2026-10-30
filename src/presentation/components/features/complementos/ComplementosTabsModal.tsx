@@ -76,10 +76,16 @@ export function ComplementosTabsModal({
     setConfirmExitOpen(false)
   }, [])
 
+  const [embedFormState, setEmbedFormState] = useState({
+    isSubmitting: false,
+    canSubmit: false,
+  })
+
   const handleSaveAndCloseFromConfirm = useCallback(() => {
+    if (!embedFormState.canSubmit) return
     setConfirmExitOpen(false)
     void ncRef.current?.saveComplementoAndClose?.()
-  }, [])
+  }, [embedFormState.canSubmit])
 
   const title = useMemo(() => {
     return state.mode === 'create' ? 'Novo Complemento' : 'Editar Complemento'
@@ -87,11 +93,6 @@ export function ComplementosTabsModal({
 
   const abasExtras = state.mode === 'edit' && Boolean(state.complementoId)
   const abaCadastro = state.tab === 'complemento'
-
-  const [embedFormState, setEmbedFormState] = useState({
-    isSubmitting: false,
-    canSubmit: false,
-  })
 
   return (
     <>
@@ -110,11 +111,16 @@ export function ComplementosTabsModal({
         footerActions={
           abaCadastro
             ? {
+                showCancel: true,
+                cancelLabel: 'Cancelar',
+                cancelVariant: 'dangerOutline',
+                onCancel: handleRequestClose,
                 showSave: true,
                 saveLabel: 'Salvar',
                 saveFormId: COMPLEMENTO_TABS_FORM_ID,
                 saveLoading: embedFormState.isSubmitting,
                 saveDisabled: !embedFormState.canSubmit || embedFormState.isSubmitting,
+                barActionOrder: ['cancel', 'save'],
               }
             : {
                 showCancel: true,
@@ -220,7 +226,8 @@ export function ComplementosTabsModal({
                 <button
                     type="button"
                     onClick={handleSaveAndCloseFromConfirm}
-                    className="w-full rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
+                    disabled={!embedFormState.canSubmit || embedFormState.isSubmitting}
+                    className="w-full rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Salvar e fechar
                   </button>

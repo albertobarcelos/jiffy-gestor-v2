@@ -9,6 +9,11 @@ import {
   montarOpcoesMeioPagamentoFinalizarApp,
   montarPagamentosAoTrocarMeioFinalizarApp,
   montarPagamentosDasLinhasFinalizarApp,
+  parseValorDigitadoFinalizarApp,
+  valorACobrirFinalizarApp,
+  valorJaPagoFinalizarApp,
+  sanitizarTextoValorFinalizarApp,
+  textoValorLinhaFinalizarApp,
 } from '@/src/application/expedicao/app/pagamentoFinalizarEntregaApp'
 
 const dinheiro: CobrancaAppEntregador = {
@@ -43,7 +48,7 @@ describe('pagamentoFinalizarEntregaApp', () => {
         { id: 'mp-pix', nome: 'Pix' },
       ],
     })
-    expect(opcoes[0]).toEqual({ id: 'mp-din', nome: 'Dinheiro', noPedido: true })
+    expect(opcoes[0]).toEqual({ id: 'mp-din', nome: 'Dinheiro', noPedido: true, jaPago: false })
     expect(opcoes.map(opcao => opcao.id)).toEqual(['mp-din', 'mp-cartao', 'mp-pix'])
   })
 
@@ -81,6 +86,93 @@ describe('pagamentoFinalizarEntregaApp', () => {
         faltaPagar: 0,
       })
     ).toEqual([{ meioPagamentoId: 'mp-din', valor: 20 }])
+  })
+
+  it('na porta cobra o pedido, não a cédula, quando há troco', () => {
+    const dinheiro: CobrancaAppEntregador = {
+      id: 'cob-din',
+      meioPagamentoId: 'mp-din',
+      valor: 500,
+      pendente: true,
+      nome: 'Dinheiro',
+    }
+    expect(
+      valorACobrirFinalizarApp({
+        cobrancas: [dinheiro],
+        valorFinal: 300,
+        faltaPagar: 300,
+      })
+    ).toBe(300)
+    expect(
+      montarLinhasIniciaisFinalizarApp({
+        cobrancas: [dinheiro],
+        valorFinal: 300,
+        faltaPagar: 300,
+      })
+    ).toEqual([{ meioPagamentoId: 'mp-din', valor: 300 }])
+  })
+
+  it('ignora faltaPagar da API quando as cobranças já separam o restante', () => {
+    const dinheiroPago: CobrancaAppEntregador = {
+      id: 'cob-din-pago',
+      meioPagamentoId: 'mp-din',
+      valor: 15,
+      pendente: false,
+      nome: 'Dinheiro',
+    }
+    const pixPorta: CobrancaAppEntregador = {
+      id: 'cob-pix-porta',
+      meioPagamentoId: 'mp-pix',
+      valor: 285,
+      pendente: true,
+      nome: 'Pix',
+    }
+    expect(
+      valorACobrirFinalizarApp({
+        cobrancas: [dinheiroPago, pixPorta],
+        valorFinal: 300,
+        faltaPagar: 300,
+      })
+    ).toBe(285)
+    expect(
+      montarLinhasIniciaisFinalizarApp({
+        cobrancas: [dinheiroPago, pixPorta],
+        valorFinal: 300,
+        faltaPagar: 300,
+      })
+    ).toEqual([{ meioPagamentoId: 'mp-pix', valor: 285 }])
+  })
+
+  it('alvo da porta é o restante do pedido, não o pagamento já efetivado', () => {
+    expect(
+      valorACobrirFinalizarApp({
+        cobrancas: [pixPago, dinheiro],
+        valorFinal: 69.4,
+        faltaPagar: 49.4,
+      })
+    ).toBe(49.4)
+    expect(valorJaPagoFinalizarApp([pixPago, dinheiro])).toBe(20)
+    expect(
+      montarLinhasIniciaisFinalizarApp({
+        cobrancas: [pixPago, dinheiro],
+        valorFinal: 69.4,
+        faltaPagar: 49.4,
+      })
+    ).toEqual([{ meioPagamentoId: 'mp-din', valor: 49.4 }])
+    expect(
+      valorACobrirFinalizarApp({
+        cobrancas: [pixPago],
+        valorFinal: 20,
+        faltaPagar: 0,
+      })
+    ).toBe(0)
+    expect(
+      montarLinhasIniciaisFinalizarApp({
+        cobrancas: [pixPago],
+        valorFinal: 20,
+        faltaPagar: 0,
+      })
+    ).toEqual([])
   })
 
   it('permite duas formas na porta e reparte o valor', () => {
@@ -124,6 +216,18 @@ describe('pagamentoFinalizarEntregaApp', () => {
       { meioPagamentoId: 'mp-din', valor: 20 },
       { meioPagamentoId: 'mp-cartao', valor: 29.4 },
     ])
+  })
+
+  it('campo de valor vazio não deixa zero preso no final', () => {
+    expect(textoValorLinhaFinalizarApp(0)).toBe('')
+    expect(textoValorLinhaFinalizarApp(64)).toBe('64')
+    expect(textoValorLinhaFinalizarApp(24.7)).toBe('24,7')
+    expect(parseValorDigitadoFinalizarApp('')).toBeNull()
+    expect(parseValorDigitadoFinalizarApp('60')).toBe(60)
+    expect(parseValorDigitadoFinalizarApp('060')).toBe(60)
+    expect(sanitizarTextoValorFinalizarApp('')).toBe('')
+    expect(sanitizarTextoValorFinalizarApp('060')).toBe('60')
+    expect(sanitizarTextoValorFinalizarApp('0,50')).toBe('0,50')
   })
 
   it('lista meios da porta mesmo se a loja usa TEF no PDV', () => {

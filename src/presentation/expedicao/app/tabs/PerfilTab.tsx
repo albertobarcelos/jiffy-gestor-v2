@@ -23,7 +23,7 @@ export function PerfilTab(props: {
       </header>
       <div
         data-expedicao-scroll
-        className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-y-contain px-4 pb-4"
+        className="relative z-0 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-y-contain px-4 pb-16"
       >
         <section className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/[0.04]">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-secondary text-xl font-semibold text-white">

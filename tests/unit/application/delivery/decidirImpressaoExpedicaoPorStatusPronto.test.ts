@@ -4,11 +4,18 @@ import {
   deveImprimirCupomExpedicaoNesteCliente,
   lerResumoStatusDelivery,
 } from '@/src/application/delivery/decidirImpressaoExpedicaoPorStatusPronto'
+import { DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY } from '@/src/shared/types/deliveryImpressao'
 
 const estacoes = [
   { id: 'balcao', gestorDelivery: false },
   { id: 'expedicao', gestorDelivery: true },
 ]
+
+const prefsSeparadoLigado = {
+  ...DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+  modo: 'separado' as const,
+  imprimirAoFicarPronto: true,
+}
 
 describe('lerResumoStatusDelivery', () => {
   it('lê vendaId e statusDelivery do summary', () => {
@@ -42,8 +49,31 @@ describe('decidirImpressaoExpedicaoNoPronto', () => {
         estacaoDestePcId: 'expedicao',
         estacoes,
         statusDelivery: 'PRONTO',
+        prefs: prefsSeparadoLigado,
       })
     ).toEqual({ imprimir: true, receptoraId: 'expedicao' })
+  })
+
+  it('não imprime se a opção de expedição ao marcar pronto estiver desligada', () => {
+    expect(
+      decidirImpressaoExpedicaoNoPronto({
+        estacaoDestePcId: 'expedicao',
+        estacoes,
+        statusDelivery: 'PRONTO',
+        prefs: { ...prefsSeparadoLigado, imprimirAoFicarPronto: false },
+      })
+    ).toEqual({ imprimir: false, receptoraId: 'expedicao' })
+  })
+
+  it('não imprime no modo unificado', () => {
+    expect(
+      decidirImpressaoExpedicaoNoPronto({
+        estacaoDestePcId: 'expedicao',
+        estacoes,
+        statusDelivery: 'PRONTO',
+        prefs: { ...DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY, modo: 'unificado', imprimirAoFicarPronto: true },
+      })
+    ).toEqual({ imprimir: false, receptoraId: 'expedicao' })
   })
 
   it('não imprime se este PC não for a receptora', () => {
@@ -52,6 +82,7 @@ describe('decidirImpressaoExpedicaoNoPronto', () => {
         estacaoDestePcId: 'balcao',
         estacoes,
         statusDelivery: 'PRONTO',
+        prefs: prefsSeparadoLigado,
       })
     ).toEqual({ imprimir: false, receptoraId: 'expedicao' })
   })
@@ -62,6 +93,7 @@ describe('decidirImpressaoExpedicaoNoPronto', () => {
         estacaoDestePcId: null,
         estacoes,
         statusDelivery: 'PRONTO',
+        prefs: prefsSeparadoLigado,
       })
     ).toEqual({ imprimir: false, receptoraId: 'expedicao' })
   })
@@ -72,6 +104,7 @@ describe('decidirImpressaoExpedicaoNoPronto', () => {
         estacaoDestePcId: 'expedicao',
         estacoes,
         statusDelivery: 'EM_PREPARO',
+        prefs: prefsSeparadoLigado,
       }).imprimir
     ).toBe(false)
   })

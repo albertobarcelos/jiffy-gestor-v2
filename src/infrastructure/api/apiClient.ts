@@ -240,8 +240,36 @@ export class ApiError extends Error {
 /**
  * Extrai mensagem útil do corpo JSON de erro (Zod `issues`, Nest `detail`, `errors[]`, etc.).
  */
+function mensagemDeItemErro(item: unknown): string | null {
+  if (typeof item === 'string' && item.trim()) return item.trim()
+  if (item && typeof item === 'object' && typeof (item as { message?: unknown }).message === 'string') {
+    const m = (item as { message: string }).message.trim()
+    if (m) return m
+  }
+  return null
+}
+
 export function textoErroCorpoApi(body: unknown): string | null {
-  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+  if (typeof body === 'string') {
+    const trimmed = body.trim()
+    if (!trimmed) return null
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        return textoErroCorpoApi(JSON.parse(trimmed))
+      } catch {
+        return null
+      }
+    }
+    return null
+  }
+
+  if (Array.isArray(body) && body.length > 0) {
+    const first = mensagemDeItemErro(body[0])
+    if (first) return first
+    return null
+  }
+
+  if (!body || typeof body !== 'object') {
     return null
   }
 
@@ -270,12 +298,8 @@ export function textoErroCorpoApi(body: unknown): string | null {
 
   const errorsArr = o.errors
   if (Array.isArray(errorsArr) && errorsArr.length > 0) {
-    const first = errorsArr[0]
-    if (typeof first === 'string') return first
-    if (first && typeof first === 'object' && typeof (first as { message?: unknown }).message === 'string') {
-      const m = (first as { message: string }).message.trim()
-      if (m) return m
-    }
+    const first = mensagemDeItemErro(errorsArr[0])
+    if (first) return first
   }
 
   const detail = o.detail
@@ -314,5 +338,20 @@ export function mensagemLegivelApiError(error: ApiError): string {
   }
 
   return error.message.trim() || `Erro HTTP ${error.status}`
+}
+
+/** Mensagem de toast a partir de ApiError, JSON de validação ou Error simples. */
+export function mensagemLegivelErro(error: unknown, fallback: string): string {
+  if (error instanceof ApiError) {
+    const msg = mensagemLegivelApiError(error)
+    if (msg.trim()) return msg
+  }
+  if (error instanceof Error) {
+    const fromBody = textoErroCorpoApi(error.message)
+    if (fromBody) return fromBody
+    const msg = error.message.trim()
+    if (msg) return msg
+  }
+  return fallback
 }
 

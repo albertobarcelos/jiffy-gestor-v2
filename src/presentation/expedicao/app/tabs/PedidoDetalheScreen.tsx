@@ -7,6 +7,7 @@ import { formatarMoedaApp } from '@/src/presentation/expedicao/app/format'
 import { AppSpinner } from '@/src/presentation/expedicao/app/shell/AppSpinner'
 import { hrefWazeNavegacaoApp } from '@/src/application/expedicao/app/navegacaoEntregadorApp'
 import { hrefWhatsAppApp } from '@/src/application/expedicao/app/telefoneEntregadorApp'
+import { TrocoLevarAppAviso } from '@/src/presentation/expedicao/app/tabs/TrocoLevarAppAviso'
 
 export function PedidoDetalheScreen(props: {
   pedido: PedidoResumoAppEntregador
@@ -96,7 +97,8 @@ export function PedidoDetalheScreen(props: {
 
         <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/[0.04]">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Pagamento</p>
-          <p className="mt-2 text-lg font-extrabold text-zinc-900">
+          <TrocoLevarAppAviso valor={props.pedido.trocoLevar} className="mt-3" />
+          <p className="mt-3 text-lg font-extrabold text-zinc-900">
             {props.pedido.formaPagamento || (props.pedido.faltaPagar > 0 ? 'Na entrega' : 'Pago')}
           </p>
           <p className="mt-1 text-sm font-semibold text-zinc-500">

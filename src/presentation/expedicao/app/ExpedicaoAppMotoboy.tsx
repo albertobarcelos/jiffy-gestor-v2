@@ -378,7 +378,7 @@ export function ExpedicaoAppMotoboy() {
         />
       ) : null}
       {rodada.tela === 'abas' && !(aba === 'pedidos' && pedidoAberto) ? (
-        <div key={aba} className="expedicao-slide-direita flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div key={aba} className="expedicao-slide-direita relative z-0 flex min-h-0 flex-1 flex-col overflow-hidden">
           {aba === 'pedidos' ? (
             <PedidosTab
               loja={lojaNome}
