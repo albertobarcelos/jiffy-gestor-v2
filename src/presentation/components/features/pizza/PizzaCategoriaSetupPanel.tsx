@@ -9,10 +9,11 @@ import {
 import { MENU_WIDE_PANEL_CLASS } from '@/src/presentation/components/features/menus/menuPanelConstants'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
-import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { useCriarPizzaCategoriaCompletoMutation } from '@/src/presentation/hooks/pizza/usePizza'
+import {
+  useCarregarEdicaoCategoriaPizza,
+  useSalvarEdicaoCategoriaPizzaMutation,
+} from '@/src/presentation/hooks/pizza/usePizzaEdicaoCategoria'
 import { buildCreateCompletoPayload } from '@/src/application/mappers/pizza/buildCreateCompletoPayload'
 import {
   mergeEditDraftFromStepChange,
@@ -22,15 +23,11 @@ import {
   type PizzaTamanhoEditDraft,
 } from '@/src/application/mappers/pizza/pizzaEditMappers'
 import {
-  carregarEdicaoCategoriaPizzaUseCase,
-  salvarEdicaoCategoriaPizzaUseCase,
-} from '@/src/infrastructure/composition/pizzaUseCases'
-import {
   createDefaultPizzaCategoriaDraft,
   serializePizzaDraft,
   syncDraftPrecosComTamanhos,
-  type PizzaCategoriaDraft,
-} from './pizzaDefaults'
+} from '@/src/application/dto/pizza/pizzaDraftDefaults'
+import type { PizzaCategoriaDraft } from '@/src/application/dto/pizza/pizzaDraftTypes'
 import {
   nextPizzaCategoriaSetupStep,
   PIZZA_CATEGORIA_SETUP_STEPS,
@@ -78,7 +75,6 @@ export function PizzaCategoriaSetupPanel({
   categoriaId = null,
 }: PizzaCategoriaSetupPanelProps) {
   const isEdit = mode === 'edit'
-  const invalidate = useInvalidateTenantQueries()
 
   const [step, setStep] = useState<PizzaCategoriaSetupStepId>('informacoes')
   const [draft, setDraft] = useState<PizzaCategoriaDraft | PizzaCategoriaEditDraft | null>(null)
@@ -86,9 +82,8 @@ export function PizzaCategoriaSetupPanel({
   const saboresStepRef = useRef<PizzaCategoriaSaboresStepHandle>(null)
   const [confirmExitOpen, setConfirmExitOpen] = useState(false)
   const [panelSession, setPanelSession] = useState(0)
-  const [loadingEdit, setLoadingEdit] = useState(false)
-  const [loadError, setLoadError] = useState<string | null>(null)
   const prevOpenRef = useRef(false)
+  const lastLoadedSessionRef = useRef<string | null>(null)
 
   const goToStep = useCallback(
     (next: PizzaCategoriaSetupStepId) => {
@@ -105,25 +100,28 @@ export function PizzaCategoriaSetupPanel({
   )
 
   const criarMutation = useCriarPizzaCategoriaCompletoMutation()
-  const salvarEditMutation = useSecureTenantMutation<void, PizzaCategoriaEditDraft>(
-    async ({ token }, input) => {
-      await salvarEdicaoCategoriaPizzaUseCase.execute({ token, draft: input })
-    },
-    {
-      onSuccess: async () => {
-        await invalidate(['pizza'])
-      },
-    }
+  const salvarEditMutation = useSalvarEdicaoCategoriaPizzaMutation()
+  const edicaoQuery = useCarregarEdicaoCategoriaPizza(
+    isEdit ? categoriaId : null,
+    open && isEdit && Boolean(categoriaId),
+    panelSession
   )
 
   const saving = isEdit ? salvarEditMutation.isPending : criarMutation.isPending
+  const loadingEdit = isEdit && edicaoQuery.isLoading
+  const loadError =
+    isEdit && edicaoQuery.isError
+      ? edicaoQuery.error instanceof Error
+        ? edicaoQuery.error.message
+        : 'Erro ao carregar categoria'
+      : null
 
   useEffect(() => {
     if (open && !prevOpenRef.current) {
       setStep('informacoes')
       setConfirmExitOpen(false)
-      setLoadError(null)
       setPanelSession(s => s + 1)
+      lastLoadedSessionRef.current = null
 
       if (!isEdit) {
         const nextDraft = createDefaultPizzaCategoriaDraft(initialNome)
@@ -138,39 +136,20 @@ export function PizzaCategoriaSetupPanel({
   }, [open, initialNome, isEdit])
 
   useEffect(() => {
-    if (!open || !isEdit || !categoriaId) return
+    if (!isEdit || !edicaoQuery.data) return
+    const sessionMarker = `${panelSession}:${edicaoQuery.data.categoriaId}`
+    if (lastLoadedSessionRef.current === sessionMarker) return
 
-    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-    if (!token) return
-
-    let cancelled = false
-    setLoadingEdit(true)
-    setLoadError(null)
-
-    carregarEdicaoCategoriaPizzaUseCase
-      .execute({ token, categoriaId })
-      .then(loaded => {
-        if (cancelled) return
-        const tamanhosOrdenados = aplicarOrdemTamanhosSalva(
-          loaded.tamanhos,
-          lerOrdemTamanhos(loaded.categoriaId)
-        )
-        const nextDraft = { ...loaded, tamanhos: tamanhosOrdenados }
-        setDraft(nextDraft)
-        baselineRef.current = serializePizzaEditDraft(nextDraft)
-      })
-      .catch(error => {
-        if (cancelled) return
-        setLoadError(error instanceof Error ? error.message : 'Erro ao carregar categoria')
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingEdit(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [open, isEdit, categoriaId, panelSession])
+    const loaded = edicaoQuery.data
+    const tamanhosOrdenados = aplicarOrdemTamanhosSalva(
+      loaded.tamanhos,
+      lerOrdemTamanhos(loaded.categoriaId)
+    )
+    const nextDraft = { ...loaded, tamanhos: tamanhosOrdenados }
+    setDraft(nextDraft)
+    baselineRef.current = serializePizzaEditDraft(nextDraft)
+    lastLoadedSessionRef.current = sessionMarker
+  }, [edicaoQuery.data, isEdit, panelSession])
 
   const isDirty = useMemo(() => {
     if (!draft) return false

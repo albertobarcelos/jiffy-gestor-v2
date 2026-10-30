@@ -1,6 +1,7 @@
 'use client'
 
 import {
+  aplicarReordenacaoPizzaUseCase,
   atualizarPizzaCategoriaViaBffUseCase,
   atualizarPizzaSaborViaBffUseCase,
   buscarPizzaCategoriaViaBffUseCase,
@@ -17,6 +18,7 @@ import {
   reordenarPizzaSaborViaBffUseCase,
   substituirPrecosPizzaComplementoViaBffUseCase,
 } from '@/src/infrastructure/composition/pizzaUseCases'
+import type { AplicarReordenacaoPizzaInput } from '@/src/application/use-cases/pizza/AplicarReordenacaoPizzaUseCase'
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
@@ -273,6 +275,19 @@ export function useReordenarPizzaSaborMutation() {
       onSuccess: async (_data, variables) => {
         await invalidate(['pizza'])
         await invalidate(['pizza', 'sabores', variables.categoriaPizzaId])
+      },
+    }
+  )
+}
+
+export function useAplicarReordenacaoPizzaMutation() {
+  const invalidate = useInvalidateTenantQueries()
+
+  return useSecureTenantMutation<void, Omit<AplicarReordenacaoPizzaInput, 'token'>>(
+    ({ token }, input) => aplicarReordenacaoPizzaUseCase.execute({ token, ...input }),
+    {
+      onSuccess: async () => {
+        await invalidate(['pizza'])
       },
     }
   )

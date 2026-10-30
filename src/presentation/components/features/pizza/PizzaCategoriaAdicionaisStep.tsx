@@ -14,10 +14,8 @@ import {
   type PizzaCategoriaDraft,
   type PizzaSaborPrecoDraft,
 } from './pizzaDefaults'
-import {
-  PizzaComplementoNomeComDescricao,
-  PizzaComplementoPrecoEditor,
-} from './PizzaCategoriaAdicionaisTab'
+import { PizzaComplementoNomeComDescricao } from './PizzaComplementoNomeComDescricao'
+import { PizzaComplementoPrecoEditor } from './PizzaComplementoPrecoEditor'
 
 type FilterTab = 'vinculados' | 'catalogo' | 'todos'
 

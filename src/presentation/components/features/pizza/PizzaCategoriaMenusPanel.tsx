@@ -1,12 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useMenus } from '@/src/presentation/hooks/menus/useMenus'
-import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { vincularPizzaCategoriaMenusUseCase } from '@/src/infrastructure/composition/pizzaUseCases'
+import {
+  useDesvincularPizzaCategoriaDoMenuMutation,
+  usePizzaCategoriaMenusVinculos,
+  useVincularPizzaCategoriaAoMenuMutation,
+} from '@/src/presentation/hooks/pizza/useVincularPizzaCategoriaMenus'
 import { showToast } from '@/src/shared/utils/toast'
 import type { Menu } from '@/src/shared/types/menus'
 
@@ -26,73 +28,25 @@ export function PizzaCategoriaMenusPanel({
   lockedMenuId,
   onChanged,
 }: PizzaCategoriaMenusPanelProps) {
-  const invalidate = useInvalidateTenantQueries()
   const { data: menusData, isLoading: loadingMenus } = useMenus({ limit: 100, ativo: true })
   const menus = menusData?.items ?? MENUS_VAZIOS
   const menuIds = useMemo(() => menus.map(m => m.id), [menus])
-  const menuIdsKey = menuIds.join(',')
 
-  const [linkedMenuIds, setLinkedMenuIds] = useState<string[]>([])
-  const [loadingLinks, setLoadingLinks] = useState(true)
-  const [savingMenuId, setSavingMenuId] = useState<string | null>(null)
-  const [saboresCount, setSaboresCount] = useState(0)
-
-  useEffect(() => {
-    if (loadingMenus) return
-
-    let cancelled = false
-
-    async function refreshLinks() {
-      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-      if (!token || menuIds.length === 0) {
-        if (!cancelled) {
-          setLinkedMenuIds(prev => (prev.length === 0 ? prev : []))
-          setLoadingLinks(false)
-        }
-        return
-      }
-
-      setLoadingLinks(true)
-      try {
-        const [linked, sabores] = await Promise.all([
-          vincularPizzaCategoriaMenusUseCase.listarMenuIdsComPizzaCategoria({
-            token,
-            categoriaPizzaId: categoriaId,
-            menuIds,
-          }),
-          vincularPizzaCategoriaMenusUseCase.listarSaboresAtivosDaCategoria({
-            token,
-            categoriaPizzaId: categoriaId,
-          }),
-        ])
-        if (cancelled) return
-        setLinkedMenuIds(linked)
-        setSaboresCount(sabores.length)
-      } catch (error) {
-        if (!cancelled) {
-          showToast.error(error instanceof Error ? error.message : 'Erro ao carregar cardápios')
-        }
-      } finally {
-        if (!cancelled) setLoadingLinks(false)
-      }
-    }
-
-    void refreshLinks()
-    return () => {
-      cancelled = true
-    }
-    // menuIdsKey estabiliza a lista; menuIds é lido do closure atual.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- menuIds derivado de menuIdsKey
-  }, [categoriaId, loadingMenus, menuIdsKey])
-
-  const invalidateMenuQueries = useCallback(
-    async (menuId: string) => {
-      await invalidate(['menu', menuId])
-      await invalidate(['menu-produtos', menuId])
-      await invalidate(['menu-grupos', menuId])
-    },
-    [invalidate]
+  const vinculosQuery = usePizzaCategoriaMenusVinculos(
+    categoriaId,
+    menuIds,
+    !loadingMenus && menuIds.length > 0
   )
+  const vincularMutation = useVincularPizzaCategoriaAoMenuMutation()
+  const desvincularMutation = useDesvincularPizzaCategoriaDoMenuMutation()
+
+  const [optimisticLinked, setOptimisticLinked] = useState<string[] | null>(null)
+  const linkedMenuIds = optimisticLinked ?? vinculosQuery.data?.linkedMenuIds ?? []
+  const saboresCount = vinculosQuery.data?.saboresCount ?? 0
+  const savingMenuId =
+    vincularMutation.isPending || desvincularMutation.isPending
+      ? (vincularMutation.variables?.menuId ?? desvincularMutation.variables?.menuId ?? null)
+      : null
 
   const handleToggle = async (menuId: string, nextLinked: boolean) => {
     if (lockedMenuId && menuId === lockedMenuId && !nextLinked) {
@@ -100,41 +54,33 @@ export function PizzaCategoriaMenusPanel({
       return
     }
 
-    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-    if (!token) return
+    const previous = linkedMenuIds
+    setOptimisticLinked(
+      nextLinked
+        ? previous.includes(menuId)
+          ? previous
+          : [...previous, menuId]
+        : previous.filter(id => id !== menuId)
+    )
 
-    setSavingMenuId(menuId)
     try {
       if (nextLinked) {
-        await vincularPizzaCategoriaMenusUseCase.vincularPizzaCategoriaAoMenu({
-          token,
-          menuId,
-          categoriaPizzaId: categoriaId,
-        })
+        await vincularMutation.mutateAsync({ menuId, categoriaPizzaId: categoriaId })
         showToast.success('Categoria vinculada ao cardápio')
       } else {
-        await vincularPizzaCategoriaMenusUseCase.desvincularPizzaCategoriaDoMenu({
-          token,
-          menuId,
-          categoriaPizzaId: categoriaId,
-        })
+        await desvincularMutation.mutateAsync({ menuId, categoriaPizzaId: categoriaId })
         showToast.success('Categoria removida do cardápio')
       }
-
-      setLinkedMenuIds(prev => {
-        if (nextLinked) return prev.includes(menuId) ? prev : [...prev, menuId]
-        return prev.filter(id => id !== menuId)
-      })
-      await invalidateMenuQueries(menuId)
       onChanged?.()
     } catch (error) {
+      setOptimisticLinked(previous)
       showToast.error(error instanceof Error ? error.message : 'Erro ao atualizar cardápio')
     } finally {
-      setSavingMenuId(null)
+      setOptimisticLinked(null)
     }
   }
 
-  if (loadingMenus || loadingLinks) {
+  if (loadingMenus || vinculosQuery.isLoading) {
     return <JiffyLoading text="Carregando cardápios..." className="py-8" />
   }
 

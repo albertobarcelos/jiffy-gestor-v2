@@ -6,7 +6,7 @@ import {
   fetchAllPizzaSabores,
   fetchTamanhosCountByCategorias,
   groupSaboresByCategoriaId,
-} from '@/src/presentation/components/features/pizza/reorder/pizzaReorderCatalogLoad'
+} from '@/src/presentation/hooks/pizza/pizzaReorderCatalogLoad'
 import type { SaborPizzaSummary } from '@/src/shared/types/pizza'
 
 export type PizzaHubCatalogData = {

@@ -788,15 +788,30 @@ O planejamento original das fases acima é uma referência histórica. Para os p
 
 ### Refatoração do catálogo pizza — implementada
 
-O catálogo de pizza no gestor está organizado por BFF e use cases de aplicação. A UI usa `pizzaUseCases` na composition para carregar/salvar edição de categoria, criar payload completo, vincular categoria/sabores a cardápios e manter os fluxos sem chamada direta ao backend externo.
+O catálogo de pizza no gestor está organizado por BFF e use cases de aplicação. A UI **não** importa composition: conversa só com hooks em `presentation/hooks/pizza`, que usam `pizzaUseCases` (composition) → use cases → `IPizzaCadastroGateway` → BFF → backend.
+
+```
+features/pizza (UI)
+  → hooks/pizza (useSecureTenant*)
+    → infrastructure/composition/pizzaUseCases
+      → application/use-cases/pizza
+        → IPizzaCadastroGateway (PizzaBffRepository)
+          → app/api/cardapio/pizza
+            → PizzaCrudUseCases + PizzaRepository
+              → jiffy-backend /api/v1/cardapio/pizza
+```
+
+**Decisão de modelo:** contratos de API permanecem **DTO-centric** em `shared/types/pizza.ts` (anti-corruption). Entidades de domínio (`CategoriaPizza`, `SaborPizza`) são mínimas e usadas pontualmente; defaults de draft ficam em `application/dto/pizza/pizzaDraftDefaults.ts`. Formatação visual de moeda/impacto (`+ R$`) fica em `presentation/utils/pizza`.
 
 Entregue neste ciclo:
 
 - `PizzaBffRepository` ampliado para tamanhos e grupos de massas/bordas.
 - Mappers de criação/edição em `application/mappers/pizza`.
-- Entidades mínimas `CategoriaPizza` e `SaborPizza` no domínio.
-- Helpers puros de impacto/preço de adicionais em `application`.
-- Testes de mappers de pizza movidos para `tests/unit/application/pizza`.
+- Hooks de edição/vínculo/reordenação em `presentation/hooks/pizza`.
+- Helpers de regra de preço de adicionais em `application/pizza`; máscara de UI em presentation.
+- Testes de mappers e use cases de edição em `tests/unit/application/pizza`.
+
+**Dívida aceita:** árvore server (`PizzaCrudUseCases`) e client (`*ViaBffUseCase`) espelhadas; unificação fica para depois.
 
 ### Configuração no gestor — implementada
 

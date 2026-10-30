@@ -6,7 +6,7 @@ import {
   formatarDigitacaoMoedaBrlComImpacto,
   formatarMoedaBrlComImpacto,
   parseMoedaBrlComImpacto,
-} from '@/src/application/pizza/pizzaComplementoImpacto'
+} from '@/src/presentation/utils/pizza/pizzaMoedaImpacto'
 import { formatBRLFromMaskedInput, parseBRLToNumber } from '@/src/shared/utils/formatters'
 import type { TipoImpactoPreco } from '@/src/shared/types/pizza'
 

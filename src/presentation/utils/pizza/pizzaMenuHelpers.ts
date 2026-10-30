@@ -1,4 +1,4 @@
-import { formatPizzaMoney } from '@/src/presentation/components/features/pizza/pizzaDefaults'
+import { formatPizzaMoney } from '@/src/presentation/utils/pizza/pizzaFormatters'
 import type { PrecoSaborTamanho } from '@/src/shared/types/pizza'
 
 export function isPizzaGrupoProdutoId(

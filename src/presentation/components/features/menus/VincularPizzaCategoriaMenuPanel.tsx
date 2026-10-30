@@ -1,14 +1,12 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { Button } from '@/src/presentation/components/ui/button'
 import { MENU_SIDE_PANEL_CLASS } from '@/src/presentation/components/features/menus/menuPanelConstants'
 import { usePizzaCategorias } from '@/src/presentation/hooks/pizza/usePizza'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
-import { vincularPizzaCategoriaMenusUseCase } from '@/src/infrastructure/composition/pizzaUseCases'
+import { useVincularPizzaCategoriaAoMenuMutation } from '@/src/presentation/hooks/pizza/useVincularPizzaCategoriaMenus'
 import { showToast } from '@/src/shared/utils/toast'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import type { CategoriaPizza } from '@/src/shared/types/pizza'
@@ -26,10 +24,12 @@ export function VincularPizzaCategoriaMenuPanel({
   onClose,
   onSuccess,
 }: VincularPizzaCategoriaMenuPanelProps) {
-  const invalidate = useInvalidateTenantQueries()
   const { data, isLoading, refetch } = usePizzaCategorias({ ativo: true, enabled: open })
   const categorias = data?.items ?? []
-  const [savingId, setSavingId] = useState<string | null>(null)
+  const vincularMutation = useVincularPizzaCategoriaAoMenuMutation()
+  const savingId = vincularMutation.isPending
+    ? (vincularMutation.variables?.categoriaPizzaId ?? null)
+    : null
 
   const categoriasOrdenadas = useMemo(
     () => [...categorias].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
@@ -37,26 +37,16 @@ export function VincularPizzaCategoriaMenuPanel({
   )
 
   const handleVincular = async (categoria: CategoriaPizza) => {
-    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-    if (!token) return
-
-    setSavingId(categoria.id)
     try {
-      await vincularPizzaCategoriaMenusUseCase.vincularPizzaCategoriaAoMenu({
-        token,
+      await vincularMutation.mutateAsync({
         menuId,
         categoriaPizzaId: categoria.id,
       })
-      await invalidate(['menu', menuId])
-      await invalidate(['menu-produtos', menuId])
-      await invalidate(['menu-grupos', menuId])
       showToast.success(`"${categoria.nome}" vinculada ao cardápio`)
       onSuccess?.()
       onClose()
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Erro ao vincular categoria')
-    } finally {
-      setSavingId(null)
     }
   }
 

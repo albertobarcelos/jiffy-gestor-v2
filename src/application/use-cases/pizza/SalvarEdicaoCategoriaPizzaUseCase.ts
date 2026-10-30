@@ -15,10 +15,12 @@ import {
 import type { PrecoComplementoPizza, PrecoSaborTamanhoInput } from '@/src/shared/types/pizza'
 
 function mapComplementoInput(item: PizzaLinhaComplementoEditDraft) {
+  const valor = Number.isFinite(item.valor) ? Math.max(0, item.valor) : 0
   return {
     nome: item.nome.trim(),
-    valor: item.valor,
-    tipoImpactoPreco: 'aumenta' as const,
+    valor,
+    // Massa/borda: impacto só quando há valor; senão nenhum (não força "aumenta").
+    tipoImpactoPreco: (valor > 0 ? 'aumenta' : 'nenhum') as 'aumenta' | 'nenhum',
     ativo: item.ativo,
   }
 }

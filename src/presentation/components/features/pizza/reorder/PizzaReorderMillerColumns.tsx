@@ -2,7 +2,7 @@
 
 import { MenuReorderSortableColumn } from '@/src/presentation/components/features/menus/reorder/MenuReorderSortableColumn'
 import { MenuReorderSortableRow } from '@/src/presentation/components/features/menus/reorder/MenuReorderSortableRow'
-import type { usePizzaReorderState } from './usePizzaReorderState'
+import type { usePizzaReorderState } from '@/src/presentation/hooks/pizza/usePizzaReorderState'
 
 export type PizzaReorderState = ReturnType<typeof usePizzaReorderState>
 
