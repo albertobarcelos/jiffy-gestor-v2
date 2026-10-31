@@ -2,16 +2,16 @@ import type { MeioPagamento } from '@/src/domain/entities/MeioPagamento'
 import type { TipoAtendimentoDelivery } from '@/src/domain/types/vendaDetalhe'
 
 /**
- * Pedido manual sem tipo delivery (ex.: balcão): mostra o meio se entrega
- * OU retirada estiver ligada. As duas desligadas ficam só no POS.
+ * Pedido balcão no Gestor: coluna Terminal (`ativo` / POS Ativo).
+ * Entrega e retirada não entram nesse critério.
  */
-export function meioVisivelNoPedidoManual(meio: MeioPagamento): boolean {
-  return meio.isDelivery()
+export function meioVisivelNoPedidoBalcao(meio: MeioPagamento): boolean {
+  return meio.isAtivo()
 }
 
 /**
- * Pedido delivery no Gestor: só o canal do tipo do pedido (igual ao checkout público).
- * Sem tipo: mantém a união entrega ∪ retirada.
+ * Pedido delivery no Gestor: só o canal do tipo (igual ao checkout público).
+ * Sem tipo (balcão): só meios com Terminal ativo.
  */
 export function meioVisivelParaTipoPedidoManual(
   meio: MeioPagamento,
@@ -20,7 +20,7 @@ export function meioVisivelParaTipoPedidoManual(
   if (tipoAtendimento === 'entrega' || tipoAtendimento === 'retirada') {
     return meio.disponivelParaTipoEntrega(tipoAtendimento)
   }
-  return meioVisivelNoPedidoManual(meio)
+  return meioVisivelNoPedidoBalcao(meio)
 }
 
 export function coletarMeiosDasPaginas(
@@ -29,7 +29,7 @@ export function coletarMeiosDasPaginas(
   return (pages ?? []).flatMap(page => page.meiosPagamento ?? [])
 }
 
-/** União por id, respeitando o tipo do pedido quando informado. */
+/** União por id, respeitando balcão (Terminal) ou o canal delivery informado. */
 export function unirMeiosPedidoManual(
   listas: MeioPagamento[][],
   tipoAtendimento?: TipoAtendimentoDelivery | null

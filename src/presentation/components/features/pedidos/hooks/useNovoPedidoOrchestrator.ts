@@ -465,7 +465,7 @@ export function useNovoPedidoOrchestrator({
     isFetching: isFetchingMeiosPagamento,
   } = useMeiosPagamentoPedidoManual(
     open && (currentStep >= 3 || modoVisualizacao || !!vendaId),
-    // Delivery: filtra pelo tipo do pedido. Balcão: união dos canais.
+    // Delivery: canal do tipo. Balcão: Terminal (`ativo`).
     pedidoDeliveryGestor ? tipoAtendimentoDelivery : null
   )
 

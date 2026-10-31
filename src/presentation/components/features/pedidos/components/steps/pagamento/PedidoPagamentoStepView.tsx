@@ -10,9 +10,10 @@ import {
   varsCardMeioPagamentoLancado,
 } from '@/src/shared/utils/corFormaPagamentoFiscal'
 import { INFORMACOES_ADICIONAIS_NOTA_MAX } from '@/src/shared/helpers/informacoesAdicionaisNota'
-import { MdCreditCard, MdDelete, MdEdit, MdPersonOutline } from 'react-icons/md'
+import { MdCreditCard, MdDelete, MdEdit, MdPersonOutline, MdWarningAmber } from 'react-icons/md'
 import { PedidoPagamentoStep } from '../../PedidoPagamentoStep'
 import { formatarTelefoneBr } from '@/src/shared/utils/telefoneBr'
+import { mensagemMeiosPagamentoVaziosPedido } from '@/src/application/meios-pagamentos/mensagemMeiosPagamentoVaziosPedido'
 import { useNovoPedidoFormContext } from '../../../context/NovoPedidoFormContext'
 import { useNovoPedidoUIContext } from '../../../context/NovoPedidoUIContext'
 import { useNovoPedidoDetalheContext } from '../../../context/NovoPedidoDetalheContext'
@@ -63,6 +64,8 @@ export function PedidoPagamentoStepView() {
     taxaEntregaId,
     enderecoEntregaCoberturaStatus,
     pedidoComEntrega,
+    pedidoComRetirada,
+    pedidoDeliveryGestor,
     moradaEntregaSelecionada,
   } = useNovoPedidoFormContext()
 
@@ -333,20 +336,39 @@ export function PedidoPagamentoStepView() {
 
             <div ref={secaoPagamentoRef} className="mb-2 scroll-mt-3 scroll-mb-4">
               <Label className="mb-2 block text-base font-semibold">Forma de Pagamento</Label>
-              <div
-                ref={meiosPagamentoScrollRef}
-                className={`scrollbar-thin flex gap-3 overflow-x-auto pb-2 ${mostrarLoadingFormasPagamento ? 'min-h-[120px] cursor-default' : 'cursor-grab select-none active:cursor-grabbing'}`}
-                style={{ scrollbarWidth: 'thin' }}
-                onMouseDown={
-                  mostrarLoadingFormasPagamento ? undefined : handleMouseDownMeiosPagamento
-                }
-              >
-                {mostrarLoadingFormasPagamento ? (
-                  <div className="flex w-full flex-1 items-center justify-center py-2">
-                    <JiffyLoading />
+              {mostrarLoadingFormasPagamento ? (
+                <div
+                  ref={meiosPagamentoScrollRef}
+                  className="flex min-h-[120px] w-full items-center justify-center py-2"
+                >
+                  <JiffyLoading />
+                </div>
+              ) : meiosPagamento.length === 0 ? (
+                <div
+                  role="alert"
+                  className="rounded-lg border border-secondary bg-alternate/10 px-3 py-3 text-secondary"
+                >
+                  <div className="flex items-start gap-2">
+                    <MdWarningAmber
+                      className="mt-0.5 h-5 w-5 shrink-0 text-secondary"
+                      aria-hidden
+                    />
+                    <p className="text-sm font-medium">
+                      {mensagemMeiosPagamentoVaziosPedido({
+                        pedidoDeliveryGestor,
+                        pedidoComRetirada,
+                      })}
+                    </p>
                   </div>
-                ) : (
-                  meiosPagamento.map(meio => {
+                </div>
+              ) : (
+                <div
+                  ref={meiosPagamentoScrollRef}
+                  className="scrollbar-thin flex cursor-grab gap-3 overflow-x-auto pb-2 select-none active:cursor-grabbing"
+                  style={{ scrollbarWidth: 'thin' }}
+                  onMouseDown={handleMouseDownMeiosPagamento}
+                >
+                  {meiosPagamento.map(meio => {
                     const Icone = obterIconeMeioPagamento(meio.getNome())
                     const estilo = estiloCardMeioPagamento(meio.getFormaPagamentoFiscal())
                     const { labelColor, labelFontWeight, ...estiloCard } = estilo
@@ -376,9 +398,9 @@ export function PedidoPagamentoStepView() {
                         </span>
                       </button>
                     )
-                  })
-                )}
-              </div>
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="space-y-0 border-t pt-1 text-sm leading-snug">

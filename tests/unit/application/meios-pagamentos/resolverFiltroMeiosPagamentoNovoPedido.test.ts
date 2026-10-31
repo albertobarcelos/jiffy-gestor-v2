@@ -2,24 +2,27 @@ import { describe, expect, it } from 'vitest'
 import { MeioPagamento } from '@/src/domain/entities/MeioPagamento'
 import {
   coletarMeiosDasPaginas,
-  meioVisivelNoPedidoManual,
+  meioVisivelNoPedidoBalcao,
   meioVisivelParaTipoPedidoManual,
   unirMeiosPedidoManual,
 } from '@/src/application/meios-pagamentos/resolverFiltroMeiosPagamentoNovoPedido'
 
-function meio(id: string, entrega: boolean, retirada: boolean) {
-  return MeioPagamento.create(id, id, false, 'pix', true, false, null, entrega, retirada)
+function meio(
+  id: string,
+  entrega: boolean,
+  retirada: boolean,
+  ativo = true
+) {
+  return MeioPagamento.create(id, id, false, 'pix', ativo, false, null, entrega, retirada)
 }
 
-describe('meioVisivelNoPedidoManual', () => {
-  it('mostra se entrega ou retirada estiver ligada', () => {
-    expect(meioVisivelNoPedidoManual(meio('pix', true, false))).toBe(true)
-    expect(meioVisivelNoPedidoManual(meio('pix', false, true))).toBe(true)
-    expect(meioVisivelNoPedidoManual(meio('pix', true, true))).toBe(true)
+describe('meioVisivelNoPedidoBalcao', () => {
+  it('mostra meio com Terminal ativo, mesmo sem canal delivery', () => {
+    expect(meioVisivelNoPedidoBalcao(meio('pos', false, false, true))).toBe(true)
   })
 
-  it('esconde o meio só de POS, com as duas flags desligadas', () => {
-    expect(meioVisivelNoPedidoManual(meio('pos', false, false))).toBe(false)
+  it('esconde meio com Terminal desligado', () => {
+    expect(meioVisivelNoPedidoBalcao(meio('off', true, true, false))).toBe(false)
   })
 })
 
@@ -35,19 +38,20 @@ describe('meioVisivelParaTipoPedidoManual', () => {
     expect(meioVisivelParaTipoPedidoManual(meio('pix', false, true), 'entrega')).toBe(false)
   })
 
-  it('sem tipo mantém a união dos canais', () => {
-    expect(meioVisivelParaTipoPedidoManual(meio('pix', false, true), null)).toBe(true)
-    expect(meioVisivelParaTipoPedidoManual(meio('pos', false, false), null)).toBe(false)
+  it('sem tipo (balcão) usa Terminal, não o canal delivery', () => {
+    expect(meioVisivelParaTipoPedidoManual(meio('pos', false, false, true), null)).toBe(true)
+    expect(meioVisivelParaTipoPedidoManual(meio('delivery-only', true, false, false), null)).toBe(
+      false
+    )
   })
 })
 
 describe('unirMeiosPedidoManual', () => {
-  it('sem tipo junta entrega-only e retirada-only e ignora POS', () => {
-    const soEntrega = meio('entrega', true, false)
-    const soRetirada = meio('retirada', false, true)
-    const soPos = meio('pos', false, false)
-    const unidos = unirMeiosPedidoManual([[soEntrega, soPos], [soRetirada, soPos]])
-    expect(unidos.map(item => item.getId()).sort()).toEqual(['entrega', 'retirada'])
+  it('sem tipo (balcão) mantém só Terminal ativo', () => {
+    const terminal = meio('terminal', false, false, true)
+    const soEntregaInativo = meio('entrega-off', true, false, false)
+    const unidos = unirMeiosPedidoManual([[terminal, soEntregaInativo]], null)
+    expect(unidos.map(item => item.getId())).toEqual(['terminal'])
   })
 
   it('com tipo retirada descarta meio só de entrega', () => {
@@ -66,15 +70,15 @@ describe('unirMeiosPedidoManual', () => {
 
   it('não duplica meio que veio nas duas listas', () => {
     const ambos = meio('pix', true, true)
-    const unidos = unirMeiosPedidoManual([[ambos], [ambos]])
+    const unidos = unirMeiosPedidoManual([[ambos], [ambos]], 'entrega')
     expect(unidos).toHaveLength(1)
     expect(unidos[0].getId()).toBe('pix')
   })
 
-  it('esgota páginas antes de unir', () => {
-    const page1 = { meiosPagamento: [meio('a', true, false)] }
-    const page2 = { meiosPagamento: [meio('b', false, true)] }
-    const unidos = unirMeiosPedidoManual([coletarMeiosDasPaginas([page1, page2])])
+  it('esgota páginas antes de unir no balcão', () => {
+    const page1 = { meiosPagamento: [meio('a', false, false, true)] }
+    const page2 = { meiosPagamento: [meio('b', false, false, true)] }
+    const unidos = unirMeiosPedidoManual([coletarMeiosDasPaginas([page1, page2])], null)
     expect(unidos.map(item => item.getId()).sort()).toEqual(['a', 'b'])
   })
 })
