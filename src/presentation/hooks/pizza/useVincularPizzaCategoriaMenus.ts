@@ -46,7 +46,7 @@ export function useVincularPizzaCategoriaAoMenuMutation() {
   const invalidate = useInvalidateTenantQueries()
 
   return useSecureTenantMutation<
-    void,
+    number,
     { menuId: string; categoriaPizzaId: string }
   >(
     ({ token }, { menuId, categoriaPizzaId }) =>

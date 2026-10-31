@@ -48,15 +48,24 @@ export async function fetchAllPizzaCategorias(token: string): Promise<CategoriaP
   return sortByOrdemThenNome(items)
 }
 
+export type FetchPizzaSaboresOptions = {
+  categoriaPizzaId?: string
+  q?: string
+  ativo?: boolean | null
+}
+
 export async function fetchAllPizzaSabores(
   token: string,
-  categoriaPizzaId?: string
+  options: FetchPizzaSaboresOptions = {}
 ): Promise<SaborPizzaSummary[]> {
+  const { categoriaPizzaId, q, ativo = null } = options
   const items = await fetchAllPages<SaborPizzaSummary>({
     fetchPage: async offset =>
       listarPizzaSaboresViaBffUseCase.execute({
         token,
         categoriaPizzaId,
+        q,
+        ativo,
         limit: PAGE_SIZE,
         offset,
       }),
@@ -69,7 +78,11 @@ export async function fetchAllPizzaSaboresByCategoria(
   token: string,
   categoriaPizzaId: string
 ): Promise<SaborPizzaSummary[]> {
-  return fetchAllPizzaSabores(token, categoriaPizzaId)
+  return fetchAllPizzaSabores(token, { categoriaPizzaId })
+}
+
+export function sortCategoriasPizzaByOrdem(list: CategoriaPizza[]): CategoriaPizza[] {
+  return sortByOrdemThenNome(list)
 }
 
 export function groupSaboresByCategoriaId(

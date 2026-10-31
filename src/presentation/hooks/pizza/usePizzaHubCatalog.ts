@@ -14,18 +14,31 @@ export type PizzaHubCatalogData = {
   tamanhosCountByCategoriaId: Record<string, number>
 }
 
-export function usePizzaHubCatalog(categoriaIds: readonly string[], enabled = true) {
+export type UsePizzaHubCatalogOptions = {
+  enabled?: boolean
+  /** Filtro de status enviado à API de sabores (`ativo`). */
+  ativo?: boolean | null
+}
+
+export function usePizzaHubCatalog(
+  categoriaIds: readonly string[],
+  options: UsePizzaHubCatalogOptions | boolean = true
+) {
+  const normalized =
+    typeof options === 'boolean' ? { enabled: options, ativo: null as boolean | null } : options
+  const { enabled = true, ativo = null } = normalized
+
   const categoriaKey = useMemo(
     () => [...categoriaIds].sort().join('|'),
     [categoriaIds]
   )
 
   const query = useSecureTenantQuery<PizzaHubCatalogData>(
-    ['pizza', 'hub', 'catalog', categoriaKey],
+    ['pizza', 'hub', 'catalog', categoriaKey, ativo],
     async ({ token }) => {
       const ids = categoriaKey ? categoriaKey.split('|') : []
       const [sabores, tamanhosCountByCategoriaId] = await Promise.all([
-        fetchAllPizzaSabores(token),
+        fetchAllPizzaSabores(token, { ativo }),
         ids.length > 0 ? fetchTamanhosCountByCategorias(token, ids) : Promise.resolve({}),
       ])
 

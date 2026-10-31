@@ -1,17 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { MdArrowBack } from 'react-icons/md'
+import { MdArrowBack, MdSearch } from 'react-icons/md'
 import { CatalogGroupHeader } from '@/src/presentation/components/features/catalogo/CatalogGroupHeader'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { Button } from '@/src/presentation/components/ui/button'
 import { showToast } from '@/src/shared/utils/toast'
-import {
-  useAtualizarPizzaCategoriaMutation,
-  usePizzaCategorias,
-} from '@/src/presentation/hooks/pizza/usePizza'
-import { usePizzaHubCatalog } from '@/src/presentation/hooks/pizza/usePizzaHubCatalog'
+import { useAtualizarPizzaCategoriaMutation } from '@/src/presentation/hooks/pizza/usePizza'
+import { usePizzaHubLista } from '@/src/presentation/hooks/pizza/usePizzaHubLista'
 import { PizzaCategoriaSetupPanel } from './PizzaCategoriaSetupPanel'
 import { PizzaSaborModal } from './PizzaSaborModal'
 import { PizzaCategoriaSaboresSection } from './PizzaCategoriaSaboresSection'
@@ -22,6 +19,8 @@ import {
 import { PizzaReorderModal } from './reorder/PizzaReorderModal'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import type { CategoriaPizza, SaborPizzaSummary } from '@/src/shared/types/pizza'
+
+type FilterStatus = 'Todos' | 'Ativo' | 'Inativo'
 
 function PizzaCategoriaBlock({
   categoria,
@@ -58,7 +57,7 @@ function PizzaCategoriaBlock({
 
   return (
     <div className="space-y-1">
-      <div className="sticky top-0 z-20 -mx-1 bg-gray-50">
+      <div className="sticky top-0 z-20 -mx-1 bg-gray-50 px-1">
         <CatalogGroupHeader
           grupo={categoria.nome}
           grupoId={categoria.id}
@@ -125,8 +124,12 @@ function PizzaCategoriaBlock({
 export function PizzasHubPage() {
   const router = useRouter()
   const { toGestao } = useGestaoPath()
-  const { data, isLoading, isError, refetch } = usePizzaCategorias({ limit: 50 })
   const atualizarCategoria = useAtualizarPizzaCategoriaMutation()
+
+  const [searchText, setSearchText] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>('Ativo')
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [setupOpen, setSetupOpen] = useState(false)
   const [reorderOpen, setReorderOpen] = useState(false)
@@ -137,28 +140,52 @@ export function PizzasHubPage() {
   const [saborEditId, setSaborEditId] = useState<string | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
 
-  const categorias = data?.items ?? []
-  const categoriaIds = useMemo(() => categorias.map(c => c.id), [categorias])
+  useEffect(() => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(searchText)
+    }, 500)
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+    }
+  }, [searchText])
+
+  const ativoFilter = useMemo<boolean | null>(() => {
+    if (filterStatus === 'Ativo') return true
+    if (filterStatus === 'Inativo') return false
+    return null
+  }, [filterStatus])
 
   const {
+    categorias,
     saboresByCategoriaId,
     tamanhosCountByCategoriaId,
-    isLoading: isLoadingCatalog,
-    isFetching: isFetchingCatalog,
-    data: catalogData,
-  } = usePizzaHubCatalog(categoriaIds, categorias.length > 0)
+    isSearching,
+    isLoading,
+    catalogLoading,
+    isError,
+    refetch,
+  } = usePizzaHubLista({
+    q: debouncedSearch,
+    ativo: ativoFilter,
+  })
 
-  // Só bloqueia a UI no 1º load; refresh após alteração usa cache até o novo dado chegar
-  const catalogLoading = isLoadingCatalog || (isFetchingCatalog && !catalogData)
-
+  // Na busca, abre categorias que trouxeram sabores pelo `q`.
   useEffect(() => {
-    const main = document.querySelector('main')
-    if (!main) return
-    main.classList.add('scrollbar-hide')
-    return () => {
-      main.classList.remove('scrollbar-hide')
-    }
-  }, [])
+    if (!isSearching) return
+    setExpandedGroups(prev => {
+      const next = { ...prev }
+      let changed = false
+      for (const categoria of categorias) {
+        const sabores = saboresByCategoriaId[categoria.id] ?? []
+        if (sabores.length > 0 && next[categoria.id] === false) {
+          next[categoria.id] = true
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [isSearching, categorias, saboresByCategoriaId])
 
   const handleToggleExpand = useCallback((categoriaId: string) => {
     setExpandedGroups(prev => ({
@@ -214,49 +241,78 @@ export function PizzasHubPage() {
     setSaborModalOpen(true)
   }
 
-  const header = useMemo(
-    () => (
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-1 py-4 md:px-[30px]">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => router.push(toGestao('/produtos'))}
-            className="rounded-lg p-2 text-secondary-text hover:bg-gray-100"
-            aria-label="Voltar para produtos"
-          >
-            <MdArrowBack size={20} />
-          </button>
-          <div>
-            <h1 className="text-lg font-semibold text-primary-text">Pizzas</h1>
-            <p className="text-xs text-secondary-text">
-              Configure categorias, tamanhos, massas, bordas e sabores.
-            </p>
-          </div>
-        </div>
-        <div className="flex shrink-0 flex-nowrap items-center gap-1.5">
-          {categorias.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => setReorderOpen(true)}
-              className="flex h-8 shrink-0 items-center whitespace-nowrap rounded-lg border border-primary/50 bg-white px-2.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 md:px-3 md:text-sm"
-            >
-              Reordenar pizzas
-            </button>
-          ) : null}
-          <Button variant="contained" onClick={() => setSetupOpen(true)}>
-            + Nova categoria pizza
-          </Button>
-        </div>
-      </div>
-    ),
-    [router, toGestao, categorias.length]
-  )
+  const temFiltroAtivo = Boolean(debouncedSearch.trim()) || filterStatus !== 'Todos'
+  const listaVazia = categorias.length === 0
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-gray-50">
-      {header}
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-gray-50">
+      <div className="z-30 shrink-0 border-b border-gray-200 bg-white">
+        <div className="grid grid-cols-1 items-center gap-3 px-1 py-4 md:grid-cols-[1fr_auto_1fr] md:px-[30px]">
+          <div className="flex shrink-0 items-center gap-3">
+            <button
+              type="button"
+              onClick={() => router.push(toGestao('/produtos'))}
+              className="rounded-lg p-2 text-secondary-text hover:bg-gray-100"
+              aria-label="Voltar para produtos"
+            >
+              <MdArrowBack size={20} />
+            </button>
+            <h1 className="text-lg font-semibold text-primary-text">Pizzas</h1>
+          </div>
 
-      <div className="flex-1 px-1 pb-4 pt-2 md:px-[30px] md:pb-6">
+          <div className="flex w-full items-center justify-center gap-3 md:w-auto">
+            <div className="relative h-8 w-full min-w-[160px] max-w-[360px] md:w-[280px]">
+              <input
+                id="pizzas-hub-search"
+                type="text"
+                placeholder="Pesquisar categoria ou sabor..."
+                value={searchText}
+                onChange={e => setSearchText(e.target.value)}
+                className="h-full w-full rounded-lg border border-gray-200 bg-info px-5 pl-12 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+              />
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
+                <MdSearch size={18} />
+              </span>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-1.5">
+              <label
+                htmlFor="pizzas-hub-status"
+                className="text-xs font-semibold text-secondary-text"
+              >
+                Status
+              </label>
+              <select
+                id="pizzas-hub-status"
+                value={filterStatus}
+                onChange={e => setFilterStatus(e.target.value as FilterStatus)}
+                className="h-8 w-[120px] rounded-lg border border-gray-200 bg-info px-3 text-sm text-primary-text focus:border-primary focus:outline-none"
+              >
+                <option value="Todos">Todos</option>
+                <option value="Ativo">Ativo</option>
+                <option value="Inativo">Inativo</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 flex-nowrap items-center justify-start gap-1.5 md:justify-end">
+            {categorias.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setReorderOpen(true)}
+                className="flex h-8 shrink-0 items-center whitespace-nowrap rounded-lg border border-primary/50 bg-white px-2.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 md:px-3 md:text-sm"
+              >
+                Reordenar pizzas
+              </button>
+            ) : null}
+            <Button variant="contained" onClick={() => setSetupOpen(true)}>
+              + Nova categoria pizza
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-4 scrollbar-hide md:px-[30px] md:pb-6">
         {isLoading ? (
           <JiffyLoading text="Carregando categorias pizza..." />
         ) : isError ? (
@@ -266,14 +322,18 @@ export function PizzasHubPage() {
               Tentar novamente
             </Button>
           </div>
-        ) : categorias.length === 0 ? (
+        ) : listaVazia ? (
           <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-8 text-center">
             <p className="text-sm text-secondary-text">
-              Nenhuma categoria pizza cadastrada. Comece configurando tamanhos, massas e bordas.
+              {temFiltroAtivo
+                ? 'Nenhuma categoria ou sabor encontrado com os filtros atuais.'
+                : 'Nenhuma categoria pizza cadastrada. Comece configurando tamanhos, massas e bordas.'}
             </p>
-            <Button variant="contained" className="mt-4" onClick={() => setSetupOpen(true)}>
-              Criar primeira categoria
-            </Button>
+            {!temFiltroAtivo ? (
+              <Button variant="contained" className="mt-4" onClick={() => setSetupOpen(true)}>
+                Criar primeira categoria
+              </Button>
+            ) : null}
           </div>
         ) : (
           <div

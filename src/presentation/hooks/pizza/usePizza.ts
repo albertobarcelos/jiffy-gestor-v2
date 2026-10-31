@@ -68,19 +68,22 @@ export function usePizzaSabores(
   params: { q?: string; ativo?: boolean | null; limit?: number; enabled?: boolean } = {}
 ) {
   const { q = '', ativo = null, limit = 100, enabled = true } = params
+  const qTrim = q.trim()
+  // Sem categoria: permite listagem global quando há `q` (busca unificada do hub).
+  const canList = Boolean(categoriaPizzaId) || Boolean(qTrim)
 
   return useSecureTenantQuery<{ items: SaborPizzaSummary[]; count: number }>(
-    ['pizza', 'sabores', categoriaPizzaId, q, ativo, limit],
+    ['pizza', 'sabores', categoriaPizzaId ?? null, qTrim, ativo, limit],
     ({ token }) =>
       listarPizzaSaboresViaBffUseCase.execute({
         token,
-        categoriaPizzaId: categoriaPizzaId!,
-        q,
+        categoriaPizzaId,
+        q: qTrim || undefined,
         ativo,
         limit,
         offset: 0,
       }),
-    { enabled: Boolean(categoriaPizzaId) && enabled, staleTime: 1000 * 60 * 2 }
+    { enabled: canList && enabled, staleTime: 1000 * 60 * 2 }
   )
 }
 

@@ -6,7 +6,7 @@ import {
   JiffySidePanelModal,
   type JiffySidePanelFooterActions,
 } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
-import { MENU_WIDE_PANEL_CLASS } from '@/src/presentation/components/features/menus/menuPanelConstants'
+import { MENU_SIDE_PANEL_CLASS } from '@/src/presentation/components/features/menus/menuPanelConstants'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { usePizzaCategorias } from '@/src/presentation/hooks/pizza/usePizza'
@@ -160,7 +160,7 @@ export function PizzaNovoWizard({ open, onClose, onSuccess }: PizzaNovoWizardPro
         onClose={onClose}
         title="Nova pizza"
         subtitle="Escolha se vai criar uma categoria nova ou um sabor em categoria existente."
-        panelClassName={MENU_WIDE_PANEL_CLASS}
+        panelClassName={MENU_SIDE_PANEL_CLASS}
         footerVariant="bar"
         footerActions={footerActions}
       >

@@ -61,7 +61,12 @@ export function aplicarOrdemTamanhosSalva<T extends { id?: string }>(
   return [...ranked.map(r => r.item), ...unranked.map(u => u.item)]
 }
 
-/** Extrai ids de servidor na ordem atual do draft (ignora cards ainda sem id). */
-export function coletarIdsTamanhosOrdenados(tamanhos: Array<{ id?: string }>): string[] {
+/**
+ * Extrai ids de servidor na ordem atual do draft (ignora cards ainda sem id).
+ * Aceita `PizzaTamanhoDraft` / `PizzaTamanhoEditDraft` (localId obrigatório; id opcional).
+ */
+export function coletarIdsTamanhosOrdenados(
+  tamanhos: ReadonlyArray<{ localId: string; id?: string }>
+): string[] {
   return tamanhos.map(t => t.id).filter((id): id is string => Boolean(id))
 }
