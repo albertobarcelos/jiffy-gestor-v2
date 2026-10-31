@@ -128,6 +128,9 @@ export class ListarMenuGruposViaBffUseCase {
       q?: string
       limit?: number
       offset?: number
+      ativo?: boolean | null
+      grupoProdutoId?: string
+      tipo?: MenuProdutoCatalogTipoFiltro
     }
   ) {
     const { token, menuId, ...params } = input

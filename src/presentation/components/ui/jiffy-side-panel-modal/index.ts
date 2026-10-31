@@ -7,6 +7,7 @@ export {
   footerBarPrimaryMutedSx,
   footerBarGrayBarSx,
   footerBarErrorBarSx,
+  footerBarErrorTint10BarSx,
   footerBarPrimaryTint10BarSx,
   footerBarDangerOutlineBarSx,
 } from './JiffySidePanelModal'

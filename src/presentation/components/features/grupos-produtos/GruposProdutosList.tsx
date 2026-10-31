@@ -38,7 +38,12 @@ import {
   EscolherTipoProdutoModal,
   useEscolherTipoProdutoCadastro,
 } from '../produtos/EscolherTipoProdutoModal'
+import {
+  EscolherTipoCategoriaModal,
+  type TipoCadastroCategoria,
+} from './EscolherTipoCategoriaModal'
 import { ProdutoNovoWizard } from '../produtos/ProdutoNovoWizard'
+import { PizzaCategoriaSetupPanel } from '@/src/presentation/components/features/pizza/PizzaCategoriaSetupPanel'
 
 interface GruposProdutosListProps {
   onReload?: () => void
@@ -50,6 +55,8 @@ interface GruposProdutosListProps {
  */
 export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
   const tipoCadastro = useEscolherTipoProdutoCadastro()
+  const [tipoCategoriaOpen, setTipoCategoriaOpen] = useState(false)
+  const [pizzaSetupOpen, setPizzaSetupOpen] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardCategoriaId, setWizardCategoriaId] = useState<string | undefined>()
   const [searchText, setSearchText] = useState('')
@@ -338,6 +345,29 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     onReload?.()
   }, [invalidateListas, onReload])
 
+  const handleContinuarTipoCategoria = useCallback(
+    (tipo: TipoCadastroCategoria) => {
+      setTipoCategoriaOpen(false)
+      if (tipo === 'pizza') {
+        setPizzaSetupOpen(true)
+        return
+      }
+      openTabsModal({
+        tab: 'grupo',
+        mode: 'create',
+        grupoId: undefined,
+      })
+    },
+    [openTabsModal]
+  )
+
+  const handlePizzaSetupSuccess = useCallback(() => {
+    setPizzaSetupOpen(false)
+    void invalidate(['pizza'])
+    void invalidateListas()
+    onReload?.()
+  }, [invalidate, invalidateListas, onReload])
+
   // Handler para quando o drag termina - versão simples: envia para API e recarrega a página
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     const { active, over } = event
@@ -416,13 +446,8 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
             <div className="flex-1 flex gap-2 items-center justify-end flex-wrap md:flex-nowrap">
               
               <button
-                onClick={() =>
-                  openTabsModal({
-                    tab: 'grupo',
-                    mode: 'create',
-                    grupoId: undefined,
-                  })
-                }
+                type="button"
+                onClick={() => setTipoCategoriaOpen(true)}
                 className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
               >
                 Novo
@@ -568,6 +593,17 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       open={tipoCadastro.open}
       onClose={tipoCadastro.fechar}
       onContinuar={tipoCadastro.continuar}
+    />
+    <EscolherTipoCategoriaModal
+      open={tipoCategoriaOpen}
+      onClose={() => setTipoCategoriaOpen(false)}
+      onContinuar={handleContinuarTipoCategoria}
+    />
+    <PizzaCategoriaSetupPanel
+      open={pizzaSetupOpen}
+      mode="create"
+      onClose={() => setPizzaSetupOpen(false)}
+      onSuccess={handlePizzaSetupSuccess}
     />
     <ProdutoNovoWizard
       origem="cadastro"

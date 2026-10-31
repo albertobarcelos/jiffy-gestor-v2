@@ -1,0 +1,307 @@
+export type RegraPrecoMultiplosSabores = 'proporcional' | 'maior'
+
+export type TipoImpactoPreco = 'nenhum' | 'aumenta' | 'diminui'
+
+export interface PizzaPaginationParams {
+  q?: string
+  limit?: number
+  offset?: number
+  ativo?: boolean | null
+}
+
+export interface PizzaPaginatedResponse<T> {
+  items: T[]
+  count: number
+  page?: number
+  limit?: number
+  totalPages?: number
+  hasNext?: boolean
+  hasPrevious?: boolean
+}
+
+export interface CategoriaPizza {
+  id: string
+  nome: string
+  ordem: number
+  corHex: string
+  iconName: string
+  regraPrecoMultiplosSabores: RegraPrecoMultiplosSabores
+  ativoDelivery: boolean
+  ativoLocal: boolean
+  ativo: boolean
+  /** Config da categoria (grupo_pizza_config) — default true na API. */
+  permiteDesconto?: boolean
+  /** Config da categoria (grupo_pizza_config) — default true na API. */
+  permiteAcrescimo?: boolean
+  /** IDs das impressoras vinculadas (GET categoria / create completo). */
+  impressorasIds?: string[]
+  imagemUrl?: string | null
+  dataCriacao: string
+  dataAtualizacao: string
+}
+
+export interface GrupoPizzaConfigInput {
+  menuId?: string | null
+  regraPrecoMultiplosSabores?: RegraPrecoMultiplosSabores
+  imprimir?: boolean
+  permiteDesconto?: boolean
+  permiteAcrescimo?: boolean
+  ativo?: boolean
+}
+
+export interface PizzaTamanho {
+  id: string
+  grupoPizzaConfigId: string
+  nome: string
+  quantidadePedacos: number
+  quantidadeMaximaDivisoes: number
+  ativo: boolean
+  dataCriacao: string
+  dataAtualizacao: string
+}
+
+export interface PizzaTamanhoInput {
+  nome: string
+  quantidadePedacos: number
+  quantidadeMaximaDivisoes: number
+  ativo?: boolean
+}
+
+export interface PrecoSaborTamanho {
+  pizzaTamanhoId: string
+  nome: string
+  precoCheio: number
+}
+
+export interface PrecoSaborTamanhoInput {
+  pizzaTamanhoId: string
+  precoCheio: number
+}
+
+export interface SaborPizzaSummary {
+  id: string
+  nome: string
+  descricao: string | null
+  imagemUrl?: string | null
+  ativo: boolean
+  ordem: number
+  categoriaPizzaId: string
+  dataCriacao: string
+  dataAtualizacao: string
+}
+
+export interface SaborPizza extends SaborPizzaSummary {
+  precosTamanho: PrecoSaborTamanho[]
+}
+
+export interface MassaPizzaInput {
+  nome: string
+  descricao?: string | null
+  valor: number
+  tipoImpactoPreco?: TipoImpactoPreco
+  ativo?: boolean
+}
+
+export interface BordaPizzaInput {
+  nome: string
+  descricao?: string | null
+  valor: number
+  tipoImpactoPreco?: TipoImpactoPreco
+  ativo?: boolean
+}
+
+export interface GrupoMassasPizzaNestedInput {
+  nome: string
+  massas: MassaPizzaInput[]
+  obrigatorio?: boolean
+  qtdMinima?: number
+  qtdMaxima?: number
+  ordem?: number
+  ativo?: boolean
+}
+
+export interface GrupoBordasPizzaNestedInput {
+  nome: string
+  bordas: BordaPizzaInput[]
+  obrigatorio?: boolean
+  qtdMinima?: number
+  qtdMaxima?: number
+  ordem?: number
+  ativo?: boolean
+}
+
+export interface CreateCategoriaPizzaInput {
+  nome: string
+  ativo?: boolean | null
+  imagemUrl?: string | null
+  corHex?: string
+  iconName?: string
+}
+
+export interface UpdateCategoriaPizzaInput {
+  nome?: string
+  ativo?: boolean | null
+  imagemUrl?: string | null
+  corHex?: string
+  iconName?: string
+  regraPrecoMultiplosSabores?: RegraPrecoMultiplosSabores
+  permiteDesconto?: boolean
+  permiteAcrescimo?: boolean
+  /** Substitui integralmente a lista de impressoras vinculadas. */
+  impressorasIds?: string[]
+}
+
+export interface PrecoComplementoPizza {
+  pizzaTamanhoId: string
+  valor: number
+}
+
+export interface ComplementoPizza {
+  id: string
+  categoriaPizzaId: string
+  complementoId: string
+  nome: string
+  descricao: string | null
+  tipoImpactoPreco: TipoImpactoPreco
+  valor: number
+  imagemUrl?: string | null
+  ativo: boolean
+  precos: PrecoComplementoPizza[]
+  dataCriacao: string
+  dataAtualizacao: string
+}
+
+export interface CreateComplementoPizzaInput {
+  categoriaPizzaId: string
+  complementoId: string
+  ativo?: boolean
+  precos: PrecoComplementoPizza[]
+}
+
+export interface ReplaceComplementoPizzaPrecosInput {
+  precos: PrecoComplementoPizza[]
+}
+
+export interface CreateCategoriaPizzaCompletoInput {
+  nome: string
+  ativo?: boolean | null
+  imagemUrl?: string | null
+  corHex?: string
+  iconName?: string
+  /** IDs das impressoras vinculadas à categoria na criação. */
+  impressorasIds?: string[]
+  config?: GrupoPizzaConfigInput
+  tamanhos?: PizzaTamanhoInput[]
+  sabores?: Array<{
+    nome: string
+    descricao?: string | null
+    imagemUrl?: string | null
+    ativo?: boolean
+    precosTamanho?: Array<{ nome: string; precoCheio: number }>
+  }>
+  /** Adicionais (complementos) vinculados na criação, com preços por nome do tamanho. */
+  complementos?: Array<{
+    complementoId: string
+    ativo?: boolean
+    precos?: Array<{ nome: string; valor: number }>
+  }>
+  gruposBordas?: GrupoBordasPizzaNestedInput[]
+  gruposMassas?: GrupoMassasPizzaNestedInput[]
+}
+
+export interface CategoriaPizzaCompletoResponse {
+  categoria: CategoriaPizza
+  tamanhos: PizzaTamanho[]
+  sabores: SaborPizza[]
+  gruposBordas: Array<{
+    id: string
+    nome: string
+    bordas: Array<{
+      id: string
+      nome: string
+      valor: number
+      ativo: boolean
+    }>
+  }>
+  gruposMassas: Array<{
+    id: string
+    nome: string
+    massas: Array<{
+      id: string
+      nome: string
+      valor: number
+      ativo: boolean
+    }>
+  }>
+}
+
+export interface CreateSaborPizzaInput {
+  nome: string
+  descricao?: string | null
+  imagemUrl?: string | null
+  ativo?: boolean
+  categoriaPizzaId: string
+  precosTamanho?: PrecoSaborTamanhoInput[]
+}
+
+export interface UpdateSaborPizzaInput {
+  nome?: string
+  descricao?: string | null
+  imagemUrl?: string | null
+  ativo?: boolean
+  precosTamanho?: PrecoSaborTamanhoInput[]
+}
+
+export interface MassaPizza {
+  id: string
+  nome: string
+  descricao: string | null
+  tipoImpactoPreco: TipoImpactoPreco
+  valor: number
+  ativo: boolean
+}
+
+export interface BordaPizza {
+  id: string
+  nome: string
+  descricao: string | null
+  tipoImpactoPreco: TipoImpactoPreco
+  valor: number
+  ativo: boolean
+}
+
+export interface GrupoMassasPizzaSummary {
+  id: string
+  nome: string
+  categoriaPizzaId: string
+  obrigatorio: boolean
+  qtdMinima: number
+  qtdMaxima: number
+  ordem: number
+  ativo: boolean
+}
+
+export interface GrupoBordasPizzaSummary {
+  id: string
+  nome: string
+  categoriaPizzaId: string
+  obrigatorio: boolean
+  qtdMinima: number
+  qtdMaxima: number
+  ordem: number
+  ativo: boolean
+}
+
+export interface GrupoMassasPizza extends GrupoMassasPizzaSummary {
+  massas: MassaPizza[]
+}
+
+export interface GrupoBordasPizza extends GrupoBordasPizzaSummary {
+  bordas: BordaPizza[]
+}
+
+export interface GrupoComplementoDelta<TAdd, TUpdate> {
+  add: TAdd[]
+  update: TUpdate[]
+  delete: string[]
+}

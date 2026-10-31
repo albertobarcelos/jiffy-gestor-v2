@@ -31,7 +31,8 @@ const initialState: State = {
   favoritoFilter: 'Todos',
   grupoProdutoId: '',
   grupoComplementosId: '',
-  tipo: 'all',
+  // Default padrao: esconde sabores pizza no MenuEditor até existir venda pizza
+  tipo: 'padrao',
 }
 
 function reducer(state: State, action: Action): State {

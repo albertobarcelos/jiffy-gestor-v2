@@ -224,6 +224,7 @@ export class MenuRepository implements IMenuRepository {
     const query = new URLSearchParams()
     appendPagination(query, params)
     if (params.grupoProdutoId) query.append('grupoProdutoId', params.grupoProdutoId)
+    if (params.tipo) query.append('tipo', params.tipo)
 
     const { data } = await this.apiClient.request<any>(
       `${BASE}/${menuId}/grupos-produtos?${query.toString()}`,

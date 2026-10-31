@@ -41,6 +41,7 @@ type ListarMenuGruposParams = {
   offset?: number
   ativo?: boolean | null
   grupoProdutoId?: string
+  tipo?: MenuProdutoCatalogTipoFiltro | string
 }
 
 function unwrapData<T>(payload: { data: T } | T): T {
@@ -219,6 +220,8 @@ export class MenuBffRepository {
       searchParams.set('ativo', String(params.ativo))
     }
     if (params.grupoProdutoId) searchParams.set('grupoProdutoId', params.grupoProdutoId)
+    // Backend defaulta tipoCategoria=padrao se omitido — pizza some da listagem.
+    if (params.tipo) searchParams.set('tipo', params.tipo)
 
     const data = await fetchBffJson<{ items?: MenuGrupoProduto[]; count?: number }>(
       `/api/menus/${encodeURIComponent(menuId)}/grupos-produtos?${searchParams}`,

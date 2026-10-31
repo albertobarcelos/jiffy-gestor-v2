@@ -1,0 +1,108 @@
+import type {
+  CategoriaPizza,
+  CategoriaPizzaCompletoResponse,
+  BordaPizzaInput,
+  ComplementoPizza,
+  CreateComplementoPizzaInput,
+  CreateCategoriaPizzaCompletoInput,
+  CreateCategoriaPizzaInput,
+  CreateSaborPizzaInput,
+  GrupoComplementoDelta,
+  GrupoBordasPizza,
+  GrupoBordasPizzaNestedInput,
+  GrupoBordasPizzaSummary,
+  GrupoMassasPizza,
+  GrupoMassasPizzaNestedInput,
+  GrupoMassasPizzaSummary,
+  MassaPizzaInput,
+  PizzaPaginatedResponse,
+  PizzaPaginationParams,
+  PizzaTamanho,
+  ReplaceComplementoPizzaPrecosInput,
+  SaborPizza,
+  SaborPizzaSummary,
+  UpdateSaborPizzaInput,
+} from '@/src/shared/types/pizza'
+
+export type CreateGrupoBordasPizzaInput = GrupoBordasPizzaNestedInput & {
+  categoriaPizzaId?: string
+  grupoPizzaConfigId?: string
+}
+
+export type UpdateGrupoBordasPizzaInput = Partial<Omit<GrupoBordasPizzaNestedInput, 'bordas'>> & {
+  bordas?: GrupoComplementoDelta<BordaPizzaInput, BordaPizzaInput & { id: string }>
+}
+
+export type CreateGrupoMassasPizzaInput = GrupoMassasPizzaNestedInput & {
+  categoriaPizzaId?: string
+  grupoPizzaConfigId?: string
+}
+
+export type UpdateGrupoMassasPizzaInput = Partial<Omit<GrupoMassasPizzaNestedInput, 'massas'>> & {
+  massas?: GrupoComplementoDelta<MassaPizzaInput, MassaPizzaInput & { id: string }>
+}
+
+export interface IPizzaRepository {
+  listarCategorias(params: PizzaPaginationParams): Promise<PizzaPaginatedResponse<CategoriaPizza>>
+  buscarCategoriaPorId(id: string): Promise<CategoriaPizza>
+  criarCategoria(input: CreateCategoriaPizzaInput): Promise<CategoriaPizza>
+  criarCategoriaCompleto(input: CreateCategoriaPizzaCompletoInput): Promise<CategoriaPizzaCompletoResponse>
+  atualizarCategoria(id: string, input: Partial<CreateCategoriaPizzaInput>): Promise<CategoriaPizza>
+  reordenarCategoria(id: string, novaPosicao: number): Promise<CategoriaPizza>
+  excluirCategoria(id: string): Promise<void>
+
+  listarSabores(
+    params: PizzaPaginationParams & { categoriaPizzaId?: string }
+  ): Promise<PizzaPaginatedResponse<SaborPizzaSummary>>
+  buscarSaborPorId(id: string): Promise<SaborPizza>
+  criarSabor(input: CreateSaborPizzaInput): Promise<SaborPizza>
+  atualizarSabor(id: string, input: UpdateSaborPizzaInput): Promise<SaborPizza>
+  reordenarSabor(id: string, novaPosicao: number): Promise<SaborPizzaSummary>
+  excluirSabor(id: string): Promise<void>
+
+  listarTamanhos(
+    params: PizzaPaginationParams & { categoriaPizzaId?: string }
+  ): Promise<PizzaPaginatedResponse<PizzaTamanho>>
+  buscarTamanhoPorId(id: string): Promise<PizzaTamanho>
+  criarTamanho(input: {
+    grupoPizzaConfigId: string
+    nome: string
+    quantidadePedacos: number
+    quantidadeMaximaDivisoes: number
+    ativo?: boolean
+  }): Promise<PizzaTamanho>
+  atualizarTamanho(
+    id: string,
+    input: Partial<{
+      nome: string
+      quantidadePedacos: number
+      quantidadeMaximaDivisoes: number
+      ativo: boolean
+    }>
+  ): Promise<PizzaTamanho>
+  excluirTamanho(id: string): Promise<void>
+
+  listarGruposBordas(
+    params: PizzaPaginationParams & { categoriaPizzaId?: string }
+  ): Promise<PizzaPaginatedResponse<GrupoBordasPizzaSummary>>
+  buscarGrupoBordasPorId(id: string): Promise<GrupoBordasPizza>
+  criarGrupoBordas(input: CreateGrupoBordasPizzaInput): Promise<GrupoBordasPizza>
+  atualizarGrupoBordas(id: string, input: UpdateGrupoBordasPizzaInput): Promise<GrupoBordasPizza>
+  excluirGrupoBordas(id: string): Promise<void>
+
+  listarGruposMassas(
+    params: PizzaPaginationParams & { categoriaPizzaId?: string }
+  ): Promise<PizzaPaginatedResponse<GrupoMassasPizzaSummary>>
+  buscarGrupoMassasPorId(id: string): Promise<GrupoMassasPizza>
+  criarGrupoMassas(input: CreateGrupoMassasPizzaInput): Promise<GrupoMassasPizza>
+  atualizarGrupoMassas(id: string, input: UpdateGrupoMassasPizzaInput): Promise<GrupoMassasPizza>
+  excluirGrupoMassas(id: string): Promise<void>
+
+  listarComplementosPizza(categoriaPizzaId: string): Promise<ComplementoPizza[]>
+  criarComplementoPizza(input: CreateComplementoPizzaInput): Promise<ComplementoPizza>
+  substituirPrecosComplementoPizza(
+    id: string,
+    input: ReplaceComplementoPizzaPrecosInput
+  ): Promise<ComplementoPizza>
+  desvincularComplementoPizza(id: string): Promise<void>
+}

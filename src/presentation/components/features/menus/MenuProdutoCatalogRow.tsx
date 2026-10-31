@@ -17,6 +17,8 @@ export type MenuProdutoCatalogRowProps = {
   imagemCadastro?: string | null
   permissoesCadastro?: Partial<MenuProdutoPermissoes> | null
   saving: MenuProdutoListaSaving
+  valorExibicao?: string
+  valorSomenteLeitura?: boolean
   onNomeChange: (produtoId: string, nome: string) => void | boolean | Promise<void | boolean>
   onValorChange: (produtoId: string, valor: number) => void | boolean | Promise<void | boolean>
   onSwitchToggle: (produtoId: string, ativo: boolean) => void
@@ -38,6 +40,8 @@ function MenuProdutoCatalogRowInner({
   imagemCadastro,
   permissoesCadastro,
   saving,
+  valorExibicao,
+  valorSomenteLeitura = false,
   onNomeChange,
   onValorChange,
   onSwitchToggle,
@@ -53,14 +57,16 @@ function MenuProdutoCatalogRowInner({
       valor={Number(produto.valor)}
       valorPromocional={Number(produto.valorPromocional ?? 0)}
       promocaoAtiva={produto.promocaoAtiva === true}
+      valorExibicao={valorExibicao}
+      valorSomenteLeitura={valorSomenteLeitura}
       ativo={produto.ativo}
       imagemUrl={resolverImagemMenuProduto(produto, imagemCadastro)}
       codigo={codigo}
       isSavingValor={saving.valor}
       isSavingStatus={saving.status}
       isSavingNome={saving.nome}
-      onNomeChange={onNomeChange}
-      onValorChange={onValorChange}
+      onNomeChange={valorSomenteLeitura ? undefined : onNomeChange}
+      onValorChange={valorSomenteLeitura ? undefined : onValorChange}
       onSwitchToggle={onSwitchToggle}
       onEdit={onEdit}
       actionsSlot={
@@ -85,6 +91,8 @@ function areEqual(
     prev.codigo === next.codigo &&
     prev.imagemCadastro === next.imagemCadastro &&
     prev.permissoesCadastro === next.permissoesCadastro &&
+    prev.valorExibicao === next.valorExibicao &&
+    prev.valorSomenteLeitura === next.valorSomenteLeitura &&
     prev.saving.nome === next.saving.nome &&
     prev.saving.valor === next.saving.valor &&
     prev.saving.status === next.saving.status &&

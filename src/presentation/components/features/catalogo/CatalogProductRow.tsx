@@ -12,6 +12,7 @@ import {
 } from 'react-icons/md'
 import { ProdutoValorInput } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoValorInput'
 import { ProdutoNomeInput } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoNomeInput'
+import { ProdutoStatusSwitch } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoStatusSwitch'
 import { MenuProdutoPauseControl } from '@/src/presentation/components/features/menus/MenuProdutoPauseControl'
 import { cn } from '@/src/shared/utils/cn'
 import { formatBRLFromMaskedInput } from '@/src/shared/utils/formatters'
@@ -27,7 +28,8 @@ import {
 import type { CatalogListVariant } from './types'
 
 const FOTO_BOX = 'h-14 w-14 shrink-0 self-start md:h-16 md:w-16 md:self-auto'
-const NOME_COL = 'min-w-0 max-w-none justify-self-start md:max-w-[25ch]'
+const FOTO_BOX_COMPACT = 'h-10 w-10 shrink-0 self-start md:h-11 md:w-11 md:self-auto'
+const NOME_COL = 'min-w-0 max-w-none justify-self-start md:max-w-[34ch]'
 const AREA_FOTO = 'catalog-row-area-foto'
 const AREA_NOME = 'catalog-row-area-nome'
 const AREA_CODIGO = 'catalog-row-area-codigo'
@@ -41,11 +43,13 @@ export function catalogRowGridClass(opts: {
   hideCodigo: boolean
   hasActions: boolean
   hasCategoria: boolean
+  centerActions?: boolean
 }): string {
   if (opts.isMenu && opts.hideCodigo) {
-    return opts.hasActions
-      ? 'catalog-row-menu-hidecodigo-actions'
-      : 'catalog-row-menu-hidecodigo'
+    if (!opts.hasActions) return 'catalog-row-menu-hidecodigo'
+    return opts.centerActions
+      ? 'catalog-row-menu-hidecodigo-actions-centered'
+      : 'catalog-row-menu-hidecodigo-actions'
   }
   if (opts.isMenu) {
     return 'catalog-row-menu'
@@ -68,6 +72,10 @@ export interface CatalogProductRowProps {
   imagemUrl?: string | null
   codigo?: string
   actionsSlot?: ReactNode
+  /** Texto formatado no lugar do input de valor (ex.: pizza — "À partir de R$ X"). */
+  valorExibicao?: string
+  /** Oculta edição inline de preço (sabores pizza). */
+  valorSomenteLeitura?: boolean
   categoriaSlot?: ReactNode
   isSavingValor?: boolean
   isSavingStatus?: boolean
@@ -85,8 +93,12 @@ export interface CatalogProductRowProps {
   hidePauseAndPrice?: boolean
   /** Esconde o selo COD. */
   hideCodigo?: boolean
+  /** Centraliza as ações no espaço entre o nome e os metadados. */
+  centerActions?: boolean
   /** Nome em cinza quando a categoria está desativada neste cardápio. */
   nomeInativo?: boolean
+  /** Linha mais baixa (foto e padding menores) — ex.: hub de pizzas. */
+  compact?: boolean
 }
 
 function CatalogProductRowInner({
@@ -100,6 +112,8 @@ function CatalogProductRowInner({
   imagemUrl,
   codigo,
   actionsSlot,
+  valorExibicao,
+  valorSomenteLeitura = false,
   categoriaSlot,
   isSavingValor,
   isSavingStatus,
@@ -114,10 +128,13 @@ function CatalogProductRowInner({
   onClearImage,
   hidePauseAndPrice = false,
   hideCodigo = false,
+  centerActions = false,
   nomeInativo = false,
+  compact = false,
 }: CatalogProductRowProps) {
   const [imagemExpandida, setImagemExpandida] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const fotoBox = compact ? FOTO_BOX_COMPACT : FOTO_BOX
   const { exibicao: nomeExibicao, truncado: nomeTruncado } = truncarNomeCatalogoLista(
     nome,
     NOME_CATALOGO_LISTA_MAX_CHARS
@@ -199,7 +216,7 @@ function CatalogProductRowInner({
     <span
       className={cn(
         'flex items-center justify-center rounded-lg border border-dashed',
-        FOTO_BOX,
+        fotoBox,
         podeTrocarImagem
           ? 'border-primary/40 bg-primary/5 text-primary hover:bg-primary/10'
           : 'border-gray-300 bg-gray-50 text-secondary-text'
@@ -207,7 +224,9 @@ function CatalogProductRowInner({
       aria-hidden={!podeTrocarImagem}
       title={podeTrocarImagem ? undefined : 'Sem imagem'}
     >
-      <MdImageNotSupported className="h-7 w-7 md:h-8 md:w-8" />
+      <MdImageNotSupported
+        className={compact ? 'h-5 w-5 md:h-6 md:w-6' : 'h-7 w-7 md:h-8 md:w-8'}
+      />
     </span>
   )
 
@@ -216,7 +235,8 @@ function CatalogProductRowInner({
       <div
         onClick={() => onEdit(id)}
         className={cn(
-          'grid cursor-pointer items-start gap-x-2 gap-y-1.5 px-2 py-2 md:items-center md:gap-x-2 md:gap-y-2 md:px-4',
+          'grid cursor-pointer items-start gap-x-2 px-2 md:items-center md:gap-x-2 md:px-4',
+          compact ? 'gap-y-1 py-1 md:gap-y-1' : 'gap-y-1.5 py-2 md:gap-y-2',
           'relative z-0 has-[.tooltip-hover-above:hover]:z-[100] has-[.tooltip-hover-below:hover]:z-[100]',
           isMenu ? 'border border-gray-200' : null,
           pausadoNoMenu
@@ -227,6 +247,7 @@ function CatalogProductRowInner({
             hideCodigo,
             hasActions: Boolean(actionsSlot),
             hasCategoria: Boolean(categoriaSlot),
+            centerActions,
           })
         )}
       >
@@ -245,7 +266,7 @@ function CatalogProductRowInner({
             }}
             className={cn(
               'group relative overflow-hidden rounded-lg border border-gray-200 bg-white disabled:opacity-60',
-              FOTO_BOX,
+              fotoBox,
               AREA_FOTO
             )}
           >
@@ -332,7 +353,9 @@ function CatalogProductRowInner({
             className={cn(
               AREA_ACOES,
               'flex min-w-0 flex-nowrap items-center',
-              hideCodigo
+              centerActions
+                ? 'w-full justify-start md:w-full md:justify-start'
+                : hideCodigo
                 ? 'justify-self-end md:justify-self-center'
                 : 'w-full justify-start md:justify-center'
             )}
@@ -379,57 +402,75 @@ function CatalogProductRowInner({
                   'min-w-[calc(4.5rem+0.375rem+6rem)]'
                 )}
               >
-                {mostrarBadgePromocional ? (
-                  <Tooltip
-                    title={
-                      promocaoPausadaNaLista
-                        ? 'A promoção está pausada'
-                        : 'Preço promocional'
-                    }
-                    arrow
-                    placement="top"
-                  >
-                    <span
-                      className={cn(
-                        'inline-flex min-w-[4.5rem] items-center justify-center rounded-lg border px-2 py-2 text-center text-xs font-semibold tabular-nums md:text-sm',
-                        promocaoPausadaNaLista
-                          ? 'border-red-300 bg-red-50 text-red-600 line-through decoration-red-600/80'
-                          : 'border-emerald-600/40 bg-emerald-50 text-emerald-700'
-                      )}
-                    >
-                      {formatBRLFromMaskedInput(promoNum)}
-                    </span>
-                  </Tooltip>
-                ) : null}
-                {podeEditarValor && onValorChange ? (
-                  <ProdutoValorInput
-                    valor={valor}
-                    disabled={Boolean(isSavingValor) || valorNormalBloqueadoPorPromocao}
-                    title={
-                      valorNormalBloqueadoPorPromocao
-                        ? 'Pause ou remova a promoção para alterar o preço normal'
-                        : undefined
-                    }
-                    className={
-                      promocaoVigente
-                        ? 'text-secondary-text line-through decoration-primary/60'
-                        : undefined
-                    }
-                    onCommit={novoValor => onValorChange(id, novoValor)}
-                  />
-                ) : (
+                {valorSomenteLeitura ? (
                   <span
-                    className={cn(
-                      'inline-flex w-24 items-center justify-center rounded-lg border border-primary/50 bg-info p-2 text-center text-xs font-normal text-primary-text md:text-sm',
-                      promocaoVigente &&
-                        'text-secondary-text line-through decoration-primary/60'
-                    )}
+                    className="shrink-0 text-xs font-medium text-secondary-text md:text-sm"
+                    title={valorExibicao}
                   >
-                    {formatBRLFromMaskedInput(valor)}
+                    {valorExibicao ?? '—'}
                   </span>
+                ) : (
+                  <>
+                    {mostrarBadgePromocional ? (
+                      <Tooltip
+                        title={
+                          promocaoPausadaNaLista
+                            ? 'A promoção está pausada'
+                            : 'Preço promocional'
+                        }
+                        arrow
+                        placement="top"
+                      >
+                        <span
+                          className={cn(
+                            'inline-flex min-w-[4.5rem] items-center justify-center rounded-lg border px-2 py-2 text-center text-xs font-semibold tabular-nums md:text-sm',
+                            promocaoPausadaNaLista
+                              ? 'border-red-300 bg-red-50 text-red-600 line-through decoration-red-600/80'
+                              : 'border-emerald-600/40 bg-emerald-50 text-emerald-700'
+                          )}
+                        >
+                          {formatBRLFromMaskedInput(promoNum)}
+                        </span>
+                      </Tooltip>
+                    ) : null}
+                    {podeEditarValor && onValorChange ? (
+                      <ProdutoValorInput
+                        valor={valor}
+                        disabled={Boolean(isSavingValor) || valorNormalBloqueadoPorPromocao}
+                        title={
+                          valorNormalBloqueadoPorPromocao
+                            ? 'Pause ou remova a promoção para alterar o preço normal'
+                            : undefined
+                        }
+                        className={
+                          promocaoVigente
+                            ? 'text-secondary-text line-through decoration-primary/60'
+                            : undefined
+                        }
+                        onCommit={novoValor => onValorChange(id, novoValor)}
+                      />
+                    ) : (
+                      <span
+                        className={cn(
+                          'inline-flex w-24 items-center justify-center rounded-lg border border-primary/50 bg-info p-2 text-center text-xs font-normal text-primary-text md:text-sm',
+                          promocaoVigente &&
+                            'text-secondary-text line-through decoration-primary/60'
+                        )}
+                      >
+                        {formatBRLFromMaskedInput(valor)}
+                      </span>
+                    )}
+                  </>
                 )}
               </div>
             )}
+            {!hidePauseAndPrice && !isMenu ? (
+              <ProdutoStatusSwitch
+                isAtivo={ativo}
+                disabled={isSavingStatus}
+                onChange={status => onSwitchToggle?.(id, status)}
+              />
+            ) : null}
             {hidePauseAndPrice || !isMenu ? null : (
               <span className="hidden shrink-0 md:inline-flex">{renderPauseMenu()}</span>
             )}
@@ -487,6 +528,8 @@ function arePropsEqual(prev: CatalogProductRowProps, next: CatalogProductRowProp
     prev.imagemUrl === next.imagemUrl &&
     prev.codigo === next.codigo &&
     prev.actionsSlot === next.actionsSlot &&
+    prev.valorExibicao === next.valorExibicao &&
+    prev.valorSomenteLeitura === next.valorSomenteLeitura &&
     prev.categoriaSlot === next.categoriaSlot &&
     prev.isSavingValor === next.isSavingValor &&
     prev.isSavingStatus === next.isSavingStatus &&
@@ -501,7 +544,9 @@ function arePropsEqual(prev: CatalogProductRowProps, next: CatalogProductRowProp
     prev.onClearImage === next.onClearImage &&
     prev.hidePauseAndPrice === next.hidePauseAndPrice &&
     prev.hideCodigo === next.hideCodigo &&
-    prev.nomeInativo === next.nomeInativo
+    prev.centerActions === next.centerActions &&
+    prev.nomeInativo === next.nomeInativo &&
+    prev.compact === next.compact
   )
 }
 

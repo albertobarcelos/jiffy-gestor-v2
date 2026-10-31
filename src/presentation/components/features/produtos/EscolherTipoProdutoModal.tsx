@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
 import { MdKebabDining } from 'react-icons/md'
 import {
   JiffySidePanelModal,
@@ -32,7 +33,7 @@ const OPCOES: Array<{
     id: 'pizza',
     titulo: 'Pizza',
     descricao: 'Defina tamanho, tipos de massa, borda e sabores.',
-    disponivel: false,
+    disponivel: true,
     iconName: 'pizza',
   },
   {
@@ -49,6 +50,8 @@ interface EscolherTipoProdutoModalProps {
   onClose: () => void
   onContinuar: (tipo: TipoCadastroProduto) => void
   cancelVariant?: JiffySidePanelFooterActions['cancelVariant']
+  /** Oculta a opção Pizza (ex.: cadastro a partir do menu, sem vínculo pizza ainda). */
+  ocultarPizza?: boolean
 }
 
 export function EscolherTipoProdutoModal({
@@ -56,14 +59,19 @@ export function EscolherTipoProdutoModal({
   onClose,
   onContinuar,
   cancelVariant = 'primaryTint10',
+  ocultarPizza = false,
 }: EscolherTipoProdutoModalProps) {
   const [tipo, setTipo] = useState<TipoCadastroProduto>('preparado')
+  const opcoes = useMemo(
+    () => (ocultarPizza ? OPCOES.filter(o => o.id !== 'pizza') : OPCOES),
+    [ocultarPizza]
+  )
 
   useEffect(() => {
     if (open) setTipo('preparado')
   }, [open])
 
-  const podeContinuar = OPCOES.some(o => o.id === tipo && o.disponivel)
+  const podeContinuar = opcoes.some(o => o.id === tipo && o.disponivel)
 
   const handleContinuar = useCallback(() => {
     if (!podeContinuar) return
@@ -95,7 +103,7 @@ export function EscolherTipoProdutoModal({
       footerActions={footerActions}
     >
       <div role="radiogroup" aria-label="Tipo de produto" className="flex flex-col gap-3 p-4 md:p-6">
-        {OPCOES.map(opcao => {
+        {opcoes.map(opcao => {
           const selecionado = tipo === opcao.id
           return (
             <button
@@ -153,7 +161,8 @@ export function EscolherTipoProdutoModal({
   )
 }
 
-export function useEscolherTipoProdutoCadastro() {
+export function useEscolherTipoProdutoCadastro(options?: { onPizza?: () => void }) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const pendingRef = useRef<(() => void) | null>(null)
 
@@ -167,13 +176,26 @@ export function useEscolherTipoProdutoCadastro() {
     setOpen(false)
   }, [])
 
-  const continuar = useCallback((tipo: TipoCadastroProduto) => {
-    if (tipo !== 'preparado') return
-    const seguir = pendingRef.current
-    pendingRef.current = null
-    setOpen(false)
-    seguir?.()
-  }, [])
+  const continuar = useCallback(
+    (tipo: TipoCadastroProduto) => {
+      if (tipo === 'pizza') {
+        pendingRef.current = null
+        setOpen(false)
+        if (options?.onPizza) {
+          options.onPizza()
+          return
+        }
+        router.push('/produtos/pizzas')
+        return
+      }
+      if (tipo !== 'preparado') return
+      const seguir = pendingRef.current
+      pendingRef.current = null
+      setOpen(false)
+      seguir?.()
+    },
+    [options?.onPizza, router]
+  )
 
   return { open, pedirTipo, fechar, continuar }
 }

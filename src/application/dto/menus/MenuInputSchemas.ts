@@ -86,6 +86,8 @@ export const ListarMenuGruposQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
   ativo: optionalBoolFromQuery,
   grupoProdutoId: z.string().optional(),
+  /** Sem isso o backend assume `padrao` e esconde categorias pizza. */
+  tipo: MenuProdutoTipoFiltroSchema,
 })
 
 export const MenuRouteIdSchema = z.string().trim().min(1, 'Menu não informado')

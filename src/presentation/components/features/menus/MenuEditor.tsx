@@ -41,8 +41,19 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyFriendlyAlertDialog } from '@/src/presentation/components/ui/JiffyFriendlyAlertDialog'
 import { categoriaAtivaNoSnapshot } from '@/src/domain/policies/menu/categoriaStatusNoMenu'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
-import { resolverCodigoMenuProduto, resolverImagemMenuProduto } from '@/src/shared/utils/catalogoProdutoIndex'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { usePizzaCategorias } from '@/src/presentation/hooks/pizza/usePizza'
+import { usePizzaSaboresPrecosResumo } from '@/src/presentation/hooks/pizza/usePizzaSaboresPrecosResumo'
+import { PizzaSaborModal } from '@/src/presentation/components/features/pizza/PizzaSaborModal'
+import { PizzaCategoriaSetupPanel } from '@/src/presentation/components/features/pizza/PizzaCategoriaSetupPanel'
+import {
+  formatarPrecoAPartirDe,
+  isPizzaGrupoProdutoId,
+} from '@/src/presentation/utils/pizza/pizzaMenuHelpers'
+import type { CategoriaPizza } from '@/src/shared/types/pizza'
+import { resolverCodigoMenuProduto } from '@/src/shared/utils/catalogoProdutoIndex'
 import { podeDesvincularProdutoDoMenu } from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
+import { showToast } from '@/src/shared/utils/toast'
 import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
 
 interface MenuEditorProps {
@@ -51,6 +62,7 @@ interface MenuEditorProps {
 
 export function MenuEditor({ menuId }: MenuEditorProps) {
   const { toGestao } = useGestaoPath()
+  const invalidate = useInvalidateTenantQueries()
   const isMobile = useIsMobile()
   const { state: filters, query, temFiltroAtivo, actions } = useMenuProdutosFilters()
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(false)
@@ -80,8 +92,23 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   const [addOpen, setAddOpen] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardCategoriaId, setWizardCategoriaId] = useState<string | undefined>()
+  const [pizzaSaborModalOpen, setPizzaSaborModalOpen] = useState(false)
+  const [pizzaSaborEditId, setPizzaSaborEditId] = useState<string | null>(null)
+  const [pizzaSaborCategoria, setPizzaSaborCategoria] = useState<CategoriaPizza | null>(null)
+  const [pizzaCategoriaEditOpen, setPizzaCategoriaEditOpen] = useState(false)
+  const [pizzaCategoriaEditId, setPizzaCategoriaEditId] = useState<string | null>(null)
   const [reorderOpen, setReorderOpen] = useState(false)
+  // Fluxo de vincular/criar pizza no menu oculto até existir venda pizza
   const tipoCadastro = useEscolherTipoProdutoCadastro()
+  const { data: pizzaCategoriasData } = usePizzaCategorias({ limit: 100 })
+  const pizzaCategoriaIds = useMemo(
+    () => new Set((pizzaCategoriasData?.items ?? []).map(categoria => categoria.id)),
+    [pizzaCategoriasData?.items]
+  )
+  const pizzaCategoriaPorId = useMemo(
+    () => new Map((pizzaCategoriasData?.items ?? []).map(categoria => [categoria.id, categoria])),
+    [pizzaCategoriasData?.items]
+  )
   const {
     data: produtosTodosData,
   } = useMenuProdutos({
@@ -114,6 +141,12 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     setWizardCategoriaId(undefined)
   }, [])
 
+  const handlePizzaMenuSuccess = useCallback(async () => {
+    await invalidate(['menu', menuId])
+    await invalidate(['menu-produtos', menuId])
+    await invalidate(['menu-grupos', menuId])
+  }, [invalidate, menuId])
+
   const grupos = useMemo(
     () => coletarGruposMenuPorSnapshot(gruposData?.pages),
     [gruposData?.pages]
@@ -128,6 +161,17 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     }
     return Array.from(map.values())
   }, [produtosData?.pages])
+
+  const pizzaSaborIds = useMemo(
+    () =>
+      produtosDoMenu
+        .filter(produto =>
+          isPizzaGrupoProdutoId(produto.grupoProduto?.id, pizzaCategoriaIds)
+        )
+        .map(produto => produto.produtoId),
+    [produtosDoMenu, pizzaCategoriaIds]
+  )
+  const { precosPorSaborId } = usePizzaSaboresPrecosResumo(pizzaSaborIds)
 
   const idsNoMenu = useMemo(() => {
     const source = addOpen ? produtosTodosData?.pages : produtosData?.pages
@@ -262,13 +306,35 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     })
   }, [])
 
-  const handleProdutoRemovido = useCallback((produtoId: string) => {
-    setTabsState(prev =>
-      prev.produto?.produtoId === produtoId
-        ? { open: false, tab: 'produto', produto: null, grupo: null }
-        : prev
-    )
+  const closePizzaSaborModal = useCallback(() => {
+    setPizzaSaborModalOpen(false)
+    setPizzaSaborEditId(null)
+    setPizzaSaborCategoria(null)
   }, [])
+
+  const closePizzaCategoriaModal = useCallback(() => {
+    setPizzaCategoriaEditOpen(false)
+    setPizzaCategoriaEditId(null)
+  }, [])
+
+  const handleProdutoRemovido = useCallback(
+    (produtoId: string) => {
+      setTabsState(prev =>
+        prev.produto?.produtoId === produtoId
+          ? { open: false, tab: 'produto', produto: null, grupo: null }
+          : prev
+      )
+      setPizzaSaborEditId(prev => {
+        if (prev === produtoId) {
+          setPizzaSaborModalOpen(false)
+          setPizzaSaborCategoria(null)
+          return null
+        }
+        return prev
+      })
+    },
+    []
+  )
 
   const {
     codigoPorId,
@@ -297,18 +363,37 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     (produtoId: string) => {
       const produtoMenu = produtosDoMenu.find(p => p.produtoId === produtoId)
       if (!produtoMenu) return
+
+      const grupoId = produtoMenu.grupoProduto?.id
+      if (isPizzaGrupoProdutoId(grupoId, pizzaCategoriaIds)) {
+        const categoria = grupoId ? (pizzaCategoriaPorId.get(grupoId) ?? null) : null
+        if (!categoria) {
+          showToast.error('Categoria pizza não encontrada')
+          return
+        }
+        setPizzaSaborCategoria(categoria)
+        setPizzaSaborEditId(produtoId)
+        setPizzaSaborModalOpen(true)
+        return
+      }
+
       openTabs({
         tab: 'produto',
         produto: produtoMenu,
         grupo: findGrupo(produtoMenu.grupoProduto?.id),
       })
     },
-    [produtosDoMenu, findGrupo, openTabs]
+    [produtosDoMenu, findGrupo, openTabs, pizzaCategoriaIds, pizzaCategoriaPorId]
   )
 
   const handleEditGrupo = useCallback(
     (grupoId: string | undefined) => {
       if (!grupoId) return
+      if (isPizzaGrupoProdutoId(grupoId, pizzaCategoriaIds)) {
+        setPizzaCategoriaEditId(grupoId)
+        setPizzaCategoriaEditOpen(true)
+        return
+      }
       const grupo = findGrupo(grupoId)
       if (!grupo) return
       const primeiro = produtosPorGrupo.get(grupoId)?.[0] ?? null
@@ -322,17 +407,28 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       }
       setCategoriaPanelGrupo(grupo)
     },
-    [findGrupo, produtosPorGrupo, openTabs]
+    [findGrupo, produtosPorGrupo, openTabs, pizzaCategoriaIds]
   )
+
+  const handlePizzaItemEditSuccess = useCallback(async () => {
+    await handlePizzaMenuSuccess()
+    await invalidate(['pizza', 'sabor', 'preco-resumo'])
+  }, [handlePizzaMenuSuccess, invalidate])
 
   const handleAddProduto = useCallback(
     (_grupoNome: string, grupoId: string | undefined) => {
+      if (grupoId && pizzaCategoriaIds.has(grupoId)) {
+        showToast.error(
+          'Vínculo de pizza ao cardápio temporariamente indisponível até o fluxo de venda pizza.'
+        )
+        return
+      }
       tipoCadastro.pedirTipo(() => openWizardCadastro(grupoId))
     },
-    [tipoCadastro.pedirTipo, openWizardCadastro]
+    [openWizardCadastro, pizzaCategoriaIds, tipoCadastro]
   )
 
-  /** Cabeçalho / empty state: painel para vincular produtos do cadastro base. */
+  /** Cabe├ºalho / empty state: painel para vincular produtos do cadastro base. */
   const handleAdicionarProdutosCabecalho = useCallback(() => {
     setAddOpen(true)
   }, [])
@@ -352,6 +448,11 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
 
   const renderItem = useCallback(
     (produto: MenuProduto) => {
+      const isPizzaSabor = isPizzaGrupoProdutoId(produto.grupoProduto?.id, pizzaCategoriaIds)
+      const resumoPreco = precosPorSaborId.get(produto.produtoId)
+      const valorExibicao = isPizzaSabor
+        ? formatarPrecoAPartirDe(resumoPreco?.precoMinimo)
+        : undefined
       const saving = savingDaLinha(produto.produtoId)
       return (
         <MenuProdutoCatalogRow
@@ -363,6 +464,8 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
           imagemCadastro={imagemPorId.get(produto.produtoId)}
           permissoesCadastro={permissoesPorId.get(produto.produtoId)}
           saving={saving}
+          valorExibicao={valorExibicao}
+          valorSomenteLeitura={isPizzaSabor}
           onNomeChange={handleNomeChange}
           onValorChange={handleValorChange}
           onSwitchToggle={handleStatusToggle}
@@ -373,6 +476,8 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       )
     },
     [
+      pizzaCategoriaIds,
+      precosPorSaborId,
       codigoPorId,
       handleEditProduto,
       handleNomeChange,
@@ -397,12 +502,12 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   if (!menu) {
     return (
       <div className="p-6">
-        <p className="text-sm text-secondary-text">Menu não encontrado.</p>
+        <p className="text-sm text-secondary-text">Menu n├úo encontrado.</p>
         <Link
           href={toGestao('/cardapio')}
           className="mt-2 inline-block text-sm font-semibold text-primary"
         >
-          Voltar ao cardápio
+          Voltar ao card├ípio
         </Link>
       </div>
     )
@@ -497,7 +602,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
               <MenuCardapioEmptyState onAdicionar={handleAdicionarProdutosCabecalho} />
             ) : undefined
           }
-          listAriaLabel="Produtos deste cardápio"
+          listAriaLabel="Produtos deste card├ípio"
           addProdutoLabel="Adicionar produto"
           onToggleExpand={handleToggleExpand}
           onEditGrupo={handleEditGrupo}
@@ -539,6 +644,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         onClose={tipoCadastro.fechar}
         onContinuar={tipoCadastro.continuar}
         cancelVariant={MENU_MODAL_CANCEL_VARIANT}
+        ocultarPizza
       />
       <MenuNovoProdutoWizard
         open={wizardOpen}
@@ -546,6 +652,20 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         menuNome={menu.nome}
         initialCategoriaId={wizardCategoriaId}
         onClose={closeWizardCadastro}
+      />
+      <PizzaSaborModal
+        open={pizzaSaborModalOpen}
+        categoria={pizzaSaborCategoria}
+        saborId={pizzaSaborEditId}
+        onClose={closePizzaSaborModal}
+        onSuccess={() => void handlePizzaItemEditSuccess()}
+      />
+      <PizzaCategoriaSetupPanel
+        open={pizzaCategoriaEditOpen}
+        mode="edit"
+        categoriaId={pizzaCategoriaEditId}
+        onClose={closePizzaCategoriaModal}
+        onSuccess={() => void handlePizzaItemEditSuccess()}
       />
       <MenuReorderCardapioModal
         open={reorderOpen}
@@ -560,13 +680,13 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         onConfirm={() => void confirmStatusToggle()}
         title={
           statusConfirm?.ativo
-            ? 'Retomar este produto neste cardápio?'
-            : 'Ops! Pausar este produto neste cardápio?'
+            ? 'Retomar este produto neste card├ípio?'
+            : 'Ops! Pausar este produto neste card├ípio?'
         }
         description={
           statusConfirm?.ativo
-            ? 'O produto voltará a ficar disponível apenas neste cardápio. O cadastro base e os demais menus não serão alterados.'
-            : 'Ao pausar, o produto deixará de aparecer neste cardápio. O cadastro base e os demais menus não serão alterados. Confirme se é isso mesmo que você deseja.'
+            ? 'O produto voltar├í a ficar dispon├¡vel apenas neste card├ípio. O cadastro base e os demais menus n├úo ser├úo alterados.'
+            : 'Ao pausar, o produto deixar├í de aparecer neste card├ípio. O cadastro base e os demais menus n├úo ser├úo alterados. Confirme se ├® isso mesmo que voc├¬ deseja.'
         }
         confirmLabel="Ok, entendi!"
         iconVariant={statusConfirm?.ativo ? 'success' : 'warning'}
