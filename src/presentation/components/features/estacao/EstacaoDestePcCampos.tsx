@@ -2,7 +2,16 @@
 
 import { useEffect, useState } from 'react'
 import Tooltip from '@mui/material/Tooltip'
-import { MdAdd, MdCheck, MdComputer, MdDeliveryDining, MdEdit, MdInfo } from 'react-icons/md'
+import {
+  MdAdd,
+  MdCheck,
+  MdComputer,
+  MdDeliveryDining,
+  MdEdit,
+  MdInfo,
+  MdReceiptLong,
+} from 'react-icons/md'
+import { EmissaoAutomaticaEstacaoPolicy } from '@/src/domain/policies/estacao/EmissaoAutomaticaEstacaoPolicy'
 import type { EstacaoImpressaoResumo } from '@/src/domain/estacao-impressao/EstacaoImpressao'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { cn } from '@/src/shared/utils/cn'
@@ -27,9 +36,12 @@ type EstacaoDestePcCamposProps = {
   receptoraEstacaoId?: string | null
   /** Coluna Principal do delivery. No balcão fica oculta. */
   mostrarReceptora?: boolean
+  /** Emissão automática ao FINALIZADO — só na receptora. */
+  emissaoAutomaticaAoFinalizar?: boolean
   disabled?: boolean
   ocupado?: boolean
   onReceptoraChange?: (estacaoId: string | null) => void
+  onEmissaoAutomaticaChange?: (ativo: boolean) => void
   onSelecionar: (estacaoId: string) => void
   onCriar: (nome: string) => Promise<EstacaoImpressaoResumo | void | undefined>
   onRenomear: (nome: string) => Promise<void>
@@ -40,9 +52,11 @@ export function EstacaoDestePcCampos({
   estacaoId,
   receptoraEstacaoId = null,
   mostrarReceptora = true,
+  emissaoAutomaticaAoFinalizar = false,
   disabled = false,
   ocupado = false,
   onReceptoraChange,
+  onEmissaoAutomaticaChange,
   onSelecionar,
   onCriar,
   onRenomear,
@@ -81,14 +95,24 @@ export function EstacaoDestePcCampos({
       onReceptoraChange(id)
       return
     }
-    if (receptoraEstacaoId === id) onReceptoraChange(null)
+    if (receptoraEstacaoId === id) {
+      onReceptoraChange(null)
+      onEmissaoAutomaticaChange?.(false)
+    }
+  }
+
+  const handleToggleEmissaoAutomatica = (id: string, next: boolean) => {
+    if (bloqueado || !onEmissaoAutomaticaChange) return
+    const ehReceptora = receptoraEstacaoId === id
+    if (!EmissaoAutomaticaEstacaoPolicy.podeAtivar(ehReceptora)) return
+    onEmissaoAutomaticaChange(EmissaoAutomaticaEstacaoPolicy.valorEfetivo(ehReceptora, next))
   }
 
   const gradeEstacao = mostrarReceptora
-    ? 'grid-cols-[minmax(0,1fr)_3.75rem_5.75rem]'
+    ? 'grid-cols-[minmax(0,1fr)_3.75rem_5.5rem_5.5rem]'
     : 'grid-cols-[minmax(0,1fr)_3.75rem]'
   const textoAjuda = mostrarReceptora
-    ? 'Em Deste PC, marque qual estação este computador configura. Em Principal, escolha a estação do delivery (só uma por loja). Salve para aplicar.'
+    ? 'Em Deste PC, marque qual estação este computador configura. Em Principal, a estação do delivery (só uma por loja). NF auto só na Principal — emite nota ao finalizar o pedido. Salve para aplicar.'
     : 'Delivery e balcão usam esta estação para registrar os lançamentos do caixa.'
 
   return (
@@ -144,19 +168,31 @@ export function EstacaoDestePcCampos({
                 <span>Estação</span>
                 <span className="whitespace-nowrap text-center">Deste PC</span>
                 {mostrarReceptora ? (
-                  <span className="flex items-center justify-center gap-0.5">
-                    Principal
-                    <CampoInfo
-                      texto="Estação principal do delivery: pedidos finalizados, caixa e impressão. Só uma por loja — ao ligar em uma, a outra desliga. Salve alterações para aplicar."
-                      ariaLabel="Estação principal do delivery"
-                    />
-                  </span>
+                  <>
+                    <span className="flex items-center justify-center gap-0.5">
+                      Principal
+                      <CampoInfo
+                        texto="Estação principal do delivery: pedidos finalizados, caixa e impressão. Só uma por loja — ao ligar em uma, a outra desliga. Salve alterações para aplicar."
+                        ariaLabel="Estação principal do delivery"
+                      />
+                    </span>
+                    <span className="flex items-center justify-center gap-0.5">
+                      NF auto
+                      <CampoInfo
+                        texto="Emite a nota fiscal automaticamente ao finalizar o pedido de delivery. Só funciona na estação Principal. Sem Principal ligada, o interruptor fica bloqueado."
+                        ariaLabel="Emissão automática de nota fiscal"
+                      />
+                    </span>
+                  </>
                 ) : null}
               </div>
               <div role="radiogroup" aria-label="Estação de impressão deste PC" className="space-y-0.5">
                 {estacoes.map(estacao => {
                   const ativa = estacaoId === estacao.id
                   const ehReceptora = receptoraEstacaoId === estacao.id
+                  const podeEmissaoAuto = EmissaoAutomaticaEstacaoPolicy.podeAtivar(ehReceptora)
+                  const emissaoAutoLigada =
+                    podeEmissaoAuto && emissaoAutomaticaAoFinalizar === true
                   return (
                     <div
                       key={estacao.id}
@@ -211,28 +247,51 @@ export function EstacaoDestePcCampos({
                         </button>
                       </div>
                       {mostrarReceptora ? (
-                        <div
-                          className="flex items-center justify-end gap-1 py-1 pr-1"
-                          onClick={e => e.stopPropagation()}
-                        >
-                          <JiffyIconSwitch
-                            checked={ehReceptora}
-                            onChange={e => handleToggleReceptora(estacao.id, e.target.checked)}
-                            disabled={bloqueado}
-                            size="xs"
-                            inputProps={{
-                              'aria-label': `${estacao.nome || 'Estação'} como principal do delivery`,
-                            }}
-                          />
-                          <span className="flex h-5 w-5 shrink-0 items-center justify-center">
-                            {ehReceptora ? (
-                              <MdDeliveryDining
-                                className="h-5 w-5 text-secondary"
-                                aria-hidden
-                              />
-                            ) : null}
-                          </span>
-                        </div>
+                        <>
+                          <div
+                            className="flex items-center justify-end gap-1 py-1 pr-1"
+                            onClick={e => e.stopPropagation()}
+                          >
+                            <JiffyIconSwitch
+                              checked={ehReceptora}
+                              onChange={e => handleToggleReceptora(estacao.id, e.target.checked)}
+                              disabled={bloqueado}
+                              size="xs"
+                              inputProps={{
+                                'aria-label': `${estacao.nome || 'Estação'} como principal do delivery`,
+                              }}
+                            />
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+                              {ehReceptora ? (
+                                <MdDeliveryDining
+                                  className="h-5 w-5 text-secondary"
+                                  aria-hidden
+                                />
+                              ) : null}
+                            </span>
+                          </div>
+                          <div
+                            className="flex items-center justify-end gap-1 py-1 pr-1"
+                            onClick={e => e.stopPropagation()}
+                          >
+                            <JiffyIconSwitch
+                              checked={emissaoAutoLigada}
+                              onChange={e =>
+                                handleToggleEmissaoAutomatica(estacao.id, e.target.checked)
+                              }
+                              disabled={bloqueado || !podeEmissaoAuto}
+                              size="xs"
+                              inputProps={{
+                                'aria-label': `${estacao.nome || 'Estação'} com emissão automática ao finalizar`,
+                              }}
+                            />
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+                              {emissaoAutoLigada ? (
+                                <MdReceiptLong className="h-5 w-5 text-secondary" aria-hidden />
+                              ) : null}
+                            </span>
+                          </div>
+                        </>
                       ) : null}
                     </div>
                   )

@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import type { IEstacaoDestePcStore } from '@/src/application/ports/IEstacaoDestePcStore'
 import type { IEstacaoImpressaoGateway } from '@/src/application/ports/IEstacaoImpressaoGateway'
 import { CriarEstacaoDestePcUseCase } from '@/src/application/use-cases/estacao-impressao/CriarEstacaoDestePcUseCase'
+import { DefinirEmissaoAutomaticaAoFinalizarEstacaoUseCase } from '@/src/application/use-cases/estacao-impressao/DefinirEmissaoAutomaticaAoFinalizarEstacaoUseCase'
 import { DefinirEstacaoReceptoraDeliveryUseCase } from '@/src/application/use-cases/estacao-impressao/DefinirEstacaoReceptoraDeliveryUseCase'
+import { MENSAGEM_EMISSAO_AUTOMATICA_SO_RECEPTORA } from '@/src/domain/policies/estacao/EmissaoAutomaticaEstacaoPolicy'
 import { RenomearEstacaoDestePcUseCase } from '@/src/application/use-cases/estacao-impressao/RenomearEstacaoDestePcUseCase'
 import { ResolverEstacaoImpressaoDestePcUseCase } from '@/src/application/use-cases/estacao-impressao/ResolverEstacaoImpressaoDestePcUseCase'
 import { SalvarMapeamentosEstacaoUseCase } from '@/src/application/use-cases/estacao-impressao/SalvarMapeamentosEstacaoUseCase'
@@ -38,7 +40,13 @@ function gatewayFake(overrides: Partial<IEstacaoImpressaoGateway> = {}): IEstaca
 
 describe('CriarEstacaoDestePcUseCase', () => {
   it('cria na API e vincula neste PC', async () => {
-    const criada = { id: 'est-1', nome: 'Caixa', ativo: true, gestorDelivery: false }
+    const criada = {
+      id: 'est-1',
+      nome: 'Caixa',
+      ativo: true,
+      gestorDelivery: false,
+      emissaoAutomaticaAoFinalizar: false,
+    }
     const gateway = gatewayFake({ criar: vi.fn().mockResolvedValue(criada) })
     const store = storeFake()
     const useCase = new CriarEstacaoDestePcUseCase(gateway, store)
@@ -61,7 +69,13 @@ describe('CriarEstacaoDestePcUseCase', () => {
 
 describe('RenomearEstacaoDestePcUseCase', () => {
   it('atualiza na API e grava o nome neste PC', async () => {
-    const atualizada = { id: 'est-1', nome: 'Balcão', ativo: true, gestorDelivery: false }
+    const atualizada = {
+      id: 'est-1',
+      nome: 'Balcão',
+      ativo: true,
+      gestorDelivery: false,
+      emissaoAutomaticaAoFinalizar: false,
+    }
     const gateway = gatewayFake({ atualizar: vi.fn().mockResolvedValue(atualizada) })
     const store = storeFake()
     const useCase = new RenomearEstacaoDestePcUseCase(gateway, store)
@@ -113,10 +127,13 @@ describe('LembrarNomeEstacaoDestePcUseCase', () => {
 })
 
 describe('DefinirEstacaoReceptoraDeliveryUseCase', () => {
-  it('desliga a anterior e liga a nova', async () => {
+  it('desliga a anterior (e zera NF auto) e liga a nova', async () => {
     const gateway = gatewayFake()
     await new DefinirEstacaoReceptoraDeliveryUseCase(gateway).execute('est-a', 'est-b')
-    expect(gateway.atualizar).toHaveBeenNthCalledWith(1, 'est-a', { gestorDelivery: false })
+    expect(gateway.atualizar).toHaveBeenNthCalledWith(1, 'est-a', {
+      gestorDelivery: false,
+      emissaoAutomaticaAoFinalizar: false,
+    })
     expect(gateway.atualizar).toHaveBeenNthCalledWith(2, 'est-b', { gestorDelivery: true })
   })
 
@@ -124,6 +141,59 @@ describe('DefinirEstacaoReceptoraDeliveryUseCase', () => {
     const gateway = gatewayFake()
     await new DefinirEstacaoReceptoraDeliveryUseCase(gateway).execute('est-a', 'est-a')
     expect(gateway.atualizar).not.toHaveBeenCalled()
+  })
+})
+
+describe('DefinirEmissaoAutomaticaAoFinalizarEstacaoUseCase', () => {
+  const estacoesDaLoja = [
+    {
+      id: 'est-a',
+      nome: 'Balcão',
+      ativo: true,
+      gestorDelivery: false,
+      emissaoAutomaticaAoFinalizar: false,
+    },
+    {
+      id: 'est-b',
+      nome: 'Expedição',
+      ativo: true,
+      gestorDelivery: true,
+      emissaoAutomaticaAoFinalizar: false,
+    },
+  ]
+
+  it('grava true depois de resolver a receptora na listagem', async () => {
+    const gateway = gatewayFake({ listar: vi.fn().mockResolvedValue(estacoesDaLoja) })
+    await new DefinirEmissaoAutomaticaAoFinalizarEstacaoUseCase(gateway).execute({
+      estacaoId: 'est-b',
+      ativo: true,
+    })
+    expect(gateway.listar).toHaveBeenCalled()
+    expect(gateway.atualizar).toHaveBeenCalledWith('est-b', {
+      emissaoAutomaticaAoFinalizar: true,
+    })
+  })
+
+  it('recusa true quando a listagem diz que não é receptora', async () => {
+    const gateway = gatewayFake({ listar: vi.fn().mockResolvedValue(estacoesDaLoja) })
+    await expect(
+      new DefinirEmissaoAutomaticaAoFinalizarEstacaoUseCase(gateway).execute({
+        estacaoId: 'est-a',
+        ativo: true,
+      })
+    ).rejects.toThrow(MENSAGEM_EMISSAO_AUTOMATICA_SO_RECEPTORA)
+    expect(gateway.atualizar).not.toHaveBeenCalled()
+  })
+
+  it('grava false mesmo sem receptora', async () => {
+    const gateway = gatewayFake({ listar: vi.fn().mockResolvedValue(estacoesDaLoja) })
+    await new DefinirEmissaoAutomaticaAoFinalizarEstacaoUseCase(gateway).execute({
+      estacaoId: 'est-a',
+      ativo: false,
+    })
+    expect(gateway.atualizar).toHaveBeenCalledWith('est-a', {
+      emissaoAutomaticaAoFinalizar: false,
+    })
   })
 })
 

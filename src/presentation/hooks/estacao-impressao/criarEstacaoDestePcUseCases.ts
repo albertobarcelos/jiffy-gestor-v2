@@ -1,4 +1,5 @@
 import { CriarEstacaoDestePcUseCase } from '@/src/application/use-cases/estacao-impressao/CriarEstacaoDestePcUseCase'
+import { DefinirEmissaoAutomaticaAoFinalizarEstacaoUseCase } from '@/src/application/use-cases/estacao-impressao/DefinirEmissaoAutomaticaAoFinalizarEstacaoUseCase'
 import { DefinirEstacaoReceptoraDeliveryUseCase } from '@/src/application/use-cases/estacao-impressao/DefinirEstacaoReceptoraDeliveryUseCase'
 import { LembrarNomeEstacaoDestePcUseCase } from '@/src/application/use-cases/estacao-impressao/LembrarNomeEstacaoDestePcUseCase'
 import { ListarEstacoesImpressaoUseCase } from '@/src/application/use-cases/estacao-impressao/ListarEstacoesImpressaoUseCase'
@@ -27,6 +28,7 @@ export function criarEstacaoImpressaoUseCases(token: string) {
     resolverDestePc: new ResolverEstacaoImpressaoDestePcUseCase(gateway, store),
     salvarMapeamentos: new SalvarMapeamentosEstacaoUseCase(gateway),
     definirReceptora: new DefinirEstacaoReceptoraDeliveryUseCase(gateway),
+    definirEmissaoAutomatica: new DefinirEmissaoAutomaticaAoFinalizarEstacaoUseCase(gateway),
     invalidarCacheMapeamentos: (estacaoId?: string) => gateway.invalidarCacheMapeamentos(estacaoId),
   }
 }
