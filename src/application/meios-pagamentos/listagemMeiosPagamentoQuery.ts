@@ -32,8 +32,9 @@ type QueryListagemMeios = {
 
 /**
  * Query da listagem.
- * Flag nova tem prioridade. `ativoDelivery` legado segue na URL
- * para a API que ainda não lê os canais separados; sozinho, preenche só entrega.
+ * Flags novas de canal têm prioridade. `ativoDelivery` legado só vai na URL
+ * quando nenhuma flag nova foi informada — no backend o legado mapeia para
+ * `ativoEntregaDelivery` e, junto com retirada, faria AND indevido.
  */
 export function montarQueryListagemMeiosPagamento(params: QueryListagemMeios): URLSearchParams {
   const search = new URLSearchParams()
@@ -41,6 +42,10 @@ export function montarQueryListagemMeiosPagamento(params: QueryListagemMeios): U
   search.set('offset', String(params.offset))
   if (params.q) search.set('q', params.q)
   if (params.ativo != null) search.set('ativo', String(params.ativo))
+
+  const temCanalNovo =
+    params.ativoEntregaDelivery != null || params.ativoRetiradaDelivery != null
+
   if (params.ativoEntregaDelivery != null) {
     search.set('ativoEntregaDelivery', String(params.ativoEntregaDelivery))
   } else if (params.ativoDelivery != null && params.ativoRetiradaDelivery == null) {
@@ -49,7 +54,7 @@ export function montarQueryListagemMeiosPagamento(params: QueryListagemMeios): U
   if (params.ativoRetiradaDelivery != null) {
     search.set('ativoRetiradaDelivery', String(params.ativoRetiradaDelivery))
   }
-  if (params.ativoDelivery != null) {
+  if (params.ativoDelivery != null && !temCanalNovo) {
     search.set('ativoDelivery', String(params.ativoDelivery))
   }
   return search

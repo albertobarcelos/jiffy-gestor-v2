@@ -463,7 +463,11 @@ export function useNovoPedidoOrchestrator({
     meiosPagamento,
     isPending: isPendingMeiosPagamento,
     isFetching: isFetchingMeiosPagamento,
-  } = useMeiosPagamentoPedidoManual(open && (currentStep >= 3 || modoVisualizacao || !!vendaId))
+  } = useMeiosPagamentoPedidoManual(
+    open && (currentStep >= 3 || modoVisualizacao || !!vendaId),
+    // Delivery: filtra pelo tipo do pedido. Balcão: união dos canais.
+    pedidoDeliveryGestor ? tipoAtendimentoDelivery : null
+  )
 
   const { entregadores, entregadoresQuery } = useEntregadoresQuery({
     enabled: open && (pedidoComEntrega || Boolean(modoVisualizacao)),

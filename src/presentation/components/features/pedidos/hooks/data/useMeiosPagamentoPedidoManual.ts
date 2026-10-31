@@ -5,6 +5,7 @@ import {
   coletarMeiosDasPaginas,
   unirMeiosPedidoManual,
 } from '@/src/application/meios-pagamentos/resolverFiltroMeiosPagamentoNovoPedido'
+import type { TipoAtendimentoDelivery } from '@/src/domain/types/vendaDetalhe'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
 import { ordenarMeiosPagamentoPadrao } from '@/src/shared/utils/corFormaPagamentoFiscal'
 
@@ -19,57 +20,71 @@ function esgotarPaginas(query: {
 }
 
 /**
- * Meios do pedido manual: entrega OU retirada.
- * Busca os dois canais, esgota as páginas e une por id — não perde meio na página 2.
+ * Meios do pedido manual.
+ * Delivery: só o canal do tipo (entrega ou retirada).
+ * Balcão / sem tipo: união dos dois canais (sem `ativoDelivery` legado).
  */
-export function useMeiosPagamentoPedidoManual(enabled: boolean) {
+export function useMeiosPagamentoPedidoManual(
+  enabled: boolean,
+  tipoAtendimento?: TipoAtendimentoDelivery | null
+) {
+  const soEntrega = tipoAtendimento === 'entrega'
+  const soRetirada = tipoAtendimento === 'retirada'
+  const buscarAmbos = !soEntrega && !soRetirada
+
+  const entregaEnabled = enabled && (buscarAmbos || soEntrega)
+  const retiradaEnabled = enabled && (buscarAmbos || soRetirada)
+
   const entrega = useMeiosPagamentoInfinite({
     limit: 100,
     ativoEntregaDelivery: true,
-    ativoDelivery: true,
-    enabled,
+    enabled: entregaEnabled,
     refetchOnWindowFocus: false,
   })
   const retirada = useMeiosPagamentoInfinite({
     limit: 100,
     ativoRetiradaDelivery: true,
-    ativoDelivery: true,
-    enabled,
+    enabled: retiradaEnabled,
     refetchOnWindowFocus: false,
   })
 
   useEffect(() => {
     esgotarPaginas({
-      enabled,
+      enabled: entregaEnabled,
       hasNextPage: Boolean(entrega.hasNextPage),
       isFetchingNextPage: entrega.isFetchingNextPage,
       fetchNextPage: entrega.fetchNextPage,
     })
-  }, [enabled, entrega.hasNextPage, entrega.isFetchingNextPage, entrega.fetchNextPage])
+  }, [entregaEnabled, entrega.hasNextPage, entrega.isFetchingNextPage, entrega.fetchNextPage])
 
   useEffect(() => {
     esgotarPaginas({
-      enabled,
+      enabled: retiradaEnabled,
       hasNextPage: Boolean(retirada.hasNextPage),
       isFetchingNextPage: retirada.isFetchingNextPage,
       fetchNextPage: retirada.fetchNextPage,
     })
-  }, [enabled, retirada.hasNextPage, retirada.isFetchingNextPage, retirada.fetchNextPage])
+  }, [retiradaEnabled, retirada.hasNextPage, retirada.isFetchingNextPage, retirada.fetchNextPage])
 
   const meiosPagamento = useMemo(
     () =>
       ordenarMeiosPagamentoPadrao(
         unirMeiosPedidoManual(
-          coletarMeiosDasPaginas(entrega.data?.pages),
-          coletarMeiosDasPaginas(retirada.data?.pages)
+          [
+            entregaEnabled ? coletarMeiosDasPaginas(entrega.data?.pages) : [],
+            retiradaEnabled ? coletarMeiosDasPaginas(retirada.data?.pages) : [],
+          ],
+          tipoAtendimento
         )
       ),
-    [entrega.data, retirada.data]
+    [entrega.data, retirada.data, entregaEnabled, retiradaEnabled, tipoAtendimento]
   )
 
   return {
     meiosPagamento,
-    isPending: entrega.isPending || retirada.isPending,
-    isFetching: entrega.isFetching || retirada.isFetching,
+    isPending:
+      (entregaEnabled && entrega.isPending) || (retiradaEnabled && retirada.isPending),
+    isFetching:
+      (entregaEnabled && entrega.isFetching) || (retiradaEnabled && retirada.isFetching),
   }
 }
