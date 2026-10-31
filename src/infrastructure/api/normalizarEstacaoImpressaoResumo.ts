@@ -18,7 +18,9 @@ export function normalizarEstacaoImpressaoResumo(payload: unknown): EstacaoImpre
   const nome = o.nome != null ? String(o.nome) : ''
   const ativo = typeof o.ativo === 'boolean' ? o.ativo : true
   const gestorDelivery = typeof o.gestorDelivery === 'boolean' ? o.gestorDelivery : false
-  return { id, nome, ativo, gestorDelivery }
+  const emissaoAutomaticaAoFinalizar =
+    typeof o.emissaoAutomaticaAoFinalizar === 'boolean' ? o.emissaoAutomaticaAoFinalizar : false
+  return { id, nome, ativo, gestorDelivery, emissaoAutomaticaAoFinalizar }
 }
 
 export function normalizarListaEstacoesImpressao(payload: unknown): EstacaoImpressaoResumo[] {

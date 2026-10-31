@@ -138,6 +138,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
     Record<string, ModoImpressaoImpressora>
   >({})
   const [receptoraEstacaoIdPendente, setReceptoraEstacaoIdPendente] = useState<string | null>(null)
+  const [emissaoAutomaticaPendente, setEmissaoAutomaticaPendente] = useState(false)
   const [cupomTemplate, setCupomTemplate] = useState<DeliveryCupomTemplateConfig>(
     DEFAULT_DELIVERY_CUPOM_TEMPLATE
   )
@@ -148,6 +149,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
 
   const estacaoErroToastRef = useRef(false)
   const receptoraSalvaRef = useRef<string | null>(null)
+  const emissaoAutomaticaSalvaRef = useRef(false)
   const receptoraHidratadaRef = useRef(false)
   const modosHidratadosEstacaoRef = useRef('')
   const modosImpressaoEstacaoRef = useRef(modosImpressaoEstacao)
@@ -257,18 +259,39 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
     if (!open) {
       receptoraHidratadaRef.current = false
       receptoraSalvaRef.current = null
+      emissaoAutomaticaSalvaRef.current = false
       setReceptoraEstacaoIdPendente(null)
+      setEmissaoAutomaticaPendente(false)
       return
     }
     if (receptoraHidratadaRef.current || estacoes.length === 0) return
-    const id = resolverEstacaoReceptoraDelivery(estacoes)?.id ?? null
+    const receptora = resolverEstacaoReceptoraDelivery(estacoes)
+    const id = receptora?.id ?? null
+    const auto = receptora?.emissaoAutomaticaAoFinalizar === true
     setReceptoraEstacaoIdPendente(id)
+    setEmissaoAutomaticaPendente(auto)
     receptoraSalvaRef.current = id
+    emissaoAutomaticaSalvaRef.current = auto
     receptoraHidratadaRef.current = true
   }, [open, estacoes])
 
-  const handleReceptoraChange = useCallback((estacaoId: string | null) => {
-    setReceptoraEstacaoIdPendente(estacaoId?.trim() || null)
+  const handleReceptoraChange = useCallback(
+    (estacaoId: string | null) => {
+      const nextId = estacaoId?.trim() || null
+      setReceptoraEstacaoIdPendente(nextId)
+      if (!nextId) {
+        setEmissaoAutomaticaPendente(false)
+        return
+      }
+      const flagNaNova =
+        estacoes.find(e => e.id === nextId)?.emissaoAutomaticaAoFinalizar === true
+      setEmissaoAutomaticaPendente(flagNaNova)
+    },
+    [estacoes]
+  )
+
+  const handleEmissaoAutomaticaChange = useCallback((ativo: boolean) => {
+    setEmissaoAutomaticaPendente(ativo)
   }, [])
 
   const handleSelecionarEstacao = useCallback(
@@ -336,6 +359,24 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
       if (receptoraPendente !== receptoraSalva) {
         await casos.definirReceptora.execute(receptoraSalva, receptoraPendente)
         receptoraSalvaRef.current = receptoraPendente
+        // Após trocar a Principal, o valor já persistido de NF auto é o da nova receptora.
+        emissaoAutomaticaSalvaRef.current =
+          receptoraPendente != null &&
+          estacoes.find(e => e.id === receptoraPendente)?.emissaoAutomaticaAoFinalizar === true
+      }
+
+      const emissaoPendente = Boolean(receptoraPendente) && emissaoAutomaticaPendente
+      if (
+        receptoraPendente &&
+        emissaoPendente !== emissaoAutomaticaSalvaRef.current
+      ) {
+        await casos.definirEmissaoAutomatica.execute({
+          estacaoId: receptoraPendente,
+          ativo: emissaoPendente,
+        })
+        emissaoAutomaticaSalvaRef.current = emissaoPendente
+      } else if (!receptoraPendente) {
+        emissaoAutomaticaSalvaRef.current = false
       }
 
       invalidateEstacaoQueries()
@@ -377,6 +418,8 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
     vinculosFisicos,
     estacaoIdSelecionada,
     receptoraEstacaoIdPendente,
+    emissaoAutomaticaPendente,
+    estacoes,
     onClose,
   ])
 
@@ -455,9 +498,11 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
               estacoes={estacoes}
               estacaoId={estacaoIdSelecionada}
               receptoraEstacaoId={receptoraEstacaoIdPendente}
+              emissaoAutomaticaAoFinalizar={emissaoAutomaticaPendente}
               disabled={carregando || salvando}
               ocupado={ocupadoEstacao}
               onReceptoraChange={handleReceptoraChange}
+              onEmissaoAutomaticaChange={handleEmissaoAutomaticaChange}
               onSelecionar={handleSelecionarEstacao}
               onCriar={handleCriarEstacao}
               onRenomear={renomearEstacao}
