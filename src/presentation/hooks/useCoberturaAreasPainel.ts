@@ -5,6 +5,7 @@ import type { AreaEntregaDTO } from '@/src/application/dto/delivery/CoberturaEnt
 import {
   mensagemSucessoSalvarAreasCobertura,
   montarSalvarAreasCobertura,
+  removerDraftCriacaoPorId,
   type AreaRascunhoCriacaoCobertura,
 } from '@/src/presentation/components/features/configuracoes/coberturaAreasDraft'
 import type {
@@ -75,7 +76,8 @@ export function useCoberturaAreasPainel({
   const [geometriasAreaDraft, setGeometriasAreaDraft] = useState<Record<string, LatLngLiteral[]>>(
     {}
   )
-  const [mapaInstanciaEpoch, setMapaInstanciaEpoch] = useState(0)
+  /** Remonta só os overlays de área (não o Google Map inteiro). */
+  const [areasPoligonosEpoch, setAreasPoligonosEpoch] = useState(0)
   const acoesDesenhoRef = useRef<AcoesDesenhoCobertura | null>(null)
 
   const areasComDraft = useMemo(
@@ -142,12 +144,11 @@ export function useCoberturaAreasPainel({
 
   useEffect(() => {
     if (painelAba === 'areas') return
+    // Mantém geometrias/criação em memória — só sai do modo desenho/edição.
     setFerramenta('navegar')
     setPontosDesenho(0)
     setPodeConcluirDesenho(false)
     setAreaFormaEditandoId(null)
-    setGeometriasAreaDraft({})
-    setAreasCriacaoDraft([])
   }, [painelAba])
 
   const handleDesenhoEstadoChange = useCallback((estado: EstadoDesenhoCobertura) => {
@@ -267,7 +268,34 @@ export function useCoberturaAreasPainel({
     atualizarAreasLoteMutation.isPending ||
     excluirAreaMutation.isPending
 
-  const handleSalvarTaxasAreasLote = useCallback(async () => {
+  const sincronizarDraftsTaxaPrazoAtivo = useCallback(() => {
+    setTaxasAreaDraft(
+      Object.fromEntries(areas.map(area => [area.id, String(area.valorTaxa).replace('.', ',')]))
+    )
+    setPrazosAreaDraft(
+      Object.fromEntries(areas.map(area => [area.id, String(area.tempoEntregaInMinutes)]))
+    )
+    setAtivosAreaDraft(Object.fromEntries(areas.map(area => [area.id, area.ativo])))
+  }, [areas])
+
+  const descartarAlteracoesAreas = useCallback(() => {
+    const tinhaGeometriaOuCriacao =
+      Object.keys(geometriasAreaDraft).length > 0 || areasCriacaoDraft.length > 0
+    setGeometriasAreaDraft({})
+    setAreasCriacaoDraft([])
+    limparEdicaoForma()
+    limparDesenhoEmAndamento()
+    sincronizarDraftsTaxaPrazoAtivo()
+    if (tinhaGeometriaOuCriacao) setAreasPoligonosEpoch(n => n + 1)
+  }, [
+    areasCriacaoDraft.length,
+    geometriasAreaDraft,
+    limparDesenhoEmAndamento,
+    limparEdicaoForma,
+    sincronizarDraftsTaxaPrazoAtivo,
+  ])
+
+  const handleSalvarTaxasAreasLote = useCallback(async (): Promise<boolean> => {
     const montagem = montarSalvarAreasCobertura({
       areas,
       taxasAreaDraft,
@@ -278,36 +306,36 @@ export function useCoberturaAreasPainel({
     })
     if (!montagem.ok) {
       showToast.error(montagem.erro)
-      return
+      return false
     }
     const { patches, criacoes } = montagem
     if (patches.length === 0 && criacoes.length === 0) {
       showToast.info('Nenhuma alteração para salvar.')
-      return
+      return true
     }
 
     try {
       let criadas = 0
       for (let index = 0; index < criacoes.length; index++) {
+        const criacao = criacoes[index]
         await criarAreaMutation.mutateAsync({
           nome: `Área ${areas.length + index + 1}`,
-          area: criacoes[index].area,
+          area: criacao.area,
           valorTaxa: 8,
           tempoEntregaInMinutes: TEMPO_PADRAO_AREA_NOVA,
           ativo: true,
         })
         criadas += 1
+        // Remove já persistido — retry não duplica se o lote falhar depois.
+        setAreasCriacaoDraft(prev => removerDraftCriacaoPorId(prev, criacao.id))
       }
 
       if (patches.length > 0) {
         const resultado = await atualizarAreasLoteMutation.mutateAsync(patches)
         if (resultado.ok < resultado.total) {
           showToast.error(mensagemFalhaLoteCobertura(resultado))
-          if (criadas > 0) {
-            setAreasCriacaoDraft([])
-            setMapaInstanciaEpoch(n => n + 1)
-          }
-          return
+          if (criadas > 0) setAreasPoligonosEpoch(n => n + 1)
+          return false
         }
       }
 
@@ -315,12 +343,14 @@ export function useCoberturaAreasPainel({
       setGeometriasAreaDraft({})
       setAreasCriacaoDraft([])
       limparEdicaoForma()
-      if (mudouGeometria || criadas > 0) setMapaInstanciaEpoch(n => n + 1)
+      if (mudouGeometria || criadas > 0) setAreasPoligonosEpoch(n => n + 1)
       showToast.success(mensagemSucessoSalvarAreasCobertura({ criadas, patches }))
+      return true
     } catch (error) {
       showToast.error(
         error instanceof Error ? error.message : 'Não foi possível salvar as áreas.'
       )
+      return false
     }
   }, [
     areas,
@@ -365,7 +395,7 @@ export function useCoberturaAreasPainel({
     prazosAreaDraft,
     setPrazosAreaDraft,
     ativosAreaDraft,
-    mapaInstanciaEpoch,
+    areasPoligonosEpoch,
     acoesDesenhoRef,
     areasPainelPendentes,
     criacaoAreasPendentes,
@@ -391,6 +421,7 @@ export function useCoberturaAreasPainel({
     handleApagarAreaNoMapa,
     handleToggleAreaAtivo,
     handleSalvarTaxasAreasLote,
+    descartarAlteracoesAreas,
     handleConfirmarExclusaoArea,
     desenharDesfazer: () => acoesDesenhoRef.current?.desfazer(),
     desenharConcluir: () => acoesDesenhoRef.current?.concluir(),

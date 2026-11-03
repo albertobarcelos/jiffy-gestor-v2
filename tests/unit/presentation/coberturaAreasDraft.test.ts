@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { montarSalvarAreasCobertura } from '@/src/presentation/components/features/configuracoes/coberturaAreasDraft'
+import {
+  montarSalvarAreasCobertura,
+  removerDraftCriacaoPorId,
+} from '@/src/presentation/components/features/configuracoes/coberturaAreasDraft'
 import type { AreaEntregaDTO } from '@/src/application/dto/delivery/CoberturaEntregaDTO'
 import { pathsDeCirculo } from '@/src/shared/utils/geoJsonCircle'
 
@@ -55,5 +58,16 @@ describe('montarSalvarAreasCobertura', () => {
     expect(resultado.ok).toBe(false)
     if (resultado.ok) return
     expect(resultado.erro).toMatch(/Taxa inválida/)
+  })
+})
+
+describe('removerDraftCriacaoPorId', () => {
+  it('remove só o rascunho persistido', () => {
+    const paths = pathsDeCirculo({ lat: -23.55, lng: -46.63 }, 400)
+    const drafts = [
+      { id: 'r1', paths, forma: 'circulo' as const },
+      { id: 'r2', paths, forma: 'poligono' as const },
+    ]
+    expect(removerDraftCriacaoPorId(drafts, 'r1').map(d => d.id)).toEqual(['r2'])
   })
 })

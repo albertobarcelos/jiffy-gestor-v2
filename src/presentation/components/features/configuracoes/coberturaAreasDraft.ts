@@ -126,6 +126,14 @@ export function montarSalvarAreasCobertura(params: {
   return { ok: true, patches, criacoes }
 }
 
+/** Remove um rascunho de criação já persistido (idempotência do Salvar lote). */
+export function removerDraftCriacaoPorId(
+  drafts: AreaRascunhoCriacaoCobertura[],
+  id: string
+): AreaRascunhoCriacaoCobertura[] {
+  return drafts.filter(draft => draft.id !== id)
+}
+
 export function mensagemSucessoSalvarAreasCobertura(params: {
   criadas: number
   patches: PatchAreaCobertura[]

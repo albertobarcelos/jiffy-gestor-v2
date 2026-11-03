@@ -1156,7 +1156,7 @@ export function CoberturaDeliveryMap({
         ? 'Clique no mapa para marcar os vértices. Use o card à esquerda para concluir.'
         : `${verticesDesenho.length} ponto${verticesDesenho.length === 1 ? '' : 's'}. Mínimo de ${MIN_VERTICES_AREA} para fechar a área.`
       : ferramenta === 'circulo'
-        ? 'Clique no centro e de novo na borda. Isso cria uma área com nome e taxa, mesmo fora do raio.'
+        ? 'Clique no centro e de novo na borda. A área fica em rascunho até Salvar no painel (pode ficar fora do raio).'
         : ferramenta === 'editar'
           ? areaFormaEditandoId
             ? 'Ajuste o raio (círculo) ou os vértices. Clique em Salvar no painel para confirmar.'

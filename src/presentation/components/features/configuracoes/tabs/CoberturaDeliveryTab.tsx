@@ -84,8 +84,12 @@ import { CampoTaxaInline } from '@/src/presentation/components/features/configur
 import { CoberturaAreasListaPainel } from '@/src/presentation/components/features/configuracoes/CoberturaAreasListaPainel'
 import { CoberturaBotaoSalvarTaxasLote } from '@/src/presentation/components/features/configuracoes/CoberturaBotaoSalvarTaxasLote'
 import { CoberturaDialogExclusaoArea } from '@/src/presentation/components/features/configuracoes/CoberturaDialogExclusaoArea'
+import { CoberturaTrocaAbaDialog } from '@/src/presentation/components/features/configuracoes/CoberturaTrocaAbaDialog'
 import { CoberturaTaxasManuaisPainel } from '@/src/presentation/components/features/configuracoes/CoberturaTaxasManuaisPainel'
-import { useReportarCoberturaSuja } from '@/src/presentation/components/features/configuracoes/coberturaSairGuard'
+import {
+  useLiberarUnloadCobertura,
+  useReportarCoberturaSuja,
+} from '@/src/presentation/components/features/configuracoes/coberturaSairGuard'
 import { useTaxasInfinite } from '@/src/presentation/hooks/useTaxas'
 
 const NENHUM_RAIO: RaioEntregaDTO[] = []
@@ -106,6 +110,8 @@ const CoberturaDeliveryMap = dynamic(
 
 const TEMPO_PADRAO_FAIXA_KM = 45
 const ALCANCE_INICIAL_KM = 4
+
+type DestinoSaidaCobertura = CoberturaPainelAba | 'reload'
 
 export function CoberturaDeliveryTab() {
   const empresaDeliveryQuery = useEmpresaDeliveryMe()
@@ -128,6 +134,9 @@ export function CoberturaDeliveryTab() {
 
   const [mapaVisivel, setMapaVisivel] = useState(true)
   const [painelAba, setPainelAba] = useState<CoberturaPainelAba>('raios')
+  const [saidaPendente, setSaidaPendente] = useState<DestinoSaidaCobertura | null>(null)
+  const [salvandoTrocaAba, setSalvandoTrocaAba] = useState(false)
+  const liberarUnload = useLiberarUnloadCobertura()
   const [painelRecolhido, setPainelRecolhido] = useState(false)
   const [hoverCobertura, setHoverCobertura] = useState<DestaqueCobertura | null>(null)
   const [taxasDraft, setTaxasDraft] = useState<Record<string, string>>({})
@@ -521,7 +530,37 @@ export function CoberturaDeliveryTab() {
     taxasPrazosPendentes || areasPainel.areasPainelPendentes || pinPendente
   useReportarCoberturaSuja(coberturaSuja)
 
-  const handleSalvarTaxasLote = useCallback(async () => {
+  /** F5 / Ctrl+R: abre o modal em vez do alert nativo (botão Recarregar da barra ainda usa beforeunload). */
+  useEffect(() => {
+    if (!coberturaSuja) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      const teclaR = event.key === 'r' || event.key === 'R'
+      const recarregar =
+        event.key === 'F5' || ((event.ctrlKey || event.metaKey) && teclaR)
+      if (!recarregar) return
+      event.preventDefault()
+      event.stopPropagation()
+      setSaidaPendente('reload')
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [coberturaSuja])
+
+  const descartarAlteracoesRaios = useCallback(() => {
+    setTaxasDraft(
+      Object.fromEntries(
+        raiosOrdenados.map(raio => [raio.id, String(raio.valorTaxa).replace('.', ',')])
+      )
+    )
+    setPrazosDraft(
+      Object.fromEntries(
+        raiosOrdenados.map(raio => [raio.id, String(raio.tempoEntregaInMinutes)])
+      )
+    )
+    setAtivosDraft(Object.fromEntries(raiosOrdenados.map(raio => [raio.id, raio.ativo])))
+  }, [raiosOrdenados])
+
+  const handleSalvarTaxasLote = useCallback(async (): Promise<boolean> => {
     const patches: Array<{
       id: string
       input: { valorTaxa?: number; tempoEntregaInMinutes?: number; ativo?: boolean }
@@ -533,7 +572,7 @@ export function CoberturaDeliveryTab() {
         const valor = parseTaxaDraftCobertura(brutoTaxa)
         if (valor === null) {
           showToast.error(`Taxa inválida em ${formatAlcanceAteKm(raio.distanciaMaximaEmMetros)}.`)
-          return
+          return false
         }
         if (valor !== raio.valorTaxa) input.valorTaxa = valor
       }
@@ -544,7 +583,7 @@ export function CoberturaDeliveryTab() {
           showToast.error(
             `Prazo inválido em ${formatAlcanceAteKm(raio.distanciaMaximaEmMetros)}. Use minutos inteiros.`
           )
-          return
+          return false
         }
         if (minutos !== raio.tempoEntregaInMinutes) input.tempoEntregaInMinutes = minutos
       }
@@ -561,13 +600,13 @@ export function CoberturaDeliveryTab() {
     }
     if (patches.length === 0) {
       showToast.info('Nenhuma alteração para salvar.')
-      return
+      return true
     }
     try {
       const resultado = await atualizarRaiosLoteMutation.mutateAsync(patches)
       if (resultado.ok < resultado.total) {
         showToast.error(mensagemFalhaLoteCobertura(resultado))
-        return
+        return false
       }
       const mudouTaxa = patches.some(p => p.input.valorTaxa !== undefined)
       const mudouPrazo = patches.some(p => p.input.tempoEntregaInMinutes !== undefined)
@@ -585,10 +624,109 @@ export function CoberturaDeliveryTab() {
       } else if (mudouAtivo) {
         showToast.success('Cobertura atualizada.')
       }
+      return true
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Não foi possível salvar as taxas.')
+      return false
     }
   }, [ativosDraft, atualizarRaiosLoteMutation, prazosDraft, raiosOrdenados, taxasDraft])
+
+  const abaAtualTemPendencias = useCallback(
+    (aba: CoberturaPainelAba) => {
+      if (aba === 'areas') return areasPainel.areasPainelPendentes
+      if (aba === 'raios') return taxasPrazosPendentes
+      return false
+    },
+    [areasPainel.areasPainelPendentes, taxasPrazosPendentes]
+  )
+
+  const concluirSaidaPendente = useCallback(
+    (destino: DestinoSaidaCobertura) => {
+      setSaidaPendente(null)
+      if (destino === 'reload') {
+        liberarUnload()
+        window.location.reload()
+        return
+      }
+      setPainelAba(destino)
+      if (painelRecolhido) setPainelRecolhido(false)
+    },
+    [liberarUnload, painelRecolhido]
+  )
+
+  const solicitarTrocaAba = useCallback(
+    (destino: CoberturaPainelAba) => {
+      if (destino === painelAba) {
+        if (painelRecolhido) setPainelRecolhido(false)
+        return
+      }
+      if (abaAtualTemPendencias(painelAba)) {
+        setSaidaPendente(destino)
+        if (painelRecolhido) setPainelRecolhido(false)
+        return
+      }
+      setPainelAba(destino)
+      if (painelRecolhido) setPainelRecolhido(false)
+    },
+    [abaAtualTemPendencias, painelAba, painelRecolhido]
+  )
+
+  const handleSalvarESairPendente = useCallback(async () => {
+    if (!saidaPendente) return
+    setSalvandoTrocaAba(true)
+    try {
+      if (saidaPendente === 'reload') {
+        if (areasPainel.areasPainelPendentes) {
+          const okAreas = await areasPainel.handleSalvarTaxasAreasLote()
+          if (!okAreas) return
+        }
+        if (taxasPrazosPendentes) {
+          const okRaios = await handleSalvarTaxasLote()
+          if (!okRaios) return
+        }
+        concluirSaidaPendente('reload')
+        return
+      }
+      const ok =
+        painelAba === 'areas'
+          ? await areasPainel.handleSalvarTaxasAreasLote()
+          : painelAba === 'raios'
+            ? await handleSalvarTaxasLote()
+            : true
+      if (ok) concluirSaidaPendente(saidaPendente)
+    } finally {
+      setSalvandoTrocaAba(false)
+    }
+  }, [
+    areasPainel,
+    concluirSaidaPendente,
+    handleSalvarTaxasLote,
+    painelAba,
+    saidaPendente,
+    taxasPrazosPendentes,
+  ])
+
+  const handleSairSemSalvarPendente = useCallback(() => {
+    if (!saidaPendente) return
+    if (saidaPendente === 'reload') {
+      if (areasPainel.areasPainelPendentes) areasPainel.descartarAlteracoesAreas()
+      if (taxasPrazosPendentes) descartarAlteracoesRaios()
+      if (pinPendente) setPinRascunho(null)
+      concluirSaidaPendente('reload')
+      return
+    }
+    if (painelAba === 'areas') areasPainel.descartarAlteracoesAreas()
+    else if (painelAba === 'raios') descartarAlteracoesRaios()
+    concluirSaidaPendente(saidaPendente)
+  }, [
+    areasPainel,
+    concluirSaidaPendente,
+    descartarAlteracoesRaios,
+    painelAba,
+    pinPendente,
+    saidaPendente,
+    taxasPrazosPendentes,
+  ])
 
   const handleDefinirAlcanceRaio = useCallback(async () => {
     const parsed = parseAlcanceKmInteiro(alcanceKmTexto, DISTANCIA_MAXIMA_KM_RAIO)
@@ -818,12 +956,14 @@ export function CoberturaDeliveryTab() {
               ) : (
                 <div className="absolute inset-0">
                   <CoberturaDeliveryMap
-                    key={`cobertura-mapa-${areasPainel.mapaInstanciaEpoch}`}
                     origem={origemGeo ?? (setupInicial ? pinRascunho : null)}
                     raios={raiosNoMapa}
                     areas={areasNoMapa}
                     ferramenta={areasPainel.ferramenta}
-                    areasRascunhoCriacao={areasPainel.areasCriacaoDraft}
+                    areasRascunhoCriacao={
+                      camadasMapa.areas ? areasPainel.areasCriacaoDraft : []
+                    }
+                    areasPoligonosEpoch={areasPainel.areasPoligonosEpoch}
                     areaDestacadaId={destaqueMapa.areaDestacadaId}
                     raioDestacadoId={destaqueMapa.raioDestacadoId}
                     destacarTodasAreas={destaqueMapa.destacarTodasAreas}
@@ -889,10 +1029,7 @@ export function CoberturaDeliveryTab() {
                   <button
                     key={aba.id}
                     type="button"
-                    onClick={() => {
-                      setPainelAba(aba.id)
-                      if (painelRecolhido) setPainelRecolhido(false)
-                    }}
+                    onClick={() => solicitarTrocaAba(aba.id)}
                     className={`-mb-px border-b-2 pb-2 text-xs font-semibold ${
                       painelAba === aba.id
                         ? 'border-primary text-primary'
@@ -1068,7 +1205,7 @@ export function CoberturaDeliveryTab() {
                 <div className="grid grid-cols-2 gap-2 px-3 py-3">
                   <button
                     type="button"
-                    onClick={() => setPainelAba('raios')}
+                    onClick={() => solicitarTrocaAba('raios')}
                     onMouseEnter={() =>
                       raioAlcance
                         ? destacarNaLista({ tipo: 'raio', id: raioAlcance.id })
@@ -1086,7 +1223,7 @@ export function CoberturaDeliveryTab() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPainelAba('areas')}
+                    onClick={() => solicitarTrocaAba('areas')}
                     onMouseEnter={() => destacarNaLista({ tipo: 'areas', id: null })}
                     onMouseLeave={() => destacarNaLista(null)}
                     className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 text-center transition-colors hover:border-primary/30 hover:bg-primary/5"
@@ -1098,7 +1235,7 @@ export function CoberturaDeliveryTab() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPainelAba('manuais')}
+                    onClick={() => solicitarTrocaAba('manuais')}
                     className="col-span-2 rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 text-center transition-colors hover:border-primary/30 hover:bg-primary/5"
                   >
                     <MdLocalOffer className="mx-auto h-5 w-5 text-primary-text" aria-hidden />
@@ -1320,6 +1457,13 @@ export function CoberturaDeliveryTab() {
         excluindo={areasPainel.excluindoArea}
         onCancelar={() => areasPainel.setAreaExcluindo(null)}
         onConfirmar={() => void areasPainel.handleConfirmarExclusaoArea()}
+      />
+      <CoberturaTrocaAbaDialog
+        aberto={saidaPendente != null}
+        salvando={salvandoTrocaAba}
+        onCancelar={() => setSaidaPendente(null)}
+        onSairSemSalvar={handleSairSemSalvarPendente}
+        onSalvar={() => void handleSalvarESairPendente()}
       />
     </div>
   )
