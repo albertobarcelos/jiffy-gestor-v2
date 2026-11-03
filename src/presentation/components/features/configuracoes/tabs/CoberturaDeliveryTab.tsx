@@ -4,7 +4,6 @@ import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
-  MdDeleteOutline,
   MdKeyboardArrowDown,
   MdKeyboardArrowUp,
   MdLocalOffer,
@@ -14,23 +13,17 @@ import {
 } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/src/presentation/components/ui/dialog'
 import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import { useEmpresaEnderecoGeo } from '@/src/presentation/hooks/useEmpresaEnderecoGeo'
-import { useAtualizarRaioEntregaDelivery, useAtualizarRaiosEntregaEmLote, useCriarRaiosEntregaEmLote, useExcluirRaiosEntregaEmLote, useRaiosEntregaDelivery } from '@/src/presentation/hooks/useRaiosEntregaDelivery'
 import {
-  useAreasEntregaDelivery,
-  useAtualizarAreaEntregaDelivery,
-  useAtualizarAreasEntregaEmLote,
-  useCriarAreaEntregaDelivery,
-  useExcluirAreaEntregaDelivery,
-} from '@/src/presentation/hooks/useAreasEntregaDelivery'
+  useAtualizarRaioEntregaDelivery,
+  useAtualizarRaiosEntregaEmLote,
+  useCriarRaiosEntregaEmLote,
+  useExcluirRaiosEntregaEmLote,
+  useRaiosEntregaDelivery,
+} from '@/src/presentation/hooks/useRaiosEntregaDelivery'
+import { useAreasEntregaDelivery } from '@/src/presentation/hooks/useAreasEntregaDelivery'
+import { useCoberturaAreasPainel } from '@/src/presentation/hooks/useCoberturaAreasPainel'
 import { showToast } from '@/src/shared/utils/toast'
 import { DELIVERY_HUB_PATH, configuracoesTabPath } from '@/src/shared/constants/configuracoesRoutes'
 import {
@@ -54,12 +47,6 @@ import type {
 } from '@/src/shared/utils/geolocalizacaoEmpresa'
 import { pontosGeoIguais, type GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import {
-  geoJsonToLatLngPath,
-  latLngPathsToGeoJsonPolygon,
-  type LatLngLiteral,
-} from '@/src/shared/types/geoJsonPolygon'
-import { geoJsonPolygonDeCirculo } from '@/src/shared/utils/geoJsonCircle'
-import {
   parseAlcanceKmInteiro,
   sincronizarFaixasAlcanceKm,
 } from '@/src/shared/utils/alcanceCoberturaKm'
@@ -68,16 +55,6 @@ import {
   pinDentroDoRaioPermitido,
   pinEmpresaDeveSeguirNovoEndereco,
 } from '@/src/shared/utils/ajustePinEmpresa'
-import type {
-  AcoesDesenhoCobertura,
-  EstadoDesenhoCobertura,
-  FerramentaCobertura,
-} from '@/src/presentation/components/features/configuracoes/CoberturaDeliveryMap'
-import {
-  mensagemSucessoSalvarAreasCobertura,
-  montarSalvarAreasCobertura,
-  type AreaRascunhoCriacaoCobertura,
-} from '@/src/presentation/components/features/configuracoes/coberturaAreasDraft'
 import {
   resolverDestaqueCobertura,
   raioAlcanceMaximo,
@@ -88,8 +65,8 @@ import {
   formatAlcanceAteKm,
   kmParaMetrosRaio,
   metrosParaKmRaio,
-  type RaioEntregaDTO,
   type AreaEntregaDTO,
+  type RaioEntregaDTO,
 } from '@/src/application/dto/delivery/CoberturaEntregaDTO'
 import { temCoberturaEntregaAtiva } from '@/src/application/mappers/CoberturaEntregaMapper'
 import {
@@ -102,7 +79,11 @@ import {
   parseTaxaDraftCobertura,
   type CoberturaPainelAba,
 } from '@/src/presentation/components/features/configuracoes/coberturaPainelAbas'
+import { CampoPrazoInline } from '@/src/presentation/components/features/configuracoes/CampoPrazoInline'
+import { CampoTaxaInline } from '@/src/presentation/components/features/configuracoes/CampoTaxaInline'
+import { CoberturaAreasListaPainel } from '@/src/presentation/components/features/configuracoes/CoberturaAreasListaPainel'
 import { CoberturaBotaoSalvarTaxasLote } from '@/src/presentation/components/features/configuracoes/CoberturaBotaoSalvarTaxasLote'
+import { CoberturaDialogExclusaoArea } from '@/src/presentation/components/features/configuracoes/CoberturaDialogExclusaoArea'
 import { CoberturaTaxasManuaisPainel } from '@/src/presentation/components/features/configuracoes/CoberturaTaxasManuaisPainel'
 import { useReportarCoberturaSuja } from '@/src/presentation/components/features/configuracoes/coberturaSairGuard'
 import { useTaxasInfinite } from '@/src/presentation/hooks/useTaxas'
@@ -126,136 +107,6 @@ const CoberturaDeliveryMap = dynamic(
 const TEMPO_PADRAO_FAIXA_KM = 45
 const ALCANCE_INICIAL_KM = 4
 
-function mensagemErroArea(error: unknown): string {
-  const msg = error instanceof Error ? error.message : 'Não foi possível salvar a área.'
-  if (/sobrepos|overlap|intersect/i.test(msg)) {
-    return 'Esta área sobrepõe outra já cadastrada. Ajuste o desenho e tente novamente.'
-  }
-  return msg
-}
-
-function CampoTaxaInline({
-  label,
-  value,
-  onChange,
-  disabled,
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  disabled?: boolean
-}) {
-  return (
-    <div className="flex min-w-0 items-center rounded-md border border-gray-200 bg-white">
-      <span className="pl-1.5 text-[10px] text-secondary-text">R$</span>
-      <input
-        type="text"
-        inputMode="decimal"
-        aria-label={label}
-        value={value}
-        disabled={disabled}
-        onChange={event => onChange(event.target.value)}
-        onFocus={event => event.currentTarget.select()}
-        onMouseUp={event => event.preventDefault()}
-        className="w-full min-w-0 bg-transparent px-1 py-1 text-sm text-primary-text outline-none disabled:opacity-50"
-      />
-    </div>
-  )
-}
-
-function CampoPrazoInline({
-  label,
-  value,
-  onChange,
-  disabled,
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  disabled?: boolean
-}) {
-  return (
-    <div className="flex min-w-0 items-center rounded-md border border-gray-200 bg-white">
-      <input
-        type="text"
-        inputMode="numeric"
-        aria-label={label}
-        value={value}
-        disabled={disabled}
-        onChange={event => onChange(event.target.value)}
-        onFocus={event => event.currentTarget.select()}
-        onMouseUp={event => event.preventDefault()}
-        className="w-full min-w-0 bg-transparent px-1 py-1 text-center text-sm text-primary-text outline-none disabled:opacity-50"
-      />
-      <span className="pr-1.5 text-[10px] text-secondary-text">min</span>
-    </div>
-  )
-}
-
-function NomeAreaInline({
-  area,
-  salvando,
-  onSalvar,
-}: {
-  area: AreaEntregaDTO
-  salvando: boolean
-  onSalvar: (nome: string) => Promise<void>
-}) {
-  const [editando, setEditando] = useState(false)
-  const [texto, setTexto] = useState(area.nome ?? '')
-
-  useEffect(() => {
-    if (!editando) setTexto(area.nome ?? '')
-  }, [area.nome, editando])
-
-  const confirmar = async () => {
-    const nome = texto.trim()
-    if (!nome || nome === (area.nome ?? '').trim()) {
-      setEditando(false)
-      setTexto(area.nome ?? '')
-      return
-    }
-    await onSalvar(nome)
-    setEditando(false)
-  }
-
-  if (!editando) {
-    return (
-      <button
-        type="button"
-        onClick={() => setEditando(true)}
-        disabled={salvando}
-        title="Clique para editar o nome"
-        className="truncate text-left text-xs font-medium text-primary-text hover:underline disabled:opacity-50"
-      >
-        {area.nome?.trim() || 'Clique para nomear'}
-      </button>
-    )
-  }
-
-  return (
-    <input
-      autoFocus
-      aria-label="Nome da área"
-      value={texto}
-      disabled={salvando}
-      onChange={event => setTexto(event.target.value)}
-      onBlur={() => void confirmar()}
-      onKeyDown={event => {
-        if (event.key === 'Enter') {
-          event.preventDefault()
-          event.currentTarget.blur()
-        }
-        if (event.key === 'Escape') {
-          setEditando(false)
-          setTexto(area.nome ?? '')
-        }
-      }}
-      className="w-full min-w-0 rounded-md border border-gray-200 bg-white px-1 py-0.5 text-xs text-primary-text outline-none focus:border-primary"
-    />
-  )
-}
-
 export function CoberturaDeliveryTab() {
   const empresaDeliveryQuery = useEmpresaDeliveryMe()
   const raiosQuery = useRaiosEntregaDelivery({
@@ -273,38 +124,15 @@ export function CoberturaDeliveryTab() {
   const atualizarRaioMutation = useAtualizarRaioEntregaDelivery()
   const atualizarRaiosLoteMutation = useAtualizarRaiosEntregaEmLote()
   const excluirRaiosLoteMutation = useExcluirRaiosEntregaEmLote()
-  const criarAreaMutation = useCriarAreaEntregaDelivery()
-  const atualizarAreaMutation = useAtualizarAreaEntregaDelivery()
-  const atualizarAreasLoteMutation = useAtualizarAreasEntregaEmLote()
-  const excluirAreaMutation = useExcluirAreaEntregaDelivery()
   const { geoQuery, atualizarOrigemMutation } = useEmpresaEnderecoGeo()
 
-  const [areaExcluindo, setAreaExcluindo] = useState<AreaEntregaDTO | null>(null)
-  const [ferramenta, setFerramenta] = useState<FerramentaCobertura>('navegar')
-  /** Áreas desenhadas ainda não persistidas (polígono/círculo). */
-  const [areasCriacaoDraft, setAreasCriacaoDraft] = useState<AreaRascunhoCriacaoCobertura[]>([])
   const [mapaVisivel, setMapaVisivel] = useState(true)
   const [painelAba, setPainelAba] = useState<CoberturaPainelAba>('raios')
   const [painelRecolhido, setPainelRecolhido] = useState(false)
-  const [areaFormaEditandoId, setAreaFormaEditandoId] = useState<string | null>(null)
   const [hoverCobertura, setHoverCobertura] = useState<DestaqueCobertura | null>(null)
-  const [pontosDesenho, setPontosDesenho] = useState(0)
-  const [podeConcluirDesenho, setPodeConcluirDesenho] = useState(false)
   const [taxasDraft, setTaxasDraft] = useState<Record<string, string>>({})
   const [prazosDraft, setPrazosDraft] = useState<Record<string, string>>({})
   const [ativosDraft, setAtivosDraft] = useState<Record<string, boolean>>({})
-  const [taxasAreaDraft, setTaxasAreaDraft] = useState<Record<string, string>>({})
-  const [prazosAreaDraft, setPrazosAreaDraft] = useState<Record<string, string>>({})
-  const [ativosAreaDraft, setAtivosAreaDraft] = useState<Record<string, boolean>>({})
-  /** Geometria reposicionada no mapa (ferramenta Mover) — só persiste no Salvar do painel. */
-  const [geometriasAreaDraft, setGeometriasAreaDraft] = useState<Record<string, LatLngLiteral[]>>(
-    {}
-  )
-  /**
-   * Reinicia a instância do Google Map após salvar/descartar geometria.
-   * O `draggable` nativo do Polygon corrompe o Map após o 1º arraste; remount limpa isso.
-   */
-  const [mapaInstanciaEpoch, setMapaInstanciaEpoch] = useState(0)
   const [alcanceKmTexto, setAlcanceKmTexto] = useState('')
   const [definindoAlcance, setDefinindoAlcance] = useState(false)
   const [confirmandoSetup, setConfirmandoSetup] = useState(false)
@@ -317,11 +145,20 @@ export function CoberturaDeliveryTab() {
   const geocodeResultadoRef = useRef<GeocodeEmpresaResult | null>(null)
   const geocodeAssinaturaRef = useRef('')
   const [mapaIndisponivel, setMapaIndisponivel] = useState(mapaGoogleAuthFalhou)
-  const acoesDesenhoRef = useRef<AcoesDesenhoCobertura | null>(null)
 
   const empresaDelivery = empresaDeliveryQuery.data
   const raios = raiosQuery.data ?? []
   const areas = areasQuery.data ?? []
+
+  const onIrParaAbaAreas = useCallback(() => setPainelAba('areas'), [])
+  const onExibirMapa = useCallback(() => setMapaVisivel(true), [])
+  const areasPainel = useCoberturaAreasPainel({
+    areas,
+    painelAba,
+    onIrParaAbaAreas,
+    onExibirMapa,
+  })
+
   const qtdTaxasManuais = useMemo(() => {
     const pages = taxasCatalogoQuery.data?.pages ?? []
     return pages
@@ -332,32 +169,9 @@ export function CoberturaDeliveryTab() {
     () => raios.map(raio => ({ ...raio, ativo: ativosDraft[raio.id] ?? raio.ativo })),
     [ativosDraft, raios]
   )
-  const areasComDraft = useMemo(
-    () =>
-      areas.map(area => {
-        const ativo = ativosAreaDraft[area.id] ?? area.ativo
-        const pathsDraft = geometriasAreaDraft[area.id]
-        // Com Mover/Editar, o Google Maps segura a posição visual.
-        // Espelhar o rascunho nas `areas` remonta o polígono e quebra o arraste/edição.
-        if (
-          !pathsDraft ||
-          ferramenta === 'mover' ||
-          ferramenta === 'editar' ||
-          areaFormaEditandoId === area.id
-        ) {
-          return { ...area, ativo }
-        }
-        try {
-          return { ...area, ativo, area: latLngPathsToGeoJsonPolygon(pathsDraft) }
-        } catch {
-          return { ...area, ativo }
-        }
-      }),
-    [areaFormaEditandoId, areas, ativosAreaDraft, ferramenta, geometriasAreaDraft]
-  )
   const camadasMapa = camadasMapaCobertura(painelAba)
   const raiosNoMapa = camadasMapa.raios ? raiosComDraft : NENHUM_RAIO
-  const areasNoMapa = camadasMapa.areas ? areasComDraft : NENHUMA_AREA
+  const areasNoMapa = camadasMapa.areas ? areasPainel.areasComDraft : NENHUMA_AREA
   const origemGeo = geoQuery.data?.enderecoLocalizacao ?? null
   const enderecoEmpresa = geoQuery.data?.endereco
   const geoConfigurada = origemGeo != null
@@ -406,10 +220,10 @@ export function CoberturaDeliveryTab() {
     () =>
       resolverDestaqueCobertura({
         hover: hoverCobertura,
-        areaFormaEditandoId,
+        areaFormaEditandoId: areasPainel.areaFormaEditandoId,
         areaEditandoId: null,
       }),
-    [hoverCobertura, areaFormaEditandoId]
+    [hoverCobertura, areasPainel.areaFormaEditandoId]
   )
 
   const destacarNaLista = useCallback(
@@ -423,10 +237,7 @@ export function CoberturaDeliveryTab() {
     criarRaiosLoteMutation.isPending ||
     atualizarRaioMutation.isPending ||
     atualizarRaiosLoteMutation.isPending ||
-    criarAreaMutation.isPending ||
-    atualizarAreaMutation.isPending ||
-    atualizarAreasLoteMutation.isPending ||
-    excluirAreaMutation.isPending ||
+    areasPainel.salvandoAreas ||
     excluirRaiosLoteMutation.isPending ||
     atualizarOrigemMutation.isPending ||
     confirmandoSetup
@@ -449,21 +260,6 @@ export function CoberturaDeliveryTab() {
     // Só ressincroniza quando id/valor/prazo/ativo da API muda — não enquanto o operador edita.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [raiosTaxaSignature])
-
-  const areasTaxaSignature = areas
-    .map(area => `${area.id}:${area.valorTaxa}:${area.tempoEntregaInMinutes}:${area.ativo ? 1 : 0}`)
-    .join('|')
-  useEffect(() => {
-    setTaxasAreaDraft(
-      Object.fromEntries(areas.map(area => [area.id, String(area.valorTaxa).replace('.', ',')]))
-    )
-    setPrazosAreaDraft(
-      Object.fromEntries(areas.map(area => [area.id, String(area.tempoEntregaInMinutes)]))
-    )
-    setAtivosAreaDraft(Object.fromEntries(areas.map(area => [area.id, area.ativo])))
-    // Só ressincroniza quando id/valor/prazo/ativo da API muda — não enquanto o operador edita.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [areasTaxaSignature])
 
   useEffect(() => {
     if (!raioAlcance) {
@@ -643,129 +439,6 @@ export function CoberturaDeliveryTab() {
     tentarGeocodeDeNovo,
   ])
 
-  const limparEdicaoForma = useCallback(() => {
-    setAreaFormaEditandoId(null)
-  }, [])
-
-  const limparDesenhoEmAndamento = useCallback(() => {
-    setFerramenta('navegar')
-    setPontosDesenho(0)
-    setPodeConcluirDesenho(false)
-  }, [])
-
-  const handleFerramentaChange = useCallback(
-    (proxima: FerramentaCobertura) => {
-      if (proxima !== 'editar') {
-        limparEdicaoForma()
-      }
-      if (proxima === 'poligono' || proxima === 'circulo' || proxima === 'editar') {
-        setMapaVisivel(true)
-      }
-      setFerramenta(proxima)
-    },
-    [limparEdicaoForma]
-  )
-
-  useEffect(() => {
-    if (painelAba === 'areas') return
-    setFerramenta('navegar')
-    setPontosDesenho(0)
-    setPodeConcluirDesenho(false)
-    setAreaFormaEditandoId(null)
-    setGeometriasAreaDraft({})
-    setAreasCriacaoDraft([])
-  }, [painelAba])
-
-  const handleDesenhoEstadoChange = useCallback((estado: EstadoDesenhoCobertura) => {
-    setPontosDesenho(estado.pontos)
-    setPodeConcluirDesenho(estado.podeConcluir)
-  }, [])
-
-  const handleAcoesDesenhoProntas = useCallback((acoes: AcoesDesenhoCobertura | null) => {
-    acoesDesenhoRef.current = acoes
-  }, [])
-
-  const handleSelecionarAreaParaEditar = useCallback((areaId: string) => {
-    setAreaFormaEditandoId(areaId)
-  }, [])
-
-  const handleFormaAreaAlterada = useCallback((areaId: string, paths: LatLngLiteral[]) => {
-    setAreaFormaEditandoId(prev => prev ?? areaId)
-    setGeometriasAreaDraft(prev => ({ ...prev, [areaId]: paths }))
-  }, [])
-
-  const handleSalvarNomeArea = useCallback(
-    async (area: AreaEntregaDTO, nome: string) => {
-      try {
-        await atualizarAreaMutation.mutateAsync({ id: area.id, input: { nome } })
-        showToast.success('Nome da área atualizado.')
-      } catch (error) {
-        showToast.error(mensagemErroArea(error))
-      }
-    },
-    [atualizarAreaMutation]
-  )
-
-  const adicionarAreaCriacaoDraft = useCallback(
-    (paths: LatLngLiteral[], forma: 'circulo' | 'poligono') => {
-      const id =
-        typeof crypto !== 'undefined' && 'randomUUID' in crypto
-          ? `rascunho-${crypto.randomUUID()}`
-          : `rascunho-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-      setAreasCriacaoDraft(prev => [...prev, { id, paths, forma }])
-      setPainelAba('areas')
-      limparDesenhoEmAndamento()
-    },
-    [limparDesenhoEmAndamento]
-  )
-
-  const handlePoligonoDesenhado = useCallback(
-    (paths: LatLngLiteral[]) => {
-      try {
-        latLngPathsToGeoJsonPolygon(paths) // valida antes de aceitar o rascunho
-        adicionarAreaCriacaoDraft(paths, 'poligono')
-      } catch (error) {
-        showToast.error(error instanceof Error ? error.message : 'Polígono inválido')
-        setFerramenta('poligono')
-      }
-    },
-    [adicionarAreaCriacaoDraft]
-  )
-
-  const handleCirculoDesenhado = useCallback(
-    (centro: LatLngLiteral, raioMetros: number) => {
-      try {
-        const geometria = geoJsonPolygonDeCirculo(centro, raioMetros)
-        adicionarAreaCriacaoDraft(geoJsonToLatLngPath(geometria), 'circulo')
-      } catch (error) {
-        showToast.error(error instanceof Error ? error.message : 'Círculo inválido')
-        setFerramenta('circulo')
-      }
-    },
-    [adicionarAreaCriacaoDraft]
-  )
-
-  const handleAreaArrastada = useCallback((areaId: string, paths: LatLngLiteral[]) => {
-    setGeometriasAreaDraft(prev => ({ ...prev, [areaId]: paths }))
-  }, [])
-
-  const handleAreaRascunhoArrastada = useCallback((id: string, paths: LatLngLiteral[]) => {
-    setAreasCriacaoDraft(prev => prev.map(item => (item.id === id ? { ...item, paths } : item)))
-  }, [])
-
-  const handleApagarAreaRascunho = useCallback((id: string) => {
-    setAreasCriacaoDraft(prev => prev.filter(item => item.id !== id))
-  }, [])
-
-  const handleApagarAreaNoMapa = useCallback(
-    (areaId: string) => {
-      const area = areas.find(item => item.id === areaId)
-      if (!area) return
-      setAreaExcluindo(area)
-    },
-    [areas]
-  )
-
   const handlePinMovido = useCallback(
     (point: GeoJsonPoint) => {
       setPainelRecolhido(false)
@@ -832,10 +505,6 @@ export function CoberturaDeliveryTab() {
     setAtivosDraft(prev => ({ ...prev, [raioId]: ativo }))
   }, [])
 
-  const handleToggleAreaAtivo = useCallback((areaId: string, ativo: boolean) => {
-    setAtivosAreaDraft(prev => ({ ...prev, [areaId]: ativo }))
-  }, [])
-
   const taxasPrazosPendentes = useMemo(() => {
     return raiosOrdenados.some(
       raio =>
@@ -848,29 +517,8 @@ export function CoberturaDeliveryTab() {
     )
   }, [ativosDraft, prazosDraft, raiosOrdenados, taxasDraft])
 
-  const taxasPrazosAreaPendentes = useMemo(() => {
-    return areas.some(
-      area =>
-        linhaTaxaPrazoPendente(
-          taxasAreaDraft[area.id] ?? '',
-          prazosAreaDraft[area.id] ?? '',
-          area.valorTaxa,
-          area.tempoEntregaInMinutes
-        ) || ativoCoberturaPendente(ativosAreaDraft[area.id], area.ativo)
-    )
-  }, [areas, ativosAreaDraft, prazosAreaDraft, taxasAreaDraft])
-
-  const geometriasAreaPendentes = Object.keys(geometriasAreaDraft).length > 0
-  const criacaoAreasPendentes = areasCriacaoDraft.length > 0
-  const areasPainelPendentes =
-    taxasPrazosAreaPendentes || geometriasAreaPendentes || criacaoAreasPendentes
-
   const coberturaSuja =
-    taxasPrazosPendentes ||
-    taxasPrazosAreaPendentes ||
-    geometriasAreaPendentes ||
-    criacaoAreasPendentes ||
-    pinPendente
+    taxasPrazosPendentes || areasPainel.areasPainelPendentes || pinPendente
   useReportarCoberturaSuja(coberturaSuja)
 
   const handleSalvarTaxasLote = useCallback(async () => {
@@ -941,73 +589,6 @@ export function CoberturaDeliveryTab() {
       showToast.error(error instanceof Error ? error.message : 'Não foi possível salvar as taxas.')
     }
   }, [ativosDraft, atualizarRaiosLoteMutation, prazosDraft, raiosOrdenados, taxasDraft])
-
-  const handleSalvarTaxasAreasLote = useCallback(async () => {
-    const montagem = montarSalvarAreasCobertura({
-      areas,
-      taxasAreaDraft,
-      prazosAreaDraft,
-      ativosAreaDraft,
-      geometriasAreaDraft,
-      areasCriacaoDraft,
-    })
-    if (!montagem.ok) {
-      showToast.error(montagem.erro)
-      return
-    }
-    const { patches, criacoes } = montagem
-    if (patches.length === 0 && criacoes.length === 0) {
-      showToast.info('Nenhuma alteração para salvar.')
-      return
-    }
-
-    try {
-      let criadas = 0
-      for (let index = 0; index < criacoes.length; index++) {
-        await criarAreaMutation.mutateAsync({
-          nome: `Área ${areas.length + index + 1}`,
-          area: criacoes[index].area,
-          valorTaxa: 8,
-          tempoEntregaInMinutes: TEMPO_PADRAO_FAIXA_KM,
-          ativo: true,
-        })
-        criadas += 1
-      }
-
-      if (patches.length > 0) {
-        const resultado = await atualizarAreasLoteMutation.mutateAsync(patches)
-        if (resultado.ok < resultado.total) {
-          showToast.error(mensagemFalhaLoteCobertura(resultado))
-          if (criadas > 0) {
-            setAreasCriacaoDraft([])
-            setMapaInstanciaEpoch(n => n + 1)
-          }
-          return
-        }
-      }
-
-      const mudouGeometria = patches.some(p => p.input.area !== undefined)
-      setGeometriasAreaDraft({})
-      setAreasCriacaoDraft([])
-      limparEdicaoForma()
-      if (mudouGeometria || criadas > 0) setMapaInstanciaEpoch(n => n + 1)
-      showToast.success(mensagemSucessoSalvarAreasCobertura({ criadas, patches }))
-    } catch (error) {
-      showToast.error(
-        error instanceof Error ? error.message : 'Não foi possível salvar as áreas.'
-      )
-    }
-  }, [
-    areas,
-    areasCriacaoDraft,
-    ativosAreaDraft,
-    atualizarAreasLoteMutation,
-    criarAreaMutation,
-    geometriasAreaDraft,
-    limparEdicaoForma,
-    prazosAreaDraft,
-    taxasAreaDraft,
-  ])
 
   const handleDefinirAlcanceRaio = useCallback(async () => {
     const parsed = parseAlcanceKmInteiro(alcanceKmTexto, DISTANCIA_MAXIMA_KM_RAIO)
@@ -1161,17 +742,6 @@ export function CoberturaDeliveryTab() {
     raiosQuery,
   ])
 
-  const handleConfirmarExclusaoArea = useCallback(async () => {
-    if (!areaExcluindo) return
-    try {
-      await excluirAreaMutation.mutateAsync(areaExcluindo.id)
-      showToast.success('Área excluída.')
-      setAreaExcluindo(null)
-    } catch (error) {
-      showToast.error(error instanceof Error ? error.message : 'Não foi possível excluir a área.')
-    }
-  }, [areaExcluindo, excluirAreaMutation])
-
   if (empresaDeliveryQuery.isPending) {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
@@ -1248,36 +818,36 @@ export function CoberturaDeliveryTab() {
               ) : (
                 <div className="absolute inset-0">
                   <CoberturaDeliveryMap
-                    key={`cobertura-mapa-${mapaInstanciaEpoch}`}
+                    key={`cobertura-mapa-${areasPainel.mapaInstanciaEpoch}`}
                     origem={origemGeo ?? (setupInicial ? pinRascunho : null)}
                     raios={raiosNoMapa}
                     areas={areasNoMapa}
-                    ferramenta={ferramenta}
-                    areasRascunhoCriacao={areasCriacaoDraft}
+                    ferramenta={areasPainel.ferramenta}
+                    areasRascunhoCriacao={areasPainel.areasCriacaoDraft}
                     areaDestacadaId={destaqueMapa.areaDestacadaId}
                     raioDestacadoId={destaqueMapa.raioDestacadoId}
                     destacarTodasAreas={destaqueMapa.destacarTodasAreas}
-                    areaFormaEditandoId={areaFormaEditandoId}
+                    areaFormaEditandoId={areasPainel.areaFormaEditandoId}
                     ferramentasHabilitadas={Boolean(empresaDelivery)}
                     desenhoHabilitado={painelAba === 'areas'}
-                    onFerramentaChange={handleFerramentaChange}
-                    onPoligonoDesenhado={handlePoligonoDesenhado}
-                    onCirculoDesenhado={handleCirculoDesenhado}
-                    onDesenhoCancelado={limparDesenhoEmAndamento}
-                    onSelecionarAreaParaEditar={handleSelecionarAreaParaEditar}
-                    onFormaAreaAlterada={handleFormaAreaAlterada}
-                    onAreaArrastada={handleAreaArrastada}
-                    onAreaRascunhoArrastada={handleAreaRascunhoArrastada}
-                    onApagarArea={handleApagarAreaNoMapa}
-                    onApagarAreaRascunho={handleApagarAreaRascunho}
+                    onFerramentaChange={areasPainel.handleFerramentaChange}
+                    onPoligonoDesenhado={areasPainel.handlePoligonoDesenhado}
+                    onCirculoDesenhado={areasPainel.handleCirculoDesenhado}
+                    onDesenhoCancelado={areasPainel.limparDesenhoEmAndamento}
+                    onSelecionarAreaParaEditar={areasPainel.handleSelecionarAreaParaEditar}
+                    onFormaAreaAlterada={areasPainel.handleFormaAreaAlterada}
+                    onAreaArrastada={areasPainel.handleAreaArrastada}
+                    onAreaRascunhoArrastada={areasPainel.handleAreaRascunhoArrastada}
+                    onApagarArea={areasPainel.handleApagarAreaNoMapa}
+                    onApagarAreaRascunho={areasPainel.handleApagarAreaRascunho}
                     pinRascunho={pinRascunho}
                     pinSnapEpoch={pinSnapEpoch}
                     centroAjustePin={centroAjustePin}
                     raioAjustePinMetros={raioAjustePin ?? undefined}
                     ajusteLivre={ajusteLivre}
                     onPinMovido={handlePinMovido}
-                    onDesenhoEstadoChange={handleDesenhoEstadoChange}
-                    onAcoesDesenhoProntas={handleAcoesDesenhoProntas}
+                    onDesenhoEstadoChange={areasPainel.handleDesenhoEstadoChange}
+                    onAcoesDesenhoProntas={areasPainel.handleAcoesDesenhoProntas}
                     onHoverArea={id => destacarNaLista({ tipo: 'area', id })}
                     onHoverRaio={id => destacarNaLista({ tipo: 'raio', id })}
                     onHoverFim={() => destacarNaLista(null)}
@@ -1443,44 +1013,41 @@ export function CoberturaDeliveryTab() {
               </div>
             ) : null}
 
-            {ferramenta === 'poligono' ? (
+            {areasPainel.ferramenta === 'poligono' ? (
               <div className="mx-3 mt-3 rounded-xl bg-primary px-3 py-2.5 text-xs text-white">
                 <p className="font-semibold">Desenhando área</p>
                 <p className="mt-1 text-white/85">
-                  {pontosDesenho === 0
+                  {areasPainel.pontosDesenho === 0
                     ? 'Clique no mapa para marcar os vértices.'
-                    : `${pontosDesenho} ponto${pontosDesenho === 1 ? '' : 's'}. Mínimo de 3 para concluir.`}
+                    : `${areasPainel.pontosDesenho} ponto${areasPainel.pontosDesenho === 1 ? '' : 's'}. Mínimo de 3 para concluir.`}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   <button
                     type="button"
-                    onClick={() => acoesDesenhoRef.current?.desfazer()}
-                    disabled={pontosDesenho === 0}
+                    onClick={areasPainel.desenharDesfazer}
+                    disabled={areasPainel.pontosDesenho === 0}
                     className="rounded-md bg-white/20 px-2 py-1 font-semibold hover:bg-white/30 disabled:opacity-40"
                   >
                     Desfazer
                   </button>
                   <button
                     type="button"
-                    onClick={() => acoesDesenhoRef.current?.concluir()}
-                    disabled={!podeConcluirDesenho}
+                    onClick={areasPainel.desenharConcluir}
+                    disabled={!areasPainel.podeConcluirDesenho}
                     className="rounded-md bg-white px-2 py-1 font-semibold text-primary disabled:opacity-40"
                   >
                     Concluir área
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (acoesDesenhoRef.current) acoesDesenhoRef.current.cancelar()
-                      else limparDesenhoEmAndamento()
-                    }}
+                    onClick={areasPainel.cancelarDesenhoPoligono}
                     className="rounded-md bg-white/20 px-2 py-1 font-semibold hover:bg-white/30"
                   >
                     Cancelar
                   </button>
                 </div>
               </div>
-            ) : ferramenta === 'circulo' ? (
+            ) : areasPainel.ferramenta === 'circulo' ? (
               <div className="mx-3 mt-3 rounded-xl bg-primary px-3 py-2.5 text-xs text-white">
                 <p className="font-semibold">Desenhando círculo</p>
                 <p className="mt-1 text-white/85">
@@ -1488,7 +1055,7 @@ export function CoberturaDeliveryTab() {
                 </p>
                 <button
                   type="button"
-                  onClick={() => setFerramenta('navegar')}
+                  onClick={() => areasPainel.setFerramenta('navegar')}
                   className="mt-2 rounded-md bg-white/20 px-2 py-1 font-semibold hover:bg-white/30"
                 >
                   Cancelar
@@ -1552,108 +1119,30 @@ export function CoberturaDeliveryTab() {
             ) : painelAba === 'manuais' ? (
               <CoberturaTaxasManuaisPainel />
             ) : painelAba === 'areas' ? (
-              <div className="flex min-h-0 flex-1 flex-col">
-                <p className="px-4 pt-2 text-[11px] leading-snug text-secondary-text">
-                  Cada área tem nome, taxa e prazo próprios. Clique no nome para editar. Desenhe ou
-                  mova no mapa com os atalhos à direita.
-                </p>
-                <div className="grid grid-cols-[minmax(3.2rem,0.9fr)_minmax(3.1rem,1fr)_minmax(2.6rem,0.8fr)_1.4rem_auto] items-center gap-1 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-secondary-text">
-                  <span>Nome</span>
-                  <span>Taxa</span>
-                  <span>Prazo</span>
-                  <span className="sr-only">Ativo</span>
-                  <span className="text-right">Ações</span>
-                </div>
-                <div className="min-h-0 flex-1 overflow-auto border-t border-gray-100">
-                  {areasQuery.isPending ? (
-                    <div className="flex justify-center p-6">
-                      <JiffyLoading />
-                    </div>
-                  ) : (
-                    <>
-                      {areas.length === 0 ? (
-                        <p className="p-4 text-center text-xs text-secondary-text">
-                          Nenhuma área salva. Use o polígono ou o círculo à direita. A área pode
-                          ficar fora do raio e tem nome e taxa próprios.
-                        </p>
-                      ) : (
-                        <div>
-                          {areas.map(area => (
-                            <div
-                              key={area.id}
-                              className={`grid grid-cols-[minmax(3.2rem,0.9fr)_minmax(3.1rem,1fr)_minmax(2.6rem,0.8fr)_1.4rem_auto] items-center gap-1 px-3 py-2 text-sm ${
-                                destaqueMapa.destacarTodasAreas ||
-                                destaqueMapa.areaDestacadaId === area.id
-                                  ? 'bg-gray-100'
-                                  : 'hover:bg-gray-100'
-                              }`}
-                              onMouseEnter={() => destacarNaLista({ tipo: 'area', id: area.id })}
-                              onMouseLeave={() => destacarNaLista(null)}
-                            >
-                              <NomeAreaInline
-                                area={area}
-                                salvando={salvando}
-                                onSalvar={nome => handleSalvarNomeArea(area, nome)}
-                              />
-                              <CampoTaxaInline
-                                label={`Taxa ${area.nome?.trim() || area.id}`}
-                                value={taxasAreaDraft[area.id] ?? ''}
-                                disabled={salvando}
-                                onChange={value =>
-                                  setTaxasAreaDraft(prev => ({ ...prev, [area.id]: value }))
-                                }
-                              />
-                              <CampoPrazoInline
-                                label={`Prazo ${area.nome?.trim() || area.id}`}
-                                value={prazosAreaDraft[area.id] ?? ''}
-                                disabled={salvando}
-                                onChange={value =>
-                                  setPrazosAreaDraft(prev => ({ ...prev, [area.id]: value }))
-                                }
-                              />
-                              <JiffyIconSwitch
-                                checked={ativosAreaDraft[area.id] ?? area.ativo}
-                                onChange={e => handleToggleAreaAtivo(area.id, e.target.checked)}
-                                disabled={salvando}
-                                size="xs"
-                                inputProps={{
-                                  'aria-label': `Ativar área ${area.nome ?? area.id}`,
-                                }}
-                              />
-                              <div className="flex justify-end">
-                                <button
-                                  type="button"
-                                  onClick={() => setAreaExcluindo(area)}
-                                  disabled={salvando}
-                                  className="rounded-lg p-1.5 text-secondary-text hover:bg-red-50 hover:text-red-600"
-                                  aria-label="Excluir área"
-                                  title="Excluir área"
-                                >
-                                  <MdDeleteOutline className="h-5 w-5" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-                <div className="shrink-0 space-y-2 border-t border-gray-100 px-3 py-2">
-                  <CoberturaBotaoSalvarTaxasLote
-                    pendente={areasPainelPendentes}
-                    disabled={
-                      salvando ||
-                      !areasPainelPendentes ||
-                      (areas.length === 0 && !criacaoAreasPendentes)
-                    }
-                    salvando={
-                      atualizarAreasLoteMutation.isPending || criarAreaMutation.isPending
-                    }
-                    onClick={() => void handleSalvarTaxasAreasLote()}
-                  />
-                </div>
-              </div>
+              <CoberturaAreasListaPainel
+                areas={areas}
+                carregando={areasQuery.isPending}
+                salvando={salvando}
+                salvandoLote={areasPainel.salvandoLoteAreas}
+                pendente={areasPainel.areasPainelPendentes}
+                criacaoPendentes={areasPainel.criacaoAreasPendentes}
+                taxasDraft={areasPainel.taxasAreaDraft}
+                prazosDraft={areasPainel.prazosAreaDraft}
+                ativosDraft={areasPainel.ativosAreaDraft}
+                areaDestacadaId={destaqueMapa.areaDestacadaId}
+                destacarTodasAreas={destaqueMapa.destacarTodasAreas}
+                onTaxaChange={(areaId, value) =>
+                  areasPainel.setTaxasAreaDraft(prev => ({ ...prev, [areaId]: value }))
+                }
+                onPrazoChange={(areaId, value) =>
+                  areasPainel.setPrazosAreaDraft(prev => ({ ...prev, [areaId]: value }))
+                }
+                onToggleAtivo={areasPainel.handleToggleAreaAtivo}
+                onSalvarNome={areasPainel.handleSalvarNomeArea}
+                onExcluir={areasPainel.setAreaExcluindo}
+                onSalvarLote={() => void areasPainel.handleSalvarTaxasAreasLote()}
+                onDestacar={destacarNaLista}
+              />
             ) : (
               <div className="flex min-h-0 flex-1 flex-col">
                 <div className="mx-3 mt-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-3">
@@ -1826,38 +1315,12 @@ export function CoberturaDeliveryTab() {
         </div>
       </div>
 
-      <Dialog open={areaExcluindo != null} onOpenChange={open => !open && setAreaExcluindo(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Excluir área de entrega?</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-secondary-text">
-            A área{' '}
-            <span className="font-semibold text-primary-text">
-              {areaExcluindo?.nome?.trim() || 'sem nome'}
-            </span>{' '}
-            será removida. Endereços dentro dela podem deixar de receber cotação.
-          </p>
-          <DialogFooter className="gap-2 sm:gap-2">
-            <button
-              type="button"
-              onClick={() => setAreaExcluindo(null)}
-              disabled={excluirAreaMutation.isPending}
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-secondary-text"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleConfirmarExclusaoArea()}
-              disabled={excluirAreaMutation.isPending}
-              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-            >
-              {excluirAreaMutation.isPending ? 'Excluindo…' : 'Excluir'}
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CoberturaDialogExclusaoArea
+        area={areasPainel.areaExcluindo}
+        excluindo={areasPainel.excluindoArea}
+        onCancelar={() => areasPainel.setAreaExcluindo(null)}
+        onConfirmar={() => void areasPainel.handleConfirmarExclusaoArea()}
+      />
     </div>
   )
 }
