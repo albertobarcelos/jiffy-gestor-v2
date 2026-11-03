@@ -13,6 +13,7 @@ import {
   MdDraw,
   MdEdit,
   MdOpenWith,
+  MdPanTool,
   MdRadioButtonUnchecked,
   MdSatelliteAlt,
   MdZoomIn,
@@ -416,8 +417,13 @@ function MapAreasPoligonos({
     const overlays: Array<google.maps.Polygon | google.maps.Circle> = []
     const listeners: google.maps.MapsEventListener[] = []
 
+    // Pan do mapa competindo com Polygon.draggable corrompe o gesto (travamento intermitente).
     if (arrasteHabilitado) {
-      map.setOptions({ draggableCursor: 'grab', draggingCursor: 'grabbing' })
+      map.setOptions({
+        draggable: false,
+        draggableCursor: 'grab',
+        draggingCursor: 'grabbing',
+      })
     }
 
     for (let index = 0; index < areas.length; index++) {
@@ -550,7 +556,11 @@ function MapAreasPoligonos({
     }
 
     return () => {
-      map.setOptions({ draggableCursor: undefined, draggingCursor: undefined })
+      map.setOptions({
+        draggable: true,
+        draggableCursor: undefined,
+        draggingCursor: undefined,
+      })
       for (const listener of listeners) listener.remove()
       for (const overlay of overlays) overlay.setMap(null)
     }
@@ -592,13 +602,10 @@ function MapAreasRascunhoCriacao({
   onArrasteRef.current = onAreaRascunhoArrastada
   onApagarRef.current = onApagarAreaRascunho
 
-  // Em modo mover, não remonta ao atualizar paths (Google Maps segura a posição visual).
+  // Após dragend o paths muda → remonta o polígono (Polygon.draggable corrompe após o 1º arraste).
   const signature = useMemo(
-    () =>
-      arrasteHabilitado
-        ? areasRascunho.map(a => a.id).join('|')
-        : areasRascunho.map(a => `${a.id}:${JSON.stringify(a.paths)}`).join('|'),
-    [areasRascunho, arrasteHabilitado]
+    () => areasRascunho.map(a => `${a.id}:${JSON.stringify(a.paths)}`).join('|'),
+    [areasRascunho]
   )
 
   useEffect(() => {
@@ -608,7 +615,11 @@ function MapAreasRascunhoCriacao({
     const listeners: google.maps.MapsEventListener[] = []
 
     if (arrasteHabilitado) {
-      map.setOptions({ draggableCursor: 'grab', draggingCursor: 'grabbing' })
+      map.setOptions({
+        draggable: false,
+        draggableCursor: 'grab',
+        draggingCursor: 'grabbing',
+      })
     }
 
     for (const area of areasRascunho) {
@@ -647,7 +658,11 @@ function MapAreasRascunhoCriacao({
 
     return () => {
       if (arrasteHabilitado) {
-        map.setOptions({ draggableCursor: undefined, draggingCursor: undefined })
+        map.setOptions({
+          draggable: true,
+          draggableCursor: undefined,
+          draggingCursor: undefined,
+        })
       }
       for (const listener of listeners) listener.remove()
       for (const polygon of polygons) polygon.setMap(null)
@@ -1173,7 +1188,9 @@ export function CoberturaDeliveryMap({
                     ? 'Pin movido. Confirme no card à esquerda para atualizar os raios.'
                     : pinArrastavel
                       ? 'Clique no mapa ou arraste o pin. Confirme no card para gravar.'
-                      : null
+                      : ferramenta === 'navegar' && desenhoHabilitado
+                        ? 'Mova o mapa livremente. Use Editar para alterar uma área ou este botão para sair da edição.'
+                        : null
 
   return (
     <div className="relative h-full min-h-0 overflow-hidden">
@@ -1209,6 +1226,15 @@ export function CoberturaDeliveryMap({
           {desenhoHabilitado ? (
             <>
           <span className="mx-2 border-t border-gray-100" />
+          <button
+            type="button"
+            title="Mover mapa"
+            aria-label="Mover mapa"
+            onClick={() => onFerramentaChange?.('navegar')}
+            className={`p-2.5 ${classeBotaoFerramenta(ferramenta === 'navegar')}`}
+          >
+            <MdPanTool className="h-5 w-5" aria-hidden />
+          </button>
           <button
             type="button"
             title="Desenhar polígono"

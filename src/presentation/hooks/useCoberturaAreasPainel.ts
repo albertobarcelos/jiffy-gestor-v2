@@ -85,14 +85,10 @@ export function useCoberturaAreasPainel({
       areas.map(area => {
         const ativo = ativosAreaDraft[area.id] ?? area.ativo
         const pathsDraft = geometriasAreaDraft[area.id]
-        // Com Mover/Editar, o Google Maps segura a posição visual.
-        // Espelhar o rascunho nas `areas` remonta o polígono e quebra o arraste/edição.
-        if (
-          !pathsDraft ||
-          ferramenta === 'mover' ||
-          ferramenta === 'editar' ||
-          areaFormaEditandoId === area.id
-        ) {
+        // Em Editar, o Google Maps segura vértices/raio — espelhar draft remonta e quebra.
+        // Em Mover, após dragend precisamos espelhar: remonta o polígono (bug do draggable nativo
+        // corrompe o overlay após o 1º arraste; sem remount o 2º trava).
+        if (!pathsDraft || ferramenta === 'editar' || areaFormaEditandoId === area.id) {
           return { ...area, ativo }
         }
         try {
