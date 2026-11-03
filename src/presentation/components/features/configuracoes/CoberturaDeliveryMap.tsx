@@ -341,6 +341,7 @@ function MapAreasPoligonos({
   hoverHabilitado,
   arrasteHabilitado,
   apagarHabilitado,
+  remountEpoch,
   onSelecionarArea,
   onFormaAlterada,
   onAreaArrastada,
@@ -358,6 +359,7 @@ function MapAreasPoligonos({
   hoverHabilitado: boolean
   arrasteHabilitado: boolean
   apagarHabilitado: boolean
+  remountEpoch: number
   onSelecionarArea?: (areaId: string) => void
   onFormaAlterada?: (areaId: string, paths: LatLngLiteral[]) => void
   onAreaArrastada?: (areaId: string, paths: LatLngLiteral[]) => void
@@ -386,6 +388,10 @@ function MapAreasPoligonos({
         .join('|'),
     [areas]
   )
+  // Em modo mover, hover/destaque da lista não pode remountar o polígono (quebra o arraste).
+  const destaqueSignature = arrasteHabilitado
+    ? 'mover'
+    : `${areaDestacadaId ?? ''}:${destacarTodasAreas ? 1 : 0}:${haDestaqueAtivo ? 1 : 0}`
 
   useEffect(() => {
     if (!map || typeof google === 'undefined') return
@@ -393,16 +399,22 @@ function MapAreasPoligonos({
     const polygons: google.maps.Polygon[] = []
     const listeners: google.maps.MapsEventListener[] = []
 
+    if (arrasteHabilitado) {
+      map.setOptions({ draggableCursor: 'grab', draggingCursor: 'grabbing' })
+    }
+
     for (let index = 0; index < areas.length; index++) {
       const area = areas[index]
       if (!area.ativo && areaFormaEditandoId !== area.id) continue
       const cores = CORES_COBERTURA[(index + raiosCount) % CORES_COBERTURA.length]
       const editando = areaFormaEditandoId === area.id
-      const destacada = editando || destacarTodasAreas || areaDestacadaId === area.id
+      const destacada =
+        editando ||
+        (!arrasteHabilitado && (destacarTodasAreas || areaDestacadaId === area.id))
       const estilo = estiloOverlayCobertura({
         ativo: area.ativo,
         destacado: destacada,
-        haDestaqueAtivo,
+        haDestaqueAtivo: arrasteHabilitado ? false : haDestaqueAtivo,
         variante: 'area',
         editando,
       })
@@ -481,12 +493,24 @@ function MapAreasPoligonos({
     }
 
     return () => {
+      map.setOptions({ draggableCursor: undefined, draggingCursor: undefined })
       for (const listener of listeners) listener.remove()
       for (const polygon of polygons) polygon.setMap(null)
     }
     // areas: recria só quando a assinatura de geometria/ativo muda (não a cada re-render)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, areasSignature, raiosCount, areaDestacadaId, areaFormaEditandoId, destacarTodasAreas, haDestaqueAtivo, selecaoHabilitada, hoverHabilitado, arrasteHabilitado, apagarHabilitado])
+  }, [
+    map,
+    areasSignature,
+    raiosCount,
+    destaqueSignature,
+    areaFormaEditandoId,
+    selecaoHabilitada,
+    hoverHabilitado,
+    arrasteHabilitado,
+    apagarHabilitado,
+    remountEpoch,
+  ])
 
   return null
 }
@@ -751,6 +775,8 @@ type CoberturaDeliveryMapProps = {
   raioDestacadoId?: string | null
   destacarTodasAreas?: boolean
   areaFormaEditandoId?: string | null
+  /** Incrementar para forçar recriação dos polígonos (descartar posição, etc.). */
+  areasPoligonosEpoch?: number
   ferramentasHabilitadas?: boolean
   desenhoHabilitado?: boolean
   onFerramentaChange?: (ferramenta: FerramentaCobertura) => void
@@ -790,6 +816,7 @@ export function CoberturaDeliveryMap({
   raioDestacadoId = null,
   destacarTodasAreas = false,
   areaFormaEditandoId = null,
+  areasPoligonosEpoch = 0,
   ferramentasHabilitadas = true,
   desenhoHabilitado = true,
   onFerramentaChange,
@@ -825,7 +852,12 @@ export function CoberturaDeliveryMap({
   const modoCirculo = ferramenta === 'circulo'
   const arrasteHabilitado = ferramenta === 'mover' && !areaFormaEditandoId
   const apagarHabilitado = ferramenta === 'apagar' && !areaFormaEditandoId
-  const pinArrastavel = Boolean(onPinMovido) && ferramenta !== 'poligono' && ferramenta !== 'circulo'
+  const pinArrastavel =
+    Boolean(onPinMovido) &&
+    ferramenta !== 'poligono' &&
+    ferramenta !== 'circulo' &&
+    ferramenta !== 'mover' &&
+    ferramenta !== 'apagar'
 
   const centroRaios = useMemo(() => latLngFromGeoJsonPoint(origem), [origem])
   const centroPin = useMemo(
@@ -1082,7 +1114,7 @@ export function CoberturaDeliveryMap({
           fullscreenControl: false,
           zoomControl: false,
           mapTypeId: satelite ? 'hybrid' : 'roadmap',
-          gestureHandling: arrasteHabilitado ? 'cooperative' : 'greedy',
+          gestureHandling: 'greedy',
           clickableIcons: false,
         }}
       >
@@ -1098,6 +1130,7 @@ export function CoberturaDeliveryMap({
           congelarVisao={
             modoDesenho ||
             modoCirculo ||
+            arrasteHabilitado ||
             Boolean(areaFormaEditandoId) ||
             (pinPendente && !recentrarNoEndereco)
           }
@@ -1178,6 +1211,7 @@ export function CoberturaDeliveryMap({
           hoverHabilitado={hoverHabilitado}
           arrasteHabilitado={arrasteHabilitado}
           apagarHabilitado={apagarHabilitado}
+          remountEpoch={areasPoligonosEpoch}
           onSelecionarArea={onSelecionarAreaParaEditar}
           onFormaAlterada={onFormaAreaAlterada}
           onAreaArrastada={onAreaArrastada}
