@@ -302,7 +302,11 @@ export function DeliveryCheckoutRevisaoModal({
             <button
               type="button"
               onClick={onVoltar}
-              className="flex min-h-[3rem] w-full items-center justify-center rounded-xl bg-black text-base font-semibold text-white"
+              className="flex min-h-[3rem] w-full items-center justify-center rounded-xl text-base font-semibold"
+              style={{
+                backgroundColor: 'var(--delivery-primary-dark)',
+                color: 'var(--delivery-btn-text, #ffffff)',
+              }}
             >
               Voltar
             </button>
@@ -354,9 +358,9 @@ export function DeliveryCheckoutRevisaoModal({
         <LinhaSecao
           icone={
             isEntrega ? (
-              <MdDeliveryDining className="h-5 w-5 text-black" aria-hidden />
+              <MdDeliveryDining className="h-5 w-5 delivery-text-primary" aria-hidden />
             ) : (
-              <TbPaperBag className="h-5 w-5 text-black" aria-hidden />
+              <TbPaperBag className="h-5 w-5 delivery-text-primary" aria-hidden />
             )
           }
           label="Tipo de Pedido:"
@@ -369,7 +373,7 @@ export function DeliveryCheckoutRevisaoModal({
         </LinhaSecao>
 
         <LinhaSecao
-          icone={<UserRound className="h-5 w-5 text-black" />}
+          icone={<UserRound className="h-5 w-5 delivery-text-primary" />}
           label={isEntrega ? 'Entregue a:' : 'Pedido de:'}
           onEditar={somenteLeitura ? undefined : onEditarCliente}
           editLabel="Editar cliente"
@@ -381,7 +385,7 @@ export function DeliveryCheckoutRevisaoModal({
         </LinhaSecao>
 
         <LinhaSecao
-          icone={<MapPin className="h-5 w-5 text-black" />}
+          icone={<MapPin className="h-5 w-5 delivery-text-primary" />}
           label={isEntrega ? 'Seu endereço:' : 'Retirada no local:'}
           onEditar={somenteLeitura || !isEntrega ? undefined : onEditarEndereco}
           editLabel="Trocar endereço"
@@ -418,7 +422,7 @@ export function DeliveryCheckoutRevisaoModal({
         </LinhaSecao>
 
         <LinhaSecao
-          icone={<IconePagamento className="h-5 w-5 text-black" />}
+          icone={<IconePagamento className="h-5 w-5 delivery-text-primary" />}
           label="Pagamento:"
           onEditar={somenteLeitura ? undefined : onEditarPagamento}
           editLabel="Editar pagamento"
@@ -544,7 +548,10 @@ export function DeliveryCheckoutRevisaoModal({
           >
             <div
               className="flex items-center justify-between gap-3 rounded-xl px-3 py-2"
-              style={{ backgroundColor: '#000000', color: '#ffffff' }}
+              style={{
+                backgroundColor: 'var(--delivery-primary-dark)',
+                color: 'var(--delivery-btn-text, #ffffff)',
+              }}
             >
               <span className="min-w-0 text-sm font-medium text-white">
                 Deseja adicionar observação?
@@ -562,7 +569,10 @@ export function DeliveryCheckoutRevisaoModal({
                   className="min-w-[3.25rem] rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
                   style={
                     adicionarObservacao
-                      ? { backgroundColor: '#ffffff', color: '#000000' }
+                      ? {
+                          backgroundColor: '#ffffff',
+                          color: 'var(--delivery-primary-dark)',
+                        }
                       : { backgroundColor: 'transparent', color: '#ffffff' }
                   }
                 >
@@ -575,7 +585,10 @@ export function DeliveryCheckoutRevisaoModal({
                   className="min-w-[3.25rem] rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
                   style={
                     !adicionarObservacao
-                      ? { backgroundColor: '#ffffff', color: '#000000' }
+                      ? {
+                          backgroundColor: '#ffffff',
+                          color: 'var(--delivery-primary-dark)',
+                        }
                       : { backgroundColor: 'transparent', color: '#ffffff' }
                   }
                 >
@@ -633,7 +646,10 @@ export function DeliveryCheckoutRevisaoModal({
               <>
                 <div
                   className="flex items-center justify-between gap-3 rounded-xl px-3 py-2"
-                  style={{ backgroundColor: '#000000', color: '#ffffff' }}
+                  style={{
+                    backgroundColor: 'var(--delivery-primary-dark)',
+                    color: 'var(--delivery-btn-text, #ffffff)',
+                  }}
                 >
                   <span className="min-w-0 text-sm font-medium text-white">
                     Deseja Nota fiscal?
@@ -651,7 +667,10 @@ export function DeliveryCheckoutRevisaoModal({
                       className="min-w-[3.25rem] rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
                       style={
                         desejaNotaFiscal
-                          ? { backgroundColor: '#ffffff', color: '#000000' }
+                          ? {
+                              backgroundColor: '#ffffff',
+                              color: 'var(--delivery-primary-dark)',
+                            }
                           : { backgroundColor: 'transparent', color: '#ffffff' }
                       }
                     >
@@ -664,7 +683,10 @@ export function DeliveryCheckoutRevisaoModal({
                       className="min-w-[3.25rem] rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
                       style={
                         !desejaNotaFiscal
-                          ? { backgroundColor: '#ffffff', color: '#000000' }
+                          ? {
+                              backgroundColor: '#ffffff',
+                              color: 'var(--delivery-primary-dark)',
+                            }
                           : { backgroundColor: 'transparent', color: '#ffffff' }
                       }
                     >

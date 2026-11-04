@@ -92,7 +92,11 @@ export function DeliveryCheckoutConfirmarSairEnderecoDialog({
             data-checkout-leave-without-numero=""
             onMouseDown={e => e.preventDefault()}
             onClick={onConfirmarSair}
-            className="min-h-[48px] w-full rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white"
+            className="min-h-[48px] w-full rounded-xl px-4 py-3 text-sm font-semibold"
+            style={{
+              backgroundColor: 'var(--delivery-primary-dark)',
+              color: 'var(--delivery-btn-text, #ffffff)',
+            }}
           >
             Sim, sair
           </button>

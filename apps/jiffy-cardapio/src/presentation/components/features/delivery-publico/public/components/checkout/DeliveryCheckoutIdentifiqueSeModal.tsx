@@ -364,7 +364,11 @@ export function DeliveryCheckoutIdentifiqueSeModal({
                 type="button"
                 onClick={() => void handleSalvarNome()}
                 disabled={salvandoNome}
-                className="min-h-[44px] w-full rounded-xl bg-black text-sm font-semibold text-white disabled:opacity-60"
+                className="min-h-[44px] w-full rounded-xl text-sm font-semibold disabled:opacity-60"
+                style={{
+                  backgroundColor: 'var(--delivery-primary-dark)',
+                  color: 'var(--delivery-btn-text, #ffffff)',
+                }}
               >
                 {salvandoNome ? 'Salvando...' : 'Salvar nome'}
               </button>

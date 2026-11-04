@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { MdRefresh } from 'react-icons/md'
+import { MdRefresh, MdSettingsBackupRestore } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyConfirmDialog } from '@/src/presentation/components/ui/jiffy-confirm-dialog'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
@@ -60,9 +60,11 @@ export function DeliveryDesignCustomizerScreen() {
     published,
     hydrated,
     isDirty,
+    isAtDefaultDesign,
     updateDraft,
     publish,
     restore,
+    applyDefaultDesign,
     replaceFromMe,
     salvarDraftAsync,
     publicarAsync,
@@ -150,17 +152,29 @@ export function DeliveryDesignCustomizerScreen() {
     }
   }, [busy, draft, publish])
 
-  const handleRestore = useCallback(async () => {
+  const handleUndo = useCallback(async () => {
     if (busy) return
     try {
       await restore()
-      showToast.success('Design restaurado.')
+      showToast.success('Alterações desfeitas.')
     } catch (error) {
       const msg =
-        error instanceof Error ? error.message : 'Não foi possível restaurar o design.'
+        error instanceof Error ? error.message : 'Não foi possível desfazer as alterações.'
       showToast.error(msg)
     }
   }, [busy, restore])
+
+  const handleApplyDefaultDesign = useCallback(async () => {
+    if (busy) return
+    try {
+      await applyDefaultDesign()
+      showToast.success('Design padrão aplicado.')
+    } catch (error) {
+      const msg =
+        error instanceof Error ? error.message : 'Não foi possível aplicar o design padrão.'
+      showToast.error(msg)
+    }
+  }, [applyDefaultDesign, busy])
 
   const handleMigrationDismiss = useCallback(() => {
     if (!empresa?.id || migrationBusy) return
@@ -257,12 +271,22 @@ export function DeliveryDesignCustomizerScreen() {
           ) : null}
           <button
             type="button"
-            onClick={() => void handleRestore()}
+            onClick={() => void handleUndo()}
             disabled={!isDirty || busy}
             className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold text-primary-text transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <MdRefresh className="h-4 w-4" aria-hidden />
-            Restaurar design
+            Desfazer
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleApplyDefaultDesign()}
+            disabled={isAtDefaultDesign || busy}
+            title="Aplica o visual padrão de fábrica (layout, cores, tipografia e categorias). Nome e mídia permanecem."
+            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold text-primary-text transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <MdSettingsBackupRestore className="h-4 w-4" aria-hidden />
+            Design padrão
           </button>
           <button
             type="button"

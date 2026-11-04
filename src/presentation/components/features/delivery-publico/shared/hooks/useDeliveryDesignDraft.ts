@@ -7,6 +7,23 @@ import { createDefaultDesignConfig } from '../constants/defaultDesignConfig'
 import { canPublishDesign, getPublishDisabledReason } from '../constants/designPublishRules'
 import { isDesignConfigEqual } from '../utils/designConfigStorage'
 import { apiDesignConfigToUi, uiDesignConfigToApi } from '../utils/mapDeliveryDesignConfig'
+
+/** Factory default preservando nome e mídia já existentes no draft. */
+function applyFactoryThemePreservingCabecalho(
+  current: DeliveryPublicoDesignConfig,
+  nomeExibicaoFallback: string
+): DeliveryPublicoDesignConfig {
+  const defaults = createDefaultDesignConfig(nomeExibicaoFallback)
+  return {
+    ...defaults,
+    cabecalho: {
+      ...defaults.cabecalho,
+      nomeExibicao: current.cabecalho.nomeExibicao,
+      logoUrl: current.cabecalho.logoUrl,
+      capaUrl: current.cabecalho.capaUrl,
+    },
+  }
+}
 import {
   useDeliveryDesignMe,
   usePublicarDesignDelivery,
@@ -142,6 +159,20 @@ export function useDeliveryDesignDraft({
     }
   }, [published, salvarDraftMutation])
 
+  const applyDefaultDesign = useCallback(async () => {
+    const next = applyFactoryThemePreservingCabecalho(draft, nomeExibicaoFallback)
+    if (isDesignConfigEqual(draft, next)) return
+
+    lockAutosaveRef.current = true
+    try {
+      skipAutosaveRef.current = true
+      setDraft(next)
+      await salvarDraftMutation.mutateAsync(uiDesignConfigToApi(next))
+    } finally {
+      lockAutosaveRef.current = false
+    }
+  }, [draft, nomeExibicaoFallback, salvarDraftMutation])
+
   const replaceFromMe = useCallback(
     (me: DeliveryPublicoDesignMeResponseDTO) => {
       skipAutosaveRef.current = true
@@ -154,14 +185,25 @@ export function useDeliveryDesignDraft({
 
   const isDirty = useMemo(() => !isDesignConfigEqual(draft, published), [draft, published])
 
+  const isAtDefaultDesign = useMemo(
+    () =>
+      isDesignConfigEqual(
+        draft,
+        applyFactoryThemePreservingCabecalho(draft, nomeExibicaoFallback)
+      ),
+    [draft, nomeExibicaoFallback]
+  )
+
   return {
     draft,
     published,
     hydrated,
     isDirty,
+    isAtDefaultDesign,
     updateDraft,
     publish,
     restore,
+    applyDefaultDesign,
     replaceFromMe,
     salvarDraftAsync: salvarDraftMutation.mutateAsync,
     publicarAsync: publicarMutation.mutateAsync,
