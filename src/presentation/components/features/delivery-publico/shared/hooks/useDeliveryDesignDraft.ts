@@ -118,7 +118,7 @@ export function useDeliveryDesignDraft({
 
     try {
       await salvarDraftMutation.mutateAsync(payload)
-      const result = await publicarMutation.mutateAsync()
+      const result = await publicarMutation.mutateAsync(payload)
 
       const uiPublished = apiDesignConfigToUi(result.published, nomeExibicaoFallback)
       const uiDraft = apiDesignConfigToUi(result.draft, nomeExibicaoFallback)

@@ -3,33 +3,24 @@
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
-import { requireGestorConfig } from '@/src/infrastructure/api/gestorConfigRequest'
-import {
-  buscarDesignDeliveryMe,
-  limparBannerEmpresaDelivery,
-  limparLogoEmpresaDelivery,
-  publicarDesignDelivery,
-  salvarDraftDesignDelivery,
-} from '@/src/infrastructure/api/deliveryDesignApi'
-import {
-  deliveryPublicoDesignMeResponseSchema,
-  type DeliveryPublicoDesignConfigDTO,
-  type DeliveryPublicoDesignMeResponseDTO,
+import type {
+  DeliveryPublicoDesignConfigDTO,
+  DeliveryPublicoDesignMeResponseDTO,
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDesignDTO'
-import { validarDraftDesign } from '@/src/application/services/delivery/validarDraftDesign'
-import { validarPublicacaoDesign } from '@/src/application/services/delivery/validarPublicacaoDesign'
+import {
+  buscarDesignDeliveryMeUseCase,
+  limparBannerEmpresaDeliveryUseCase,
+  limparLogoEmpresaDeliveryUseCase,
+  publicarDesignDeliveryUseCase,
+  salvarDraftDesignDeliveryUseCase,
+} from '@/src/infrastructure/composition/deliveryDesignUseCases'
 
 export const DELIVERY_DESIGN_ME_QUERY_KEY = ['delivery', 'design-me'] as const
-
-function parseMeResponse(raw: unknown): DeliveryPublicoDesignMeResponseDTO {
-  return deliveryPublicoDesignMeResponseSchema.parse(raw)
-}
 
 export function useDeliveryDesignMe(enabled = true) {
   return useSecureTenantQuery<DeliveryPublicoDesignMeResponseDTO>(
     DELIVERY_DESIGN_ME_QUERY_KEY,
-    async ({ token }) =>
-      parseMeResponse(requireGestorConfig(await buscarDesignDeliveryMe(token))),
+    async ({ token }) => buscarDesignDeliveryMeUseCase.execute(token),
     {
       enabled,
       staleTime: 1000 * 30,
@@ -46,12 +37,7 @@ export function useSalvarDraftDesignDelivery() {
     DeliveryPublicoDesignMeResponseDTO,
     DeliveryPublicoDesignConfigDTO
   >(
-    async ({ token }, body) => {
-      const validated = validarDraftDesign(body)
-      return parseMeResponse(
-        requireGestorConfig(await salvarDraftDesignDelivery(token, validated))
-      )
-    },
+    async ({ token }, body) => salvarDraftDesignDeliveryUseCase.execute(token, body),
     {
       onSuccess: async () => {
         await invalidate(DELIVERY_DESIGN_ME_QUERY_KEY)
@@ -63,9 +49,15 @@ export function useSalvarDraftDesignDelivery() {
 export function usePublicarDesignDelivery() {
   const invalidate = useInvalidateTenantQueries()
 
-  return useSecureTenantMutation<DeliveryPublicoDesignMeResponseDTO, void>(
-    async ({ token }) =>
-      parseMeResponse(requireGestorConfig(await publicarDesignDelivery(token))),
+  return useSecureTenantMutation<
+    DeliveryPublicoDesignMeResponseDTO,
+    DeliveryPublicoDesignConfigDTO | void
+  >(
+    async ({ token }, draftAtual) =>
+      publicarDesignDeliveryUseCase.execute(
+        token,
+        draftAtual === undefined || draftAtual === null ? undefined : draftAtual
+      ),
     {
       onSuccess: async () => {
         await invalidate(DELIVERY_DESIGN_ME_QUERY_KEY)
@@ -78,7 +70,7 @@ export function useLimparLogoEmpresaDelivery() {
   const invalidate = useInvalidateTenantQueries()
   return useSecureTenantMutation<void, void>(
     async ({ token }) => {
-      requireGestorConfig(await limparLogoEmpresaDelivery(token))
+      await limparLogoEmpresaDeliveryUseCase.execute(token)
     },
     {
       onSuccess: async () => {
@@ -92,7 +84,7 @@ export function useLimparBannerEmpresaDelivery() {
   const invalidate = useInvalidateTenantQueries()
   return useSecureTenantMutation<void, void>(
     async ({ token }) => {
-      requireGestorConfig(await limparBannerEmpresaDelivery(token))
+      await limparBannerEmpresaDeliveryUseCase.execute(token)
     },
     {
       onSuccess: async () => {
@@ -100,8 +92,4 @@ export function useLimparBannerEmpresaDelivery() {
       },
     }
   )
-}
-
-export function assertDesignPublicavel(config: DeliveryPublicoDesignConfigDTO) {
-  return validarPublicacaoDesign(config)
 }

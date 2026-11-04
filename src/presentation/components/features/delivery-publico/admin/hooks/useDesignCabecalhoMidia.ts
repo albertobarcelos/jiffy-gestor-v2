@@ -4,12 +4,14 @@ import { useCallback, useState } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchEmpresaPublicaMidia } from '@/src/infrastructure/api/empresaDeliveryMidiaApi'
 import {
-  clearEmpresaDeliveryBanner,
-  clearEmpresaDeliveryLogo,
   mensagemLegivelDeliveryMediaError,
   uploadEmpresaDeliveryBanner,
   uploadEmpresaDeliveryLogo,
 } from '@/src/infrastructure/api/deliveryMediaApi'
+import {
+  limparBannerEmpresaDeliveryUseCase,
+  limparLogoEmpresaDeliveryUseCase,
+} from '@/src/infrastructure/composition/deliveryDesignUseCases'
 import { validateDeliveryImageFile } from '@/src/shared/constants/deliveryImageUpload'
 import { showToast } from '@/src/shared/utils/toast'
 import type { DeliveryPublicoDesignConfig } from '../../shared/types/deliveryPublicoDesignConfig'
@@ -170,9 +172,9 @@ export function useDesignCabecalhoMidia({
 
       try {
         if (field === 'logoUrl') {
-          await clearEmpresaDeliveryLogo(token)
+          await limparLogoEmpresaDeliveryUseCase.execute(token)
         } else {
-          await clearEmpresaDeliveryBanner(token)
+          await limparBannerEmpresaDeliveryUseCase.execute(token)
         }
         revokeBlobUrl(previousUrl)
         updateCabecalhoField(field, null)
