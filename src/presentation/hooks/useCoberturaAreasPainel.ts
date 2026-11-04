@@ -85,10 +85,9 @@ export function useCoberturaAreasPainel({
       areas.map(area => {
         const ativo = ativosAreaDraft[area.id] ?? area.ativo
         const pathsDraft = geometriasAreaDraft[area.id]
-        // Em Editar, o Google Maps segura vértices/raio — espelhar draft remonta e quebra.
-        // Em Mover, após dragend precisamos espelhar: remonta o polígono (bug do draggable nativo
-        // corrompe o overlay após o 1º arraste; sem remount o 2º trava).
-        if (!pathsDraft || ferramenta === 'editar' || areaFormaEditandoId === area.id) {
+        // Sempre espelha o rascunho (trocar Editar↔Mover↔mão mantém a forma atual).
+        // Remount durante edição de vértices é evitado no Map (signature estável por área).
+        if (!pathsDraft) {
           return { ...area, ativo }
         }
         try {
@@ -97,7 +96,7 @@ export function useCoberturaAreasPainel({
           return { ...area, ativo }
         }
       }),
-    [areaFormaEditandoId, areas, ativosAreaDraft, ferramenta, geometriasAreaDraft]
+    [areas, ativosAreaDraft, geometriasAreaDraft]
   )
 
   const areasTaxaSignature = areas

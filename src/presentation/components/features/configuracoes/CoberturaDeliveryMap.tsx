@@ -399,12 +399,18 @@ function MapAreasPoligonos({
   onHoverAreaRef.current = onHoverArea
   onHoverFimRef.current = onHoverFim
 
+  // Enquanto uma área está em edição de vértices/raio, congela a assinatura dela:
+  // updates do draft (set_at) não remountam o overlay (quebraria o arraste dos handles).
   const areasSignature = useMemo(
     () =>
       areas
-        .map(a => `${a.id}:${a.ativo ? 1 : 0}:${JSON.stringify(a.area.coordinates)}`)
+        .map(a =>
+          areaFormaEditandoId === a.id
+            ? `${a.id}:editing:${a.ativo ? 1 : 0}`
+            : `${a.id}:${a.ativo ? 1 : 0}:${JSON.stringify(a.area.coordinates)}`
+        )
         .join('|'),
-    [areas]
+    [areaFormaEditandoId, areas]
   )
   // Em modo mover, hover/destaque da lista não pode remountar o polígono (quebra o arraste).
   const destaqueSignature = arrasteHabilitado
@@ -414,7 +420,13 @@ function MapAreasPoligonos({
   useEffect(() => {
     if (!map || typeof google === 'undefined') return
 
-    const overlays: Array<google.maps.Polygon | google.maps.Circle> = []
+    type OverlayTracked = {
+      areaId: string
+      modo: 'editar' | 'mover' | 'outro'
+      circle?: google.maps.Circle
+      polygon?: google.maps.Polygon
+    }
+    const overlays: OverlayTracked[] = []
     const listeners: google.maps.MapsEventListener[] = []
 
     // Pan do mapa competindo com Polygon.draggable corrompe o gesto (travamento intermitente).
@@ -460,7 +472,7 @@ function MapAreasPoligonos({
           draggable: true,
           zIndex: estilo.zIndex,
         })
-        overlays.push(circle)
+        overlays.push({ areaId: area.id, modo: 'editar', circle })
         const emitirCirculo = () => {
           const centroLatLng = circle.getCenter()
           const raio = circle.getRadius()
@@ -500,7 +512,11 @@ function MapAreasPoligonos({
           draggable: arrasteHabilitado && !editando,
           zIndex: estilo.zIndex,
         })
-        overlays.push(polygon)
+        overlays.push({
+          areaId: area.id,
+          modo: editando ? 'editar' : arrasteHabilitado ? 'mover' : 'outro',
+          polygon,
+        })
 
         if (apagarHabilitado && !editando) {
           listeners.push(
@@ -551,18 +567,53 @@ function MapAreasPoligonos({
           listeners.push(path.addListener('set_at', emitir))
           listeners.push(path.addListener('insert_at', emitir))
           listeners.push(path.addListener('remove_at', emitir))
+          // Clique duplo no vértice remove (mínimo de 3 vértices).
+          listeners.push(
+            polygon.addListener('dblclick', (event: google.maps.PolyMouseEvent) => {
+              event.stop?.()
+              if (event.vertex == null) return
+              if (path.getLength() <= MIN_VERTICES_AREA) return
+              path.removeAt(event.vertex)
+            })
+          )
         }
       }
     }
 
     return () => {
+      // Ao trocar Editar↔Mover (ou outra ferramenta), grava a geometria visual no draft
+      // antes de destruir o overlay — senão a posição/forma some ao voltar.
+      for (const item of overlays) {
+        if (item.modo === 'editar') {
+          if (item.circle) {
+            const centroLatLng = item.circle.getCenter()
+            const raio = item.circle.getRadius()
+            if (centroLatLng && raio >= 15) {
+              onFormaAlteradaRef.current?.(
+                item.areaId,
+                pathsDeCirculo(
+                  { lat: centroLatLng.lat(), lng: centroLatLng.lng() },
+                  raio
+                )
+              )
+            }
+          } else if (item.polygon) {
+            onFormaAlteradaRef.current?.(item.areaId, lerPathsDoPoligono(item.polygon))
+          }
+        } else if (item.modo === 'mover' && item.polygon) {
+          onAreaArrastadaRef.current?.(item.areaId, lerPathsDoPoligono(item.polygon))
+        }
+      }
       map.setOptions({
         draggable: true,
         draggableCursor: undefined,
         draggingCursor: undefined,
       })
       for (const listener of listeners) listener.remove()
-      for (const overlay of overlays) overlay.setMap(null)
+      for (const item of overlays) {
+        item.circle?.setMap(null)
+        item.polygon?.setMap(null)
+      }
     }
     // areas: recria só quando a assinatura de geometria/ativo muda (não a cada re-render)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -611,7 +662,7 @@ function MapAreasRascunhoCriacao({
   useEffect(() => {
     if (!map || typeof google === 'undefined') return
 
-    const polygons: google.maps.Polygon[] = []
+    const polygons: Array<{ id: string; polygon: google.maps.Polygon }> = []
     const listeners: google.maps.MapsEventListener[] = []
 
     if (arrasteHabilitado) {
@@ -636,7 +687,7 @@ function MapAreasRascunhoCriacao({
         draggable: arrasteHabilitado,
         zIndex: 5,
       })
-      polygons.push(polygon)
+      polygons.push({ id: area.id, polygon })
 
       if (apagarHabilitado) {
         listeners.push(
@@ -658,6 +709,9 @@ function MapAreasRascunhoCriacao({
 
     return () => {
       if (arrasteHabilitado) {
+        for (const item of polygons) {
+          onArrasteRef.current?.(item.id, lerPathsDoPoligono(item.polygon))
+        }
         map.setOptions({
           draggable: true,
           draggableCursor: undefined,
@@ -665,7 +719,7 @@ function MapAreasRascunhoCriacao({
         })
       }
       for (const listener of listeners) listener.remove()
-      for (const polygon of polygons) polygon.setMap(null)
+      for (const item of polygons) item.polygon.setMap(null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, signature, arrasteHabilitado, apagarHabilitado])
@@ -1174,8 +1228,8 @@ export function CoberturaDeliveryMap({
         ? 'Clique no centro e de novo na borda. A área fica em rascunho até Salvar no painel (pode ficar fora do raio).'
         : ferramenta === 'editar'
           ? areaFormaEditandoId
-            ? 'Ajuste o raio (círculo) ou os vértices. Clique em Salvar no painel para confirmar.'
-            : 'Clique em uma área para editar. Círculos usam alça de raio.'
+            ? 'Ajuste o raio (círculo) ou os vértices. Clique duplo no vértice para remover (mín. 3). Salve no painel.'
+            : 'Clique em uma área para editar. Círculos usam alça de raio; em polígonos, duplo clique remove vértice.'
           : ferramenta === 'mover'
             ? 'Arraste uma área no mapa para reposicionar.'
             : ferramenta === 'apagar'
