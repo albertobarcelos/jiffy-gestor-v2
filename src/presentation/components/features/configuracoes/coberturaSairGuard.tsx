@@ -20,6 +20,7 @@ import {
 
 const ReportarSujoContext = createContext<(sujo: boolean) => void>(() => undefined)
 const PedirSaidaContext = createContext<(acao: () => void) => void>((acao: () => void) => acao())
+const LiberarUnloadContext = createContext<() => void>(() => undefined)
 
 export function CoberturaSairGuardProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
@@ -27,6 +28,7 @@ export function CoberturaSairGuardProvider({ children }: { children: ReactNode }
   const [aberto, setAberto] = useState(false)
   const acaoRef = useRef<(() => void) | null>(null)
   const sujoRef = useRef(false)
+  const permitirUnloadRef = useRef(false)
   sujoRef.current = sujo
 
   const pedirSaida = useCallback((acao: () => void) => {
@@ -38,9 +40,19 @@ export function CoberturaSairGuardProvider({ children }: { children: ReactNode }
     setAberto(true)
   }, [])
 
+  /** Libera o próximo unload (ex.: reload após Salvar / Sair sem salvar no modal). */
+  const liberarUnload = useCallback(() => {
+    permitirUnloadRef.current = true
+    setSujo(false)
+    sujoRef.current = false
+  }, [])
+
   useEffect(() => {
     if (!sujo) return
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      // Alerta nativo do browser — único aviso possível no botão Recarregar da barra.
+      // F5/Ctrl+R são interceptados na Tab para abrir o modal customizado.
+      if (permitirUnloadRef.current) return
       event.preventDefault()
       event.returnValue = ''
     }
@@ -73,42 +85,44 @@ export function CoberturaSairGuardProvider({ children }: { children: ReactNode }
   return (
     <ReportarSujoContext.Provider value={setSujo}>
       <PedirSaidaContext.Provider value={pedirSaida}>
-        {children}
-        <Dialog open={aberto} onOpenChange={open => !open && setAberto(false)}>
-          <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle>Alterações não salvas</DialogTitle>
-            </DialogHeader>
-            <p className="text-sm text-secondary-text">
-              Deseja sair sem salvar? As alterações de cobertura serão perdidas.
-            </p>
-            <DialogFooter className="gap-2 sm:gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setAberto(false)
-                  acaoRef.current = null
-                }}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-secondary-text"
-              >
-                Continuar editando
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const acao = acaoRef.current
-                  acaoRef.current = null
-                  setAberto(false)
-                  setSujo(false)
-                  acao?.()
-                }}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white"
-              >
-                Sair sem salvar
-              </button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <LiberarUnloadContext.Provider value={liberarUnload}>
+          {children}
+          <Dialog open={aberto} onOpenChange={open => !open && setAberto(false)}>
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Alterações não salvas</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-secondary-text">
+                Deseja sair sem salvar? As alterações de cobertura serão perdidas.
+              </p>
+              <DialogFooter className="gap-2 sm:gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAberto(false)
+                    acaoRef.current = null
+                  }}
+                  className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-secondary-text"
+                >
+                  Continuar editando
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const acao = acaoRef.current
+                    acaoRef.current = null
+                    setAberto(false)
+                    setSujo(false)
+                    acao?.()
+                  }}
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white"
+                >
+                  Sair sem salvar
+                </button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </LiberarUnloadContext.Provider>
       </PedirSaidaContext.Provider>
     </ReportarSujoContext.Provider>
   )
@@ -124,4 +138,8 @@ export function useReportarCoberturaSuja(sujo: boolean) {
 
 export function usePedirSaidaCobertura() {
   return useContext(PedirSaidaContext)
+}
+
+export function useLiberarUnloadCobertura() {
+  return useContext(LiberarUnloadContext)
 }

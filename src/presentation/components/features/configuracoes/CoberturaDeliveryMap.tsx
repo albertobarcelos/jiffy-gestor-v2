@@ -5,20 +5,22 @@ import {
   GoogleMap,
   InfoWindow,
   Marker,
-  Polygon,
   useGoogleMap,
   useJsApiLoader,
 } from '@react-google-maps/api'
 import {
   MdDeleteOutline,
   MdDraw,
+  MdEdit,
   MdOpenWith,
+  MdPanTool,
   MdRadioButtonUnchecked,
   MdSatelliteAlt,
   MdZoomIn,
   MdZoomOut,
 } from 'react-icons/md'
 import type { AreaEntregaDTO, RaioEntregaDTO } from '@/src/application/dto/delivery/CoberturaEntregaDTO'
+import type { AreaRascunhoCriacaoCobertura } from '@/src/presentation/components/features/configuracoes/coberturaAreasDraft'
 import {
   geoJsonPointFromLatLng,
   latLngFromGeoJsonPoint,
@@ -39,7 +41,11 @@ import {
   mapaGoogleAuthFalhou,
   onMapaGoogleAuthFailure,
 } from '@/src/shared/utils/googleMapsFalhaCliente'
-import { pathsDeAnelFaixa } from '@/src/shared/utils/geoJsonCircle'
+import {
+  detectarCirculoEmPaths,
+  pathsDeAnelFaixa,
+  pathsDeCirculo,
+} from '@/src/shared/utils/geoJsonCircle'
 import {
   pinDentroDoRaioPermitido,
   RAIO_AJUSTE_PIN_METROS,
@@ -53,7 +59,13 @@ import {
 } from '@/src/shared/utils/coberturaMapaDestaque'
 import { criarOpcoesIconePinLoja } from '@/src/presentation/components/shared/geolocalizacao/geolocalizacaoMapPinIcons'
 
-export type FerramentaCobertura = 'navegar' | 'poligono' | 'circulo' | 'mover' | 'apagar'
+export type FerramentaCobertura =
+  | 'navegar'
+  | 'poligono'
+  | 'circulo'
+  | 'editar'
+  | 'mover'
+  | 'apagar'
 
 export type AcoesDesenhoCobertura = {
   desfazer: () => void
@@ -65,6 +77,8 @@ export type EstadoDesenhoCobertura = {
   pontos: number
   podeConcluir: boolean
 }
+
+export type { AreaRascunhoCriacaoCobertura }
 
 const MAP_CONTAINER_STYLE = { width: '100%', height: '100%' }
 const FALLBACK_CENTER = { lat: -12.6819, lng: -56.9211 }
@@ -91,21 +105,25 @@ function MapFitCobertura({
   centro,
   raios,
   areas,
-  rascunhoPaths,
+  areasRascunhoCriacao,
   congelarVisao,
 }: {
   centro: LatLng | null
   raios: Array<{ distanciaMaximaEmMetros: number }>
   areas: AreaEntregaDTO[]
-  rascunhoPaths: LatLngLiteral[] | null
+  areasRascunhoCriacao: AreaRascunhoCriacaoCobertura[]
   congelarVisao: boolean
 }) {
   const map = useGoogleMap()
+  const rascunhoPontos = areasRascunhoCriacao.reduce((acc, item) => acc + item.paths.length, 0)
   const assinatura = assinaturaEnquadramentoCobertura({
     centro,
     raiosMetros: raios.map(raio => raio.distanciaMaximaEmMetros),
-    areaIds: areas.map(area => area.id),
-    rascunhoPontos: rascunhoPaths?.length ?? 0,
+    areaIds: [
+      ...areas.map(area => area.id),
+      ...areasRascunhoCriacao.map(area => area.id),
+    ],
+    rascunhoPontos,
   })
 
   useEffect(() => {
@@ -128,12 +146,12 @@ function MapFitCobertura({
       }
     }
 
-    if (rascunhoPaths?.length) {
-      for (const p of rascunhoPaths) bounds.extend(p)
+    for (const rascunho of areasRascunhoCriacao) {
+      for (const p of rascunho.paths) bounds.extend(p)
     }
 
     const temExtensao =
-      raios.length > 0 || areas.length > 0 || (rascunhoPaths?.length ?? 0) > 0
+      raios.length > 0 || areas.length > 0 || areasRascunhoCriacao.length > 0
 
     if (!temExtensao) {
       map.panTo(centro)
@@ -341,6 +359,7 @@ function MapAreasPoligonos({
   hoverHabilitado,
   arrasteHabilitado,
   apagarHabilitado,
+  remountEpoch,
   onSelecionarArea,
   onFormaAlterada,
   onAreaArrastada,
@@ -358,6 +377,7 @@ function MapAreasPoligonos({
   hoverHabilitado: boolean
   arrasteHabilitado: boolean
   apagarHabilitado: boolean
+  remountEpoch: number
   onSelecionarArea?: (areaId: string) => void
   onFormaAlterada?: (areaId: string, paths: LatLngLiteral[]) => void
   onAreaArrastada?: (areaId: string, paths: LatLngLiteral[]) => void
@@ -379,34 +399,101 @@ function MapAreasPoligonos({
   onHoverAreaRef.current = onHoverArea
   onHoverFimRef.current = onHoverFim
 
+  // Enquanto uma área está em edição de vértices/raio, congela a assinatura dela:
+  // updates do draft (set_at) não remountam o overlay (quebraria o arraste dos handles).
   const areasSignature = useMemo(
     () =>
       areas
-        .map(a => `${a.id}:${a.ativo ? 1 : 0}:${JSON.stringify(a.area.coordinates)}`)
+        .map(a =>
+          areaFormaEditandoId === a.id
+            ? `${a.id}:editing:${a.ativo ? 1 : 0}`
+            : `${a.id}:${a.ativo ? 1 : 0}:${JSON.stringify(a.area.coordinates)}`
+        )
         .join('|'),
-    [areas]
+    [areaFormaEditandoId, areas]
   )
+  // Em modo mover, hover/destaque da lista não pode remountar o polígono (quebra o arraste).
+  const destaqueSignature = arrasteHabilitado
+    ? 'mover'
+    : `${areaDestacadaId ?? ''}:${destacarTodasAreas ? 1 : 0}:${haDestaqueAtivo ? 1 : 0}`
 
   useEffect(() => {
     if (!map || typeof google === 'undefined') return
 
-    const polygons: google.maps.Polygon[] = []
+    type OverlayTracked = {
+      areaId: string
+      modo: 'editar' | 'mover' | 'outro'
+      circle?: google.maps.Circle
+      polygon?: google.maps.Polygon
+    }
+    const overlays: OverlayTracked[] = []
     const listeners: google.maps.MapsEventListener[] = []
+
+    // Pan do mapa competindo com Polygon.draggable corrompe o gesto (travamento intermitente).
+    if (arrasteHabilitado) {
+      map.setOptions({
+        draggable: false,
+        draggableCursor: 'grab',
+        draggingCursor: 'grabbing',
+      })
+    }
 
     for (let index = 0; index < areas.length; index++) {
       const area = areas[index]
       if (!area.ativo && areaFormaEditandoId !== area.id) continue
       const cores = CORES_COBERTURA[(index + raiosCount) % CORES_COBERTURA.length]
       const editando = areaFormaEditandoId === area.id
-      const destacada = editando || destacarTodasAreas || areaDestacadaId === area.id
+      const destacada =
+        editando ||
+        (!arrasteHabilitado && (destacarTodasAreas || areaDestacadaId === area.id))
       const estilo = estiloOverlayCobertura({
         ativo: area.ativo,
         destacado: destacada,
-        haDestaqueAtivo,
+        haDestaqueAtivo: arrasteHabilitado ? false : haDestaqueAtivo,
         variante: 'area',
         editando,
       })
       const rings = geoJsonToLatLngRings(area.area)
+      const circuloEdicao =
+        editando && rings[0] ? detectarCirculoEmPaths(rings[0]) : null
+
+      // Área circular em edição: alça de raio (Circle) em vez de dezenas de vértices.
+      if (circuloEdicao) {
+        const circle = new google.maps.Circle({
+          map,
+          center: circuloEdicao.centro,
+          radius: circuloEdicao.raioMetros,
+          strokeColor: cores.stroke,
+          strokeOpacity: estilo.strokeOpacity,
+          strokeWeight: estilo.strokeWeight,
+          fillColor: cores.fill,
+          fillOpacity: estilo.fillOpacity,
+          editable: true,
+          draggable: true,
+          zIndex: estilo.zIndex,
+        })
+        overlays.push({ areaId: area.id, modo: 'editar', circle })
+        const emitirCirculo = () => {
+          const centroLatLng = circle.getCenter()
+          const raio = circle.getRadius()
+          if (!centroLatLng || raio < 15) return
+          onFormaAlteradaRef.current?.(
+            area.id,
+            pathsDeCirculo(
+              { lat: centroLatLng.lat(), lng: centroLatLng.lng() },
+              raio
+            )
+          )
+        }
+        listeners.push(circle.addListener('radius_changed', emitirCirculo))
+        listeners.push(circle.addListener('center_changed', emitirCirculo))
+        listeners.push(
+          circle.addListener('click', (event: google.maps.MapMouseEvent) => {
+            event.stop?.()
+          })
+        )
+        continue
+      }
 
       for (const paths of rings) {
         const polygon = new google.maps.Polygon({
@@ -425,7 +512,11 @@ function MapAreasPoligonos({
           draggable: arrasteHabilitado && !editando,
           zIndex: estilo.zIndex,
         })
-        polygons.push(polygon)
+        overlays.push({
+          areaId: area.id,
+          modo: editando ? 'editar' : arrasteHabilitado ? 'mover' : 'outro',
+          polygon,
+        })
 
         if (apagarHabilitado && !editando) {
           listeners.push(
@@ -476,17 +567,162 @@ function MapAreasPoligonos({
           listeners.push(path.addListener('set_at', emitir))
           listeners.push(path.addListener('insert_at', emitir))
           listeners.push(path.addListener('remove_at', emitir))
+          // Clique duplo no vértice remove (mínimo de 3 vértices).
+          listeners.push(
+            polygon.addListener('dblclick', (event: google.maps.PolyMouseEvent) => {
+              event.stop?.()
+              if (event.vertex == null) return
+              if (path.getLength() <= MIN_VERTICES_AREA) return
+              path.removeAt(event.vertex)
+            })
+          )
         }
       }
     }
 
     return () => {
+      // Ao trocar Editar↔Mover (ou outra ferramenta), grava a geometria visual no draft
+      // antes de destruir o overlay — senão a posição/forma some ao voltar.
+      for (const item of overlays) {
+        if (item.modo === 'editar') {
+          if (item.circle) {
+            const centroLatLng = item.circle.getCenter()
+            const raio = item.circle.getRadius()
+            if (centroLatLng && raio >= 15) {
+              onFormaAlteradaRef.current?.(
+                item.areaId,
+                pathsDeCirculo(
+                  { lat: centroLatLng.lat(), lng: centroLatLng.lng() },
+                  raio
+                )
+              )
+            }
+          } else if (item.polygon) {
+            onFormaAlteradaRef.current?.(item.areaId, lerPathsDoPoligono(item.polygon))
+          }
+        } else if (item.modo === 'mover' && item.polygon) {
+          onAreaArrastadaRef.current?.(item.areaId, lerPathsDoPoligono(item.polygon))
+        }
+      }
+      map.setOptions({
+        draggable: true,
+        draggableCursor: undefined,
+        draggingCursor: undefined,
+      })
       for (const listener of listeners) listener.remove()
-      for (const polygon of polygons) polygon.setMap(null)
+      for (const item of overlays) {
+        item.circle?.setMap(null)
+        item.polygon?.setMap(null)
+      }
     }
     // areas: recria só quando a assinatura de geometria/ativo muda (não a cada re-render)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, areasSignature, raiosCount, areaDestacadaId, areaFormaEditandoId, destacarTodasAreas, haDestaqueAtivo, selecaoHabilitada, hoverHabilitado, arrasteHabilitado, apagarHabilitado])
+  }, [
+    map,
+    areasSignature,
+    raiosCount,
+    destaqueSignature,
+    areaFormaEditandoId,
+    selecaoHabilitada,
+    hoverHabilitado,
+    arrasteHabilitado,
+    apagarHabilitado,
+    remountEpoch,
+  ])
+
+  return null
+}
+
+/** Polígonos de áreas ainda não salvas — arrastáveis no modo Mover; apagar remove o rascunho. */
+function MapAreasRascunhoCriacao({
+  areasRascunho,
+  arrasteHabilitado,
+  apagarHabilitado,
+  onAreaRascunhoArrastada,
+  onApagarAreaRascunho,
+}: {
+  areasRascunho: AreaRascunhoCriacaoCobertura[]
+  arrasteHabilitado: boolean
+  apagarHabilitado: boolean
+  onAreaRascunhoArrastada?: (id: string, paths: LatLngLiteral[]) => void
+  onApagarAreaRascunho?: (id: string) => void
+}) {
+  const map = useGoogleMap()
+  const onArrasteRef = useRef(onAreaRascunhoArrastada)
+  const onApagarRef = useRef(onApagarAreaRascunho)
+  onArrasteRef.current = onAreaRascunhoArrastada
+  onApagarRef.current = onApagarAreaRascunho
+
+  // Após dragend o paths muda → remonta o polígono (Polygon.draggable corrompe após o 1º arraste).
+  const signature = useMemo(
+    () => areasRascunho.map(a => `${a.id}:${JSON.stringify(a.paths)}`).join('|'),
+    [areasRascunho]
+  )
+
+  useEffect(() => {
+    if (!map || typeof google === 'undefined') return
+
+    const polygons: Array<{ id: string; polygon: google.maps.Polygon }> = []
+    const listeners: google.maps.MapsEventListener[] = []
+
+    if (arrasteHabilitado) {
+      map.setOptions({
+        draggable: false,
+        draggableCursor: 'grab',
+        draggingCursor: 'grabbing',
+      })
+    }
+
+    for (const area of areasRascunho) {
+      if (area.paths.length < MIN_VERTICES_AREA) continue
+      const polygon = new google.maps.Polygon({
+        map,
+        paths: area.paths,
+        strokeColor: '#1d4ed8',
+        strokeOpacity: 0.95,
+        strokeWeight: 2,
+        fillColor: '#3b82f6',
+        fillOpacity: 0.35,
+        clickable: arrasteHabilitado || apagarHabilitado,
+        draggable: arrasteHabilitado,
+        zIndex: 5,
+      })
+      polygons.push({ id: area.id, polygon })
+
+      if (apagarHabilitado) {
+        listeners.push(
+          polygon.addListener('click', (event: google.maps.MapMouseEvent) => {
+            event.stop?.()
+            onApagarRef.current?.(area.id)
+          })
+        )
+      }
+
+      if (arrasteHabilitado) {
+        listeners.push(
+          polygon.addListener('dragend', () => {
+            onArrasteRef.current?.(area.id, lerPathsDoPoligono(polygon))
+          })
+        )
+      }
+    }
+
+    return () => {
+      if (arrasteHabilitado) {
+        for (const item of polygons) {
+          onArrasteRef.current?.(item.id, lerPathsDoPoligono(item.polygon))
+        }
+        map.setOptions({
+          draggable: true,
+          draggableCursor: undefined,
+          draggingCursor: undefined,
+        })
+      }
+      for (const listener of listeners) listener.remove()
+      for (const item of polygons) item.polygon.setMap(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, signature, arrasteHabilitado, apagarHabilitado])
 
   return null
 }
@@ -746,11 +982,13 @@ type CoberturaDeliveryMapProps = {
   raios: RaioEntregaDTO[]
   areas: AreaEntregaDTO[]
   ferramenta?: FerramentaCobertura
-  rascunhoPaths?: LatLngLiteral[] | null
+  areasRascunhoCriacao?: AreaRascunhoCriacaoCobertura[]
   areaDestacadaId?: string | null
   raioDestacadoId?: string | null
   destacarTodasAreas?: boolean
   areaFormaEditandoId?: string | null
+  /** Incrementar para forçar recriação dos polígonos (descartar posição, etc.). */
+  areasPoligonosEpoch?: number
   ferramentasHabilitadas?: boolean
   desenhoHabilitado?: boolean
   onFerramentaChange?: (ferramenta: FerramentaCobertura) => void
@@ -760,7 +998,9 @@ type CoberturaDeliveryMapProps = {
   onSelecionarAreaParaEditar?: (areaId: string) => void
   onFormaAreaAlterada?: (areaId: string, paths: LatLngLiteral[]) => void
   onAreaArrastada?: (areaId: string, paths: LatLngLiteral[]) => void
+  onAreaRascunhoArrastada?: (id: string, paths: LatLngLiteral[]) => void
   onApagarArea?: (areaId: string) => void
+  onApagarAreaRascunho?: (id: string) => void
   pinRascunho?: GeoJsonPoint | null
   pinSnapEpoch?: number
   centroAjustePin?: GeoJsonPoint | null
@@ -785,11 +1025,12 @@ export function CoberturaDeliveryMap({
   raios,
   areas,
   ferramenta = 'navegar',
-  rascunhoPaths = null,
+  areasRascunhoCriacao = [],
   areaDestacadaId = null,
   raioDestacadoId = null,
   destacarTodasAreas = false,
   areaFormaEditandoId = null,
+  areasPoligonosEpoch = 0,
   ferramentasHabilitadas = true,
   desenhoHabilitado = true,
   onFerramentaChange,
@@ -799,7 +1040,9 @@ export function CoberturaDeliveryMap({
   onSelecionarAreaParaEditar,
   onFormaAreaAlterada,
   onAreaArrastada,
+  onAreaRascunhoArrastada,
   onApagarArea,
+  onApagarAreaRascunho,
   pinRascunho = null,
   pinSnapEpoch = 0,
   centroAjustePin = null,
@@ -823,9 +1066,16 @@ export function CoberturaDeliveryMap({
 
   const modoDesenho = ferramenta === 'poligono'
   const modoCirculo = ferramenta === 'circulo'
+  const modoEditarForma = ferramenta === 'editar'
   const arrasteHabilitado = ferramenta === 'mover' && !areaFormaEditandoId
   const apagarHabilitado = ferramenta === 'apagar' && !areaFormaEditandoId
-  const pinArrastavel = Boolean(onPinMovido) && ferramenta !== 'poligono' && ferramenta !== 'circulo'
+  const pinArrastavel =
+    Boolean(onPinMovido) &&
+    ferramenta !== 'poligono' &&
+    ferramenta !== 'circulo' &&
+    ferramenta !== 'editar' &&
+    ferramenta !== 'mover' &&
+    ferramenta !== 'apagar'
 
   const centroRaios = useMemo(() => latLngFromGeoJsonPoint(origem), [origem])
   const centroPin = useMemo(
@@ -845,6 +1095,7 @@ export function CoberturaDeliveryMap({
   centroMapaRef.current = centroMapa
   zoomInicialRef.current = zoomInicial
   const hoverHabilitado = ferramenta === 'navegar' && !areaFormaEditandoId
+  const selecaoEditarHabilitada = modoEditarForma
   const haDestaqueAtivo = Boolean(
     areaDestacadaId || raioDestacadoId || destacarTodasAreas || areaFormaEditandoId
   )
@@ -974,22 +1225,26 @@ export function CoberturaDeliveryMap({
         ? 'Clique no mapa para marcar os vértices. Use o card à esquerda para concluir.'
         : `${verticesDesenho.length} ponto${verticesDesenho.length === 1 ? '' : 's'}. Mínimo de ${MIN_VERTICES_AREA} para fechar a área.`
       : ferramenta === 'circulo'
-        ? 'Clique no centro e de novo na borda. Isso cria uma área com nome e taxa, mesmo fora do raio.'
-        : ferramenta === 'mover'
-          ? 'Arraste uma área no mapa para reposicionar.'
-          : ferramenta === 'apagar'
-            ? 'Clique em uma área para excluir.'
-            : ajusteLivre
-              ? 'Mova o mapa e clique para marcar a loja. Confirme no card à esquerda.'
-              : !centroPin
-              ? 'Clique no mapa para marcar a loja. Depois confirme no card à esquerda.'
-              : areaFormaEditandoId
-              ? 'Arraste os vértices. Use Salvar forma no card à esquerda.'
-              : pinPendente
-                ? 'Pin movido. Confirme no card à esquerda para atualizar os raios.'
-                : pinArrastavel
-                ? 'Clique no mapa ou arraste o pin. Confirme no card para gravar.'
-                : null
+        ? 'Clique no centro e de novo na borda. A área fica em rascunho até Salvar no painel (pode ficar fora do raio).'
+        : ferramenta === 'editar'
+          ? areaFormaEditandoId
+            ? 'Ajuste o raio (círculo) ou os vértices. Clique duplo no vértice para remover (mín. 3). Salve no painel.'
+            : 'Clique em uma área para editar. Círculos usam alça de raio; em polígonos, duplo clique remove vértice.'
+          : ferramenta === 'mover'
+            ? 'Arraste uma área no mapa para reposicionar.'
+            : ferramenta === 'apagar'
+              ? 'Clique em uma área para excluir.'
+              : ajusteLivre
+                ? 'Mova o mapa e clique para marcar a loja. Confirme no card à esquerda.'
+                : !centroPin
+                  ? 'Clique no mapa para marcar a loja. Depois confirme no card à esquerda.'
+                  : pinPendente
+                    ? 'Pin movido. Confirme no card à esquerda para atualizar os raios.'
+                    : pinArrastavel
+                      ? 'Clique no mapa ou arraste o pin. Confirme no card para gravar.'
+                      : ferramenta === 'navegar' && desenhoHabilitado
+                        ? 'Mova o mapa livremente. Use Editar para alterar uma área ou este botão para sair da edição.'
+                        : null
 
   return (
     <div className="relative h-full min-h-0 overflow-hidden">
@@ -1027,6 +1282,15 @@ export function CoberturaDeliveryMap({
           <span className="mx-2 border-t border-gray-100" />
           <button
             type="button"
+            title="Mover mapa"
+            aria-label="Mover mapa"
+            onClick={() => onFerramentaChange?.('navegar')}
+            className={`p-2.5 ${classeBotaoFerramenta(ferramenta === 'navegar')}`}
+          >
+            <MdPanTool className="h-5 w-5" aria-hidden />
+          </button>
+          <button
+            type="button"
             title="Desenhar polígono"
             aria-label="Desenhar polígono"
             onClick={() => onFerramentaChange?.(ferramenta === 'poligono' ? 'navegar' : 'poligono')}
@@ -1042,6 +1306,15 @@ export function CoberturaDeliveryMap({
             className={`p-2.5 ${classeBotaoFerramenta(ferramenta === 'circulo')}`}
           >
             <MdRadioButtonUnchecked className="h-5 w-5" aria-hidden />
+          </button>
+          <button
+            type="button"
+            title="Editar vértices da área"
+            aria-label="Editar vértices da área"
+            onClick={() => onFerramentaChange?.(ferramenta === 'editar' ? 'navegar' : 'editar')}
+            className={`p-2.5 ${classeBotaoFerramenta(ferramenta === 'editar')}`}
+          >
+            <MdEdit className="h-5 w-5" aria-hidden />
           </button>
           <button
             type="button"
@@ -1082,7 +1355,7 @@ export function CoberturaDeliveryMap({
           fullscreenControl: false,
           zoomControl: false,
           mapTypeId: satelite ? 'hybrid' : 'roadmap',
-          gestureHandling: arrasteHabilitado ? 'cooperative' : 'greedy',
+          gestureHandling: 'greedy',
           clickableIcons: false,
         }}
       >
@@ -1094,10 +1367,12 @@ export function CoberturaDeliveryMap({
               : raiosEnquadramento
           }
           areas={recentrarNoEndereco ? [] : areas}
-          rascunhoPaths={recentrarNoEndereco ? null : rascunhoPaths}
+          areasRascunhoCriacao={recentrarNoEndereco ? [] : areasRascunhoCriacao}
           congelarVisao={
             modoDesenho ||
             modoCirculo ||
+            modoEditarForma ||
+            arrasteHabilitado ||
             Boolean(areaFormaEditandoId) ||
             (pinPendente && !recentrarNoEndereco)
           }
@@ -1174,10 +1449,11 @@ export function CoberturaDeliveryMap({
           areaFormaEditandoId={areaFormaEditandoId}
           destacarTodasAreas={destacarTodasAreas}
           haDestaqueAtivo={haDestaqueAtivo}
-          selecaoHabilitada={ferramenta === 'navegar' && !areaFormaEditandoId}
+          selecaoHabilitada={selecaoEditarHabilitada}
           hoverHabilitado={hoverHabilitado}
           arrasteHabilitado={arrasteHabilitado}
           apagarHabilitado={apagarHabilitado}
+          remountEpoch={areasPoligonosEpoch}
           onSelecionarArea={onSelecionarAreaParaEditar}
           onFormaAlterada={onFormaAreaAlterada}
           onAreaArrastada={onAreaArrastada}
@@ -1186,20 +1462,13 @@ export function CoberturaDeliveryMap({
           onHoverFim={onHoverFim}
         />
 
-        {rascunhoPaths && rascunhoPaths.length >= MIN_VERTICES_AREA ? (
-          <Polygon
-            paths={rascunhoPaths}
-            options={{
-              strokeColor: '#1d4ed8',
-              strokeOpacity: 0.95,
-              strokeWeight: 2,
-              fillColor: '#3b82f6',
-              fillOpacity: 0.35,
-              clickable: false,
-              zIndex: 4,
-            }}
-          />
-        ) : null}
+        <MapAreasRascunhoCriacao
+          areasRascunho={areasRascunhoCriacao}
+          arrasteHabilitado={arrasteHabilitado}
+          apagarHabilitado={apagarHabilitado}
+          onAreaRascunhoArrastada={onAreaRascunhoArrastada}
+          onApagarAreaRascunho={onApagarAreaRascunho}
+        />
 
         {modoDesenho ? (
           <MapDesenhoPoligonoManual
