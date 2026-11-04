@@ -338,6 +338,36 @@ export async function uploadEmpresaDeliveryBanner(
   return uploadDeliveryImage('/api/delivery/empresas/me/banner/upload-intent', file, token)
 }
 
+async function clearEmpresaDeliveryMidia(
+  path: '/api/delivery/empresas/me/logo' | '/api/delivery/empresas/me/banner',
+  token: string
+): Promise<void> {
+  const response = await fetch(path, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+    },
+  })
+
+  if (!response.ok && response.status !== 204) {
+    const data = await response.json().catch(() => ({}))
+    throw new DeliveryMediaApiError(
+      extractErrorMessage(data, `Erro ${response.status}`),
+      response.status,
+      data
+    )
+  }
+}
+
+export async function clearEmpresaDeliveryLogo(token: string): Promise<void> {
+  return clearEmpresaDeliveryMidia('/api/delivery/empresas/me/logo', token)
+}
+
+export async function clearEmpresaDeliveryBanner(token: string): Promise<void> {
+  return clearEmpresaDeliveryMidia('/api/delivery/empresas/me/banner', token)
+}
+
 export async function fetchGrupoProdutoImagemUrl(
   grupoProdutoId: string,
   token: string

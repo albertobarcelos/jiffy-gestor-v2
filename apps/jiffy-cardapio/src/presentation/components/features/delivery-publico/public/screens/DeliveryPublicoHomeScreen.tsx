@@ -384,6 +384,7 @@ export function DeliveryPublicoHomeScreen({
   }, [abrirCarrinho])
 
   const isCatalogLoading = isLoading && !data
+  const designReady = Boolean(data) || (isError && !isLoading)
 
   if (isError) {
     const ui = resolverMensagemErroCatalogoPublicoUi(error)
@@ -399,8 +400,9 @@ export function DeliveryPublicoHomeScreen({
   return (
     <DeliveryThemeScope
       slug={slug}
-      nomeExibicaoFallback={empresa?.nomeFantasia ?? ''}
+      nomeExibicaoFallback={empresa?.nomeExibicao ?? empresa?.nomeFantasia ?? ''}
       empresa={empresa}
+      designReady={designReady}
     >
       <DeliveryPublicoHomeContent
         slug={slug}

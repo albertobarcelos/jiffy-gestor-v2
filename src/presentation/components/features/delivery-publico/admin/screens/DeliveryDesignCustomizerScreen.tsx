@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { MdRefresh } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { JiffyConfirmDialog } from '@/src/presentation/components/ui/jiffy-confirm-dialog'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { useMenuDeliveryId } from '@/src/presentation/hooks/useMenuDeliveryId'
 import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
@@ -20,6 +21,15 @@ import { useDeliveryDesignDraft } from '../../shared/hooks/useDeliveryDesignDraf
 import { useDesignCategoriaGrupos } from '../../shared/hooks/useDesignCategoriaGrupos'
 import type { DesignCategoriaGrupo } from '../../shared/types/designCategoriaGrupo'
 import { mergeDesignCategoriaGrupos } from '../../shared/utils/mergeDesignCategoriaGrupos'
+import {
+  getDesignMigrationMarker,
+  markDesignMigrated,
+} from '../../shared/utils/designConfigStorage'
+import { importDesignLocalToApi } from '../../shared/utils/importDesignLocalToApi'
+import {
+  isDesignLocalMigrationEnabled,
+  shouldOfferDesignLocalMigration,
+} from '../../shared/utils/shouldOfferDesignLocalMigration'
 import { DesignOpenTabsBar, type DesignWorkspaceTabId } from '../components/DesignOpenTabsBar'
 import { DesignSectionCards } from '../components/DesignSectionCards'
 import { DeliveryMobilePreviewFrame } from '../components/DeliveryMobilePreviewFrame'
@@ -30,6 +40,7 @@ import { DesignTipografiasTab } from '../components/tabs/DesignTipografiasTab'
 import { DesignCategoriasTab } from '../components/tabs/DesignCategoriasTab'
 import { NotificacoesWhatsAppDeliveryTab } from '@/src/presentation/components/features/configuracoes/tabs/NotificacoesWhatsAppDeliveryTab'
 import { DeliveryNomeCardapioView } from '@/src/presentation/components/features/delivery/hub/DeliveryNomeCardapioView'
+import { useHydrateDesignCabecalhoMidia } from '../hooks/useHydrateDesignCabecalhoMidia'
 
 export function DeliveryDesignCustomizerScreen() {
   const searchParams = useSearchParams()
@@ -38,11 +49,32 @@ export function DeliveryDesignCustomizerScreen() {
   const { data: empresaDelivery, isLoading: deliveryLoading } = useEmpresaDeliveryMe()
   const [openTabs, setOpenTabs] = useState<DesignSectionId[]>([])
   const [activeTab, setActiveTab] = useState<DesignWorkspaceTabId>('home')
+  const [migrationOpen, setMigrationOpen] = useState(false)
+  const [migrationBusy, setMigrationBusy] = useState(false)
 
-  const { draft, hydrated, isDirty, updateDraft, publish, restore } = useDeliveryDesignDraft({
+  const nomeVitrineFallback =
+    (empresaDelivery?.nomeExibicao?.trim() || empresa?.nomeExibicao || '').trim()
+
+  const {
+    draft,
+    published,
+    hydrated,
+    isDirty,
+    updateDraft,
+    publish,
+    restore,
+    replaceFromMe,
+    salvarDraftAsync,
+    publicarAsync,
+    serverPublishedAt,
+    isLoading: designLoading,
+    isSavingDraft,
+    isPublishing,
+  } = useDeliveryDesignDraft({
     empresaId: empresa?.id,
     slug: empresaDelivery?.slug,
-    nomeExibicaoFallback: empresa?.nomeExibicao ?? '',
+    nomeExibicaoFallback: nomeVitrineFallback,
+    enabled: Boolean(empresa?.id),
   })
 
   const {
@@ -60,6 +92,37 @@ export function DeliveryDesignCustomizerScreen() {
     )
   }, [categoriasGrupos])
 
+  useEffect(() => {
+    if (!hydrated || !empresa?.id || migrationOpen) return
+    if (!isDesignLocalMigrationEnabled()) return
+
+    const offer = shouldOfferDesignLocalMigration({
+      empresaId: empresa.id,
+      publishedAt: serverPublishedAt,
+      serverDraft: draft,
+      serverPublished: published,
+      nomeExibicaoFallback: empresa.nomeExibicao ?? '',
+    })
+    if (offer) setMigrationOpen(true)
+  }, [
+    draft,
+    empresa?.id,
+    empresa?.nomeExibicao,
+    hydrated,
+    migrationOpen,
+    published,
+    serverPublishedAt,
+  ])
+
+  useHydrateDesignCabecalhoMidia({
+    slug: empresaDelivery?.slug,
+    hasEmpresaDelivery: Boolean(empresaDelivery),
+    enabled: hydrated,
+    publishedLogoUrl: published.cabecalho.logoUrl,
+    publishedCapaUrl: published.cabecalho.capaUrl,
+    onChange: updateDraft,
+  })
+
   const openSection = useCallback((sectionId: DesignSectionId) => {
     setOpenTabs(current => (current.includes(sectionId) ? current : [...current, sectionId]))
     setActiveTab(sectionId)
@@ -73,17 +136,72 @@ export function DeliveryDesignCustomizerScreen() {
   }, [openSection, searchParams])
 
   const canPublish = canPublishDesign(draft)
+  const busy = isSavingDraft || isPublishing || migrationBusy
 
-  const handlePublish = useCallback(() => {
-    if (!canPublishDesign(draft)) return
-    publish()
-    showToast.success('Design publicado!')
-  }, [draft, publish])
+  const handlePublish = useCallback(async () => {
+    if (!canPublishDesign(draft) || busy) return
+    try {
+      await publish()
+      showToast.success('Design publicado!')
+    } catch (error) {
+      const msg =
+        error instanceof Error ? error.message : 'Não foi possível publicar o design.'
+      showToast.error(msg)
+    }
+  }, [busy, draft, publish])
 
-  const handleRestore = useCallback(() => {
-    restore()
-    showToast.success('Design restaurado.')
-  }, [restore])
+  const handleRestore = useCallback(async () => {
+    if (busy) return
+    try {
+      await restore()
+      showToast.success('Design restaurado.')
+    } catch (error) {
+      const msg =
+        error instanceof Error ? error.message : 'Não foi possível restaurar o design.'
+      showToast.error(msg)
+    }
+  }, [busy, restore])
+
+  const handleMigrationDismiss = useCallback(() => {
+    if (!empresa?.id || migrationBusy) return
+    if (getDesignMigrationMarker(empresa.id) !== 'imported') {
+      markDesignMigrated(empresa.id, 'dismissed')
+    }
+    setMigrationOpen(false)
+  }, [empresa?.id, migrationBusy])
+
+  const handleMigrationConfirm = useCallback(async () => {
+    if (!empresa?.id || migrationBusy) return
+    setMigrationBusy(true)
+    try {
+      const me = await importDesignLocalToApi({
+        empresaId: empresa.id,
+        nomeExibicaoFallback: empresa.nomeExibicao ?? '',
+        slug: empresaDelivery?.slug,
+        salvarDraft: salvarDraftAsync,
+        publicar: publicarAsync,
+      })
+      replaceFromMe(me)
+      setMigrationOpen(false)
+      showToast.success('Design deste aparelho importado para a conta.')
+    } catch (error) {
+      const msg =
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível importar o design local.'
+      showToast.error(msg)
+    } finally {
+      setMigrationBusy(false)
+    }
+  }, [
+    empresa?.id,
+    empresa?.nomeExibicao,
+    empresaDelivery?.slug,
+    migrationBusy,
+    publicarAsync,
+    replaceFromMe,
+    salvarDraftAsync,
+  ])
 
   const selectTab = useCallback((tabId: DesignWorkspaceTabId) => {
     setActiveTab(tabId)
@@ -97,7 +215,7 @@ export function DeliveryDesignCustomizerScreen() {
     })
   }, [])
 
-  if (empresaLoading || deliveryLoading || menuDeliveryLoading || !hydrated) {
+  if (empresaLoading || deliveryLoading || menuDeliveryLoading || designLoading || !hydrated) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center bg-white">
         <JiffyLoading />
@@ -110,6 +228,20 @@ export function DeliveryDesignCustomizerScreen() {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
+      <JiffyConfirmDialog
+        open={migrationOpen}
+        onOpenChange={open => {
+          if (!open) handleMigrationDismiss()
+        }}
+        title="Design salvo neste aparelho"
+        description="Encontramos um design do cardápio salvo só neste navegador. Deseja importar para a conta? Assim o mesmo visual vale em qualquer dispositivo."
+        cancelLabel="Agora não"
+        confirmLabel={migrationBusy ? 'Importando…' : 'Importar'}
+        busy={migrationBusy}
+        onCancel={handleMigrationDismiss}
+        onConfirm={() => void handleMigrationConfirm()}
+      />
+
       <header className="flex shrink-0 items-end gap-2 border-b border-gray-200 px-4 md:px-6">
         <div className="min-w-0 flex-1">
           <DesignOpenTabsBar
@@ -120,10 +252,13 @@ export function DeliveryDesignCustomizerScreen() {
           />
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2 py-1.5">
+          {isSavingDraft && !isPublishing ? (
+            <span className="text-xs font-medium text-gray-500">Salvando…</span>
+          ) : null}
           <button
             type="button"
-            onClick={handleRestore}
-            disabled={!isDirty}
+            onClick={() => void handleRestore()}
+            disabled={!isDirty || busy}
             className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold text-primary-text transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <MdRefresh className="h-4 w-4" aria-hidden />
@@ -131,12 +266,12 @@ export function DeliveryDesignCustomizerScreen() {
           </button>
           <button
             type="button"
-            onClick={handlePublish}
-            disabled={!canPublish}
+            onClick={() => void handlePublish()}
+            disabled={!canPublish || busy}
             title={getPublishDisabledReason(draft)}
             className="inline-flex h-9 items-center rounded-lg bg-secondary px-5 text-sm font-semibold text-white transition-colors hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Publicar
+            {isPublishing ? 'Publicando…' : 'Publicar'}
           </button>
         </div>
       </header>
@@ -157,6 +292,8 @@ export function DeliveryDesignCustomizerScreen() {
                 config={draft}
                 slug={empresaDelivery?.slug}
                 hasEmpresaDelivery={Boolean(empresaDelivery)}
+                nomeFantasiaFallback={empresa?.nomeExibicao ?? ''}
+                nomeExibicaoDelivery={empresaDelivery?.nomeExibicao ?? null}
                 onChange={updateDraft}
               />
             ) : null}

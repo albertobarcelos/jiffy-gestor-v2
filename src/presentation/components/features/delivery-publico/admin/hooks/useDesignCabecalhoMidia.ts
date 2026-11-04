@@ -1,14 +1,15 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchEmpresaPublicaMidia } from '@/src/infrastructure/api/empresaDeliveryMidiaApi'
 import {
+  clearEmpresaDeliveryBanner,
+  clearEmpresaDeliveryLogo,
   mensagemLegivelDeliveryMediaError,
   uploadEmpresaDeliveryBanner,
   uploadEmpresaDeliveryLogo,
 } from '@/src/infrastructure/api/deliveryMediaApi'
-import { removerImagemUseCase } from '@/src/presentation/hooks/media/criarImagemMediaUseCases'
-import { fetchEmpresaPublicaMidia } from '@/src/infrastructure/api/empresaDeliveryMidiaApi'
 import { validateDeliveryImageFile } from '@/src/shared/constants/deliveryImageUpload'
 import { showToast } from '@/src/shared/utils/toast'
 import type { DeliveryPublicoDesignConfig } from '../../shared/types/deliveryPublicoDesignConfig'
@@ -21,10 +22,6 @@ type UseDesignCabecalhoMidiaOptions = {
   logoUrl: string | null
   capaUrl: string | null
   onChange: (updater: (current: DeliveryPublicoDesignConfig) => DeliveryPublicoDesignConfig) => void
-}
-
-function isPersistedImageUrl(url: string | null | undefined): url is string {
-  return typeof url === 'string' && url.trim().length > 0 && !url.startsWith('blob:')
 }
 
 function revokeBlobUrl(url: string | null | undefined) {
@@ -43,9 +40,8 @@ export function useDesignCabecalhoMidia({
   const { auth } = useAuthStore()
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
   const [isUploadingBanner, setIsUploadingBanner] = useState(false)
-  const hydratedSlugRef = useRef<string | null>(null)
-  const logoImageIdRef = useRef<string | null>(null)
-  const bannerImageIdRef = useRef<string | null>(null)
+  const [isClearingLogo, setIsClearingLogo] = useState(false)
+  const [isClearingBanner, setIsClearingBanner] = useState(false)
 
   const updateCabecalhoField = useCallback(
     (field: CabecalhoMidiaField, url: string | null) => {
@@ -56,56 +52,6 @@ export function useDesignCabecalhoMidia({
     },
     [onChange]
   )
-
-  useEffect(() => {
-    const trimmedSlug = slug?.trim()
-    if (!trimmedSlug || !hasEmpresaDelivery) return
-    if (hydratedSlugRef.current === trimmedSlug) return
-
-    let cancelled = false
-
-    void fetchEmpresaPublicaMidia(trimmedSlug)
-      .then(({ logoUrl: apiLogo, bannerUrl: apiBanner }) => {
-        if (cancelled) return
-
-        onChange(current => {
-          const nextLogo = isPersistedImageUrl(current.cabecalho.logoUrl)
-            ? current.cabecalho.logoUrl
-            : apiLogo
-          const nextCapa = isPersistedImageUrl(current.cabecalho.capaUrl)
-            ? current.cabecalho.capaUrl
-            : apiBanner
-
-          if (
-            nextLogo === current.cabecalho.logoUrl &&
-            nextCapa === current.cabecalho.capaUrl
-          ) {
-            return current
-          }
-
-          revokeBlobUrl(current.cabecalho.logoUrl)
-          revokeBlobUrl(current.cabecalho.capaUrl)
-
-          return {
-            ...current,
-            cabecalho: {
-              ...current.cabecalho,
-              logoUrl: nextLogo,
-              capaUrl: nextCapa,
-            },
-          }
-        })
-
-        hydratedSlugRef.current = trimmedSlug
-      })
-      .catch(() => {
-        if (!cancelled) hydratedSlugRef.current = trimmedSlug
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [slug, hasEmpresaDelivery, onChange])
 
   const uploadMidia = useCallback(
     async (field: CabecalhoMidiaField, file: File) => {
@@ -143,19 +89,33 @@ export function useDesignCabecalhoMidia({
       )
 
       try {
-        const confirmado =
-          field === 'logoUrl'
-            ? await uploadEmpresaDeliveryLogo(file, token)
-            : await uploadEmpresaDeliveryBanner(file, token)
-        if (field === 'logoUrl') logoImageIdRef.current = confirmado.imageId
-        else bannerImageIdRef.current = confirmado.imageId
+        if (field === 'logoUrl') {
+          await uploadEmpresaDeliveryLogo(file, token)
+        } else {
+          await uploadEmpresaDeliveryBanner(file, token)
+        }
 
-        const { logoUrl: apiLogo, bannerUrl: apiBanner } =
-          await fetchEmpresaPublicaMidia(trimmedSlug)
-        const persistedUrl = field === 'logoUrl' ? apiLogo : apiBanner
+        let persistedUrl: string | null = null
+        for (let attempt = 0; attempt < 4; attempt++) {
+          if (attempt > 0) {
+            await new Promise(resolve => window.setTimeout(resolve, 350 * attempt))
+          }
+          const { logoUrl: apiLogo, bannerUrl: apiBanner } =
+            await fetchEmpresaPublicaMidia(trimmedSlug)
+          persistedUrl = field === 'logoUrl' ? apiLogo : apiBanner
+          if (persistedUrl?.trim()) break
+        }
 
         revokeBlobUrl(preview)
-        updateCabecalhoField(field, persistedUrl ?? preview)
+        if (!persistedUrl?.trim()) {
+          updateCabecalhoField(field, previousUrl ?? null)
+          throw new Error(
+            field === 'logoUrl'
+              ? 'Logo enviado, mas a URL ainda não está disponível. Tente novamente.'
+              : 'Capa enviada, mas a URL ainda não está disponível. Tente novamente.'
+          )
+        }
+        updateCabecalhoField(field, persistedUrl)
 
         showToast.successLoading(
           toastId,
@@ -182,69 +142,64 @@ export function useDesignCabecalhoMidia({
     [uploadMidia]
   )
 
-  const imageIdDaEmpresa = useCallback(
-    async (field: CabecalhoMidiaField, token: string): Promise<string | null> => {
-      const atual = field === 'logoUrl' ? logoImageIdRef.current : bannerImageIdRef.current
-      if (atual) return atual
-      const response = await fetch('/api/delivery/empresas/me', {
-        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-      })
-      if (!response.ok) return null
-      const body = (await response.json().catch(() => null)) as {
-        logo?: { imageId?: string | null } | null
-        banner?: { imageId?: string | null } | null
-      } | null
-      const logoId = body?.logo?.imageId?.trim() || null
-      const bannerId = body?.banner?.imageId?.trim() || null
-      logoImageIdRef.current = logoId
-      bannerImageIdRef.current = bannerId
-      return field === 'logoUrl' ? logoId : bannerId
-    },
-    []
-  )
-
-  const removerMidia = useCallback(
-    async (field: CabecalhoMidiaField, url: string | null) => {
-      if (url?.startsWith('blob:') || !isPersistedImageUrl(url)) {
-        revokeBlobUrl(url)
-        updateCabecalhoField(field, null)
-        return
-      }
+  const clearMidia = useCallback(
+    async (field: CabecalhoMidiaField) => {
       const token = auth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado')
         return
       }
-      const toastId = showToast.loading(field === 'logoUrl' ? 'Removendo logo...' : 'Removendo capa...')
-      try {
-        const imageId = await imageIdDaEmpresa(field, token)
-        if (!imageId) {
-          showToast.errorLoading(toastId, 'Não foi possível identificar a imagem para remover.')
-          return
-        }
-        await removerImagemUseCase().execute({ imageId, token })
-        if (field === 'logoUrl') logoImageIdRef.current = null
-        else bannerImageIdRef.current = null
+
+      if (!hasEmpresaDelivery) {
+        showToast.error('Configure o Delivery antes de remover imagens.')
+        return
+      }
+
+      const previousUrl = field === 'logoUrl' ? logoUrl : capaUrl
+      if (previousUrl?.startsWith('blob:') || !previousUrl?.trim()) {
+        revokeBlobUrl(previousUrl)
         updateCabecalhoField(field, null)
-        showToast.successLoading(toastId, field === 'logoUrl' ? 'Logo removida.' : 'Capa removida.')
+        return
+      }
+
+      const setClearing = field === 'logoUrl' ? setIsClearingLogo : setIsClearingBanner
+      setClearing(true)
+      const toastId = showToast.loading(
+        field === 'logoUrl' ? 'Removendo logo...' : 'Removendo capa...'
+      )
+
+      try {
+        if (field === 'logoUrl') {
+          await clearEmpresaDeliveryLogo(token)
+        } else {
+          await clearEmpresaDeliveryBanner(token)
+        }
+        revokeBlobUrl(previousUrl)
+        updateCabecalhoField(field, null)
+        showToast.successLoading(
+          toastId,
+          field === 'logoUrl' ? 'Logo removido.' : 'Capa removida.'
+        )
       } catch (error) {
         showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+      } finally {
+        setClearing(false)
       }
     },
-    [auth, imageIdDaEmpresa, updateCabecalhoField]
+    [auth, hasEmpresaDelivery, logoUrl, capaUrl, updateCabecalhoField]
   )
 
   const clearLogo = useCallback(() => {
-    void removerMidia('logoUrl', logoUrl)
-  }, [logoUrl, removerMidia])
+    void clearMidia('logoUrl')
+  }, [clearMidia])
 
   const clearBanner = useCallback(() => {
-    void removerMidia('capaUrl', capaUrl)
-  }, [capaUrl, removerMidia])
+    void clearMidia('capaUrl')
+  }, [clearMidia])
 
   return {
-    isUploadingLogo,
-    isUploadingBanner,
+    isUploadingLogo: isUploadingLogo || isClearingLogo,
+    isUploadingBanner: isUploadingBanner || isClearingBanner,
     handleLogoUpload,
     handleBannerUpload,
     clearLogo,

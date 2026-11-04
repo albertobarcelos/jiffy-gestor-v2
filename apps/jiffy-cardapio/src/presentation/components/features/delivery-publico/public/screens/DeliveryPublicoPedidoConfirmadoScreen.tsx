@@ -84,7 +84,7 @@ export function DeliveryPublicoPedidoConfirmadoScreen({
 
   if (status === 'loading') {
     return (
-      <DeliveryThemeScope slug={slug}>
+      <DeliveryThemeScope slug={slug} designReady>
         <div className="flex min-h-full items-center justify-center">
           <div
             className="h-12 w-12 animate-spin rounded-full border-b-2"
@@ -104,7 +104,7 @@ export function DeliveryPublicoPedidoConfirmadoScreen({
         : mensagemErro || 'Tente novamente em instantes.'
 
     return (
-      <DeliveryThemeScope slug={slug}>
+      <DeliveryThemeScope slug={slug} designReady>
         <div className="mx-auto flex min-h-full w-full max-w-md flex-col items-center justify-center gap-4 px-4 text-center">
           <h1 className="delivery-font-title text-xl font-semibold delivery-text-primary">
             {titulo}
@@ -119,7 +119,11 @@ export function DeliveryPublicoPedidoConfirmadoScreen({
   }
 
   return (
-    <DeliveryThemeScope slug={slug} nomeExibicaoFallback={pedido.nomeEmpresa ?? ''}>
+    <DeliveryThemeScope
+      slug={slug}
+      nomeExibicaoFallback={pedido.nomeEmpresa ?? ''}
+      designReady
+    >
       <div className="min-h-full">
         <DeliveryCheckoutShell
           open

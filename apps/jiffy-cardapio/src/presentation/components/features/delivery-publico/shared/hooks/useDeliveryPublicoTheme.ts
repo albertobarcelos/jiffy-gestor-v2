@@ -10,19 +10,24 @@ type UseDeliveryPublicoThemeOptions = {
   slug: string
   nomeExibicaoFallback?: string
   empresa?: EmpresaPublicaDTO | null
+  /** Ver `usePublishedDesignBySlug` — evita flash até o catálogo carregar. */
+  designReady?: boolean
 }
 
 /**
- * Design publicado + merge opcional com empresa → CSS vars do customizador.
+ * Design publicado do catálogo (`empresa.design`) + merge com mídia/nome da empresa → CSS vars.
  */
 export function useDeliveryPublicoTheme({
   slug,
   nomeExibicaoFallback = '',
   empresa = null,
+  designReady = false,
 }: UseDeliveryPublicoThemeOptions) {
   const { config: publishedConfig, hydrated } = usePublishedDesignBySlug({
     slug,
     nomeExibicaoFallback,
+    empresa,
+    designReady,
   })
 
   const config = useMemo(

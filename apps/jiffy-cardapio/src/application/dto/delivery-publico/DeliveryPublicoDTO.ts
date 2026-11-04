@@ -1,5 +1,6 @@
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import type { FuncionamentoPublicoDTO } from '@/src/application/dto/delivery/FuncionamentoDeliveryDTO'
+import type { DeliveryPublicoDesignConfigDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDesignDTO'
 
 /** DTOs espelhando o catálogo público delivery do backend (sem auth). */
 
@@ -100,11 +101,21 @@ export type CanalWhatsAppPublicoDTO = {
 export type EmpresaPublicaDTO = {
   id: string
   nomeFantasia: string
+  /**
+   * Nome de vitrine do delivery (custom ?? fantasia).
+   * Ausente em respostas legadas — nesse caso use `nomeFantasia`.
+   */
+  nomeExibicao?: string
   slug: string
   telefone: string | null
   segmento: string | null
   logoUrl: string | null
   bannerUrl: string | null
+  /**
+   * Design publicado do cardápio.
+   * Ausente só em respostas legadas; o tema público usa defaults nesse caso.
+   */
+  design?: DeliveryPublicoDesignConfigDTO | null
   /**
    * Quando true, o checkout exige CPF do cliente para finalizar o pedido.
    * Vem na raiz da empresa pública (não em parametroDelivery).

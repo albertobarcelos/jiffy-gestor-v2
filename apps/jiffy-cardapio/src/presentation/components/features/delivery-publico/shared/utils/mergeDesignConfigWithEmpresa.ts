@@ -1,11 +1,23 @@
 import type { EmpresaPublicaDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { DeliveryPublicoDesignConfig } from '../types/deliveryPublicoDesignConfig'
-import { nomeExibicaoCabecalhoFromEmpresa } from '../constants/defaultDesignConfig'
+import { CABECALHO_NOME_MAX_LENGTH } from '../constants/defaultDesignConfig'
+
+function resolveMidiaUrl(
+  preferida: string | null | undefined,
+  espelho: string | null | undefined
+): string | null {
+  for (const candidate of [preferida, espelho]) {
+    if (typeof candidate !== 'string') continue
+    const trimmed = candidate.trim()
+    if (!trimmed || trimmed.startsWith('blob:')) continue
+    return trimmed
+  }
+  return null
+}
 
 /**
- * Preenche cabeçalho do design com dados da API quando o admin não personalizou.
- * Nome de exibição sempre acompanha o fantasia da empresa (campo não editável no design).
- * Logo/capa: design publicado tem prioridade sobre a API.
+ * Preenche cabeçalho com dados da empresa (FK/CDN = fonte de verdade).
+ * Espelhos no design só entram se a API não trouxer URL.
  */
 export function mergeDesignConfigWithEmpresa(
   design: DeliveryPublicoDesignConfig,
@@ -13,16 +25,17 @@ export function mergeDesignConfigWithEmpresa(
 ): DeliveryPublicoDesignConfig {
   if (!empresa) return design
 
-  const nomeApi = empresa.nomeFantasia?.trim() ?? ''
   const nomeDesign = design.cabecalho.nomeExibicao.trim()
+  const nomeVitrine =
+    empresa.nomeExibicao?.trim() || empresa.nomeFantasia?.trim() || ''
 
   return {
     ...design,
     cabecalho: {
       ...design.cabecalho,
-      nomeExibicao: nomeExibicaoCabecalhoFromEmpresa(nomeApi || nomeDesign),
-      logoUrl: design.cabecalho.logoUrl ?? empresa.logoUrl,
-      capaUrl: design.cabecalho.capaUrl ?? empresa.bannerUrl,
+      nomeExibicao: (nomeDesign || nomeVitrine).slice(0, CABECALHO_NOME_MAX_LENGTH),
+      logoUrl: resolveMidiaUrl(empresa.logoUrl, design.cabecalho.logoUrl),
+      capaUrl: resolveMidiaUrl(empresa.bannerUrl, design.cabecalho.capaUrl),
     },
   }
 }

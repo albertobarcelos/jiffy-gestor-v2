@@ -21,6 +21,8 @@ export interface EmpresaDeliveryDTO {
   id: string
   slug: string
   empresaId: string
+  /** Nome de vitrine do delivery (null = usa fantasia da empresa). */
+  nomeExibicao?: string | null
   parametroDelivery: ParametroDeliveryDTO
   /** `false` quando há pendência obrigatória; orientações não afetam este campo. */
   available?: boolean
@@ -29,10 +31,12 @@ export interface EmpresaDeliveryDTO {
 
 export interface CreateEmpresaDeliveryInput {
   slug: string
+  nomeExibicao?: string | null
   parametroDelivery?: Partial<ParametroDeliveryDTO> | null
 }
 
 export interface UpdateEmpresaDeliveryInput {
   slug?: string
+  nomeExibicao?: string | null
   parametroDelivery?: Partial<ParametroDeliveryDTO> | null
 }
