@@ -23,6 +23,8 @@ import { resolverPrecosDeliveryProduto } from '../../../shared/utils/resolverPre
 export type DeliveryProdutoModalProps = {
   slug: string
   produto: CatalogoPublicoProdutoDTO
+  /** Grupo do produto no cardápio (Peça Também / rastreio no carrinho). */
+  grupoId?: string | null
   onClose: () => void
   /** Chamado após adicionar item novo (não edição). */
   onAdicionado?: (payload: {
@@ -38,6 +40,7 @@ export type DeliveryProdutoModalProps = {
 export function useDeliveryProdutoModalState({
   slug,
   produto,
+  grupoId = null,
   onClose,
   onAdicionado,
   itemEdicao,
@@ -178,6 +181,7 @@ export function useDeliveryProdutoModalState({
       const observacoes = observacao.trim().length >= 3 ? [observacao.trim()] : []
       const payload = {
         produtoId: produto.id,
+        grupoId: grupoId ?? itemEdicao?.grupoId ?? null,
         produtoNome: produto.nome,
         produtoImagemUrl: produto.imagemUrl,
         quantidade,

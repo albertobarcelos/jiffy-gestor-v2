@@ -14,6 +14,8 @@ export type ItemCarrinhoComplemento = {
 export type ItemCarrinhoDelivery = {
   id: string
   produtoId: string
+  /** Grupo do produto no cardápio (usado em Peça Também). */
+  grupoId?: string | null
   produtoNome: string
   produtoImagemUrl: string | null
   quantidade: number

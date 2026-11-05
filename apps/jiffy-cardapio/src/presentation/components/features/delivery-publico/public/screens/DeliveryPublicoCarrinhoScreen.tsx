@@ -34,15 +34,26 @@ import {
 } from '@/src/application/mappers/PedidoPublicoConfirmadoMapper'
 import type { CotacaoPedidoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { DELIVERY_PAIS_TELEFONE_PADRAO } from '@/src/shared/constants/deliveryPaisesTelefone'
-import { findCatalogoProdutoById } from '../../shared/utils/findCatalogoProdutoById'
+import {
+  findCatalogoGrupoIdByProdutoId,
+  findCatalogoProdutoById,
+} from '../../shared/utils/findCatalogoProdutoById'
 import { resolverProdutosAusentesDoCatalogo } from '@/src/domain/policies/ProdutoIndisponivelCheckoutPublico'
 import { itemSemComplemento } from '../../shared/utils/deliveryCarrinhoItemUtils'
 import {
   avaliarComplementosItemCarrinho,
+  produtoTemComplementosAtivos,
   type AvaliacaoComplementosItemCarrinho,
   type GrupoComplementoAcimaDoMaximo,
   type GrupoComplementoPendente,
 } from '../../shared/utils/produtoComplementosUtils'
+import { resolverPrecosDeliveryProduto } from '../../shared/utils/resolverPrecosDeliveryProduto'
+import { DeliveryPecaTambemCarousel } from '../../shared/components/DeliveryPecaTambemCarousel'
+import { usePecaTambemSugestoes } from '@/src/presentation/hooks/usePecaTambemSugestoes'
+import type {
+  CatalogoPublicoProdutoDTO,
+  PecaTambemProdutoDTO,
+} from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPublicaEndereco'
 import { formatDeliveryCurrency } from '../../shared/utils/formatDeliveryCurrency'
 import { isTokenCotacaoExpirado, MARGEM_RENOVACAO_TOKEN_COTACAO_MS } from '../../shared/utils/deliveryCheckoutCotacaoUtils'
@@ -190,7 +201,13 @@ export function DeliveryPublicoCarrinhoScreen({
   const atualizarQuantidade = useDeliveryCarrinhoStore(s => s.atualizarQuantidade)
   const removerItem = useDeliveryCarrinhoStore(s => s.removerItem)
   const substituirItem = useDeliveryCarrinhoStore(s => s.substituirItem)
+  const adicionarItem = useDeliveryCarrinhoStore(s => s.adicionarItem)
   const [itemEditando, setItemEditando] = useState<DeliveryCarrinhoItem | null>(null)
+  const [produtoPecaTambem, setProdutoPecaTambem] =
+    useState<CatalogoPublicoProdutoDTO | null>(null)
+  const [produtoPecaTambemGrupoId, setProdutoPecaTambemGrupoId] = useState<string | null>(
+    null
+  )
   const [aberto, setAberto] = useState(true)
   const [removingIds, setRemovingIds] = useState<Set<string>>(() => new Set())
   const [pedidoConfirmado, setPedidoConfirmado] =
@@ -311,6 +328,113 @@ export function DeliveryPublicoCarrinhoScreen({
     if (!itemEditando) return null
     return findCatalogoProdutoById(grupos, itemEditando.produtoId)
   }, [itemEditando, grupos])
+
+  const produtoIdsNoCarrinho = useMemo(
+    () => [...new Set(itens.map(item => item.produtoId))],
+    [itens]
+  )
+
+  const grupoIdsCarrinho = useMemo(() => {
+    const ids: string[] = []
+    const seen = new Set<string>()
+    // Prioriza último item adicionado: ordena por adicionadoEm desc
+    const ordenados = [...itens].sort((a, b) =>
+      b.adicionadoEm.localeCompare(a.adicionadoEm)
+    )
+    for (const item of ordenados) {
+      // Prefere o grupo do catálogo (evita grupoIdOrigem gravado por engano no carrinho).
+      const grupoId =
+        findCatalogoGrupoIdByProdutoId(grupos, item.produtoId) ||
+        item.grupoId?.trim() ||
+        null
+      if (!grupoId || seen.has(grupoId)) continue
+      seen.add(grupoId)
+      ids.push(grupoId)
+    }
+    return ids
+  }, [grupos, itens])
+
+  const pecaTambemQuery = usePecaTambemSugestoes(
+    slug,
+    grupoIdsCarrinho,
+    produtoIdsNoCarrinho
+  )
+
+  const quantidadePorProduto = useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const item of itens) {
+      map[item.produtoId] = (map[item.produtoId] ?? 0) + item.quantidade
+    }
+    return map
+  }, [itens])
+
+  const pecaTambemById = useMemo(() => {
+    const map = new Map<string, NonNullable<typeof pecaTambemQuery.data>[number]>()
+    for (const p of pecaTambemQuery.data ?? []) {
+      map.set(p.id, p)
+    }
+    return map
+  }, [pecaTambemQuery.data])
+
+  const resolverGrupoIdProduto = useCallback(
+    (produtoId: string, fromSugestao?: PecaTambemProdutoDTO | null) => {
+      return (
+        fromSugestao?.grupoId ||
+        findCatalogoGrupoIdByProdutoId(grupos, produtoId) ||
+        null
+      )
+    },
+    [grupos]
+  )
+
+  const handlePecaTambemClick = useCallback(
+    (produtoId: string) => {
+      const fromSugestao = pecaTambemById.get(produtoId)
+      const fromCatalogo = findCatalogoProdutoById(grupos, produtoId)
+      const produto = fromCatalogo ?? fromSugestao ?? null
+      if (!produto) return
+      setProdutoPecaTambem(produto)
+      setProdutoPecaTambemGrupoId(resolverGrupoIdProduto(produtoId, fromSugestao))
+    },
+    [grupos, pecaTambemById, resolverGrupoIdProduto]
+  )
+
+  const handlePecaTambemAddRapido = useCallback(
+    (produtoId: string) => {
+      const fromSugestao = pecaTambemById.get(produtoId)
+      const fromCatalogo = findCatalogoProdutoById(grupos, produtoId)
+      const produto = fromCatalogo ?? fromSugestao ?? null
+      if (!produto) return
+
+      if (produtoTemComplementosAtivos(produto)) {
+        handlePecaTambemClick(produtoId)
+        return
+      }
+
+      const precos = resolverPrecosDeliveryProduto(produto)
+      adicionarItem(slug, {
+        produtoId: produto.id,
+        grupoId: resolverGrupoIdProduto(produtoId, fromSugestao),
+        produtoNome: produto.nome,
+        produtoImagemUrl: produto.imagemUrl,
+        quantidade: 1,
+        valorUnitario: precos.preco,
+        valorTotal: precos.preco,
+        observacoes: [],
+        complementos: [],
+        precoRegular: precos.precoRegular,
+        descontoPercentual: precos.descontoPercentual,
+      })
+    },
+    [
+      adicionarItem,
+      handlePecaTambemClick,
+      pecaTambemById,
+      resolverGrupoIdProduto,
+      slug,
+      grupos,
+    ]
+  )
 
   const enderecoClienteSelecionado = useMemo(() => {
     if (form.modoEndereco !== 'existente') return null
@@ -841,6 +965,15 @@ export function DeliveryPublicoCarrinhoScreen({
                   >
                     Adicionar mais produtos
                   </button>
+
+                  {(pecaTambemQuery.data?.length ?? 0) > 0 ? (
+                    <DeliveryPecaTambemCarousel
+                      produtos={pecaTambemQuery.data ?? []}
+                      quantidadePorProduto={quantidadePorProduto}
+                      onProdutoClick={handlePecaTambemClick}
+                      onProdutoAddRapido={handlePecaTambemAddRapido}
+                    />
+                  ) : null}
                 </>
               )}
             </div>
@@ -886,8 +1019,25 @@ export function DeliveryPublicoCarrinhoScreen({
                 key={itemEditando.id}
                 slug={slug}
                 produto={produtoEdicao}
+                grupoId={
+                  itemEditando.grupoId ??
+                  findCatalogoGrupoIdByProdutoId(grupos, itemEditando.produtoId)
+                }
                 itemEdicao={itemEditando}
                 onClose={() => setItemEditando(null)}
+              />
+            ) : null}
+
+            {produtoPecaTambem && !itemEditando ? (
+              <DeliveryProdutoModal
+                key={`peca-tambem-${produtoPecaTambem.id}`}
+                slug={slug}
+                produto={produtoPecaTambem}
+                grupoId={produtoPecaTambemGrupoId}
+                onClose={() => {
+                  setProdutoPecaTambem(null)
+                  setProdutoPecaTambemGrupoId(null)
+                }}
               />
             ) : null}
           </motion.aside>

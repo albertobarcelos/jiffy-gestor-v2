@@ -82,6 +82,7 @@ export function recalcularLinhaCarrinho(
 
   return {
     produtoId: item.produtoId,
+    grupoId: item.grupoId ?? null,
     produtoNome: item.produtoNome,
     produtoImagemUrl: item.produtoImagemUrl,
     quantidade,
@@ -99,6 +100,7 @@ export function normalizarItemCarrinho(item: DeliveryCarrinhoItem): DeliveryCarr
   const base = valorUnitarioBaseProduto(item)
   const recalculado = recalcularLinhaCarrinho({
     produtoId: item.produtoId,
+    grupoId: item.grupoId,
     produtoNome: item.produtoNome,
     produtoImagemUrl: item.produtoImagemUrl,
     quantidade: item.quantidade,
@@ -193,6 +195,7 @@ export function itemSemComplemento(
   )
   return recalcularLinhaCarrinho({
     produtoId: normalizado.produtoId,
+    grupoId: normalizado.grupoId,
     produtoNome: normalizado.produtoNome,
     produtoImagemUrl: normalizado.produtoImagemUrl,
     quantidade: normalizado.quantidade,

@@ -51,6 +51,7 @@ function mesclarQuantidade(
   const normalizado = normalizarItemCarrinho(existente)
   const recalculado = recalcularLinhaCarrinho({
     produtoId: normalizado.produtoId,
+    grupoId: normalizado.grupoId,
     produtoNome: normalizado.produtoNome,
     produtoImagemUrl: normalizado.produtoImagemUrl,
     quantidade: normalizado.quantidade + quantidadeExtra,
@@ -78,6 +79,7 @@ function montarItemNovo(
   })
   const recalculado = recalcularLinhaCarrinho({
     produtoId: item.produtoId,
+    grupoId: item.grupoId,
     produtoNome: item.produtoNome,
     produtoImagemUrl: item.produtoImagemUrl,
     quantidade: item.quantidade,
