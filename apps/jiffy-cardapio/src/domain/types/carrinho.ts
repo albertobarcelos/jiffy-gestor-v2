@@ -11,6 +11,8 @@ export type ItemCarrinhoComplemento = {
   tipoImpactoPreco: string
 }
 
+export type FonteSugestaoCarrinho = 'PECA_TAMBEM'
+
 export type ItemCarrinhoDelivery = {
   id: string
   produtoId: string
@@ -31,4 +33,8 @@ export type ItemCarrinhoDelivery = {
   precoRegular?: number | null
   /** % OFF derivado ao adicionar — só exibição; cobrança usa valorUnitario. */
   descontoPercentual?: number | null
+  /** Origem da sugestão (ex.: carrossel Peça Também). */
+  fonteSugestao?: FonteSugestaoCarrinho | null
+  /** Grupo do item do carrinho que originou a sugestão Peça Também. */
+  grupoProdutoOrigemId?: string | null
 }

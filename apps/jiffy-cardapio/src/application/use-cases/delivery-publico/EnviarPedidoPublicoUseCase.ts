@@ -38,6 +38,7 @@ export type EnviarPedidoPublicoInput = {
   tokenCotacao: string
   /** Quando true, o CPF é obrigatório no payload. */
   exigeCpfVenda?: boolean
+  sessionIdPecaTambem?: string | null
   onEtapa?: (etapa: EtapaEnvioPedidoPublico) => void
 }
 
@@ -164,6 +165,7 @@ export class EnviarPedidoPublicoUseCase {
       telefoneApi: tel,
       tokenCotacao: input.tokenCotacao,
       exigeCpfVenda: input.exigeCpfVenda === true,
+      sessionIdPecaTambem: input.sessionIdPecaTambem,
     })
     if (!resultado.ok) {
       return resultado

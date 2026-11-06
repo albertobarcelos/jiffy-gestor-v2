@@ -60,6 +60,8 @@ function mesclarQuantidade(
     valorUnitarioBase,
     precoRegular: extras?.precoRegular ?? existente.precoRegular,
     descontoPercentual: extras?.descontoPercentual ?? existente.descontoPercentual,
+    fonteSugestao: normalizado.fonteSugestao,
+    grupoProdutoOrigemId: normalizado.grupoProdutoOrigemId,
   })
   return {
     ...recalculado,
@@ -88,6 +90,8 @@ function montarItemNovo(
     valorUnitarioBase: base,
     precoRegular: item.precoRegular,
     descontoPercentual: item.descontoPercentual,
+    fonteSugestao: item.fonteSugestao,
+    grupoProdutoOrigemId: item.grupoProdutoOrigemId,
   })
   return {
     ...recalculado,
@@ -260,6 +264,7 @@ export const useDeliveryCarrinhoStore = create<DeliveryCarrinhoState>()(
             const normalizado = normalizarItemCarrinho(item)
             const recalculado = recalcularLinhaCarrinho({
               produtoId: normalizado.produtoId,
+              grupoId: normalizado.grupoId,
               produtoNome: normalizado.produtoNome,
               produtoImagemUrl: normalizado.produtoImagemUrl,
               quantidade: qtd,
@@ -268,6 +273,8 @@ export const useDeliveryCarrinhoStore = create<DeliveryCarrinhoState>()(
               valorUnitarioBase: normalizado.valorUnitario,
               precoRegular: normalizado.precoRegular,
               descontoPercentual: normalizado.descontoPercentual,
+              fonteSugestao: normalizado.fonteSugestao,
+              grupoProdutoOrigemId: normalizado.grupoProdutoOrigemId,
             })
             return {
               ...recalculado,
@@ -317,6 +324,7 @@ export const useDeliveryCarrinhoStore = create<DeliveryCarrinhoState>()(
 
           const recalculado = recalcularLinhaCarrinho({
             produtoId: candidato.produtoId,
+            grupoId: candidato.grupoId,
             produtoNome: candidato.produtoNome,
             produtoImagemUrl: candidato.produtoImagemUrl,
             quantidade: candidato.quantidade,
@@ -325,6 +333,8 @@ export const useDeliveryCarrinhoStore = create<DeliveryCarrinhoState>()(
             valorUnitarioBase: base,
             precoRegular: candidato.precoRegular,
             descontoPercentual: candidato.descontoPercentual,
+            fonteSugestao: candidato.fonteSugestao,
+            grupoProdutoOrigemId: candidato.grupoProdutoOrigemId,
           })
           const itens = atuais.map(existing => {
             if (existing.id !== itemId) return existing

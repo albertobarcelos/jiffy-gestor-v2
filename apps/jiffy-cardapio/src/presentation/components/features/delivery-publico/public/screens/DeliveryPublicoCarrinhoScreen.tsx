@@ -54,6 +54,11 @@ import type {
   CatalogoPublicoProdutoDTO,
   PecaTambemProdutoDTO,
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import {
+  trackPecaTambemAddToCart,
+  trackPecaTambemClique,
+  trackPecaTambemImpressao,
+} from '../../shared/utils/pecaTambemTracking'
 import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPublicaEndereco'
 import { formatDeliveryCurrency } from '../../shared/utils/formatDeliveryCurrency'
 import { isTokenCotacaoExpirado, MARGEM_RENOVACAO_TOKEN_COTACAO_MS } from '../../shared/utils/deliveryCheckoutCotacaoUtils'
@@ -208,6 +213,9 @@ export function DeliveryPublicoCarrinhoScreen({
   const [produtoPecaTambemGrupoId, setProdutoPecaTambemGrupoId] = useState<string | null>(
     null
   )
+  const [produtoPecaTambemGrupoOrigemId, setProdutoPecaTambemGrupoOrigemId] = useState<
+    string | null
+  >(null)
   const [aberto, setAberto] = useState(true)
   const [removingIds, setRemovingIds] = useState<Set<string>>(() => new Set())
   const [pedidoConfirmado, setPedidoConfirmado] =
@@ -376,6 +384,12 @@ export function DeliveryPublicoCarrinhoScreen({
     return map
   }, [pecaTambemQuery.data])
 
+  useEffect(() => {
+    const produtos = pecaTambemQuery.data
+    if (!produtos?.length) return
+    trackPecaTambemImpressao(slug, produtos)
+  }, [pecaTambemQuery.data, slug])
+
   const resolverGrupoIdProduto = useCallback(
     (produtoId: string, fromSugestao?: PecaTambemProdutoDTO | null) => {
       return (
@@ -393,10 +407,14 @@ export function DeliveryPublicoCarrinhoScreen({
       const fromCatalogo = findCatalogoProdutoById(grupos, produtoId)
       const produto = fromCatalogo ?? fromSugestao ?? null
       if (!produto) return
+      if (fromSugestao) {
+        trackPecaTambemClique(slug, fromSugestao)
+      }
       setProdutoPecaTambem(produto)
       setProdutoPecaTambemGrupoId(resolverGrupoIdProduto(produtoId, fromSugestao))
+      setProdutoPecaTambemGrupoOrigemId(fromSugestao?.grupoIdOrigem ?? null)
     },
-    [grupos, pecaTambemById, resolverGrupoIdProduto]
+    [grupos, pecaTambemById, resolverGrupoIdProduto, slug]
   )
 
   const handlePecaTambemAddRapido = useCallback(
@@ -412,9 +430,11 @@ export function DeliveryPublicoCarrinhoScreen({
       }
 
       const precos = resolverPrecosDeliveryProduto(produto)
+      const grupoId = resolverGrupoIdProduto(produtoId, fromSugestao)
+      const grupoProdutoOrigemId = fromSugestao?.grupoIdOrigem ?? null
       adicionarItem(slug, {
         produtoId: produto.id,
-        grupoId: resolverGrupoIdProduto(produtoId, fromSugestao),
+        grupoId,
         produtoNome: produto.nome,
         produtoImagemUrl: produto.imagemUrl,
         quantidade: 1,
@@ -424,6 +444,15 @@ export function DeliveryPublicoCarrinhoScreen({
         complementos: [],
         precoRegular: precos.precoRegular,
         descontoPercentual: precos.descontoPercentual,
+        fonteSugestao: 'PECA_TAMBEM',
+        grupoProdutoOrigemId,
+      })
+      trackPecaTambemAddToCart(slug, {
+        produtoId: produto.id,
+        grupoProdutoId: grupoId,
+        grupoProdutoOrigemId,
+        quantidade: 1,
+        valorEstimado: precos.preco,
       })
     },
     [
@@ -1034,9 +1063,20 @@ export function DeliveryPublicoCarrinhoScreen({
                 slug={slug}
                 produto={produtoPecaTambem}
                 grupoId={produtoPecaTambemGrupoId}
+                fonteSugestao="PECA_TAMBEM"
+                grupoProdutoOrigemId={produtoPecaTambemGrupoOrigemId}
+                onAdicionado={({ produtoId }) => {
+                  trackPecaTambemAddToCart(slug, {
+                    produtoId,
+                    grupoProdutoId: produtoPecaTambemGrupoId,
+                    grupoProdutoOrigemId: produtoPecaTambemGrupoOrigemId,
+                    quantidade: 1,
+                  })
+                }}
                 onClose={() => {
                   setProdutoPecaTambem(null)
                   setProdutoPecaTambemGrupoId(null)
+                  setProdutoPecaTambemGrupoOrigemId(null)
                 }}
               />
             ) : null}

@@ -14,6 +14,7 @@ import {
   MdFilterList,
   MdReceiptLong,
   MdDownload,
+  MdRecommend,
 } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -1014,6 +1015,19 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     router.refresh() // Força a revalidação da rota para recarregar com os filtros limpos
   }, [router, pathname])
 
+  const handleAbrirRelatorioPecaTambem = useCallback(() => {
+    const qs = new URLSearchParams()
+    if (periodoInicial && periodoFinal) {
+      qs.set('de', periodoInicial.toISOString())
+      qs.set('ate', periodoFinal.toISOString())
+    } else if (periodo && periodo !== 'Todos') {
+      qs.set('periodo', periodo)
+    } else {
+      qs.set('periodo', 'Últimos 30 Dias')
+    }
+    router.push(`/relatorios-peca-tambem?${qs.toString()}`)
+  }, [periodo, periodoInicial, periodoFinal, router])
+
   const handleExportarRelatorio = useCallback(() => {
     const tenantAuth = useAuthStore.getState().tenantAuth
     const token = tenantAuth?.getAccessToken()
@@ -1280,6 +1294,16 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             >
               <MdCalendarToday size={18} />
               Por datas
+            </button>
+
+            <button
+              type="button"
+              onClick={handleAbrirRelatorioPecaTambem}
+              title="Abrir relatório Peça Também"
+              className="flex h-8 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg border-2 border-primary bg-white px-4 text-sm text-primary transition-colors hover:bg-primary/10"
+            >
+              <MdRecommend size={18} />
+              Relatório Peça Também
             </button>
 
             <button

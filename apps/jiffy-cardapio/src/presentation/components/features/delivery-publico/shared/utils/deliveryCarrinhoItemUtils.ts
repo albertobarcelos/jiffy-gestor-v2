@@ -92,6 +92,8 @@ export function recalcularLinhaCarrinho(
     complementos,
     precoRegular: item.precoRegular,
     descontoPercentual: item.descontoPercentual,
+    fonteSugestao: item.fonteSugestao ?? null,
+    grupoProdutoOrigemId: item.grupoProdutoOrigemId ?? null,
   }
 }
 
@@ -109,6 +111,8 @@ export function normalizarItemCarrinho(item: DeliveryCarrinhoItem): DeliveryCarr
     valorUnitarioBase: base,
     precoRegular: item.precoRegular,
     descontoPercentual: item.descontoPercentual,
+    fonteSugestao: item.fonteSugestao,
+    grupoProdutoOrigemId: item.grupoProdutoOrigemId,
   })
   return {
     ...recalculado,
@@ -123,7 +127,7 @@ export function observacaoItemCarrinho(item: DeliveryCarrinhoItem): string {
 
 type LinhaCarrinhoComparable = Pick<
   DeliveryCarrinhoItem,
-  'produtoId' | 'complementos' | 'observacoes'
+  'produtoId' | 'complementos' | 'observacoes' | 'fonteSugestao'
 > & {
   quantidade?: number
 }
@@ -159,13 +163,14 @@ function assinaturaComplementos(
     .join('|')
 }
 
-/** Chave estável: mesmo produto + mesmos complementos (por unidade) + mesma observação. */
+/** Chave estável: mesmo produto + mesmos complementos (por unidade) + mesma observação + fonte. */
 export function chaveLinhaCarrinho(item: LinhaCarrinhoComparable): string {
   const quantidadeProduto = Math.max(1, Math.floor(item.quantidade ?? 1))
   return [
     item.produtoId,
     assinaturaComplementos(item.complementos, quantidadeProduto),
     normalizarObservacaoLinha(item.observacoes),
+    item.fonteSugestao ?? '',
   ].join('::')
 }
 
@@ -204,5 +209,7 @@ export function itemSemComplemento(
     valorUnitarioBase: normalizado.valorUnitario,
     precoRegular: item.precoRegular,
     descontoPercentual: item.descontoPercentual,
+    fonteSugestao: normalizado.fonteSugestao,
+    grupoProdutoOrigemId: normalizado.grupoProdutoOrigemId,
   })
 }

@@ -19,12 +19,16 @@ import type { FlySourceRect } from '../../../shared/components/FlyingProduct'
 import { observacaoItemCarrinho } from '../../../shared/utils/deliveryCarrinhoItemUtils'
 import type { GrupoComplementoPendente } from '../../../shared/utils/produtoComplementosUtils'
 import { resolverPrecosDeliveryProduto } from '../../../shared/utils/resolverPrecosDeliveryProduto'
+import type { FonteSugestaoCarrinho } from '@/src/domain/types/carrinho'
 
 export type DeliveryProdutoModalProps = {
   slug: string
   produto: CatalogoPublicoProdutoDTO
   /** Grupo do produto no cardápio (Peça Também / rastreio no carrinho). */
   grupoId?: string | null
+  /** Quando o modal abre a partir do carrossel Peça Também. */
+  fonteSugestao?: FonteSugestaoCarrinho | null
+  grupoProdutoOrigemId?: string | null
   onClose: () => void
   /** Chamado após adicionar item novo (não edição). */
   onAdicionado?: (payload: {
@@ -41,6 +45,8 @@ export function useDeliveryProdutoModalState({
   slug,
   produto,
   grupoId = null,
+  fonteSugestao = null,
+  grupoProdutoOrigemId = null,
   onClose,
   onAdicionado,
   itemEdicao,
@@ -191,6 +197,10 @@ export function useDeliveryProdutoModalState({
         complementos: complementosSelecionados,
         precoRegular: precosProduto.precoRegular,
         descontoPercentual: precosProduto.descontoPercentual,
+        fonteSugestao:
+          fonteSugestao ?? itemEdicao?.fonteSugestao ?? null,
+        grupoProdutoOrigemId:
+          grupoProdutoOrigemId ?? itemEdicao?.grupoProdutoOrigemId ?? null,
       }
 
       if (itemEdicao) {
