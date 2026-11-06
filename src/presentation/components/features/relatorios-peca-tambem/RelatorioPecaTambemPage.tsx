@@ -2,17 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  FormControl,
-  MenuItem,
-  Modal,
-  Select,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-} from '@mui/material'
+import { FormControl, MenuItem, Modal, Select } from '@mui/material'
 import {
   MdArrowBack,
   MdAttachMoney,
@@ -91,33 +81,38 @@ function MetricCard({
   valor,
   rodape,
   icon,
+  iconBgClass,
   onClick,
 }: {
   titulo: string
   valor: string
   rodape: string
   icon: React.ReactNode
+  /** Classe Tailwind do círculo do ícone (ex.: bg-alternate), no padrão do relatório de vendas. */
+  iconBgClass: string
   onClick?: () => void
 }) {
   const classeBase =
-    'min-w-[200px] flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-left'
+    'flex min-w-[200px] flex-1 items-center gap-3 rounded-lg border-2 bg-white p-1 text-left'
   const classeClicavel = onClick
-    ? ' cursor-pointer transition-colors hover:border-primary/40 hover:bg-primary/[0.02] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'
+    ? ' cursor-pointer transition-colors hover:bg-primary/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'
     : ''
 
   const conteudo = (
-    <div className="flex items-center gap-2">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-100/90 text-primary">
-        {icon}
+    <>
+      <div
+        className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ${iconBgClass}`}
+      >
+        <span className="text-xl text-info">{icon}</span>
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold leading-tight text-primary-text">{titulo}</p>
-        <p className="truncate text-xs leading-snug text-[#006699]">{rodape}</p>
+      <div className="flex min-w-0 flex-1 flex-col items-end">
+        <span className="text-xs text-secondary-text">{titulo}</span>
+        <span className="text-[22px] leading-tight text-primary">{valor}</span>
+        <span className="max-w-full truncate text-right text-[10px] leading-tight text-secondary-text">
+          {rodape}
+        </span>
       </div>
-      <p className="shrink-0 pl-2 text-right text-base font-semibold tracking-tight text-primary-text md:text-lg">
-        {valor}
-      </p>
-    </div>
+    </>
   )
 
   if (onClick) {
@@ -334,9 +329,29 @@ export function RelatorioPecaTambemPage() {
     </div>
   )
 
+  const buscaRanking = (
+    <div className="relative w-full min-w-[280px] max-w-md md:w-[28rem]">
+      <label htmlFor="peca-tambem-busca-produto" className="sr-only">
+        Buscar produto no ranking
+      </label>
+      <MdSearch
+        className="pointer-events-none absolute left-2.5 top-1/2 z-[1] -translate-y-1/2 text-secondary-text"
+        size={17}
+      />
+      <input
+        id="peca-tambem-busca-produto"
+        type="search"
+        placeholder="Buscar produto…"
+        value={buscaDraft}
+        onChange={e => setBuscaDraft(e.target.value)}
+        className="h-8 w-full rounded-md border border-gray-200 bg-white py-1 pl-9 pr-3 text-sm text-primary-text outline-none focus:border-primary"
+      />
+    </div>
+  )
+
   return (
     <div className="flex h-full flex-col gap-4 p-3 md:p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="grid grid-cols-1 items-center gap-2 border-b-2 border-primary/70 pb-2 md:grid-cols-[1fr_auto_1fr]">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
           <button
             type="button"
@@ -346,11 +361,10 @@ export function RelatorioPecaTambemPage() {
             <MdArrowBack size={18} />
             Voltar
           </button>
-          <h1 className="text-lg font-semibold text-primary-text md:text-xl">
-            Relatório Peça Também
-          </h1>
+          <h1 className="text-xl font-semibold text-primary">Relatório Peça Também</h1>
         </div>
-        {periodoControls}
+        <div className="flex w-full justify-center md:w-auto">{buscaRanking}</div>
+        <div className="flex justify-start md:justify-end">{periodoControls}</div>
       </div>
 
       {query.isLoading ? (
@@ -380,84 +394,67 @@ export function RelatorioPecaTambemPage() {
             </div>
           ) : (
             <>
-              <section className="flex flex-col gap-2">
-                <h2 className="text-sm font-semibold text-primary-text">Resultado</h2>
-                <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col gap-[2pt]">
+                <section className="scrollbar-thin m-1 flex gap-2 overflow-x-auto">
                   <MetricCard
                     titulo="Produtos vendidos"
                     valor={formatarInteiroBr(resumo?.produtosVendidos ?? 0)}
                     rodape="Clique para ver participação no período"
-                    icon={<MdShoppingBag size={18} />}
+                    icon={<MdShoppingBag size={20} />}
+                    iconBgClass="bg-warning"
                     onClick={() => setIsDonutProdutosOpen(true)}
                   />
                   <MetricCard
                     titulo="Faturamento"
                     valor={formatarMoedaBrl(resumo?.faturamento ?? 0)}
                     rodape="Clique para ver participação no período"
-                    icon={<MdAttachMoney size={18} />}
+                    icon={<MdAttachMoney size={20} />}
+                    iconBgClass="bg-accent1"
                     onClick={() => setIsDonutFaturamentoOpen(true)}
                   />
                   <MetricCard
                     titulo="Pedidos"
                     valor={formatarInteiroBr(resumo?.pedidosComPecaTambem ?? 0)}
                     rodape="Pedidos com pelo menos 1 item Peça Também"
-                    icon={<MdReceiptLong size={18} />}
+                    icon={<MdReceiptLong size={20} />}
+                    iconBgClass="bg-alternate"
                   />
-                </div>
-              </section>
+                </section>
 
-              <section className="flex flex-col gap-2">
-                <h2 className="text-sm font-semibold text-primary-text">Funil</h2>
-                <div className="flex flex-wrap gap-2">
+                <section className="scrollbar-thin m-1 flex gap-2 overflow-x-auto">
                   <MetricCard
                     titulo="Impressões"
                     valor={formatarInteiroBr(resumo?.impressoes ?? 0)}
                     rodape="Carrossel exibido"
-                    icon={<MdVisibility size={18} />}
+                    icon={<MdVisibility size={20} />}
+                    iconBgClass="bg-accent3"
                   />
                   <MetricCard
                     titulo="Cliques"
                     valor={formatarInteiroBr(resumo?.cliques ?? 0)}
                     rodape={`Taxa clique: ${formatarTaxaPct(taxaClique)}`}
-                    icon={<MdMouse size={18} />}
+                    icon={<MdMouse size={20} />}
+                    iconBgClass="bg-secondary"
                   />
                   <MetricCard
                     titulo="Adds no carrinho"
                     valor={formatarInteiroBr(resumo?.adds ?? 0)}
                     rodape={`Taxa add: ${formatarTaxaPct(taxaAdd)}`}
-                    icon={<MdAddShoppingCart size={18} />}
+                    icon={<MdAddShoppingCart size={20} />}
+                    iconBgClass="bg-accent4"
                   />
                   <MetricCard
                     titulo="Conversões"
                     valor={formatarInteiroBr(resumo?.conversoes ?? 0)}
                     rodape={`Taxa conversão: ${formatarTaxaPct(taxaConversao)}`}
-                    icon={<MdShoppingBag size={18} />}
+                    icon={<MdShoppingBag size={20} />}
+                    iconBgClass="bg-accent5"
                   />
-                </div>
-              </section>
+                </section>
+              </div>
 
               <section className="flex flex-col gap-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="text-sm font-semibold text-primary-text">Ranking de produtos</h2>
-                  <div className="relative min-w-[200px] flex-1 sm:max-w-xs sm:flex-none">
-                    <label htmlFor="peca-tambem-busca-produto" className="sr-only">
-                      Buscar produto no ranking
-                    </label>
-                    <MdSearch
-                      className="pointer-events-none absolute left-2.5 top-1/2 z-[1] -translate-y-1/2 text-secondary-text"
-                      size={17}
-                    />
-                    <input
-                      id="peca-tambem-busca-produto"
-                      type="search"
-                      placeholder="Buscar produto…"
-                      value={buscaDraft}
-                      onChange={e => setBuscaDraft(e.target.value)}
-                      className="h-8 w-full rounded-md border border-gray-200 bg-white py-1 pl-9 pr-3 text-sm text-primary-text outline-none focus:border-primary"
-                    />
-                  </div>
-                </div>
-                <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+                <div className="overflow-hidden rounded-lg bg-info">
                   {ranking.length === 0 ? (
                     <p className="px-4 py-8 text-center text-sm text-primary/70">
                       {buscaAtiva
@@ -465,24 +462,29 @@ export function RelatorioPecaTambemPage() {
                         : 'Nenhuma venda atribuída ao Peça Também neste período. O funil acima mostra a interação; as vendas aparecem quando um item sugerido for finalizado.'}
                     </p>
                   ) : (
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Produto</TableCell>
-                          <TableCell align="right">Quantidade</TableCell>
-                          <TableCell align="right">Faturamento</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
+                    <>
+                      <div className="flex items-center gap-2 rounded-t-lg bg-custom-2 px-3 py-2 text-sm font-semibold text-primary-text">
+                        <div className="min-w-0 flex-[1.2]">Produto</div>
+                        <div className="w-36 text-center md:w-44">Quantidade</div>
+                        <div className="w-44 text-right md:w-56">Faturamento</div>
+                      </div>
+                      <div className="divide-y divide-gray-100 bg-white">
                         {ranking.map(item => (
-                          <TableRow key={item.produtoId} hover>
-                            <TableCell>{item.nomeProduto}</TableCell>
-                            <TableCell align="right">{formatarInteiroBr(item.quantidade)}</TableCell>
-                            <TableCell align="right">{formatarMoedaBrl(item.faturamento)}</TableCell>
-                          </TableRow>
+                          <div
+                            key={item.produtoId}
+                            className="flex items-center gap-2 px-3 py-2.5 text-sm text-primary-text hover:bg-primary/[0.03]"
+                          >
+                            <div className="min-w-0 flex-[1.2] truncate">{item.nomeProduto}</div>
+                            <div className="w-36 text-center md:w-44">
+                              {formatarInteiroBr(item.quantidade)}
+                            </div>
+                            <div className="w-44 text-right md:w-56">
+                              {formatarMoedaBrl(item.faturamento)}
+                            </div>
+                          </div>
                         ))}
-                      </TableBody>
-                    </Table>
+                      </div>
+                    </>
                   )}
                 </div>
               </section>
