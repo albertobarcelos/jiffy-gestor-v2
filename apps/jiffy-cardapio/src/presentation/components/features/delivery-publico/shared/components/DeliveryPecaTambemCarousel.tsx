@@ -50,7 +50,7 @@ export function DeliveryPecaTambemCarousel({
   if (produtos.length === 0) return null
 
   return (
-    <section className="mt-1" aria-label="Peça Também">
+    <section className="mt-1 mb-2" aria-label="Peça Também">
       <h2
         className="mb-2 px-0.5 text-sm font-medium tracking-wide"
         style={{ color: 'var(--delivery-text-primary)' }}

@@ -11,6 +11,7 @@ import {
 export type UseRelatorioPecaTambemParams = {
   de: string | null
   ate: string | null
+  q?: string | null
 }
 
 function mensagemErroRelatorioPecaTambem(
@@ -39,9 +40,11 @@ function mensagemErroRelatorioPecaTambem(
 async function fetchRelatorioPecaTambem(
   token: string,
   de: string,
-  ate: string
+  ate: string,
+  q: string | null
 ): Promise<RelatorioPecaTambemResponseDTO> {
   const qs = new URLSearchParams({ de, ate })
+  if (q) qs.set('q', q)
   const response = await fetchGestorApi(`/api/relatorios/peca-tambem?${qs.toString()}`, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -59,11 +62,12 @@ async function fetchRelatorioPecaTambem(
 export function useRelatorioPecaTambem(params: UseRelatorioPecaTambemParams) {
   const de = params.de?.trim() || null
   const ate = params.ate?.trim() || null
+  const q = params.q?.trim() || null
   const enabled = Boolean(de && ate)
 
   return useSecureTenantQuery(
-    ['relatorio-peca-tambem', de ?? '', ate ?? ''],
-    ({ token }) => fetchRelatorioPecaTambem(token, de!, ate!),
+    ['relatorio-peca-tambem', de ?? '', ate ?? '', q ?? ''],
+    ({ token }) => fetchRelatorioPecaTambem(token, de!, ate!, q),
     {
       enabled,
       staleTime: 60_000,

@@ -932,7 +932,7 @@ export function DeliveryPublicoCarrinhoScreen({
               </button>
             </header>
 
-            <div className="relative mx-auto min-h-0 w-full max-w-2xl flex-1 space-y-4 overflow-y-auto overscroll-y-contain p-3 pb-36 max-sm:scrollbar-hide sm:space-y-5 sm:p-4">
+            <div className="relative mx-auto min-h-0 w-full max-w-2xl flex-1 space-y-4 overflow-y-auto overscroll-y-contain p-3 max-sm:scrollbar-hide sm:space-y-5 sm:p-4">
               {!lojaAberta ? (
                 <div
                   role="status"
@@ -1008,7 +1008,7 @@ export function DeliveryPublicoCarrinhoScreen({
             </div>
 
             {itens.length > 0 ? (
-              <div className="absolute bottom-0 left-0 right-0 z-20 border-t border-neutral-200 bg-white">
+              <div className="relative z-20 shrink-0 border-t border-neutral-200 bg-white">
                 <DeliveryCheckoutFooterActions
                   onVoltar={voltar}
                   onContinuar={handleContinuarCheckout}

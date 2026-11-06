@@ -8,6 +8,10 @@ export type RelatorioPecaTambemResumoDTO = {
   adds: number
   produtosVendidos: number
   faturamento: number
+  /** Faturamento de itens de delivery (não cancelados) no período. */
+  faturamentoTotalPeriodo: number
+  /** Quantidade de itens de delivery (não cancelados) no período. */
+  produtosVendidosTotalPeriodo: number
   pedidosComPecaTambem: number
   conversoes: number
 }
@@ -37,6 +41,8 @@ export function mapRelatorioPecaTambemResponse(
       adds: Number(resumoRaw.adds) || 0,
       produtosVendidos: Number(resumoRaw.produtosVendidos) || 0,
       faturamento: Number(resumoRaw.faturamento) || 0,
+      faturamentoTotalPeriodo: Number(resumoRaw.faturamentoTotalPeriodo) || 0,
+      produtosVendidosTotalPeriodo: Number(resumoRaw.produtosVendidosTotalPeriodo) || 0,
       pedidosComPecaTambem: Number(resumoRaw.pedidosComPecaTambem) || 0,
       conversoes: Number(resumoRaw.conversoes) || 0,
     },

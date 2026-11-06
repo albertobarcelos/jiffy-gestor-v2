@@ -6,7 +6,7 @@ import { MSG_SEM_DADOS_PECA_TAMBEM } from '@/src/shared/types/relatorioPecaTambe
 const UPSTREAM_PATH = '/api/v1/relatorios/peca-tambem'
 
 /**
- * GET /api/relatorios/peca-tambem?de=&ate=
+ * GET /api/relatorios/peca-tambem?de=&ate=&q=
  * Proxy JWT → relatório Peça Também (resumo + ranking).
  */
 export async function GET(request: NextRequest) {
@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const de = searchParams.get('de')?.trim()
     const ate = searchParams.get('ate')?.trim()
+    const q = searchParams.get('q')?.trim()
     if (!de || !ate) {
       return NextResponse.json(
         { error: 'Parâmetros de e ate são obrigatórios' },
@@ -27,6 +28,7 @@ export async function GET(request: NextRequest) {
     }
 
     const qs = new URLSearchParams({ de, ate })
+    if (q) qs.set('q', q)
     const apiClient = new ApiClient()
     const response = await apiClient.request<Record<string, unknown>>(
       `${UPSTREAM_PATH}?${qs.toString()}`,
