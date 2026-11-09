@@ -382,6 +382,11 @@ html.delivery-publico-ios-lock select {
   border-radius: 0 !important;
 }
 
+/** Vitrine — capa colada ao topnav (como no app). */
+.delivery-preview-shell .delivery-loja-capa.delivery-vitrine-capa {
+  margin-top: 0 !important;
+}
+
 /**
  * Desktop — largura total do conteúdo, altura alinhada ao crop (1200×300).
  */

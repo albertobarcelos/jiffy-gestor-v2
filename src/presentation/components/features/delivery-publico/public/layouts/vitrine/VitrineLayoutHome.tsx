@@ -22,6 +22,7 @@ export function VitrineLayoutHome({
   onProdutoClick,
   onProdutoAddRapido,
   onPedidoClick,
+  onMeuPedidoClick,
   onInformacoesClick,
   quantidadePorProduto,
   carrinhoThumbs,
@@ -55,9 +56,13 @@ export function VitrineLayoutHome({
       <DeliveryVitrineHeader
         config={config}
         disponivel={viewModel.disponivel}
+        statusMensagem={viewModel.statusMensagem}
         statusDetalheHorario={viewModel.statusDetalheHorario}
+        carrinhoQuantidade={viewModel.carrinho.quantidadeItens}
         interactive={interactive}
         onInformacoesClick={onInformacoesClick}
+        onPedidoClick={onPedidoClick}
+        onMeuPedidoClick={onMeuPedidoClick}
       />
 
       <DeliveryVitrineCategoriaTabs
