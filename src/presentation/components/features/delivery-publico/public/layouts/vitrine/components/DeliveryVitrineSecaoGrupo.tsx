@@ -5,13 +5,17 @@ import { DeliverySecaoSugestoes } from '../../../../shared/components/DeliverySe
 import { DeliveryVitrineProdutoCard } from './DeliveryVitrineProdutoCard'
 import type { DeliveryPublicoDesignConfig } from '../../../../shared/types/deliveryPublicoDesignConfig'
 import type { DeliveryPublicoGrupoViewModel } from '../../../../shared/types/deliveryPublicoViewModel'
+import { resolveGrupoTituloBarStyle } from '../../../../shared/utils/resolveGrupoTituloBarStyle'
 
 type DeliveryVitrineSecaoGrupoProps = {
   config: DeliveryPublicoDesignConfig
   grupo: DeliveryPublicoGrupoViewModel
   interactive?: boolean
   denseTop?: boolean
+  quantidadePorProduto?: Record<string, number>
   onProdutoClick?: (produtoId: string) => void
+  onProdutoAddRapido?: (produtoId: string) => void
+  onAbrirCarrinho?: () => void
 }
 
 export function DeliveryVitrineSecaoGrupo({
@@ -19,7 +23,10 @@ export function DeliveryVitrineSecaoGrupo({
   grupo,
   interactive = false,
   denseTop = false,
+  quantidadePorProduto,
   onProdutoClick,
+  onProdutoAddRapido,
+  onAbrirCarrinho,
 }: DeliveryVitrineSecaoGrupoProps) {
   if (grupo.produtos.length === 0) return null
 
@@ -29,29 +36,45 @@ export function DeliveryVitrineSecaoGrupo({
         config={config}
         grupo={grupo}
         interactive={interactive}
+        quantidadePorProduto={quantidadePorProduto}
         onProdutoClick={onProdutoClick}
+        onProdutoAddRapido={onProdutoAddRapido}
+        onAbrirCarrinho={onAbrirCarrinho}
       />
     )
   }
 
+  const tituloStyle = resolveGrupoTituloBarStyle({
+    config,
+    imagemUrl: grupo.imagemUrl,
+  })
+  const mostrarNome = config.categorias.mostrarNomeTitulo !== false
+
   return (
-    <section className={`${denseTop ? 'mt-2' : 'mt-5'} px-4`} id={`grupo-${grupo.id}`}>
+    <section
+      className={`delivery-basico-grupo-section ${denseTop ? 'mt-2' : 'mt-5'} px-4`}
+      id={`grupo-${grupo.id}`}
+    >
       <h2
-        className="mb-3 text-lg font-bold @sm:text-xl"
+        className="delivery-grupo-title mb-3 flex min-h-12 items-center rounded-lg px-4 py-2.5 text-base uppercase tracking-wide @sm:min-h-14 @sm:text-lg @lg:min-h-20 @lg:py-4 @lg:text-xl @xl:min-h-20 @xl:text-2xl"
         style={{
-          color: 'var(--delivery-primary)',
+          ...tituloStyle,
           fontFamily: 'var(--delivery-font-title)',
         }}
+        aria-label={grupo.nome}
       >
-        {grupo.nome}
+        {mostrarNome ? <span className="min-w-0 leading-tight">{grupo.nome}</span> : null}
       </h2>
-      <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-1 gap-4 @lg:grid-cols-3">
         {grupo.produtos.map(produto => (
           <DeliveryVitrineProdutoCard
             key={produto.id}
             produto={produto}
             interactive={interactive}
+            quantidadeNoCarrinho={quantidadePorProduto?.[produto.id] ?? 0}
             onClick={onProdutoClick}
+            onAddRapido={onProdutoAddRapido}
+            onAbrirCarrinho={onAbrirCarrinho}
           />
         ))}
       </div>

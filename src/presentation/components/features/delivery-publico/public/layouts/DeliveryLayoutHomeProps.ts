@@ -19,6 +19,10 @@ export type DeliveryLayoutHomeProps = {
   /** Atalho "+" na lista: add direto (produtos sem complemento). */
   onProdutoAddRapido?: (produtoId: string) => void
   onPedidoClick?: () => void
+  /** Abre a confirmação do último pedido deste dispositivo. */
+  onMeuPedidoClick?: () => void
+  /** Abre modal com dados gerais da loja. */
+  onInformacoesClick?: () => void
   /** Quantidade total no carrinho por produtoId. */
   quantidadePorProduto?: Record<string, number>
   /** Miniaturas recentes do fly-to-cart (somente UI, uma por produto). */

@@ -81,6 +81,8 @@ export function buildMockDeliveryViewModel(
     grupos,
     disponivel: true,
     horarioTexto: DELIVERY_PUBLICO_HORARIO_PLACEHOLDER,
+    statusMensagem: 'Aberto, faça seu pedido!',
+    statusDetalheHorario: 'até as 22:45',
     termoBusca: '',
     carrinho: { total: 80, quantidadeItens: 8 },
     ...overrides,

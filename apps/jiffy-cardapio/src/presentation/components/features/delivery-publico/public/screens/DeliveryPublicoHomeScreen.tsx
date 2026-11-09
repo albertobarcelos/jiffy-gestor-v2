@@ -215,9 +215,29 @@ export function DeliveryPublicoHomeScreen({
   }, [])
 
   const handleGrupoClick = useCallback((grupoId: string) => {
-    document
-      .getElementById(`grupo-${grupoId}`)
-      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    const section = document.getElementById(`grupo-${grupoId}`)
+    if (!section) return
+
+    const scrollRoot =
+      (section.closest('.delivery-preview-viewport') as HTMLElement | null) ??
+      (section.closest('.delivery-publico-scroll') as HTMLElement | null)
+
+    const stickyH =
+      Number.parseFloat(
+        getComputedStyle(section).getPropertyValue('--delivery-sticky-toolbar-h').trim()
+      ) || 0
+
+    if (!scrollRoot) {
+      const top = window.scrollY + section.getBoundingClientRect().top - stickyH - 4
+      window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+      return
+    }
+
+    const rootRect = scrollRoot.getBoundingClientRect()
+    const sectionRect = section.getBoundingClientRect()
+    const nextTop =
+      scrollRoot.scrollTop + (sectionRect.top - rootRect.top) - stickyH - 4
+    scrollRoot.scrollTo({ top: Math.max(0, nextTop), behavior: 'smooth' })
   }, [])
 
   const handleProdutoClick = useCallback((produtoId: string) => {
