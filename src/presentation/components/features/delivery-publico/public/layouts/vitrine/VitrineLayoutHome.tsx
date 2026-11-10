@@ -56,7 +56,7 @@ export function VitrineLayoutHome({
       <DeliveryVitrineHeader
         config={config}
         disponivel={viewModel.disponivel}
-        statusMensagem={viewModel.statusMensagem}
+        statusMensagem={viewModel.statusMensagem ?? ''}
         statusDetalheHorario={viewModel.statusDetalheHorario}
         carrinhoQuantidade={viewModel.carrinho.quantidadeItens}
         interactive={interactive}

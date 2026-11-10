@@ -283,7 +283,8 @@ html.delivery-publico-ios-lock select {
 }
 
 /** Vitrine — capa colada ao topnav (como no app). */
-.delivery-preview-shell .delivery-loja-capa.delivery-vitrine-capa {
+.delivery-preview-shell .delivery-loja-capa.delivery-vitrine-capa,
+.delivery-preview-shell .delivery-loja-capa.delivery-grade-capa {
   margin-top: 0 !important;
 }
 
