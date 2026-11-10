@@ -17,6 +17,7 @@ import type { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { obterCarrinho } from '@/src/infrastructure/api/cardapio-mesa/cardapioMesaApiService'
 import { gravarMesaQrSession, lerMesaQrSession } from './mesaQrSession'
 import ProdutoMesaAddModal from './ProdutoMesaAddModal'
+import CarrinhoCompleto from './CarrinhoCompleto'
 import BannerPromocoesHorizontal from './BannerPromocoesHorizontal'
 import BannerPromocoesVertical from './BannerPromocoesVertical'
 
@@ -144,7 +145,14 @@ export default function CardapioMesaCatalogScreen({ mesaId }: Props) {
   const token = useAuthStore(s => s.tenantAuth?.getAccessToken())
   const [grupoId, setGrupoId] = useState<string | null>(null)
   const [produtoSel, setProdutoSel] = useState<Produto | null>(null)
+  const [carrinhoAberto, setCarrinhoAberto] = useState(false)
   const [carrinhoCount, setCarrinhoCount] = useState(0)
+
+  const atualizarCarrinhoCount = () => {
+    void obterCarrinho(lerMesaQrSession()?.sessionToken || mesaId).then(c =>
+      setCarrinhoCount(c.totalItens)
+    )
+  }
 
   const menuId = useMemo(
     () => resolverMenuCatalogoNovoPedido('balcao', null, menuVendaGestorId),
@@ -260,7 +268,7 @@ export default function CardapioMesaCatalogScreen({ mesaId }: Props) {
         </h1>
         <button
           type="button"
-          onClick={() => router.push(`/cardapio-mesa/mesa/${mesaId}/carrinho`)}
+          onClick={() => setCarrinhoAberto(true)}
           className="relative rounded-full p-2"
           style={{ color: 'var(--cardapio-text-primary)' }}
           aria-label="Carrinho"
@@ -371,12 +379,23 @@ export default function CardapioMesaCatalogScreen({ mesaId }: Props) {
           onClose={() => setProdutoSel(null)}
           onAdded={() => {
             setProdutoSel(null)
-            void obterCarrinho(lerMesaQrSession()?.sessionToken || mesaId).then(c =>
-              setCarrinhoCount(c.totalItens)
-            )
+            atualizarCarrinhoCount()
           }}
         />
       ) : null}
+
+      <CarrinhoCompleto
+        mesaId={mesaId}
+        variant="panel"
+        open={carrinhoAberto}
+        onClose={() => setCarrinhoAberto(false)}
+        onChanged={atualizarCarrinhoCount}
+        onContinueShopping={() => setCarrinhoAberto(false)}
+        onAfterEnviar={() => {
+          setCarrinhoAberto(false)
+          router.push(`/cardapio-mesa/mesa/${mesaId}`)
+        }}
+      />
     </div>
   )
 }

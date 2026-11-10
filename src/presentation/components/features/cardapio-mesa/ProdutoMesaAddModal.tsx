@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { MdAdd, MdClose, MdRemove } from 'react-icons/md'
+import { MdAdd, MdRemove } from 'react-icons/md'
 import type { Produto } from '@/src/domain/entities/Produto'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import {
@@ -11,6 +11,7 @@ import {
 import { adicionarItemCarrinho } from '@/src/infrastructure/api/cardapio-mesa/cardapioMesaApiService'
 import { showToast } from '@/src/shared/utils/toast'
 import { lerMesaQrSession } from './mesaQrSession'
+import CardapioMesaSidePanel from './CardapioMesaSidePanel'
 
 type Props = {
   mesaId: string
@@ -127,17 +128,84 @@ export default function ProdutoMesaAddModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-5 shadow-xl sm:rounded-3xl">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">{produto.getNome()}</h2>
-            <p className="text-orange-600 font-semibold">{formatarPreco(produto.getValor())}</p>
+    <CardapioMesaSidePanel
+      open
+      onClose={onClose}
+      title={produto.getNome()}
+      ariaLabel="Detalhes do produto"
+      footer={
+        loading ? null : (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  className="rounded-full border p-2"
+                  style={{
+                    borderColor: 'var(--cardapio-border, #333)',
+                    color: 'var(--cardapio-text-primary)',
+                  }}
+                  onClick={() => setQuantidade(q => Math.max(1, q - 1))}
+                >
+                  <MdRemove />
+                </button>
+                <span
+                  className="w-8 text-center font-bold"
+                  style={{ color: 'var(--cardapio-text-primary)' }}
+                >
+                  {quantidade}
+                </span>
+                <button
+                  type="button"
+                  className="rounded-full border p-2"
+                  style={{
+                    borderColor: 'var(--cardapio-border, #333)',
+                    color: 'var(--cardapio-text-primary)',
+                  }}
+                  onClick={() => setQuantidade(q => q + 1)}
+                >
+                  <MdAdd />
+                </button>
+              </div>
+              <p className="text-lg font-bold" style={{ color: 'var(--cardapio-text-primary)' }}>
+                {formatarPreco(total)}
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={enviando}
+              onClick={handleAdd}
+              className="w-full rounded-xl py-3 font-semibold text-white disabled:opacity-60"
+              style={{ backgroundColor: 'var(--cardapio-accent-primary, #FF7A00)' }}
+            >
+              {enviando ? 'Adicionando...' : 'Adicionar ao carrinho'}
+            </button>
           </div>
-          <button type="button" onClick={onClose} className="rounded-full p-2 hover:bg-gray-100" aria-label="Fechar">
-            <MdClose className="h-6 w-6" />
-          </button>
-        </div>
+        )
+      }
+    >
+      <div className="space-y-4 p-4">
+        {produto.getImagemUrl() ? (
+          <div
+            className="aspect-[16/10] w-full overflow-hidden rounded-2xl"
+            style={{ backgroundColor: 'var(--cardapio-bg-elevated, #333)' }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={produto.getImagemUrl()!}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          </div>
+        ) : null}
+
+        <p className="font-semibold text-orange-500">{formatarPreco(produto.getValor())}</p>
+
+        {produto.getDescricao() ? (
+          <p className="text-sm" style={{ color: 'var(--cardapio-text-secondary)' }}>
+            {produto.getDescricao()}
+          </p>
+        ) : null}
 
         {loading ? (
           <div className="flex justify-center py-10">
@@ -146,13 +214,21 @@ export default function ProdutoMesaAddModal({
         ) : (
           <>
             {grupos.length > 0 ? (
-              <div className="mb-4 space-y-4">
+              <div className="space-y-4">
                 {grupos.map(grupo => (
                   <div key={grupo.id}>
-                    <p className="mb-2 text-sm font-semibold text-gray-800">
+                    <p
+                      className="mb-2 text-sm font-semibold"
+                      style={{ color: 'var(--cardapio-text-primary)' }}
+                    >
                       {grupo.nome}
                       {grupo.qtdMinima > 0 ? (
-                        <span className="ml-1 font-normal text-gray-500">(mín. {grupo.qtdMinima})</span>
+                        <span
+                          className="ml-1 font-normal"
+                          style={{ color: 'var(--cardapio-text-secondary)' }}
+                        >
+                          (mín. {grupo.qtdMinima})
+                        </span>
                       ) : null}
                     </p>
                     <div className="space-y-2">
@@ -172,12 +248,19 @@ export default function ProdutoMesaAddModal({
                                   valor: comp.valor,
                                 })
                               }
-                              className={`flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm ${
-                                on ? 'border-orange-500 bg-orange-50' : 'border-gray-200'
-                              }`}
+                              className="flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm"
+                              style={{
+                                borderColor: on
+                                  ? 'var(--cardapio-accent-primary, #FF7A00)'
+                                  : 'var(--cardapio-border, #333)',
+                                backgroundColor: on
+                                  ? 'rgba(255, 122, 0, 0.12)'
+                                  : 'var(--cardapio-bg-elevated, transparent)',
+                                color: 'var(--cardapio-text-primary)',
+                              }}
                             >
                               <span>{comp.nome}</span>
-                              <span className="text-gray-600">
+                              <span style={{ color: 'var(--cardapio-text-secondary)' }}>
                                 {comp.valor ? `+ ${formatarPreco(comp.valor)}` : 'Grátis'}
                               </span>
                             </button>
@@ -189,47 +272,29 @@ export default function ProdutoMesaAddModal({
               </div>
             ) : null}
 
-            <label className="mb-1 block text-sm font-semibold text-gray-700">Observações</label>
-            <textarea
-              value={obs}
-              onChange={e => setObs(e.target.value)}
-              rows={2}
-              className="mb-4 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
-              placeholder="Ex.: sem cebola"
-            />
-
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  className="rounded-full border p-2"
-                  onClick={() => setQuantidade(q => Math.max(1, q - 1))}
-                >
-                  <MdRemove />
-                </button>
-                <span className="w-8 text-center font-bold">{quantidade}</span>
-                <button
-                  type="button"
-                  className="rounded-full border p-2"
-                  onClick={() => setQuantidade(q => q + 1)}
-                >
-                  <MdAdd />
-                </button>
-              </div>
-              <p className="text-lg font-bold text-gray-900">{formatarPreco(total)}</p>
+            <div>
+              <label
+                className="mb-1 block text-sm font-semibold"
+                style={{ color: 'var(--cardapio-text-primary)' }}
+              >
+                Observações
+              </label>
+              <textarea
+                value={obs}
+                onChange={e => setObs(e.target.value)}
+                rows={2}
+                className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
+                style={{
+                  borderColor: 'var(--cardapio-border, #333)',
+                  backgroundColor: 'var(--cardapio-bg-elevated, transparent)',
+                  color: 'var(--cardapio-text-primary)',
+                }}
+                placeholder="Ex.: sem cebola"
+              />
             </div>
-
-            <button
-              type="button"
-              disabled={enviando}
-              onClick={handleAdd}
-              className="w-full rounded-xl bg-orange-500 py-3 font-semibold text-white disabled:opacity-60"
-            >
-              {enviando ? 'Adicionando...' : 'Adicionar ao carrinho'}
-            </button>
           </>
         )}
       </div>
-    </div>
+    </CardapioMesaSidePanel>
   )
 }

@@ -8,6 +8,8 @@ import { useCardapioMesaTheme } from '@/src/presentation/hooks/cardapio-mesa/use
 import { lerMesaQrSession } from './mesaQrSession'
 import ThemeSelector from './ThemeSelector'
 import FloatingCircles from './FloatingCircles'
+import CarrosselProdutosDestaque from './CarrosselProdutosDestaque'
+import CarrinhoCompleto from './CarrinhoCompleto'
 
 type CardapioMesaHomeScreenProps = {
   mesaId: string
@@ -17,9 +19,14 @@ export default function CardapioMesaHomeScreen({ mesaId }: CardapioMesaHomeScree
   const router = useRouter()
   const { theme } = useCardapioMesaTheme()
   const [carrinhoCount, setCarrinhoCount] = useState(0)
+  const [carrinhoAberto, setCarrinhoAberto] = useState(false)
   const session = lerMesaQrSession()
   const sessionId = session?.sessionToken || mesaId
   const numeroMesa = session?.numeroMesa || '?'
+
+  const atualizarCarrinhoCount = () => {
+    void obterCarrinho(sessionId).then(c => setCarrinhoCount(c.totalItens))
+  }
 
   const borderColorCircles =
     theme === 'clean' ? 'rgba(100, 100, 100, 0.3)' : 'rgba(255, 255, 255, 0.15)'
@@ -61,11 +68,11 @@ export default function CardapioMesaHomeScreen({ mesaId }: CardapioMesaHomeScree
 
   return (
     <div
-      className="flex min-h-screen flex-col md:flex-row"
+      className="flex min-h-screen flex-col md:h-[100dvh] md:flex-row md:overflow-hidden"
       style={{ backgroundColor: 'var(--cardapio-bg-primary)' }}
     >
       <div
-        className="relative flex min-h-screen w-full flex-col md:w-1/3 md:min-h-0"
+        className="relative flex min-h-screen w-full flex-col md:h-full md:min-h-0 md:w-1/3"
         style={{ backgroundColor: 'var(--cardapio-bg-primary)' }}
       >
         <FloatingCircles borderColor={borderColorCircles} />
@@ -95,9 +102,22 @@ export default function CardapioMesaHomeScreen({ mesaId }: CardapioMesaHomeScree
               </span>
             </div>
           </div>
+
+          <p
+            className="mb-3 text-xs font-light md:mb-4"
+            style={{ color: 'var(--cardapio-text-tertiary, var(--cardapio-text-secondary))' }}
+          >
+            Seja bem-vindo(a), acesse o cardápio e faça seu pedido!
+          </p>
+
+          <div className="mb-4 flex w-full flex-col md:hidden">
+            <div className="relative h-[45vh] min-h-[300px] w-full overflow-hidden rounded-xl">
+              <CarrosselProdutosDestaque />
+            </div>
+          </div>
         </div>
 
-        <div className="relative z-10 flex flex-1 flex-col gap-3 px-3 pb-4 lg:px-6">
+        <div className="relative z-10 flex flex-1 flex-col justify-center gap-2 px-3 pb-2 lg:gap-3 lg:px-6 lg:pb-4">
           {botoes.map(botao => {
             const Icon = botao.icon
             return (
@@ -105,51 +125,76 @@ export default function CardapioMesaHomeScreen({ mesaId }: CardapioMesaHomeScree
                 key={botao.id}
                 type="button"
                 onClick={botao.onClick}
-                className="flex items-center gap-3 rounded-2xl px-4 py-4 text-left shadow-md transition hover:opacity-90"
+                className="flex items-center gap-3 rounded-2xl px-4 py-3 text-left shadow-md transition hover:opacity-90 lg:py-4"
                 style={{
-                  backgroundColor: 'var(--cardapio-bg-secondary)',
-                  color: 'var(--cardapio-text-primary)',
+                  backgroundColor: 'var(--cardapio-btn-primary, var(--cardapio-accent-primary))',
+                  color: 'var(--cardapio-btn-primary-text, #fff)',
                 }}
               >
-                <span
-                  className="flex h-12 w-12 items-center justify-center rounded-xl"
-                  style={{ backgroundColor: 'var(--cardapio-accent-primary)', color: '#fff' }}
-                >
+                <span className="flex h-10 w-10 items-center justify-center">
                   <Icon className="h-6 w-6" />
                 </span>
-                <span className="text-lg font-semibold">{botao.label}</span>
+                <span className="flex-1 text-sm font-semibold lg:text-lg">{botao.label}</span>
               </button>
             )
           })}
+
+          {carrinhoCount > 0 ? (
+            <button
+              type="button"
+              onClick={() => setCarrinhoAberto(true)}
+              className="flex items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition lg:py-4"
+              style={{
+                backgroundColor: 'var(--cardapio-bg-elevated)',
+                borderColor: 'var(--cardapio-border)',
+                color: 'var(--cardapio-text-primary)',
+              }}
+            >
+              <span className="relative">
+                <MdShoppingCart className="h-6 w-6" />
+                <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+                  {carrinhoCount > 9 ? '9+' : carrinhoCount}
+                </span>
+              </span>
+              <span className="flex-1 text-sm font-semibold lg:text-lg">Ver Carrinho</span>
+            </button>
+          ) : null}
         </div>
 
-        <div className="relative z-10 border-t px-3 py-3 lg:px-6" style={{ borderColor: 'var(--cardapio-border, #333)' }}>
-          <button
-            type="button"
-            onClick={() => router.push(`/cardapio-mesa/mesa/${mesaId}/carrinho`)}
-            className="flex w-full items-center justify-center gap-2 rounded-xl py-3 font-semibold text-white"
-            style={{ backgroundColor: 'var(--cardapio-accent-primary, #FF7A00)' }}
+        <div className="relative z-10 px-6 pb-4">
+          <p
+            className="text-center text-xs"
+            style={{ color: 'var(--cardapio-text-muted, var(--cardapio-text-secondary))' }}
           >
-            <MdShoppingCart className="h-5 w-5" />
-            Ver carrinho
-            {carrinhoCount > 0 ? (
-              <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs">
-                {carrinhoCount > 99 ? '99+' : carrinhoCount}
-              </span>
-            ) : null}
-          </button>
+            Desenvolvido por ConnectPlug
+          </p>
         </div>
       </div>
 
       <div
-        className="hidden flex-1 items-center justify-center p-8 md:flex"
-        style={{ backgroundColor: 'var(--cardapio-bg-secondary)' }}
+        className="relative hidden h-screen w-2/3 flex-col overflow-hidden md:flex"
+        style={{ background: 'var(--cardapio-gradient-secondary, var(--cardapio-bg-secondary))' }}
       >
-        <p className="max-w-sm text-center text-sm" style={{ color: 'var(--cardapio-text-secondary)' }}>
-          Escolha Cardápio para ver os produtos do menu (mesmo catálogo do pedido balcão). Pedido
-          nesta V1 ainda é simulado.
-        </p>
+        <div className="relative h-full w-full flex-1 overflow-hidden">
+          <CarrosselProdutosDestaque />
+        </div>
       </div>
+
+      <CarrinhoCompleto
+        mesaId={mesaId}
+        variant="panel"
+        open={carrinhoAberto}
+        onClose={() => setCarrinhoAberto(false)}
+        onChanged={atualizarCarrinhoCount}
+        onContinueShopping={() => {
+          setCarrinhoAberto(false)
+          router.push(`/cardapio-mesa/mesa/${mesaId}/cardapio`)
+        }}
+        onAfterEnviar={() => {
+          setCarrinhoAberto(false)
+          atualizarCarrinhoCount()
+        }}
+      />
     </div>
   )
 }
