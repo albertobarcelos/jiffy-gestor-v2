@@ -22,7 +22,7 @@ export function DeliveryCatalogoProdutoCard({
   const content = (
     <>
       <div
-        className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl border"
+        className="relative aspect-square w-full overflow-hidden rounded-2xl border"
         style={{
           backgroundColor: '#ffffff',
           borderColor: '#e5e7eb',
@@ -34,7 +34,7 @@ export function DeliveryCatalogoProdutoCard({
             sizes={DELIVERY_IMAGEM_SIZES.catalogoCard}
             priority={priority}
             produtoId={produto.id}
-            className="object-cover"
+            className="object-contain object-center"
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">

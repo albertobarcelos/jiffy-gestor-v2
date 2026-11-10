@@ -51,7 +51,7 @@ export function DeliverySugestoesProdutoCard({
             sizes={DELIVERY_IMAGEM_SIZES.sugestao}
             priority={priority}
             produtoId={produto.id}
-            className="object-cover"
+            className="object-contain object-center"
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">

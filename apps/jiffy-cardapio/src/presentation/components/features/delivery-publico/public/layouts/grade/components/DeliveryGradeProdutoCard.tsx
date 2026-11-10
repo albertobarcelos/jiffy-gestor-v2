@@ -34,7 +34,7 @@ export function DeliveryGradeProdutoCard({
             sizes={DELIVERY_IMAGEM_SIZES.gradeCard}
             priority={priority}
             produtoId={produto.id}
-            className="rounded-xl object-cover"
+            className="rounded-xl object-contain object-center"
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">

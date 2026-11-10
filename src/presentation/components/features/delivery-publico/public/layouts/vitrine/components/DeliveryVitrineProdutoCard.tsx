@@ -43,7 +43,11 @@ export function DeliveryVitrineProdutoCard({
 
   const media = produto.imagemUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={produto.imagemUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+    <img
+      src={produto.imagemUrl}
+      alt=""
+      className="absolute inset-0 h-full w-full object-contain object-center"
+    />
   ) : (
     <div className="absolute inset-0 flex items-center justify-center">
       <Camera className="h-12 w-12" style={{ color: 'var(--delivery-text-muted)' }} aria-hidden />
@@ -56,7 +60,7 @@ export function DeliveryVitrineProdutoCard({
       style={cardStyle}
     >
       <div
-        className="relative aspect-[4/3] w-full border-b"
+        className="relative aspect-square w-full border-b"
         style={{ backgroundColor: '#ffffff', borderColor: '#e5e7eb' }}
       >
         {interactive && onClick ? (

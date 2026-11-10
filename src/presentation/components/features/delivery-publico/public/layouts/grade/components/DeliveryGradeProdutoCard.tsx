@@ -29,7 +29,7 @@ export function DeliveryGradeProdutoCard({
           <img
             src={produto.imagemUrl}
             alt=""
-            className="absolute inset-0 h-full w-full rounded-xl object-cover"
+            className="absolute inset-0 h-full w-full rounded-xl object-contain object-center"
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">

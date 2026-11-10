@@ -53,7 +53,7 @@ export function DeliveryVitrineProdutoCard({
       sizes={DELIVERY_IMAGEM_SIZES.vitrineCard}
       priority={priority}
       produtoId={produto.id}
-      className="object-cover"
+      className="object-contain object-center"
     />
   ) : (
     <div className="absolute inset-0 flex items-center justify-center">
@@ -67,7 +67,7 @@ export function DeliveryVitrineProdutoCard({
       style={cardStyle}
     >
       <div
-        className="relative aspect-[4/3] w-full border-b"
+        className="relative aspect-square w-full border-b"
         style={{ backgroundColor: '#ffffff', borderColor: '#e5e7eb' }}
       >
         {interactive && onClick ? (
