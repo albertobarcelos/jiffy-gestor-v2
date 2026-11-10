@@ -135,6 +135,27 @@ export function TabSessionBootstrap() {
     }
 
     /**
+     * Cardápio mesa QR: fora de `/gestao/{slug}`. Não entrar em `wait` sem emp;
+     * o layout (`CardapioMesaTenantBootstrap`) reidrata o tenant desta aba.
+     */
+    if (pathNow === '/cardapio-mesa' || pathNow.startsWith('/cardapio-mesa/')) {
+      if (!isRehydrated) return
+      if (didRunRef.current) return
+      didRunRef.current = true
+      const existingToken = getTabTenantToken()
+      if (existingToken) {
+        try {
+          activateTenantToken(existingToken, setTenantAuth, setTabVerified)
+        } catch {
+          setTabVerified(true)
+        }
+      } else {
+        setTabVerified(true)
+      }
+      return
+    }
+
+    /**
      * Flow sem empresa na URL: não esperar Zustand.
      * Quem logou no hub e reabre `/pedidos` ficava no quadro a girar para sempre.
      */

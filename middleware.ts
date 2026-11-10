@@ -168,6 +168,7 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/api/geolocalizacao/') ||
     pathname.startsWith('/notas-fiscais') ||
     pathname.startsWith('/api/public/notas-fiscais-consumidor') ||
+    pathname.startsWith('/cardapio-mesa') ||
     pathname === '/sw-expedicao-app.js' ||
     pathname === '/expedicao-app/manifest.webmanifest'
   ) {
