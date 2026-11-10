@@ -21,9 +21,11 @@ export function GradeLayoutHome({
   onBuscaChange,
   onGrupoClick,
   onProdutoClick,
+  onProdutoAddRapido,
   onPedidoClick,
   onMeuPedidoClick,
   onInformacoesClick,
+  quantidadePorProduto,
   carrinhoThumbs,
   carrinhoThumbsBounceKey,
   carrinhoThumbsTargetRef,
@@ -102,7 +104,10 @@ export function GradeLayoutHome({
                 index > 0 &&
                 filtered.grupos[index - 1]?.id === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID
               }
+              quantidadePorProduto={quantidadePorProduto}
               onProdutoClick={onProdutoClick}
+              onProdutoAddRapido={onProdutoAddRapido}
+              onAbrirCarrinho={onPedidoClick}
             />
           ))}
         </div>

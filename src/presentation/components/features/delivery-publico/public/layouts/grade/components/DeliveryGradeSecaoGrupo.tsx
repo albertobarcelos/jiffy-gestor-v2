@@ -12,7 +12,10 @@ type DeliveryGradeSecaoGrupoProps = {
   grupo: DeliveryPublicoGrupoViewModel
   interactive?: boolean
   denseTop?: boolean
+  quantidadePorProduto?: Record<string, number>
   onProdutoClick?: (produtoId: string) => void
+  onProdutoAddRapido?: (produtoId: string) => void
+  onAbrirCarrinho?: () => void
 }
 
 export function DeliveryGradeSecaoGrupo({
@@ -20,7 +23,10 @@ export function DeliveryGradeSecaoGrupo({
   grupo,
   interactive = false,
   denseTop = false,
+  quantidadePorProduto,
   onProdutoClick,
+  onProdutoAddRapido,
+  onAbrirCarrinho,
 }: DeliveryGradeSecaoGrupoProps) {
   if (grupo.produtos.length === 0) return null
 
@@ -30,7 +36,10 @@ export function DeliveryGradeSecaoGrupo({
         config={config}
         grupo={grupo}
         interactive={interactive}
+        quantidadePorProduto={quantidadePorProduto}
         onProdutoClick={onProdutoClick}
+        onProdutoAddRapido={onProdutoAddRapido}
+        onAbrirCarrinho={onAbrirCarrinho}
       />
     )
   }
@@ -59,7 +68,10 @@ export function DeliveryGradeSecaoGrupo({
             key={produto.id}
             produto={produto}
             interactive={interactive}
+            quantidadeNoCarrinho={quantidadePorProduto?.[produto.id] ?? 0}
             onClick={onProdutoClick}
+            onAddRapido={onProdutoAddRapido}
+            onAbrirCarrinho={onAbrirCarrinho}
           />
         ))}
       </div>

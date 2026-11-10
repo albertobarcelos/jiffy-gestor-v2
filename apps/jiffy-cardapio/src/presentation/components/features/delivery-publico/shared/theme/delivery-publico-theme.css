@@ -382,9 +382,10 @@ html.delivery-publico-ios-lock select {
   border-radius: 0 !important;
 }
 
-/** Vitrine / Grade — capa colada ao topnav (como no app). */
+/** Vitrine / Grade / Catálogo — capa colada ao topnav (como no app). */
 .delivery-preview-shell .delivery-loja-capa.delivery-vitrine-capa,
-.delivery-preview-shell .delivery-loja-capa.delivery-grade-capa {
+.delivery-preview-shell .delivery-loja-capa.delivery-grade-capa,
+.delivery-preview-shell .delivery-loja-capa.delivery-catalogo-capa {
   margin-top: 0 !important;
 }
 

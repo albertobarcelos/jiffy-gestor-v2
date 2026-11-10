@@ -14,7 +14,10 @@ type DeliveryGradeSecaoGrupoProps = {
   interactive?: boolean
   denseTop?: boolean
   primeirasImagensPriority?: boolean
+  quantidadePorProduto?: Record<string, number>
   onProdutoClick?: (produtoId: string) => void
+  onProdutoAddRapido?: (produtoId: string) => void
+  onAbrirCarrinho?: () => void
 }
 
 export function DeliveryGradeSecaoGrupo({
@@ -23,7 +26,10 @@ export function DeliveryGradeSecaoGrupo({
   interactive = false,
   denseTop = false,
   primeirasImagensPriority = false,
+  quantidadePorProduto,
   onProdutoClick,
+  onProdutoAddRapido,
+  onAbrirCarrinho,
 }: DeliveryGradeSecaoGrupoProps) {
   if (grupo.produtos.length === 0) return null
 
@@ -34,7 +40,10 @@ export function DeliveryGradeSecaoGrupo({
         grupo={grupo}
         interactive={interactive}
         primeirasImagensPriority={primeirasImagensPriority}
+        quantidadePorProduto={quantidadePorProduto}
         onProdutoClick={onProdutoClick}
+        onProdutoAddRapido={onProdutoAddRapido}
+        onAbrirCarrinho={onAbrirCarrinho}
       />
     )
   }
@@ -64,7 +73,10 @@ export function DeliveryGradeSecaoGrupo({
             produto={produto}
             interactive={interactive}
             priority={devePriorizarImagemProduto(primeirasImagensPriority, index)}
+            quantidadeNoCarrinho={quantidadePorProduto?.[produto.id] ?? 0}
             onClick={onProdutoClick}
+            onAddRapido={onProdutoAddRapido}
+            onAbrirCarrinho={onAbrirCarrinho}
           />
         ))}
       </div>

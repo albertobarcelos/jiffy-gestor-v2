@@ -75,21 +75,28 @@ function GradeWireframe() {
   )
 }
 
+/** Prateleiras horizontais compactas, mesma altura dos outros modelos. */
 function CatalogoWireframe() {
   return (
     <div className="space-y-1.5">
       <Block className="h-4 w-full" />
-      <BlockSoft className="h-2 w-full rounded-full" />
-      <BlockSoft className="h-2 w-2/3 rounded-full" />
-      <BlockSoft className="h-1.5 w-1/3 bg-gray-300/80" />
-      <div className="flex gap-1.5 overflow-hidden">
-        <Block className="h-8 w-[55%] shrink-0 rounded-md" />
-        <Block className="h-8 w-[40%] shrink-0 rounded-md opacity-70" />
+      <Block className="h-5 w-full rounded-md" />
+      <BlockSoft className="h-2.5 w-full rounded-full" />
+      <div className="flex gap-1">
+        <BlockSoft className="h-2 w-1/4 bg-gray-300/80" />
+        <BlockSoft className="h-2 w-1/4" />
+        <BlockSoft className="h-2 w-1/4" />
       </div>
-      <div className="flex gap-1.5 overflow-hidden">
-        <Block className="h-7 w-[55%] shrink-0 rounded-md" />
-        <Block className="h-7 w-[40%] shrink-0 rounded-md opacity-70" />
-      </div>
+      {Array.from({ length: 2 }).map(row => (
+        <div key={row} className="space-y-1">
+          <BlockSoft className="h-1.5 w-1/3" />
+          <div className="flex gap-1 overflow-hidden">
+            <Block className="h-7 w-[42%] shrink-0 rounded-md" />
+            <Block className="h-7 w-[42%] shrink-0 rounded-md" />
+            <Block className="h-7 w-[42%] shrink-0 rounded-md opacity-55" />
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -106,7 +113,7 @@ export function LayoutModelWireframe({ layoutId }: { layoutId: DeliveryLayoutId 
 
   return (
     <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
-      <div className="mx-auto w-full max-w-[9.5rem] rounded-md border border-gray-200 bg-white p-2 shadow-sm">
+      <div className="mx-auto h-[10.75rem] w-full max-w-[9.5rem] overflow-hidden rounded-md border border-gray-200 bg-white p-2 shadow-sm">
         <Content />
       </div>
     </div>
