@@ -6,7 +6,7 @@ import { formatarMoedaApp } from '@/src/presentation/expedicao/app/format'
 export function EstouroEntregaOverlay(props: { estouro: EstouroFinalizarEntrega }) {
   const { estouro } = props
   return (
-    <div className="pointer-events-none fixed inset-0 z-[70] flex items-center justify-center px-8">
+    <div className="expedicao-app-overlay pointer-events-none fixed inset-0 z-[70] flex items-center justify-center px-8">
       <div className="expedicao-estouro rounded-3xl bg-zinc-900 px-8 py-7 text-center shadow-2xl">
         {estouro.taxa > 0 ? (
           <p className="text-[34px] font-extrabold tracking-tight text-emerald-400">

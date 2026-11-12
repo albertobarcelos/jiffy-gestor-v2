@@ -57,13 +57,21 @@ export function useHorizontalDragScroll<T extends HTMLElement>(
       document.removeEventListener('mousemove', handleGlobalMouseMove)
       document.removeEventListener('mouseup', handleGlobalMouseUp)
 
+      // Mantém a flag até depois do `click` sintético do mouseup.
       setTimeout(() => {
         hasMovedRef.current = false
-      }, 100)
+      }, 250)
     }
 
     document.addEventListener('mousemove', handleGlobalMouseMove)
     document.addEventListener('mouseup', handleGlobalMouseUp)
+  }, [])
+
+  /** Impede abrir/adicionar item quando o gesto foi arrastar a faixa. */
+  const handleClickCapture = useCallback((event: React.MouseEvent<T>) => {
+    if (!hasMovedRef.current) return
+    event.preventDefault()
+    event.stopPropagation()
   }, [])
 
   const noopMouseHandler = useCallback(() => {
@@ -99,6 +107,7 @@ export function useHorizontalDragScroll<T extends HTMLElement>(
     hasMovedRef,
     handleMouseDown,
     handleWheel,
+    handleClickCapture,
     handleMouseMove: noopMouseHandler,
     handleMouseUp: noopMouseHandler,
     handleMouseLeave: noopMouseHandler,

@@ -44,7 +44,7 @@ export function ValorLinhaPagamentoInput(props: ValorLinhaPagamentoInputProps) {
         props.onValor(parsed ?? 0)
         setTexto(textoValorLinhaFinalizarApp(parsed ?? 0))
       }}
-      className="w-28 rounded-xl border border-zinc-200 bg-white px-2 py-1.5 text-right text-sm font-semibold text-zinc-900"
+      className="w-28 rounded-xl border border-zinc-200 bg-white px-2 py-1.5 text-right text-base font-semibold text-zinc-900"
     />
   )
 }

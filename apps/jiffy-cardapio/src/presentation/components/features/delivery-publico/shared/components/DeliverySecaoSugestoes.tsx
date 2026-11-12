@@ -40,6 +40,7 @@ export function DeliverySecaoSugestoes({
     handleMouseMove,
     handleMouseUp,
     handleMouseLeave,
+    handleClickCapture,
   } = useHorizontalDragScroll<HTMLDivElement>({ mapVerticalWheel: false })
 
   if (grupo.produtos.length === 0) return null
@@ -71,6 +72,7 @@ export function DeliverySecaoSugestoes({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
+        onClickCapture={handleClickCapture}
         onWheel={handleWheel}
         className={`flex items-start gap-3 overflow-x-auto overscroll-x-contain px-4 pb-0 pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
           isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'

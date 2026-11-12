@@ -1,4 +1,10 @@
-import { IGrupoProdutoRepository, BuscarGruposResponse, CriarGrupoParams, AtualizarGrupoParams } from '@/src/domain/repositories/IGrupoProdutoRepository'
+import {
+  IGrupoProdutoRepository,
+  BuscarGruposResponse,
+  CriarGrupoParams,
+  AtualizarGrupoParams,
+  ProdutoRelacionadoDTO,
+} from '@/src/domain/repositories/IGrupoProdutoRepository'
 import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { ApiClient } from '@/src/infrastructure/api/apiClient'
 
@@ -123,6 +129,35 @@ export class GrupoProdutoRepository implements IGrupoProdutoRepository {
           Authorization: `Bearer ${this.token}`,
         },
         body: JSON.stringify({ novaPosicao }),
+      }
+    )
+  }
+
+  async listarProdutosRelacionados(grupoId: string): Promise<ProdutoRelacionadoDTO[]> {
+    const { data } = await this.apiClient.request<{
+      relacionados: ProdutoRelacionadoDTO[]
+    }>(`/api/v1/cardapio/grupos-produtos/${grupoId}/relacionados`, {
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+      },
+    })
+
+    return data?.relacionados ?? []
+  }
+
+  async substituirProdutosRelacionados(
+    grupoId: string,
+    produtoIds: string[]
+  ): Promise<void> {
+    await this.apiClient.request(
+      `/api/v1/cardapio/grupos-produtos/${grupoId}/relacionados`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.token}`,
+        },
+        body: JSON.stringify({ produtoIds }),
       }
     )
   }

@@ -14,8 +14,8 @@ export function RelatoriosView() {
   const searchParams = useSearchParams() // Obter search params da URL
   const initialPeriodo = searchParams.get('periodo') || 'Todos' // Período vindo da URL
   const initialStatus = searchParams.get('status') || null // Status vindo da URL
-
-  // Removemos as props de data inicial e final, já que VendasList vai cuidar disso internamente
+  const initialDe = searchParams.get('de')
+  const initialAte = searchParams.get('ate')
 
   const [activeTab, setActiveTab] = useState<'vendas' | 'faturamento'>('vendas')
   const [faturamentos, setFaturamentos] = useState<Faturamento[]>([])
@@ -71,6 +71,8 @@ export function RelatoriosView() {
               <VendasList
                 initialPeriodo={initialPeriodo}
                 initialStatus={initialStatus}
+                initialDe={initialDe}
+                initialAte={initialAte}
               />
             ) : (
               <div className="space-y-4">

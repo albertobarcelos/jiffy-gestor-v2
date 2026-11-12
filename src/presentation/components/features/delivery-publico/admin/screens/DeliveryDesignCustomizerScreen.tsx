@@ -38,6 +38,7 @@ import { DesignModelosTab } from '../components/tabs/DesignModelosTab'
 import { DesignCoresTab } from '../components/tabs/DesignCoresTab'
 import { DesignTipografiasTab } from '../components/tabs/DesignTipografiasTab'
 import { DesignCategoriasTab } from '../components/tabs/DesignCategoriasTab'
+import { DesignRelacionadosTab } from '../components/tabs/DesignRelacionadosTab'
 import { NotificacoesWhatsAppDeliveryTab } from '@/src/presentation/components/features/configuracoes/tabs/NotificacoesWhatsAppDeliveryTab'
 import { DeliveryNomeCardapioView } from '@/src/presentation/components/features/delivery/hub/DeliveryNomeCardapioView'
 import { useHydrateDesignCabecalhoMidia } from '../hooks/useHydrateDesignCabecalhoMidia'
@@ -340,6 +341,15 @@ export function DeliveryDesignCustomizerScreen() {
                 isError={categoriasGruposError}
                 onChange={updateDraft}
                 onGruposChange={setPreviewCategoriasGrupos}
+              />
+            ) : null}
+            {activeTab === 'relacionados' ? (
+              <DesignRelacionadosTab
+                grupos={previewCategoriasGrupos}
+                menuId={menuDeliveryId}
+                hasMenu={hasMenu}
+                isLoading={categoriasGruposLoading}
+                isError={categoriasGruposError}
               />
             ) : null}
             {activeTab === 'notificacoes' ? <NotificacoesWhatsAppDeliveryTab /> : null}

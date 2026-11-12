@@ -35,6 +35,17 @@ export interface BuscarGruposResponse {
   hasNext: boolean
 }
 
+export type ProdutoRelacionadoDTO = {
+  produtoId: string
+  ordem: number
+  nome: string
+  valor: number
+  imagemUrl: string | null
+  ativo: boolean
+  ativoDelivery: boolean
+  codigoProduto: number
+}
+
 /**
  * Interface do repositório de grupos de produtos
  */
@@ -45,5 +56,7 @@ export interface IGrupoProdutoRepository {
   atualizarGrupo(id: string, params: AtualizarGrupoParams): Promise<GrupoProduto>
   deletarGrupo(id: string): Promise<void>
   reordenarGrupo(id: string, novaPosicao: number): Promise<void>
+  listarProdutosRelacionados(grupoId: string): Promise<ProdutoRelacionadoDTO[]>
+  substituirProdutosRelacionados(grupoId: string, produtoIds: string[]): Promise<void>
 }
 

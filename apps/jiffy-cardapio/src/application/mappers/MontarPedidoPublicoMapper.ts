@@ -28,6 +28,11 @@ export type MontarPedidoPublicoParams = {
   telefoneApi?: string | null
   /** Quando true, CPF vazio ou incompleto bloqueia o pedido. */
   exigeCpfVenda?: boolean
+  /**
+   * Reservado: atribuição Peça Também no create.
+   * O backend ainda não aceita — não enviar no payload.
+   */
+  sessionIdPecaTambem?: string | null
 }
 
 export type MontarPedidoPublicoResult =
@@ -122,6 +127,8 @@ function montarComposicaoPedidoPublico({
       quantidade: Math.max(1, Math.floor(c.quantidade)),
     }))
 
+    // Peça Também fica só no carrinho/UI. Create/cotação não mandam
+    // fonteSugestao nem grupoProdutoOrigemId até o backend aceitar.
     return {
       produtoId: item.produtoId,
       quantidade,
@@ -153,7 +160,7 @@ function montarComposicaoPedidoPublico({
   }
 }
 
-/** Monta payload de cotação (mesma composição validada no create público). */
+/** Monta payload de cotação (composição de preço; sem atribuição Peça Também). */
 export function montarCotacaoPublico(
   params: MontarPedidoPublicoParams
 ): MontarCotacaoPublicoResult {
@@ -198,6 +205,8 @@ export function montarPedidoPublico(
   if (composicao.composicao.cpfDocumento) {
     payload.documentoCpfCnpj = composicao.composicao.cpfDocumento
   }
+
+  // sessionIdPecaTambem: não enviar — backend homolog/prod ainda rejeita o campo.
 
   const obsPedido = params.form.observacaoPedido.trim()
   if (obsPedido) {

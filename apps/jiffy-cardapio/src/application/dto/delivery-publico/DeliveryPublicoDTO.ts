@@ -62,6 +62,18 @@ export type CatalogoPublicoProdutoDTO = {
   gruposComplementos: CatalogoPublicoGrupoComplementoNoProdutoDTO[]
 }
 
+/** Sugestão do carrossel Peça Também (catálogo + origem no carrinho). */
+export type PecaTambemProdutoDTO = CatalogoPublicoProdutoDTO & {
+  /** Grupo do carrinho que originou esta sugestão. */
+  grupoIdOrigem: string
+  /** Grupo real do produto no menu delivery (para gravar no carrinho). */
+  grupoId: string
+}
+
+export type GetPecaTambemPublicoResponseDTO = {
+  produtos: PecaTambemProdutoDTO[]
+}
+
 export type CatalogoPublicoGrupoProdutoDTO = {
   id: string
   nome: string

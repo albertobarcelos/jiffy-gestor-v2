@@ -78,7 +78,7 @@ export function ComissoesTab(props: {
           alt=""
           width={220}
           height={220}
-          className="h-[9.5rem] w-[9.5rem] shrink-0 object-contain object-right"
+          className="expedicao-app-header-art h-[9.5rem] w-[9.5rem] shrink-0 object-contain object-right"
           priority
         />
       </header>
@@ -144,7 +144,7 @@ export function ComissoesTab(props: {
                     setRascunhoInicio(inicio)
                     aplicarFaixa(inicio, rascunhoFim)
                   }}
-                  className="mt-1 w-full bg-transparent text-sm font-semibold text-zinc-900 outline-none"
+                  className="mt-1 w-full bg-transparent text-base font-semibold text-zinc-900 outline-none"
                 />
               </label>
               <label className="min-w-0">
@@ -159,7 +159,7 @@ export function ComissoesTab(props: {
                     setRascunhoFim(fim)
                     aplicarFaixa(rascunhoInicio, fim)
                   }}
-                  className="mt-1 w-full bg-transparent text-sm font-semibold text-zinc-900 outline-none"
+                  className="mt-1 w-full bg-transparent text-base font-semibold text-zinc-900 outline-none"
                 />
               </label>
             </div>

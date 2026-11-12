@@ -28,6 +28,8 @@ export const PedidoPublicoCarrinhoItemInputSchema = z.object({
       quantidade: z.number().positive(),
     })
   ),
+  fonteSugestao: z.literal('PECA_TAMBEM').nullable().optional(),
+  grupoProdutoOrigemId: z.string().min(1).nullable().optional(),
 })
 
 export const CheckoutFormDataSchema = z.object({

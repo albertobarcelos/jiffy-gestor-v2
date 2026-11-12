@@ -41,7 +41,10 @@ import {
 } from '../../shared/stores/deliveryCarrinhoStore'
 import { buildCatalogViewModel } from '../../shared/mappers/buildCatalogViewModel'
 import { applySugestoesDaCasaVisibility } from '../../shared/utils/applySugestoesDaCasaVisibility'
-import { findCatalogoProdutoById } from '../../shared/utils/findCatalogoProdutoById'
+import {
+  findCatalogoGrupoIdByProdutoId,
+  findCatalogoProdutoById,
+} from '../../shared/utils/findCatalogoProdutoById'
 import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPublicaEndereco'
 import { formatarTelefoneBr } from '@/src/shared/utils/telefoneBr'
 import { produtoTemComplementosAtivos } from '../../shared/utils/produtoComplementosUtils'
@@ -273,6 +276,7 @@ export function DeliveryPublicoHomeScreen({
       const precos = resolverPrecosDeliveryProduto(produto)
       adicionarItem(slug, {
         produtoId: produto.id,
+        grupoId: findCatalogoGrupoIdByProdutoId(grupos, produto.id),
         produtoNome: produto.nome,
         produtoImagemUrl: produto.imagemUrl,
         quantidade: 1,
@@ -626,6 +630,7 @@ function DeliveryPublicoHomeContent({
         <DeliveryProdutoModal
           slug={slug}
           produto={produtoSelecionado}
+          grupoId={findCatalogoGrupoIdByProdutoId(grupos, produtoSelecionado.id)}
           onClose={onCloseProduto}
           onAdicionado={onProdutoAdicionado}
         />

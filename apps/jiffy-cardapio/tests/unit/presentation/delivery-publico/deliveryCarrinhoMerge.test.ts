@@ -87,6 +87,21 @@ describe('chaveLinhaCarrinho / encontrarItemIgual', () => {
     expect(semObs).not.toBe(comObs)
   })
 
+  it('diferencia fonte Peça Também do add normal', () => {
+    const menu = chaveLinhaCarrinho({
+      produtoId: 'prod-1',
+      observacoes: [],
+      complementos: [],
+    })
+    const peca = chaveLinhaCarrinho({
+      produtoId: 'prod-1',
+      observacoes: [],
+      complementos: [],
+      fonteSugestao: 'PECA_TAMBEM',
+    })
+    expect(menu).not.toBe(peca)
+  })
+
   it('normaliza observação com trim', () => {
     const a = chaveLinhaCarrinho({
       produtoId: 'prod-1',
@@ -191,6 +206,32 @@ describe('deliveryCarrinhoStore merge', () => {
     store.adicionarItem(slug, { ...base, observacoes: ['sem cebola'] })
 
     expect(useDeliveryCarrinhoStore.getState().getItens(slug)).toHaveLength(2)
+  })
+
+  it('não une o mesmo produto do menu com o do Peça Também', () => {
+    const store = useDeliveryCarrinhoStore.getState()
+    const base = {
+      produtoId: 'prod-1',
+      produtoNome: 'X-Burger',
+      produtoImagemUrl: null as string | null,
+      quantidade: 1,
+      valorUnitario: 20,
+      valorTotal: 20,
+      observacoes: [] as string[],
+      complementos: [] as DeliveryCarrinhoComplemento[],
+    }
+
+    store.adicionarItem(slug, base)
+    store.adicionarItem(slug, {
+      ...base,
+      fonteSugestao: 'PECA_TAMBEM',
+      grupoProdutoOrigemId: 'grupo-origem',
+    })
+
+    const itens = useDeliveryCarrinhoStore.getState().getItens(slug)
+    expect(itens).toHaveLength(2)
+    expect(itens.some(i => i.fonteSugestao === 'PECA_TAMBEM')).toBe(true)
+    expect(itens.some(i => !i.fonteSugestao)).toBe(true)
   })
 
   it('une ao substituir se o resultado ficar igual a outra linha', () => {

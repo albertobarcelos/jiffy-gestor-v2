@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
 import { CreatePedidoPublicoInputSchema } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
-import { montarPedidoPublico } from '@/src/application/mappers/MontarPedidoPublicoMapper'
+import {
+  montarCotacaoPublico,
+  montarPedidoPublico,
+} from '@/src/application/mappers/MontarPedidoPublicoMapper'
 import { MSG_PAGAMENTO_OBRIGATORIO_PEDIDO_PUBLICO } from '@/src/domain/policies/PagamentoObrigatorioPedidoPublico'
 import {
   calcularTrocoCheckout,
@@ -55,6 +58,60 @@ describe('montarPedidoPublico + CreatePedidoPublicoInputSchema', () => {
     if (!result.ok) return
     const parsed = CreatePedidoPublicoInputSchema.safeParse(result.payload)
     expect(parsed.success).toBe(true)
+  })
+
+  it('não envia atribuição Peça Também no create (backend ainda não aceita)', () => {
+    const result = montarPedidoPublico({
+      slug: 'loja',
+      itens: [
+        {
+          ...item,
+          fonteSugestao: 'PECA_TAMBEM',
+          grupoProdutoOrigemId: 'grupo-origem',
+        },
+      ],
+      total: 30.5,
+      form: formBase(),
+      tokenCotacao: 'token-teste',
+      sessionIdPecaTambem: 'session-xyz',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.payload).not.toHaveProperty('sessionIdPecaTambem')
+    expect(result.payload.produtos[0]).toEqual({
+      produtoId: 'p1',
+      quantidade: 1,
+      observacoes: [],
+      complementos: [],
+    })
+    expect(result.payload.produtos[0]).not.toHaveProperty('fonteSugestao')
+    expect(result.payload.produtos[0]).not.toHaveProperty('grupoProdutoOrigemId')
+    expect(CreatePedidoPublicoInputSchema.safeParse(result.payload).success).toBe(true)
+  })
+
+  it('não envia fonteSugestao na cotação', () => {
+    const result = montarCotacaoPublico({
+      slug: 'loja',
+      itens: [
+        {
+          ...item,
+          fonteSugestao: 'PECA_TAMBEM',
+          grupoProdutoOrigemId: 'grupo-origem',
+        },
+      ],
+      total: 30.5,
+      form: formBase(),
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.payload.produtos[0]).toEqual({
+      produtoId: 'p1',
+      quantidade: 1,
+      observacoes: [],
+      complementos: [],
+    })
+    expect(result.payload.produtos[0]).not.toHaveProperty('fonteSugestao')
+    expect(result.payload.produtos[0]).not.toHaveProperty('grupoProdutoOrigemId')
   })
 
   it('inclui CPF no cliente e documento quando completo', () => {
