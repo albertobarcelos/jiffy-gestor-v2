@@ -10,6 +10,7 @@ import { invalidarQueriesEntregadores } from '@/src/presentation/components/feat
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { formatarTelefoneBr } from '@/src/shared/utils/telefoneBr'
 import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
 import {
@@ -27,10 +28,11 @@ export interface EntregadorDeliveryResumo {
   id: string
   nome: string | null
   telefone?: string | null
+  ativo: boolean
 }
 
 const LISTA_GRADE =
-  'grid w-full min-w-0 grid-cols-[minmax(0,1fr)_2.75rem_2.75rem] items-center gap-x-2 md:grid-cols-[minmax(0,1.4fr)_minmax(8rem,1fr)_3.5rem_5.25rem] md:gap-x-2.5'
+  'grid w-full min-w-0 grid-cols-[minmax(0,1fr)_3rem_2.75rem_1.75rem] items-center gap-x-2 md:grid-cols-[minmax(0,1.4fr)_minmax(8rem,1fr)_4.5rem_3.5rem_1.75rem] md:gap-x-2.5'
 
 const TOOLTIP_SLOT_PROPS = {
   tooltip: {
@@ -44,15 +46,27 @@ const TOOLTIP_SLOT_PROPS = {
   },
 } as const
 
-function normalizarResumo(raw: unknown): EntregadorDeliveryResumo | null {
+function parseAtivoCampo(value: unknown): boolean | null {
+  if (typeof value === 'boolean') return value
+  if (value === 'true' || value === 1 || value === '1') return true
+  if (value === 'false' || value === 0 || value === '0') return false
+  return null
+}
+
+function normalizarResumo(
+  raw: unknown,
+  fallbackAtivo?: boolean
+): EntregadorDeliveryResumo | null {
   if (!raw || typeof raw !== 'object') return null
   const row = raw as Record<string, unknown>
   const id = String(row.id ?? '').trim()
   if (!id) return null
+  const ativoApi = parseAtivoCampo(row.ativo)
   return {
     id,
     nome: row.nome != null ? String(row.nome) : null,
     telefone: row.telefone != null ? String(row.telefone) : null,
+    ativo: ativoApi ?? fallbackAtivo ?? true,
   }
 }
 
@@ -104,6 +118,7 @@ export function EntregadoresList() {
   const [senhaEntregadorId, setSenhaEntregadorId] = useState<string | null>(null)
   const [senhaEntregadorNome, setSenhaEntregadorNome] = useState<string | null>(null)
   const [pwaQrAberto, setPwaQrAberto] = useState(false)
+  const [togglingAtivo, setTogglingAtivo] = useState<Record<string, boolean>>({})
 
   const searchTextRef = useRef('')
   const filterStatusRef = useRef(filterStatus)
@@ -141,36 +156,63 @@ export function EntregadoresList() {
 
     setIsLoading(true)
     try {
-      const params = new URLSearchParams({ limit: '100', offset: '0' })
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      }
       const q = searchTextRef.current.trim()
-      if (q) params.set('q', q)
       const status = filterStatusRef.current
-      if (status === 'Ativo') params.set('ativo', 'true')
-      if (status === 'Desativado') params.set('ativo', 'false')
 
-      const res = await fetchGestorApi(`/api/delivery/entregadores?${params.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      })
-
-      if (!res.ok) {
-        throw new Error(await mensagemErroHttp(res))
+      const montarParams = (ativo?: boolean) => {
+        const params = new URLSearchParams({ limit: '100', offset: '0' })
+        if (q) params.set('q', q)
+        if (ativo === true) params.set('ativo', 'true')
+        if (ativo === false) params.set('ativo', 'false')
+        return params
       }
 
-      const data: unknown = await res.json()
-      const items = extrairItems(data)
-        .map(normalizarResumo)
-        .filter((item): item is EntregadorDeliveryResumo => item !== null)
+      const buscar = async (ativo?: boolean) => {
+        const res = await fetchGestorApi(
+          `/api/delivery/entregadores?${montarParams(ativo).toString()}`,
+          { headers }
+        )
+        if (!res.ok) {
+          throw new Error(await mensagemErroHttp(res))
+        }
+        const data: unknown = await res.json()
+        const count =
+          data &&
+          typeof data === 'object' &&
+          'count' in data &&
+          typeof (data as { count: unknown }).count === 'number'
+            ? (data as { count: number }).count
+            : null
+        const items = extrairItems(data)
+          .map(raw =>
+            normalizarResumo(
+              raw,
+              ativo === undefined ? undefined : ativo
+            )
+          )
+          .filter((item): item is EntregadorDeliveryResumo => item !== null)
+        return { items, count: count ?? items.length }
+      }
 
-      const count =
-        data && typeof data === 'object' && 'count' in data && typeof (data as { count: unknown }).count === 'number'
-          ? (data as { count: number }).count
-          : items.length
-
-      setEntregadores(items)
-      setTotal(count)
+      // A listagem do BE (summary) não envia `ativo`; inferimos pelo filtro
+      // (e em "Todos" buscamos ativos + desativados em paralelo).
+      if (status === 'Todos') {
+        const [ativos, desativados] = await Promise.all([
+          buscar(true),
+          buscar(false),
+        ])
+        const items = [...ativos.items, ...desativados.items]
+        setEntregadores(items)
+        setTotal(ativos.count + desativados.count)
+      } else {
+        const resultado = await buscar(status === 'Ativo')
+        setEntregadores(resultado.items)
+        setTotal(resultado.count)
+      }
     } catch (error) {
       console.error('Erro ao listar entregadores:', error)
       showToast.error(error instanceof Error ? error.message : 'Erro ao listar entregadores')
@@ -224,6 +266,61 @@ export function EntregadoresList() {
   const handleSenhaSalva = () => {
     fecharSenha()
   }
+
+  const handleToggleAtivo = useCallback(
+    async (entregador: EntregadorDeliveryResumo, novoAtivo: boolean) => {
+      if (entregador.ativo === novoAtivo) return
+
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!token) {
+        showToast.error('Sessão expirada.')
+        return
+      }
+
+      const previous = entregadores
+      setTogglingAtivo(prev => ({ ...prev, [entregador.id]: true }))
+      setEntregadores(prev =>
+        prev.map(item =>
+          item.id === entregador.id ? { ...item, ativo: novoAtivo } : item
+        )
+      )
+
+      try {
+        const res = await fetchGestorApi(
+          `/api/delivery/entregadores/${encodeURIComponent(entregador.id)}`,
+          {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+            body: JSON.stringify({ ativo: novoAtivo }),
+          }
+        )
+        if (!res.ok) {
+          throw new Error(await mensagemErroHttp(res))
+        }
+
+        showToast.success(
+          novoAtivo ? 'Entregador ativado.' : 'Entregador desativado.'
+        )
+        invalidarQueriesEntregadores(queryClient, empresaId)
+        void loadEntregadores()
+      } catch (error) {
+        setEntregadores(previous)
+        showToast.error(
+          error instanceof Error ? error.message : 'Erro ao atualizar status'
+        )
+      } finally {
+        setTogglingAtivo(prev => {
+          const { [entregador.id]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [empresaId, entregadores, loadEntregadores, queryClient]
+  )
 
   const solicitarExclusao = (entregador: EntregadorDeliveryResumo) => {
     setDeletingId(entregador.id)
@@ -313,7 +410,7 @@ export function EntregadoresList() {
                 className="h-full w-full rounded-lg border border-gray-200 bg-info pl-11 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
               />
             </div>
-            <div className="mt-0 flex w-full min-w-0 items-center gap-2 sm:w-[160px] sm:shrink-0">
+            <div className="mt-0 flex w-full min-w-0 items-center gap-2 sm:w-[220px] sm:shrink-0">
               <label className="block text-xs font-semibold text-secondary-text">Status</label>
               <select
                 value={filterStatus}
@@ -340,11 +437,12 @@ export function EntregadoresList() {
             Telefone
           </div>
           <div className="text-center text-[10px] font-semibold leading-tight text-primary-text md:text-sm">
-            <span className="hidden whitespace-nowrap md:inline">Senha</span>
+            <span className="hidden whitespace-nowrap md:inline">Ativo</span>
           </div>
           <div className="text-center text-[10px] font-semibold leading-tight text-primary-text md:text-sm">
-            <span className="hidden whitespace-nowrap md:inline">Remover</span>
+            <span className="hidden whitespace-nowrap md:inline">Senha</span>
           </div>
+          <div aria-hidden className="min-w-0" />
         </div>
       </div>
 
@@ -387,6 +485,38 @@ export function EntregadoresList() {
                 onMouseDown={e => e.stopPropagation()}
                 onTouchStart={e => e.stopPropagation()}
               >
+                <MuiTooltip
+                  title={entregador.ativo ? 'Entregador ativo' : 'Entregador desativado'}
+                  placement="bottom"
+                  slotProps={TOOLTIP_SLOT_PROPS}
+                >
+                  <span className="inline-flex">
+                    <JiffyIconSwitch
+                      checked={entregador.ativo}
+                      onChange={e => {
+                        e.stopPropagation()
+                        void handleToggleAtivo(entregador, e.target.checked)
+                      }}
+                      disabled={Boolean(togglingAtivo[entregador.id])}
+                      bordered={false}
+                      size="sm"
+                      className="shrink-0 px-0 py-0"
+                      inputProps={{
+                        'aria-label': entregador.ativo
+                          ? 'Desativar entregador'
+                          : 'Ativar entregador',
+                        onClick: e => e.stopPropagation(),
+                      }}
+                    />
+                  </span>
+                </MuiTooltip>
+              </div>
+              <div
+                className="flex justify-center"
+                onClick={e => e.stopPropagation()}
+                onMouseDown={e => e.stopPropagation()}
+                onTouchStart={e => e.stopPropagation()}
+              >
                 <MuiTooltip title="Alterar senha do app" placement="bottom" slotProps={TOOLTIP_SLOT_PROPS}>
                   <button
                     type="button"
@@ -404,17 +534,19 @@ export function EntregadoresList() {
                 onMouseDown={e => e.stopPropagation()}
                 onTouchStart={e => e.stopPropagation()}
               >
-                <MuiTooltip title="Remover entregador" placement="bottom" slotProps={TOOLTIP_SLOT_PROPS}>
-                  <button
-                    type="button"
-                    aria-label="Remover entregador"
-                    disabled={isDeleting && deletingId === entregador.id}
-                    onClick={() => solicitarExclusao(entregador)}
-                    className="flex h-7 w-7 items-center justify-center rounded transition-colors hover:bg-red-50 disabled:opacity-50"
-                  >
-                    <MdDelete className="h-4 w-4 text-red-500" />
-                  </button>
-                </MuiTooltip>
+                {!entregador.ativo ? (
+                  <MuiTooltip title="Remover entregador" placement="bottom" slotProps={TOOLTIP_SLOT_PROPS}>
+                    <button
+                      type="button"
+                      aria-label="Remover entregador"
+                      disabled={isDeleting && deletingId === entregador.id}
+                      onClick={() => solicitarExclusao(entregador)}
+                      className="flex h-7 w-7 items-center justify-center rounded transition-colors hover:bg-red-50 disabled:opacity-50"
+                    >
+                      <MdDelete className="h-4 w-4 text-red-500" />
+                    </button>
+                  </MuiTooltip>
+                ) : null}
               </div>
             </div>
           )
@@ -448,13 +580,19 @@ export function EntregadoresList() {
       <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Remover entregador?</DialogTitle>
+            <DialogTitle>Remover cadastro permanentemente?</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-secondary-text">
-            {deletingNome
-              ? `O entregador "${deletingNome}" será desativado e não aparecerá nas listas de seleção.`
-              : 'O entregador será desativado (exclusão lógica) e não aparecerá nas listas de seleção.'}
-          </p>
+          <div className="space-y-3 text-sm text-secondary-text">
+            <p>
+              {deletingNome
+                ? `O cadastro do entregador "${deletingNome}" será removido de forma permanente.`
+                : 'O cadastro deste entregador será removido de forma permanente.'}
+            </p>
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700">
+              Atenção: esta ação não poderá ser desfeita e não será possível
+              recadastrar este entregador.
+            </p>
+          </div>
           <DialogFooter className="gap-2 sm:gap-2">
             <button
               type="button"
@@ -473,7 +611,7 @@ export function EntregadoresList() {
               onClick={() => void confirmarExclusao()}
               className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
             >
-              {isDeleting ? 'Removendo...' : 'Remover'}
+              {isDeleting ? 'Removendo...' : 'Remover permanentemente'}
             </button>
           </DialogFooter>
         </DialogContent>
