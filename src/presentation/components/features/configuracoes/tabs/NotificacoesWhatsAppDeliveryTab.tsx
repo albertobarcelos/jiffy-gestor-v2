@@ -10,13 +10,30 @@ import { NotificacoesWhatsAppAvisosSection } from '@/src/presentation/components
  * Etapa Delivery — Notificações WhatsApp.
  * Canal (QR) + quais avisos enviar ao cliente.
  */
-export function NotificacoesWhatsAppDeliveryTab() {
+export function NotificacoesWhatsAppDeliveryTab({
+  embeddedInPanel = false,
+}: {
+  /** Layout compacto para painel lateral (Kanban). */
+  embeddedInPanel?: boolean
+} = {}) {
   const [canalConectado, setCanalConectado] = useState(false)
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-gray-50 p-4 sm:p-6">
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+    <div
+      className={
+        embeddedInPanel
+          ? 'flex min-h-0 flex-1 flex-col overflow-y-auto bg-gray-50 p-3'
+          : 'flex min-h-0 flex-1 flex-col overflow-y-auto bg-gray-50 p-4 sm:p-6'
+      }
+    >
+      <div
+        className={
+          embeddedInPanel
+            ? 'mx-auto flex w-full flex-col gap-3'
+            : 'mx-auto flex w-full max-w-xl flex-col gap-4'
+        }
+      >
+        <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
           <div className="mb-4 flex items-start gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary/10 text-secondary">
               <MdQrCode2 className="h-6 w-6" aria-hidden />
@@ -32,7 +49,7 @@ export function NotificacoesWhatsAppDeliveryTab() {
           <CanalWhatsAppDeliverySection onConectadoChange={setCanalConectado} />
         </section>
 
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
           <div className="flex items-start gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary/10 text-secondary">
               <MdNotificationsNone className="h-6 w-6" aria-hidden />

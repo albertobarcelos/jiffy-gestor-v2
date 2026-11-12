@@ -27,6 +27,10 @@ const toastOptions = {
 }
 
 function JiffyToastBar({ toast: t }: { toast: Toast }) {
+  if (t.type === 'custom') {
+    return <>{typeof t.message === 'function' ? t.message(t) : t.message}</>
+  }
+
   return (
     <ToastBar toast={t} position={t.position}>
       {({ icon, message }) => (
@@ -50,6 +54,7 @@ function JiffyToastBar({ toast: t }: { toast: Toast }) {
 /**
  * Toaster global com botão X em cada notificação.
  * Durações por tipo continuam vindas de `showToast` / chamadas diretas a `toast`.
+ * Toasts `custom` renderizam o conteúdo próprio (sem ToastBar).
  */
 export function AppToaster() {
   return (
