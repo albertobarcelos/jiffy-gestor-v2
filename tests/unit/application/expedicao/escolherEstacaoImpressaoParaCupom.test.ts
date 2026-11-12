@@ -10,6 +10,7 @@ const estacao = (
   nome: id,
   ativo: true,
   gestorDelivery: false,
+  emissaoAutomaticaAoFinalizar: false,
   ...extras,
 })
 

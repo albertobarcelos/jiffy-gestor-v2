@@ -7,12 +7,18 @@ export type EstacaoImpressaoResumo = {
   ativo: boolean
   /** Quando true, esta estação recebe PEDIDO_DELIVERY_IMPRESSAO_SOLICITADA. */
   gestorDelivery: boolean
+  /**
+   * Emite NF automaticamente no FINALIZADO do delivery.
+   * Só tem efeito com `gestorDelivery: true` (receptora).
+   */
+  emissaoAutomaticaAoFinalizar: boolean
 }
 
 export type AtualizarEstacaoImpressaoPatch = {
   nome?: string
   ativo?: boolean
   gestorDelivery?: boolean
+  emissaoAutomaticaAoFinalizar?: boolean
 }
 
 export type ImpressoraLogica = {

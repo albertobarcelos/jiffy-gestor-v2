@@ -6,6 +6,7 @@ import type {
   CriarClienteDeliveryPublicoInput,
   GetCatalogoPublicoResponseDTO,
   GetMeiosPagamentoPublicosResponseDTO,
+  GetPecaTambemPublicoResponseDTO,
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import {
   parsePedidoDeliveryPublicoResponse,
@@ -131,6 +132,38 @@ export async function fetchMeiosPagamentoPublicos(
     throw new PublicDeliveryApiError(await parseErrorMessage(res), res.status)
   }
   return res.json()
+}
+
+export async function fetchPecaTambemPublico(
+  slug: string,
+  params: { grupoIds: string[]; excludeProdutoIds?: string[] }
+): Promise<GetPecaTambemPublicoResponseDTO> {
+  const search = new URLSearchParams()
+  if (params.grupoIds.length > 0) {
+    search.set('grupoIds', params.grupoIds.join(','))
+  }
+  if (params.excludeProdutoIds && params.excludeProdutoIds.length > 0) {
+    search.set('excludeProdutoIds', params.excludeProdutoIds.join(','))
+  }
+  const qs = search.toString()
+  const slugLimpo = normalizarSlugPublico(slug) || slug.trim()
+  const url = `/api/public/delivery/catalogo/${encodeURIComponent(slugLimpo)}/peca-tambem${
+    qs ? `?${qs}` : ''
+  }`
+
+  const res = await fetch(url, {
+    headers: { Accept: 'application/json' },
+    cache: 'no-store',
+  })
+  const body = await parseErrorBody(res)
+  if (!res.ok) {
+    throw new PublicDeliveryApiError(
+      parseErrorMessageFromBody(body, res.status),
+      res.status,
+      body
+    )
+  }
+  return body as GetPecaTambemPublicoResponseDTO
 }
 
 export async function cotarPedidoPublico(

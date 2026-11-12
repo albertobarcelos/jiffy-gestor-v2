@@ -28,6 +28,8 @@ export type MontarPedidoPublicoParams = {
   telefoneApi?: string | null
   /** Quando true, CPF vazio ou incompleto bloqueia o pedido. */
   exigeCpfVenda?: boolean
+  /** Liga conversão Peça Também ao funil anônimo da sessão. */
+  sessionIdPecaTambem?: string | null
 }
 
 export type MontarPedidoPublicoResult =
@@ -127,6 +129,12 @@ function montarComposicaoPedidoPublico({
       quantidade,
       observacoes: item.observacoes,
       complementos,
+      ...(item.fonteSugestao === 'PECA_TAMBEM'
+        ? {
+            fonteSugestao: 'PECA_TAMBEM' as const,
+            grupoProdutoOrigemId: item.grupoProdutoOrigemId ?? null,
+          }
+        : {}),
     }
   })
 
@@ -153,12 +161,18 @@ function montarComposicaoPedidoPublico({
   }
 }
 
-/** Monta payload de cotação (mesma composição validada no create público). */
+/** Monta payload de cotação (composição de preço; sem atribuição Peça Também). */
 export function montarCotacaoPublico(
   params: MontarPedidoPublicoParams
 ): MontarCotacaoPublicoResult {
   const composicao = montarComposicaoPedidoPublico(params)
   if (!composicao.ok) return composicao
+
+  // Cotação valida só preço/composição — fonteSugestao vai só no create do pedido.
+  const produtos = composicao.composicao.produtos.map(
+    ({ fonteSugestao: _fonte, grupoProdutoOrigemId: _origem, ...produto }) =>
+      produto
+  )
 
   return {
     ok: true,
@@ -166,7 +180,7 @@ export function montarCotacaoPublico(
       slug: params.slug,
       tipoEntrega: composicao.composicao.tipoEntrega,
       cliente: composicao.composicao.cliente,
-      produtos: composicao.composicao.produtos,
+      produtos,
     },
   }
 }
@@ -197,6 +211,11 @@ export function montarPedidoPublico(
 
   if (composicao.composicao.cpfDocumento) {
     payload.documentoCpfCnpj = composicao.composicao.cpfDocumento
+  }
+
+  const sessionId = params.sessionIdPecaTambem?.trim()
+  if (sessionId) {
+    payload.sessionIdPecaTambem = sessionId
   }
 
   const obsPedido = params.form.observacaoPedido.trim()

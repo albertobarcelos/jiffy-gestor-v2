@@ -4,8 +4,10 @@ import Image from 'next/image'
 import { LoginForm } from '@/src/presentation/components/features/auth/LoginForm'
 import { LoginInviteRedirect } from '@/src/presentation/components/features/auth/LoginInviteRedirect'
 import { ExpedicaoAppPwaPortao } from '@/src/presentation/expedicao/app/pwa/ExpedicaoAppPwaPortao'
+import { useChromeExpedicaoApp } from '@/src/presentation/expedicao/app/pwa/useChromeExpedicaoApp'
 
 export function ExpedicaoAppLoginScreen() {
+  useChromeExpedicaoApp('marca')
   return (
     <ExpedicaoAppPwaPortao>
       <div className="expedicao-app-login expedicao-app-shell flex h-dvh flex-col overflow-hidden bg-secondary text-zinc-900">

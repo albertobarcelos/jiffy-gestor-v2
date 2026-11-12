@@ -4,6 +4,7 @@ import {
   MdCategory,
   MdImage,
   MdPalette,
+  MdShoppingCart,
   MdStorefront,
   MdTextFields,
   MdViewModule,
@@ -11,7 +12,11 @@ import {
 import type { DesignTabId } from '../types/deliveryPublicoDesignConfig'
 
 /** Seções abríveis no workspace de Personalizar loja (inclui extras além do design visual). */
-export type DesignSectionId = DesignTabId | 'notificacoes' | 'nome-cardapio'
+export type DesignSectionId =
+  | DesignTabId
+  | 'notificacoes'
+  | 'nome-cardapio'
+  | 'relacionados'
 
 export type DesignSectionDefinition = {
   id: DesignSectionId
@@ -22,7 +27,11 @@ export type DesignSectionDefinition = {
   showsPreview: boolean
 }
 
-const DESIGN_EXTRA_SECTION_IDS = new Set<DesignSectionId>(['notificacoes', 'nome-cardapio'])
+const DESIGN_EXTRA_SECTION_IDS = new Set<DesignSectionId>([
+  'notificacoes',
+  'nome-cardapio',
+  'relacionados',
+])
 
 export const DESIGN_SECTIONS: DesignSectionDefinition[] = [
   {
@@ -67,6 +76,14 @@ export const DESIGN_SECTIONS: DesignSectionDefinition[] = [
     description: 'Ordem e aparência dos grupos de produtos no cardápio.',
     Icon: MdCategory,
     showsPreview: true,
+  },
+  {
+    id: 'relacionados',
+    label: 'Peça Também / Relacionados',
+    description:
+      'Vincule produtos sugeridos no carrossel Peça Também do carrinho do cardápio público.',
+    Icon: MdShoppingCart,
+    showsPreview: false,
   },
   {
     id: 'notificacoes',

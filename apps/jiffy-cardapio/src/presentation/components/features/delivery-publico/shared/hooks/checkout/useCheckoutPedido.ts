@@ -19,6 +19,7 @@ import {
   type DeliveryCheckoutCotacaoState,
   isTokenCotacaoExpirado,
 } from '../../utils/deliveryCheckoutCotacaoUtils'
+import { getPecaTambemSessionId } from '../../utils/pecaTambemTracking'
 import type {
   ClienteLookupState,
   EnviarPedidoCheckoutResult,
@@ -139,6 +140,7 @@ export function useCheckoutPedido({
         clienteLookup: clienteLookup.cliente,
         tokenCotacao,
         exigeCpfVenda: options?.exigeCpfVenda === true,
+        sessionIdPecaTambem: getPecaTambemSessionId(),
         onEtapa: setEtapaEnvio,
       })
 

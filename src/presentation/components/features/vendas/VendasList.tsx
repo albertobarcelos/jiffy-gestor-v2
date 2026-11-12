@@ -14,6 +14,7 @@ import {
   MdFilterList,
   MdReceiptLong,
   MdDownload,
+  MdRecommend,
 } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -79,6 +80,9 @@ interface Terminal {
 interface VendasListProps {
   initialPeriodo?: string // Período inicial vindo da URL (ex: "Hoje", "Últimos 7 Dias")
   initialStatus?: string | null // Status inicial vindo da URL
+  /** Intervalo customizado (ISO) — ex.: retorno do Relatório Peça Também com "Por datas". */
+  initialDe?: string | null
+  initialAte?: string | null
 }
 
 type ResumoFiscalMin = {
@@ -308,13 +312,28 @@ const sxVendasFiltroTextFieldMoeda = {
  * Componente de listagem de vendas
  * Implementa scroll infinito, filtros avançados e cards de métricas
  */
-export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
+export function VendasList({
+  initialPeriodo,
+  initialStatus,
+  initialDe,
+  initialAte,
+}: VendasListProps) {
   const { timezoneAgregacao, empresa } = useEmpresaMe()
   const { exportar: exportarRelatorio, isExportando } = useExportarRelatorioVendas()
   const router = useRouter()
   const pathname = usePathname()
 
   const initialPeriodoValue = normalizarPeriodoSelect(initialPeriodo)
+  const initialDeDate = (() => {
+    if (!initialDe?.trim()) return null
+    const d = new Date(initialDe)
+    return Number.isNaN(d.getTime()) ? null : d
+  })()
+  const initialAteDate = (() => {
+    if (!initialAte?.trim()) return null
+    const d = new Date(initialAte)
+    return Number.isNaN(d.getTime()) ? null : d
+  })()
 
   // Estados de filtros
   const [searchQuery, setSearchQuery] = useState('')
@@ -325,8 +344,12 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     initialStatus?.toLowerCase() === 'aberta' ? null : initialStatus || null
   )
   // Intervalo explícito só via "Por datas" (preset do Select não grava datas aqui — igual ao dashboard)
-  const [periodoInicial, setPeriodoInicial] = useState<Date | null>(null)
-  const [periodoFinal, setPeriodoFinal] = useState<Date | null>(null)
+  const [periodoInicial, setPeriodoInicial] = useState<Date | null>(
+    initialDeDate && initialAteDate ? initialDeDate : null
+  )
+  const [periodoFinal, setPeriodoFinal] = useState<Date | null>(
+    initialDeDate && initialAteDate ? initialAteDate : null
+  )
   const [tipoVendaFilter, setTipoVendaFilter] = useState<string | null>(null)
   const [meioPagamentoFilter, setMeioPagamentoFilter] = useState<string>('')
   const [usuarioAbertoPorFilter, setUsuarioAbertoPorFilter] = useState<string>('')
@@ -1014,6 +1037,19 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     router.refresh() // Força a revalidação da rota para recarregar com os filtros limpos
   }, [router, pathname])
 
+  const handleAbrirRelatorioPecaTambem = useCallback(() => {
+    const qs = new URLSearchParams()
+    if (periodoInicial && periodoFinal) {
+      qs.set('de', periodoInicial.toISOString())
+      qs.set('ate', periodoFinal.toISOString())
+    } else if (periodo && periodo !== 'Todos') {
+      qs.set('periodo', periodo)
+    } else {
+      qs.set('periodo', 'Últimos 30 Dias')
+    }
+    router.push(`/relatorios-peca-tambem?${qs.toString()}`)
+  }, [periodo, periodoInicial, periodoFinal, router])
+
   const handleExportarRelatorio = useCallback(() => {
     const tenantAuth = useAuthStore.getState().tenantAuth
     const token = tenantAuth?.getAccessToken()
@@ -1280,6 +1316,16 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             >
               <MdCalendarToday size={18} />
               Por datas
+            </button>
+
+            <button
+              type="button"
+              onClick={handleAbrirRelatorioPecaTambem}
+              title="Abrir relatório Peça Também"
+              className="flex h-8 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg border-2 border-primary bg-white px-4 text-sm text-primary transition-colors hover:bg-primary/10"
+            >
+              <MdRecommend size={18} />
+              Relatório Peça Também
             </button>
 
             <button
