@@ -3,10 +3,10 @@ import { ExpedicaoAppPwa } from '@/src/presentation/expedicao/app/pwa/ExpedicaoA
 
 export default function ExpedicaoLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="expedicao-app-shell h-dvh overflow-hidden overscroll-none bg-[var(--color-info,#f4f6f8)]">
+    <>
       <DeliveryRealtimeBridge />
       <ExpedicaoAppPwa />
       {children}
-    </div>
+    </>
   )
 }

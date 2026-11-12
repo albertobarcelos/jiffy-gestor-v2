@@ -60,7 +60,7 @@ describe('montarPedidoPublico + CreatePedidoPublicoInputSchema', () => {
     expect(parsed.success).toBe(true)
   })
 
-  it('propaga fonteSugestao Peça Também e sessionId no create', () => {
+  it('não envia atribuição Peça Também no create (backend ainda não aceita)', () => {
     const result = montarPedidoPublico({
       slug: 'loja',
       itens: [
@@ -77,12 +77,15 @@ describe('montarPedidoPublico + CreatePedidoPublicoInputSchema', () => {
     })
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.payload.sessionIdPecaTambem).toBe('session-xyz')
-    expect(result.payload.produtos[0]).toMatchObject({
+    expect(result.payload).not.toHaveProperty('sessionIdPecaTambem')
+    expect(result.payload.produtos[0]).toEqual({
       produtoId: 'p1',
-      fonteSugestao: 'PECA_TAMBEM',
-      grupoProdutoOrigemId: 'grupo-origem',
+      quantidade: 1,
+      observacoes: [],
+      complementos: [],
     })
+    expect(result.payload.produtos[0]).not.toHaveProperty('fonteSugestao')
+    expect(result.payload.produtos[0]).not.toHaveProperty('grupoProdutoOrigemId')
     expect(CreatePedidoPublicoInputSchema.safeParse(result.payload).success).toBe(true)
   })
 

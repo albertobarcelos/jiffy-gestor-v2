@@ -1,11 +1,13 @@
 import type { Metadata, Viewport } from 'next'
+import {
+  EXPEDICAO_APP_CHROME_MARCA,
+  VIEWPORT_ESCALA_APP_ENTREGADOR,
+} from '@/src/presentation/expedicao/app/pwa/viewportExpedicaoApp'
 import { ExpedicaoAppMotoboy } from '@/src/presentation/expedicao/app/ExpedicaoAppMotoboy'
 
 export const viewport: Viewport = {
-  themeColor: '#5b21b6',
-  width: 'device-width',
-  initialScale: 1,
-  viewportFit: 'cover',
+  themeColor: EXPEDICAO_APP_CHROME_MARCA,
+  ...VIEWPORT_ESCALA_APP_ENTREGADOR,
 }
 
 export const metadata: Metadata = {
@@ -19,7 +21,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: 'JiffyGO',
-    statusBarStyle: 'default',
+    statusBarStyle: 'black-translucent',
   },
 }
 

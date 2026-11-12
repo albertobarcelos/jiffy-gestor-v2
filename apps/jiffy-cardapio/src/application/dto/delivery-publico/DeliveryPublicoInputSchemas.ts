@@ -44,8 +44,7 @@ export const ProdutoPedidoPublicoInputSchema = z.object({
   quantidade: z.number().positive(),
   observacoes: z.array(z.string()).optional(),
   complementos: z.array(ComplementoPedidoPublicoInputSchema).optional(),
-  fonteSugestao: z.literal('PECA_TAMBEM').nullable().optional(),
-  grupoProdutoOrigemId: z.string().min(1).nullable().optional(),
+  // Peça Também (fonteSugestao / grupoProdutoOrigemId): só no carrinho até o backend aceitar.
 })
 
 /**
@@ -95,7 +94,7 @@ export const CreatePedidoPublicoInputSchema = z.object({
     .regex(/^\d{11}$|^\d{14}$/)
     .nullable()
     .optional(),
-  sessionIdPecaTambem: z.string().min(1).max(64).optional(),
+  // sessionIdPecaTambem: omitido — backend ainda não aceita no create.
   produtos: z.array(ProdutoPedidoPublicoInputSchema).min(1),
   cobrancas: z.array(CobrancaPedidoPublicoInputSchema).min(1),
   observacoes: z.array(z.string()).optional(),
