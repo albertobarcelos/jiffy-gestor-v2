@@ -16,6 +16,10 @@ import {
   type LinhaPagamentoFinalizarApp,
 } from '@/src/application/expedicao/app/pagamentoFinalizarEntregaApp'
 import { avisoApp } from '@/src/presentation/expedicao/app/avisoApp'
+import {
+  gravarCachePedidosEntregadorApp,
+  lerCachePedidosEntregadorApp,
+} from '@/src/presentation/expedicao/app/prefs/cachePedidosEntregadorStorage'
 
 export function usePedidosEntregadorApp(input: {
   entregadorId: string | null
@@ -27,6 +31,7 @@ export function usePedidosEntregadorApp(input: {
   const [carregandoPedidos, setCarregandoPedidos] = useState(false)
   const [atualizandoPedidos, setAtualizandoPedidos] = useState(false)
   const [erroPedidos, setErroPedidos] = useState<string | null>(null)
+  const [listaOffline, setListaOffline] = useState(false)
   const [confirmandoId, setConfirmandoId] = useState<string | null>(null)
   const [pedidoAbertoId, setPedidoAbertoId] = useState<string | null>(null)
   const [itensAberto, setItensAberto] = useState<Array<{ id: string; nome: string; quantidade: number }>>([])
@@ -45,13 +50,27 @@ export function usePedidosEntregadorApp(input: {
       else setCarregandoPedidos(true)
       setErroPedidos(null)
       try {
-        setPedidos(await listarPedidosAtivosEntregador({ token, entregadorId }))
+        const lista = await listarPedidosAtivosEntregador({ token, entregadorId })
+        setPedidos(lista)
+        setListaOffline(false)
         jaCarregouPedidos.current = true
+        gravarCachePedidosEntregadorApp(entregadorId, lista)
       } catch (error) {
         const mensagem = error instanceof Error ? error.message : 'Não foi possível carregar os pedidos.'
-        setErroPedidos(mensagem)
-        if (!jaCarregouPedidos.current) {
-          avisoApp.error(mensagem)
+        if (jaCarregouPedidos.current) {
+          setListaOffline(true)
+          setErroPedidos(null)
+        } else {
+          const cache = lerCachePedidosEntregadorApp(entregadorId)
+          if (cache) {
+            setPedidos(cache)
+            setListaOffline(true)
+            setErroPedidos(null)
+            jaCarregouPedidos.current = true
+          } else {
+            setErroPedidos(mensagem)
+            avisoApp.error(mensagem)
+          }
         }
       } finally {
         setCarregandoPedidos(false)
@@ -163,6 +182,7 @@ export function usePedidosEntregadorApp(input: {
   const resetarPedidos = useCallback(() => {
     setPedidos([])
     setErroPedidos(null)
+    setListaOffline(false)
     setPedidoAbertoId(null)
     setConfirmarId(null)
     setConfirmandoId(null)
@@ -175,6 +195,7 @@ export function usePedidosEntregadorApp(input: {
     carregandoPedidos,
     atualizandoPedidos,
     erroPedidos,
+    listaOffline,
     confirmandoId,
     pedidoAbertoId,
     setPedidoAbertoId,

@@ -28,7 +28,10 @@ export type MontarPedidoPublicoParams = {
   telefoneApi?: string | null
   /** Quando true, CPF vazio ou incompleto bloqueia o pedido. */
   exigeCpfVenda?: boolean
-  /** Liga conversão Peça Também ao funil anônimo da sessão. */
+  /**
+   * Reservado: atribuição Peça Também no create.
+   * O backend ainda não aceita — não enviar no payload.
+   */
   sessionIdPecaTambem?: string | null
 }
 
@@ -124,17 +127,13 @@ function montarComposicaoPedidoPublico({
       quantidade: Math.max(1, Math.floor(c.quantidade)),
     }))
 
+    // Peça Também fica só no carrinho/UI. Create/cotação não mandam
+    // fonteSugestao nem grupoProdutoOrigemId até o backend aceitar.
     return {
       produtoId: item.produtoId,
       quantidade,
       observacoes: item.observacoes,
       complementos,
-      ...(item.fonteSugestao === 'PECA_TAMBEM'
-        ? {
-            fonteSugestao: 'PECA_TAMBEM' as const,
-            grupoProdutoOrigemId: item.grupoProdutoOrigemId ?? null,
-          }
-        : {}),
     }
   })
 
@@ -168,19 +167,13 @@ export function montarCotacaoPublico(
   const composicao = montarComposicaoPedidoPublico(params)
   if (!composicao.ok) return composicao
 
-  // Cotação valida só preço/composição — fonteSugestao vai só no create do pedido.
-  const produtos = composicao.composicao.produtos.map(
-    ({ fonteSugestao: _fonte, grupoProdutoOrigemId: _origem, ...produto }) =>
-      produto
-  )
-
   return {
     ok: true,
     payload: {
       slug: params.slug,
       tipoEntrega: composicao.composicao.tipoEntrega,
       cliente: composicao.composicao.cliente,
-      produtos,
+      produtos: composicao.composicao.produtos,
     },
   }
 }
@@ -213,10 +206,7 @@ export function montarPedidoPublico(
     payload.documentoCpfCnpj = composicao.composicao.cpfDocumento
   }
 
-  const sessionId = params.sessionIdPecaTambem?.trim()
-  if (sessionId) {
-    payload.sessionIdPecaTambem = sessionId
-  }
+  // sessionIdPecaTambem: não enviar — backend homolog/prod ainda rejeita o campo.
 
   const obsPedido = params.form.observacaoPedido.trim()
   if (obsPedido) {
