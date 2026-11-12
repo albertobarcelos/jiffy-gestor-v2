@@ -68,8 +68,8 @@ export function AvisoCanalWhatsAppKanbanToast({
           <MdClose className="h-4 w-4" aria-hidden />
         </button>
         <p className="leading-snug">
-          Ainda falta vincular o WhatsApp para avisar seus clientes sobre os
-          pedidos. Podemos fazer isso agora?
+          Não existe uma conexão ativa do WhatsApp para avisar seus clientes.
+          Podemos configurar ou reconectá-la agora?
         </p>
         <label className="flex cursor-pointer items-center gap-2 text-xs text-gray-600">
           <input
@@ -91,7 +91,7 @@ export function AvisoCanalWhatsAppKanbanToast({
             onConfigurar()
             toast.dismiss(toastId)
           }}
-          className="self-start rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-alternate"
+          className="self-start rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-primary/70"
         >
           Configurar
         </button>
