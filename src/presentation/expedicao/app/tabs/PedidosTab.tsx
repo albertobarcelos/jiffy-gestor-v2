@@ -23,6 +23,7 @@ export function PedidosTab(props: {
   carregando: boolean
   atualizando?: boolean
   erro: string | null
+  offline?: boolean
   confirmandoId: string | null
   onAbrir: (pedidoId: string) => void
   onPedirConfirmacao: (pedidoId: string) => void
@@ -30,7 +31,8 @@ export function PedidosTab(props: {
   onAtualizar: () => Promise<void>
 }) {
   const entregasHoje = props.hoje?.quantidade ?? 0
-  const listaVazia = !props.carregando && !props.erro && props.pedidos.length === 0
+  const falhouSemLista = Boolean(props.erro && !props.carregando && props.pedidos.length === 0)
+  const listaVazia = !props.carregando && props.pedidos.length === 0 && !falhouSemLista
   const puxar = usePuxarParaAtualizar(props.onAtualizar, !props.carregando)
 
   return (
@@ -71,6 +73,7 @@ export function PedidosTab(props: {
       <div
         ref={puxar.scrollRef}
         data-expedicao-scroll
+        data-expedicao-ptr
         className="relative z-0 min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-4 pt-4"
         onTouchStart={puxar.onTouchStart}
         onTouchMove={puxar.onTouchMove}
@@ -87,7 +90,15 @@ export function PedidosTab(props: {
 
         {props.carregando ? <PedidosSkeleton /> : null}
 
-        {props.erro && !props.carregando ? (
+        {props.offline ? (
+          <div className="mb-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm leading-5 text-amber-950">
+            {props.pedidos.length > 0
+              ? 'Sem conexão. Mostrando a última lista.'
+              : 'Sem conexão. Puxe para atualizar quando a rede voltar.'}
+          </div>
+        ) : null}
+
+        {falhouSemLista ? (
           <div className="flex flex-col items-center px-4 pt-16 text-center">
             <p className="text-base font-semibold text-zinc-900">Não deu para carregar os pedidos</p>
             <p className="mt-1 text-sm text-zinc-500">{props.erro}</p>
@@ -102,13 +113,13 @@ export function PedidosTab(props: {
         ) : null}
 
         {listaVazia ? (
-          <div className="flex flex-col items-center px-2 pt-16 text-center">
+          <div className="flex flex-col items-center px-2 pt-16 text-center landscape:max-[520px]:pt-4">
             <Image
               src="/images/expedicao/tudo_certo.png"
               alt=""
               width={420}
               height={420}
-              className="h-auto max-h-[38vh] w-[min(92vw,420px)] object-contain"
+              className="expedicao-app-empty-hero h-auto max-h-[38vh] w-[min(92vw,420px)] object-contain"
               priority
             />
             <p className="mt-2 text-xl font-bold text-zinc-900">Tudo entregue!</p>
