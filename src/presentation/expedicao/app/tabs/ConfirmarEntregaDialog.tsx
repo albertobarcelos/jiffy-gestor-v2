@@ -64,9 +64,9 @@ export function ConfirmarEntregaDialog(props: ConfirmarEntregaDialogProps) {
   const podeFinalizar = valorAlvo <= 0 || (fecha && linhas.length > 0)
 
   return (
-    <div className="fixed inset-0 z-[45] flex items-end justify-center bg-black/40 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+    <div className="expedicao-app-overlay fixed inset-0 z-[45] flex items-end justify-center bg-black/40 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       <div
-        className="relative flex max-h-[min(88dvh,100%)] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-white shadow-xl"
+        className="relative flex max-h-[min(88%,var(--expedicao-vv-height,88dvh))] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-white shadow-xl"
         aria-busy={props.ocupado}
       >
         {props.ocupado ? (

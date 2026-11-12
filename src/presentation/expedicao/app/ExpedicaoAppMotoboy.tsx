@@ -42,6 +42,7 @@ import { useRodadaEntregadorApp } from '@/src/presentation/expedicao/app/hooks/u
 import { usePwaInstallPrompt } from '@/src/presentation/expedicao/app/pwa/usePwaInstallPrompt'
 import { ExpedicaoAppInstalarScreen } from '@/src/presentation/expedicao/app/pwa/ExpedicaoAppInstalarScreen'
 import { deveMostrarPortaoInstalacaoPwa } from '@/src/application/expedicao/app/portaoInstalacaoPwaEntregador'
+import { useChromeExpedicaoApp } from '@/src/presentation/expedicao/app/pwa/useChromeExpedicaoApp'
 import type { LinhaPagamentoFinalizarApp } from '@/src/application/expedicao/app/pagamentoFinalizarEntregaApp'
 
 const VERSAO_APP = '0.1.0'
@@ -54,6 +55,15 @@ export function ExpedicaoAppMotoboy() {
   const [recorde, setRecorde] = useState<RecordeTurnoEntregador | null>(null)
   const [estouro, setEstouro] = useState<EstouroFinalizarEntrega | null>(null)
   const pwa = usePwaInstallPrompt()
+  useChromeExpedicaoApp(
+    !pwa.pronto ||
+      deveMostrarPortaoInstalacaoPwa({
+        ehCelular: pwa.ehCelular,
+        standalone: pwa.standalone,
+      })
+      ? 'marca'
+      : 'shell'
+  )
 
   const sessao = useSessaoEntregadorApp()
   const entregadorId = sessao.entregador?.id ?? null
@@ -237,7 +247,7 @@ export function ExpedicaoAppMotoboy() {
   }
 
   const overlaySaindo = sessao.saindoLoja ? (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-white/80">
+    <div className="expedicao-app-overlay fixed inset-0 z-[60] flex items-center justify-center bg-white/80">
       <JiffyLoading text="Saindo…" />
     </div>
   ) : null
@@ -388,6 +398,7 @@ export function ExpedicaoAppMotoboy() {
               carregando={pedidos.carregandoPedidos}
               atualizando={pedidos.atualizandoPedidos}
               erro={pedidos.erroPedidos}
+              offline={pedidos.listaOffline}
               confirmandoId={pedidos.confirmandoId}
               onAbrir={pedidoId => void pedidos.abrirPedido(pedidoId)}
               onPedirConfirmacao={pedidos.setConfirmarId}
