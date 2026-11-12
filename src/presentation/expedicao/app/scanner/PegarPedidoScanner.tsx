@@ -323,7 +323,7 @@ export function PegarPedidoScanner({ aberto, ocupado, onFechar, onCodigo }: Pega
   const escanear = modo === 'escanear'
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black text-white">
+    <div className="expedicao-app-overlay fixed inset-0 z-50 flex flex-col bg-black text-white">
       <div className="flex items-center justify-between px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <button type="button" onClick={onFechar} className="rounded-full p-2" aria-label="Fechar">
           <MdClose className="h-7 w-7" />
@@ -378,7 +378,7 @@ export function PegarPedidoScanner({ aberto, ocupado, onFechar, onCodigo }: Pega
       {escanear ? (
       <div className="flex min-h-0 flex-1 flex-col">
       <div
-        className={`relative mx-auto mt-6 aspect-square w-[84vw] max-w-96 overflow-hidden rounded-[28px] bg-zinc-900 ring-2 ${
+        className={`expedicao-app-scan-visor relative mx-auto mt-6 aspect-square w-[84vw] max-w-96 overflow-hidden rounded-[28px] bg-zinc-900 ring-2 ${
           lido ? 'ring-emerald-400' : feedback === 'falhou' ? 'ring-amber-300' : 'ring-white'
         }`}
       >
@@ -439,7 +439,10 @@ export function PegarPedidoScanner({ aberto, ocupado, onFechar, onCodigo }: Pega
       ) : null}
       </div>
       ) : (
-        <div className="mt-4 flex min-h-0 flex-1 flex-col rounded-t-3xl bg-zinc-50 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-6 text-zinc-900">
+        <div
+          data-expedicao-scroll
+          className="mt-4 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain rounded-t-3xl bg-zinc-50 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-6 text-zinc-900"
+        >
           {lido ? (
             <div className="flex flex-col items-center gap-2 pt-10 text-center">
               <MdCheckCircle className="h-16 w-16 text-emerald-500" aria-hidden />

@@ -2,12 +2,14 @@
 
 import Image from 'next/image'
 import type { PwaInstallPrompt } from '@/src/presentation/expedicao/app/pwa/usePwaInstallPrompt'
+import { useChromeExpedicaoApp } from '@/src/presentation/expedicao/app/pwa/useChromeExpedicaoApp'
 
 type ExpedicaoAppInstalarScreenProps = {
   pwa: Pick<PwaInstallPrompt, 'podeInstalar' | 'acabouDeInstalar' | 'instalar'>
 }
 
 export function ExpedicaoAppInstalarScreen({ pwa }: ExpedicaoAppInstalarScreenProps) {
+  useChromeExpedicaoApp('marca')
   return (
     <div className="expedicao-app-shell flex h-dvh flex-col overflow-hidden bg-secondary text-white">
       <div className="shrink-0 px-6 pb-8 pt-[max(2.25rem,env(safe-area-inset-top))]">
