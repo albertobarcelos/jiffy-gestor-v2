@@ -3,6 +3,7 @@
 import { KanbanToolbar } from './components/KanbanToolbar'
 import { KanbanModaisRenderer } from './components/KanbanModaisRenderer'
 import { KanbanVisualizacaoRenderer } from './components/KanbanVisualizacaoRenderer'
+import { AvisoCanalWhatsAppKanbanHost } from './components/AvisoCanalWhatsAppKanbanHost'
 import { useKanbanOrchestrator } from './hooks/useKanbanOrchestrator'
 
 /**
@@ -17,6 +18,7 @@ export function VendasKanban() {
       <KanbanToolbar {...toolbarProps} />
       <KanbanVisualizacaoRenderer modoVisualizacao={modoVisualizacao} {...boardProps} />
       <KanbanModaisRenderer {...modaisProps} />
+      <AvisoCanalWhatsAppKanbanHost />
     </div>
   )
 }

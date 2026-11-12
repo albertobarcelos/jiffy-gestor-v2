@@ -36,8 +36,9 @@ export const showToast = {
   /**
    * Exibe uma notificação de aviso
    */
-  warning: (message: string, options?: { duration?: number }) => {
-    toast(message, {
+  warning: (message: string, options?: { duration?: number; id?: string }) => {
+    return toast(message, {
+      id: options?.id,
       icon: '⚠️',
       duration: options?.duration ?? 4000,
       style: {
