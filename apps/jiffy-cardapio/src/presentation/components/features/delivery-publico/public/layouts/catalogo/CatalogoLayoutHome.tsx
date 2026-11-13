@@ -22,7 +22,11 @@ export function CatalogoLayoutHome({
   onBuscaChange,
   onGrupoClick,
   onProdutoClick,
+  onProdutoAddRapido,
   onPedidoClick,
+  onMeuPedidoClick,
+  onInformacoesClick,
+  quantidadePorProduto,
   carrinhoThumbs,
   carrinhoThumbsBounceKey,
   carrinhoThumbsTargetRef,
@@ -49,11 +53,6 @@ export function CatalogoLayoutHome({
     [onGrupoClick]
   )
 
-  const handleMenuClick = useCallback(() => {
-    const firstGrupo = filtered.grupos[0]
-    if (firstGrupo) handleGrupoClick(firstGrupo.id)
-  }, [filtered.grupos, handleGrupoClick])
-
   return (
     <div
       ref={catalogRootRef}
@@ -64,30 +63,33 @@ export function CatalogoLayoutHome({
       <DeliveryCatalogoHeader
         config={config}
         disponivel={viewModel.disponivel}
+        statusMensagem={viewModel.statusMensagem}
+        statusDetalheHorario={viewModel.statusDetalheHorario}
         carrinhoQuantidade={viewModel.carrinho.quantidadeItens}
         interactive={interactive}
         onPedidoClick={onPedidoClick}
+        onMeuPedidoClick={onMeuPedidoClick}
+        onInformacoesClick={onInformacoesClick}
       />
 
-      <div className="mt-2 space-y-3">
-        <DeliveryCatalogoSearch
-          termoBusca={viewModel.termoBusca}
-          interactive={interactive}
-          onChange={onBuscaChange}
-        />
-      </div>
-
-      <div className="mt-3">
-        <DeliveryBasicoCatalogStickyNav catalogRootRef={catalogRootRef}>
+      <DeliveryBasicoCatalogStickyNav catalogRootRef={catalogRootRef}>
+        <div
+          className="space-y-2 pb-0 pt-2"
+          style={{ backgroundColor: 'var(--delivery-bg, var(--delivery-surface))' }}
+        >
+          <DeliveryCatalogoSearch
+            termoBusca={viewModel.termoBusca}
+            interactive={interactive}
+            onChange={onBuscaChange}
+          />
           <DeliveryCatalogoCategoriaTabs
             grupos={filtered.grupos}
             activeGrupoId={activeGrupoId}
             interactive={interactive}
             onGrupoClick={handleGrupoClick}
-            onMenuClick={handleMenuClick}
           />
-        </DeliveryBasicoCatalogStickyNav>
-      </div>
+        </div>
+      </DeliveryBasicoCatalogStickyNav>
 
       <div className="flex-1 pb-4">
         {filtered.grupos.map((grupo, index) => (
@@ -100,7 +102,10 @@ export function CatalogoLayoutHome({
               index > 0 &&
               filtered.grupos[index - 1]?.id === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID
             }
+            quantidadePorProduto={quantidadePorProduto}
             onProdutoClick={onProdutoClick}
+            onProdutoAddRapido={onProdutoAddRapido}
+            onAbrirCarrinho={onPedidoClick}
           />
         ))}
       </div>

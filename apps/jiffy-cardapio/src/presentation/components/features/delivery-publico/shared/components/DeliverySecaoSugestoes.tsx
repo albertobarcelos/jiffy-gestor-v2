@@ -53,7 +53,7 @@ export function DeliverySecaoSugestoes({
 
   return (
     <section
-      className={`mt-5 mb-0${stickyTitle ? ' delivery-basico-grupo-section' : ''}`}
+      className="delivery-basico-grupo-section mt-5 mb-0"
       id={`grupo-${grupo.id || DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID}`}
     >
       <h2

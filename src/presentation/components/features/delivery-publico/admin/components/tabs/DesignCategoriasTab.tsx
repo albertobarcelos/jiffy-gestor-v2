@@ -24,7 +24,7 @@ import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitc
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { mensagemLegivelDeliveryMediaError } from '@/src/infrastructure/api/deliveryMediaApi'
+import { mensagemLegivelDesignMidia } from '../../../shared/utils/mensagemLegivelDesignMidia'
 import { removerImagemUseCase } from '@/src/presentation/hooks/media/criarImagemMediaUseCases'
 import { previewImagemEhLocal } from '@/src/presentation/utils/previewImagemLocal'
 import type { DeliveryPublicoDesignConfig } from '../../../shared/types/deliveryPublicoDesignConfig'
@@ -218,7 +218,7 @@ export function DesignCategoriasTab({
       })
       showToast.successLoading(toastId, 'Imagem removida.')
     } catch (error) {
-      showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+      showToast.errorLoading(toastId, mensagemLegivelDesignMidia(error))
     }
   }, [
     auth,

@@ -1,33 +1,56 @@
 'use client'
 
-import { ChevronRight, ShoppingCart, User } from 'lucide-react'
 import type { DeliveryPublicoDesignConfig } from '../../../../shared/types/deliveryPublicoDesignConfig'
 import { DeliveryPublicoMidiaImagem } from '../../../../shared/media/DeliveryPublicoMidiaImagem'
 import { DELIVERY_IMAGEM_SIZES } from '../../../../shared/media/deliveryPublicoImageHosts'
+import { DeliveryBasicoTopNav } from '../../basico/DeliveryBasicoTopNav'
 
 type DeliveryCatalogoHeaderProps = {
   config: DeliveryPublicoDesignConfig
   disponivel: boolean
-  carrinhoQuantidade: number
+  statusMensagem: string
+  /** Horário complementar do dia (ex.: "até as 22:45"), igual ao Básico. */
+  statusDetalheHorario?: string | null
+  carrinhoQuantidade?: number
   interactive?: boolean
+  onInformacoesClick?: () => void
   onPedidoClick?: () => void
+  onMeuPedidoClick?: () => void
 }
 
+/**
+ * Topnav igual ao Básico/Vitrine/Grade (carrinho + hamburger) + capa abaixo.
+ */
 export function DeliveryCatalogoHeader({
   config,
   disponivel,
-  carrinhoQuantidade,
+  statusMensagem,
+  statusDetalheHorario = null,
+  carrinhoQuantidade = 0,
   interactive = false,
+  onInformacoesClick,
   onPedidoClick,
+  onMeuPedidoClick,
 }: DeliveryCatalogoHeaderProps) {
-  const nomeLoja = config.cabecalho.nomeExibicao.trim() || 'Sua loja'
-  const logoRadius = config.cabecalho.logoFormato === 'circular' ? '9999px' : '10px'
-
   return (
-    <header>
+    <header className="relative">
+      <DeliveryBasicoTopNav
+        config={config}
+        carrinhoQuantidade={carrinhoQuantidade}
+        disponivel={disponivel}
+        statusMensagem={statusMensagem}
+        statusDetalheHorario={statusDetalheHorario}
+        interactive={interactive}
+        onPedidoClick={onPedidoClick}
+        onMeuPedidoClick={onMeuPedidoClick}
+        onInformacoesClick={onInformacoesClick}
+      />
+
       <div
-        className="relative h-36 overflow-hidden @sm:h-40"
+        className="delivery-loja-capa delivery-catalogo-capa relative mt-0 h-auto w-full overflow-hidden"
         style={{ backgroundColor: 'var(--delivery-hero-bg)' }}
+        role="img"
+        aria-label="Capa da loja"
       >
         {config.cabecalho.capaUrl ? (
           <DeliveryPublicoMidiaImagem
@@ -37,80 +60,10 @@ export function DeliveryCatalogoHeader({
             className="object-cover object-center"
           />
         ) : null}
-      </div>
-
-      <div className="flex items-center gap-3 px-4 py-3">
         <div
-          className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden border border-gray-100 bg-white shadow-sm"
-          style={{ borderRadius: logoRadius }}
-        >
-          {config.cabecalho.logoUrl ? (
-            <DeliveryPublicoMidiaImagem
-              src={config.cabecalho.logoUrl}
-              sizes={DELIVERY_IMAGEM_SIZES.logo}
-              className="object-cover"
-            />
-          ) : (
-            <span className="text-base font-bold" style={{ color: 'var(--delivery-primary)' }}>
-              {(nomeLoja[0] ?? '?').toUpperCase()}
-            </span>
-          )}
-        </div>
-
-        <button
-          type="button"
-          className="flex min-w-0 flex-1 items-center gap-1 text-left"
-        >
-          <span
-            className="truncate text-base font-bold @sm:text-lg"
-            style={{
-              color: 'var(--delivery-primary)',
-              fontFamily: 'var(--delivery-font-title)',
-            }}
-          >
-            {nomeLoja}
-          </span>
-          <ChevronRight className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
-        </button>
-
-        <span
-          className={`hidden shrink-0 rounded-md px-2 py-1 text-xs font-semibold @sm:inline-flex ${
-            disponivel ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-          }`}
-        >
-          {disponivel ? 'Disponível' : 'Indisponível'}
-        </span>
-
-        <button
-          type="button"
-          aria-label="Ver carrinho"
-          disabled={!interactive}
-          onClick={() => interactive && onPedidoClick?.()}
-          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border disabled:cursor-default"
-          style={{
-            borderColor: 'var(--delivery-card-border)',
-            color: 'var(--delivery-primary)',
-          }}
-        >
-          <ShoppingCart className="h-5 w-5" aria-hidden />
-          {carrinhoQuantidade > 0 ? (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white">
-              {carrinhoQuantidade > 99 ? '99+' : carrinhoQuantidade}
-            </span>
-          ) : null}
-        </button>
-
-        <button
-          type="button"
-          aria-label="Perfil"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border"
-          style={{
-            borderColor: 'var(--delivery-card-border)',
-            color: 'var(--delivery-primary)',
-          }}
-        >
-          <User className="h-5 w-5" aria-hidden />
-        </button>
+          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/25 via-black/10 to-black/55"
+          aria-hidden
+        />
       </div>
     </header>
   )

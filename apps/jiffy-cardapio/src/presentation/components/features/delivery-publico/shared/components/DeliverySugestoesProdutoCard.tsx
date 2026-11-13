@@ -40,7 +40,7 @@ export function DeliverySugestoesProdutoCard({
   }
 
   return (
-    <article className="w-[8.75rem] shrink-0 snap-start @lg:w-[11.25rem] @xl:w-[12.5rem]">
+    <article className="w-[8.75rem] shrink-0 snap-start @lg:w-[15.5rem] @xl:w-[16.5rem]">
       <div
         className="relative aspect-square w-full overflow-hidden rounded-lg border"
         style={{ backgroundColor: '#ffffff', borderColor: '#e5e7eb' }}
@@ -51,7 +51,7 @@ export function DeliverySugestoesProdutoCard({
             sizes={DELIVERY_IMAGEM_SIZES.sugestao}
             priority={priority}
             produtoId={produto.id}
-            className="object-cover"
+            className="object-contain object-center"
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">

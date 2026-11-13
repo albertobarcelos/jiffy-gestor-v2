@@ -10,9 +10,9 @@ import type {
   DeliveryPublicoViewModel,
 } from '../types/deliveryPublicoViewModel'
 
-function previewProdutoExemplo(grupoId: string) {
+function previewProdutoExemplo(grupoId: string, index = 0) {
   return {
-    id: `preview-produto-${grupoId}`,
+    id: `preview-produto-${grupoId}-${index}`,
     nome: 'Produto exemplo',
     descricao: 'Visualização no preview do design',
     preco: 10,
@@ -20,6 +20,13 @@ function previewProdutoExemplo(grupoId: string) {
     grupoId,
     temComplementos: false,
   }
+}
+
+/** Vários cards por categoria para o preview mostrar rolagem horizontal (Catálogo). */
+function previewProdutosExemplo(grupoId: string, quantidade = 3) {
+  return Array.from({ length: quantidade }, (_, index) =>
+    previewProdutoExemplo(grupoId, index)
+  )
 }
 
 function buildMockGruposFromPreviewCatalog(): DeliveryPublicoGrupoViewModel[] {
@@ -36,14 +43,20 @@ function buildMockGruposFromPreviewCatalog(): DeliveryPublicoGrupoViewModel[] {
       temComplementos: false,
     }))
 
+    const base = produtos.length > 0 ? produtos : previewProdutosExemplo(cat.id)
+    const faltam = Math.max(0, 3 - base.length)
+
     return {
       id: cat.id,
       nome: cat.nome,
       iconName: cat.iconName,
       // Mock sem API: placeholder neutro (não colorido).
       imagemUrl: previewGrupoFallbackImagemUrl(cat.id),
-      // Garante barra de grupo no layout básico (DeliverySecaoGrupo ignora grupos sem produtos).
-      produtos: produtos.length > 0 ? produtos : [previewProdutoExemplo(cat.id)],
+      // Garante barra de grupo + cards suficientes para sugerir carrossel horizontal.
+      produtos:
+        faltam > 0
+          ? [...base, ...previewProdutosExemplo(`${cat.id}-extra`, faltam)]
+          : base,
     }
   })
 }
@@ -66,7 +79,7 @@ export function buildPreviewViewModelFromGrupos(
     iconName: grupo.iconName,
     cor: grupo.cor,
     imagemUrl: grupo.imagemUrl?.trim() || null,
-    produtos: [previewProdutoExemplo(grupo.id)],
+    produtos: previewProdutosExemplo(grupo.id),
   }))
 
   return buildMockDeliveryViewModel({ grupos: viewGrupos, ...overrides })
@@ -81,6 +94,8 @@ export function buildMockDeliveryViewModel(
     grupos,
     disponivel: true,
     horarioTexto: DELIVERY_PUBLICO_HORARIO_PLACEHOLDER,
+    statusMensagem: 'Aberto, faça seu pedido!',
+    statusDetalheHorario: 'até as 22:45',
     termoBusca: '',
     carrinho: { total: 80, quantidadeItens: 8 },
     ...overrides,

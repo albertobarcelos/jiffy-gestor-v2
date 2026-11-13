@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { DeliveryBuscaProdutos } from '../../../shared/components/DeliveryBuscaProdutos'
 import { DeliveryPedidoFooter } from '../../../shared/components/DeliveryPedidoFooter'
 import { filterViewModelByBusca } from '../../../shared/utils/filterViewModelByBusca'
 import type { DeliveryLayoutHomeProps } from '../DeliveryLayoutHomeProps'
@@ -22,7 +21,11 @@ export function VitrineLayoutHome({
   onBuscaChange,
   onGrupoClick,
   onProdutoClick,
+  onProdutoAddRapido,
   onPedidoClick,
+  onMeuPedidoClick,
+  onInformacoesClick,
+  quantidadePorProduto,
   carrinhoThumbs,
   carrinhoThumbsBounceKey,
   carrinhoThumbsTargetRef,
@@ -60,6 +63,13 @@ export function VitrineLayoutHome({
       <DeliveryVitrineHeader
         config={config}
         disponivel={viewModel.disponivel}
+        statusMensagem={viewModel.statusMensagem}
+        statusDetalheHorario={viewModel.statusDetalheHorario}
+        carrinhoQuantidade={viewModel.carrinho.quantidadeItens}
+        interactive={interactive}
+        onInformacoesClick={onInformacoesClick}
+        onPedidoClick={onPedidoClick}
+        onMeuPedidoClick={onMeuPedidoClick}
       />
 
       <DeliveryBasicoCatalogStickyNav catalogRootRef={catalogRootRef}>
@@ -67,18 +77,13 @@ export function VitrineLayoutHome({
           grupos={filtered.grupos}
           activeGrupoId={activeGrupoId}
           interactive={interactive}
+          buscaAberta={buscaAberta}
+          termoBusca={viewModel.termoBusca}
           onGrupoClick={handleGrupoClick}
           onSearchToggle={() => setBuscaAberta(current => !current)}
+          onBuscaChange={onBuscaChange}
         />
       </DeliveryBasicoCatalogStickyNav>
-
-      {buscaAberta ? (
-        <DeliveryBuscaProdutos
-          value={viewModel.termoBusca}
-          interactive={interactive}
-          onChange={onBuscaChange}
-        />
-      ) : null}
 
       <div className="flex-1 pb-4">
         {filtered.grupos.map((grupo, index) => (
@@ -91,7 +96,10 @@ export function VitrineLayoutHome({
               index > 0 &&
               filtered.grupos[index - 1]?.id === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID
             }
+            quantidadePorProduto={quantidadePorProduto}
             onProdutoClick={onProdutoClick}
+            onProdutoAddRapido={onProdutoAddRapido}
+            onAbrirCarrinho={onPedidoClick}
           />
         ))}
       </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { fetchGruposProdutoImagemUrlsBatch } from '@/src/infrastructure/api/deliveryMediaApi'
+import { buscarImagensGruposDesignUseCase } from '@/src/infrastructure/composition/deliveryDesignUseCases'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import type { DesignCategoriaGrupo } from '../types/designCategoriaGrupo'
 
@@ -48,7 +48,7 @@ export function useDesignCategoriaGruposImagens({
       try {
         const currentGrupos = gruposRef.current
         const ids = currentGrupos.map(grupo => grupo.id)
-        const imagensPorGrupoId = await fetchGruposProdutoImagemUrlsBatch(ids, token)
+        const imagensPorGrupoId = await buscarImagensGruposDesignUseCase.execute(ids, token)
 
         const enriched = currentGrupos.map(grupo => {
           const resolvedUrl =

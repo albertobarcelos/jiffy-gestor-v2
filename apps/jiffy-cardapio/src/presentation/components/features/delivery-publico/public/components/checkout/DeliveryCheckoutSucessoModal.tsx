@@ -233,8 +233,10 @@ export function DeliveryCheckoutSucessoModal({
           <button
             type="button"
             onClick={onVoltarAoCardapio}
-            className="flex min-h-[3.5rem] w-full items-center justify-center border-0 bg-black text-base font-semibold text-white"
+            className="flex min-h-[3.5rem] w-full items-center justify-center border-0 text-base font-semibold"
             style={{
+              backgroundColor: 'var(--delivery-primary-dark)',
+              color: 'var(--delivery-btn-text, #ffffff)',
               paddingBottom: 'max(0px, env(safe-area-inset-bottom))',
             }}
           >

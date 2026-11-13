@@ -50,7 +50,7 @@ function ProdutoThumb({
       sizes={DELIVERY_IMAGEM_SIZES.listThumb}
       priority={priority}
       produtoId={produtoId}
-      className="object-cover"
+      className="object-contain object-center"
     />
   ) : (
     <div className="absolute inset-0 flex items-center justify-center">

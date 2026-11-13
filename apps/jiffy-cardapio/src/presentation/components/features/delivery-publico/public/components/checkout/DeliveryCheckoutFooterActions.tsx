@@ -17,7 +17,7 @@ type DeliveryCheckoutFooterActionsProps = {
 }
 
 /**
- * Barra de ações alinhada ao footer do carrinho: Voltar (branco) + Continuar (preto).
+ * Barra de ações alinhada ao footer do carrinho: Voltar (branco) + Continuar (primary-dark do tema).
  */
 export function DeliveryCheckoutFooterActions({
   onVoltar,
@@ -46,7 +46,7 @@ export function DeliveryCheckoutFooterActions({
             if (!voltarDisabled) e.preventDefault()
           }}
           onClick={onVoltar}
-          className="inline-flex shrink-0 items-center justify-center gap-1.5 border border-neutral-300 bg-white px-5 text-base font-semibold text-black disabled:opacity-60"
+          className="inline-flex shrink-0 items-center justify-center gap-1.5 border border-neutral-300 bg-white px-5 text-base font-semibold delivery-text-primary disabled:opacity-60"
         >
           <ChevronLeft className="h-5 w-5" aria-hidden />
           {voltarLabel}
@@ -60,7 +60,11 @@ export function DeliveryCheckoutFooterActions({
             if (!continuarDisabled) e.preventDefault()
           }}
           onClick={onContinuar}
-          className="flex min-w-0 flex-1 items-center justify-center border-0 bg-black px-5 text-base font-semibold text-white disabled:opacity-60"
+          className="flex min-w-0 flex-1 items-center justify-center border-0 px-5 text-base font-semibold disabled:opacity-60"
+          style={{
+            backgroundColor: 'var(--delivery-primary-dark)',
+            color: 'var(--delivery-btn-text, #ffffff)',
+          }}
         >
           {continuarLabel}
         </button>

@@ -34,6 +34,10 @@ export type DeliveryPublicoViewModel = {
   grupos: DeliveryPublicoGrupoViewModel[]
   disponivel: boolean
   horarioTexto: string
+  /** Mensagem completa de status (topnav Básico): aberto/fechado + próxima abertura. */
+  statusMensagem?: string
+  /** Horário complementar (ex.: "até as 22:45"); null quando não aplica. */
+  statusDetalheHorario?: string | null
   termoBusca: string
   carrinho: DeliveryPublicoCarrinhoViewModel
 }

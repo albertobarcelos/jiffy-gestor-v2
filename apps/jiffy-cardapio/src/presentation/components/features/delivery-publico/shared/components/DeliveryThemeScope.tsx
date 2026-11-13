@@ -24,28 +24,49 @@ type DeliveryThemeScopeProps = {
   slug: string
   nomeExibicaoFallback?: string
   empresa?: EmpresaPublicaDTO | null
+  /**
+   * Quando `false`, mostra loading até o catálogo trazer `empresa.design`
+   * (evita flash de tema default).
+   */
+  designReady?: boolean
   className?: string
   children: ReactNode
-  /** @deprecated Spinner de tema removido — children pintam com default síncrono. */
   loadingFallback?: ReactNode
+}
+
+function DeliveryThemeLoading() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-white">
+      <div
+        className="h-12 w-12 animate-spin rounded-full border-b-2"
+        style={{ borderColor: 'var(--delivery-primary, #8338EC)' }}
+      />
+    </div>
+  )
 }
 
 /**
  * Aplica paleta/tipografia publicada num escopo isolado (home, modal, carrinho).
- * Não bloqueia o first paint: default → merge do localStorage após mount.
  */
 export function DeliveryThemeScope({
   slug,
   nomeExibicaoFallback,
   empresa,
+  designReady = false,
   className,
   children,
+  loadingFallback,
 }: DeliveryThemeScopeProps) {
-  const { config, themeStyle } = useDeliveryPublicoTheme({
+  const { config, themeStyle, hydrated } = useDeliveryPublicoTheme({
     slug,
     nomeExibicaoFallback,
     empresa,
+    designReady,
   })
+
+  if (!hydrated) {
+    return loadingFallback ?? <DeliveryThemeLoading />
+  }
 
   return (
     <DeliveryThemeContext.Provider value={{ config, themeStyle }}>

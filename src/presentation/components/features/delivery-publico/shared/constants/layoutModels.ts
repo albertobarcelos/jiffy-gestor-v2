@@ -26,7 +26,7 @@ export const LAYOUT_MODELS: LayoutModelDefinition[] = [
     descricao: 'Fotos grandes',
     premium: true,
     disponivel: true,
-    publicavel: false,
+    publicavel: true,
   },
   {
     id: 'grade',
@@ -34,7 +34,7 @@ export const LAYOUT_MODELS: LayoutModelDefinition[] = [
     descricao: 'Estrutura em blocos',
     premium: true,
     disponivel: true,
-    publicavel: false,
+    publicavel: true,
   },
   {
     id: 'catalogo',
@@ -42,7 +42,7 @@ export const LAYOUT_MODELS: LayoutModelDefinition[] = [
     descricao: 'Navegação fluida',
     premium: true,
     disponivel: true,
-    publicavel: false,
+    publicavel: true,
   },
 ]
 

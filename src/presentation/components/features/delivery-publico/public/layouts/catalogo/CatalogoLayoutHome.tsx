@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { DeliveryPedidoFooter } from '../../../shared/components/DeliveryPedidoFooter'
 import { DeliveryPublicoLojaFooter } from '../../../shared/components/DeliveryPublicoLojaFooter'
 import { filterViewModelByBusca } from '../../../shared/utils/filterViewModelByBusca'
@@ -8,6 +8,7 @@ import type { DeliveryLayoutHomeProps } from '../DeliveryLayoutHomeProps'
 import { DeliveryCatalogoHeader } from './components/DeliveryCatalogoHeader'
 import { DeliveryCatalogoSearch } from './components/DeliveryCatalogoSearch'
 import { DeliveryCatalogoCategoriaTabs } from './components/DeliveryCatalogoCategoriaTabs'
+import { DeliveryBasicoCatalogStickyNav } from '../basico/DeliveryBasicoCatalogStickyNav'
 import { DeliveryCatalogoSecaoGrupo } from './components/DeliveryCatalogoSecaoGrupo'
 import { DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID } from '../../../shared/constants/deliveryPublicoSugestoes'
 
@@ -21,7 +22,11 @@ export function CatalogoLayoutHome({
   onBuscaChange,
   onGrupoClick,
   onProdutoClick,
+  onProdutoAddRapido,
   onPedidoClick,
+  onMeuPedidoClick,
+  onInformacoesClick,
+  quantidadePorProduto,
   carrinhoThumbs,
   carrinhoThumbsBounceKey,
   carrinhoThumbsTargetRef,
@@ -38,6 +43,7 @@ export function CatalogoLayoutHome({
   }, [filtered.grupos, activeGrupoId])
 
   const stickyFooterVisible = viewModel.carrinho.quantidadeItens > 0
+  const catalogRootRef = useRef<HTMLDivElement>(null)
 
   const handleGrupoClick = useCallback(
     (grupoId: string) => {
@@ -47,36 +53,41 @@ export function CatalogoLayoutHome({
     [onGrupoClick]
   )
 
-  const handleMenuClick = useCallback(() => {
-    const firstGrupo = filtered.grupos[0]
-    if (firstGrupo) handleGrupoClick(firstGrupo.id)
-  }, [filtered.grupos, handleGrupoClick])
-
   return (
-    <div className={`flex min-h-full flex-col${stickyFooterVisible ? ' pb-24' : ''}`}>
+    <div
+      ref={catalogRootRef}
+      className={`flex min-h-full flex-col${stickyFooterVisible ? ' pb-24' : ''}`}
+    >
       <DeliveryCatalogoHeader
         config={config}
         disponivel={viewModel.disponivel}
+        statusMensagem={viewModel.statusMensagem ?? ''}
+        statusDetalheHorario={viewModel.statusDetalheHorario}
         carrinhoQuantidade={viewModel.carrinho.quantidadeItens}
         interactive={interactive}
         onPedidoClick={onPedidoClick}
+        onMeuPedidoClick={onMeuPedidoClick}
+        onInformacoesClick={onInformacoesClick}
       />
 
-      <div className="mt-2 space-y-3">
-        <DeliveryCatalogoSearch
-          termoBusca={viewModel.termoBusca}
-          interactive={interactive}
-          onChange={onBuscaChange}
-        />
-      </div>
-
-      <DeliveryCatalogoCategoriaTabs
-        grupos={filtered.grupos}
-        activeGrupoId={activeGrupoId}
-        interactive={interactive}
-        onGrupoClick={handleGrupoClick}
-        onMenuClick={handleMenuClick}
-      />
+      <DeliveryBasicoCatalogStickyNav catalogRootRef={catalogRootRef}>
+        <div
+          className="space-y-2 pb-0 pt-2"
+          style={{ backgroundColor: 'var(--delivery-bg, var(--delivery-surface))' }}
+        >
+          <DeliveryCatalogoSearch
+            termoBusca={viewModel.termoBusca}
+            interactive={interactive}
+            onChange={onBuscaChange}
+          />
+          <DeliveryCatalogoCategoriaTabs
+            grupos={filtered.grupos}
+            activeGrupoId={activeGrupoId}
+            interactive={interactive}
+            onGrupoClick={handleGrupoClick}
+          />
+        </div>
+      </DeliveryBasicoCatalogStickyNav>
 
       <div className="flex-1 pb-4">
         {filtered.grupos.map((grupo, index) => (
@@ -89,7 +100,10 @@ export function CatalogoLayoutHome({
               index > 0 &&
               filtered.grupos[index - 1]?.id === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID
             }
+            quantidadePorProduto={quantidadePorProduto}
             onProdutoClick={onProdutoClick}
+            onProdutoAddRapido={onProdutoAddRapido}
+            onAbrirCarrinho={onPedidoClick}
           />
         ))}
       </div>

@@ -495,7 +495,11 @@ export function DeliveryCheckoutPagamentoModal({
             <button
               type="button"
               onClick={handleAdicionar}
-              className="min-h-[48px] w-full rounded-xl bg-black text-sm font-semibold text-white"
+              className="min-h-[48px] w-full rounded-xl text-sm font-semibold"
+              style={{
+                backgroundColor: 'var(--delivery-primary-dark)',
+                color: 'var(--delivery-btn-text, #ffffff)',
+              }}
             >
               Adicionar pagamento
             </button>
@@ -509,7 +513,10 @@ export function DeliveryCheckoutPagamentoModal({
           >
             <div
               className="flex items-center justify-between gap-3 rounded-xl px-3 py-2"
-              style={{ backgroundColor: '#000000', color: '#ffffff' }}
+              style={{
+                backgroundColor: 'var(--delivery-primary-dark)',
+                color: 'var(--delivery-btn-text, #ffffff)',
+              }}
             >
               <span className="min-w-0 text-sm font-medium text-white">
                 2. Precisa de troco?
@@ -527,7 +534,10 @@ export function DeliveryCheckoutPagamentoModal({
                   className="min-w-[3.25rem] rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
                   style={
                     precisaTroco === true
-                      ? { backgroundColor: '#ffffff', color: '#000000' }
+                      ? {
+                          backgroundColor: '#ffffff',
+                          color: 'var(--delivery-primary-dark)',
+                        }
                       : { backgroundColor: 'transparent', color: '#ffffff' }
                   }
                 >
@@ -540,7 +550,10 @@ export function DeliveryCheckoutPagamentoModal({
                   className="min-w-[3.25rem] rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
                   style={
                     precisaTroco === false
-                      ? { backgroundColor: '#ffffff', color: '#000000' }
+                      ? {
+                          backgroundColor: '#ffffff',
+                          color: 'var(--delivery-primary-dark)',
+                        }
                       : { backgroundColor: 'transparent', color: '#ffffff' }
                   }
                 >
@@ -604,7 +617,11 @@ export function DeliveryCheckoutPagamentoModal({
               <button
                 type="button"
                 onClick={handleAdicionar}
-                className="min-h-[48px] w-full rounded-xl bg-black text-sm font-semibold text-white"
+                className="min-h-[48px] w-full rounded-xl text-sm font-semibold"
+                style={{
+                  backgroundColor: 'var(--delivery-primary-dark)',
+                  color: 'var(--delivery-btn-text, #ffffff)',
+                }}
               >
                 Adicionar pagamento
               </button>

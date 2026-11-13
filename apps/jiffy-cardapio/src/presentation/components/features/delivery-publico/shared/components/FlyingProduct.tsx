@@ -148,7 +148,7 @@ export function FlyingProduct({
       <motion.div
         initial={initialPose}
         animate={controls}
-        className="pointer-events-none fixed left-0 top-0 overflow-hidden rounded-2xl shadow-xl"
+        className="pointer-events-none fixed left-0 top-0 overflow-hidden rounded-full shadow-xl"
         style={{
           width: BASE_SIZE,
           height: BASE_SIZE,
