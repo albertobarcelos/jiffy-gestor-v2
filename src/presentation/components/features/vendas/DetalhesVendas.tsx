@@ -76,6 +76,10 @@ interface VendaDetalhes {
   tipoAcrescimo?: string | null
   valorAcrescimo?: number | null
   pagamentos: Pagamento[]
+  senha?: string | null
+  vendaCompartilhada?: boolean
+  rodizioSessao?: RodizioSessaoDetalhe | null
+  movimentacoes?: MovimentacaoVendaDetalhe[]
   // Campos fiscais
   statusVenda?: string | null
   origem?: string | null
@@ -140,6 +144,10 @@ interface ProdutoLancado {
   removido: boolean
   removidoPorId?: string
   dataRemocao?: string
+  motivoRemocao?: string | null
+  tipoItem?: string
+  observacoes?: ObservacaoLancada[]
+  pizzaLancada?: PizzaLancadaDetalhe | null
 }
 
 interface Complemento {
@@ -147,6 +155,67 @@ interface Complemento {
   quantidade: number
   valorUnitario: number
   tipoImpactoPreco: 'aumenta' | 'diminui' | 'nenhum'
+  tipoComplemento?: string | null
+}
+
+interface ObservacaoLancada {
+  id?: string
+  observacao: string
+}
+
+interface PizzaSaborDetalhe {
+  nomeSabor: string
+  quantidadePartes?: number
+}
+
+interface PizzaLancadaDetalhe {
+  nomeTamanho?: string
+  nomeCategoria?: string
+  totalPartes?: number
+  sabores?: PizzaSaborDetalhe[]
+}
+
+interface FaixaRodizioDetalhe {
+  id?: string
+  nomeFaixa: string
+  quantidade: number
+  valorUnitario: number
+  removida?: boolean
+}
+
+interface ItemRodadaDetalhe {
+  id?: string
+  nomeItem: string
+  quantidade: number
+}
+
+interface RodadaRodizioDetalhe {
+  id?: string
+  numeroRodada: number
+  status?: string
+  canceladaEm?: string | null
+  itens?: ItemRodadaDetalhe[]
+}
+
+interface RodizioSessaoDetalhe {
+  nomeRodizio?: string
+  status?: string
+  encerradaEm?: string | null
+  faixasLancadas?: FaixaRodizioDetalhe[]
+  rodadas?: RodadaRodizioDetalhe[]
+}
+
+interface SnapshotVendaDetalhe {
+  papel?: string
+  numeroMesa?: string | null
+  vendaId?: string
+}
+
+interface MovimentacaoVendaDetalhe {
+  id?: string
+  tipoMovimentacao?: string
+  snapshotsVenda?: SnapshotVendaDetalhe[]
+  snapshotProduto?: { nomeProduto?: string } | null
 }
 
 interface Pagamento {
@@ -157,8 +226,10 @@ interface Pagamento {
   canceladoPorId?: string
   cancelado: boolean
   dataCancelamento?: string
-  isTefUsed?: boolean // Adicionado
-  isTefConfirmed?: boolean // Adicionado
+  isTefUsed?: boolean
+  isTefConfirmed?: boolean
+  bandeiraCartao?: string | null
+  codigoAutorizacao?: string | null
 }
 
 interface MeioPagamentoDetalhes {
@@ -197,6 +268,58 @@ function nomeExibicaoUsuario(
   if (!id) return '—'
   const nome = String(nomes[id] ?? '').trim()
   return nome || '—'
+}
+
+function rotuloTipoComplemento(tipo: string | null | undefined): string | null {
+  const normalizado = String(tipo ?? '').trim().toLowerCase()
+  if (!normalizado || normalizado === 'padrao' || normalizado === 'padrão') return null
+  return normalizado.charAt(0).toUpperCase() + normalizado.slice(1)
+}
+
+function textoPizza(pizza: PizzaLancadaDetalhe | null | undefined): string | null {
+  if (!pizza) return null
+  const partes: string[] = []
+  if (pizza.nomeTamanho && pizza.nomeTamanho.trim()) partes.push(pizza.nomeTamanho.trim())
+  const sabores = (pizza.sabores ?? [])
+    .map(sabor => {
+      const nome = sabor.nomeSabor?.trim()
+      if (!nome) return ''
+      if (sabor.quantidadePartes && pizza.totalPartes) {
+        return `${sabor.quantidadePartes}/${pizza.totalPartes} ${nome}`
+      }
+      if (sabor.quantidadePartes) return `${sabor.quantidadePartes} ${nome}`
+      return nome
+    })
+    .filter(Boolean)
+  if (sabores.length > 0) partes.push(sabores.join(', '))
+  return partes.length > 0 ? partes.join(' · ') : null
+}
+
+function linhasTransferencia(movimentacoes: MovimentacaoVendaDetalhe[] | undefined): string[] {
+  if (!movimentacoes || movimentacoes.length === 0) return []
+  return movimentacoes.flatMap(mov => {
+    const tipo = String(mov.tipoMovimentacao ?? '').toLowerCase()
+    const snapshots = mov.snapshotsVenda ?? []
+    const mesas = Array.from(
+      new Set(
+        snapshots
+          .map(snapshot => String(snapshot.numeroMesa ?? '').trim())
+          .filter(mesa => mesa.length > 0)
+      )
+    )
+    const pareceTransferencia = tipo.includes('transfer') || mesas.length >= 2
+    if (!pareceTransferencia) return []
+    const origem = snapshots.find(snapshot => /origem|source/i.test(snapshot.papel ?? ''))
+    const destino = snapshots.find(snapshot => /destino|dest/i.test(snapshot.papel ?? ''))
+    const produto = mov.snapshotProduto?.nomeProduto?.trim() || 'Item'
+    if (origem?.numeroMesa && destino?.numeroMesa) {
+      return [`${produto} da mesa ${origem.numeroMesa} para a mesa ${destino.numeroMesa}`]
+    }
+    if (mesas.length >= 2) {
+      return [`${produto} entre a mesa ${mesas[0]} e a mesa ${mesas[1]}`]
+    }
+    return []
+  })
 }
 
 function registrarNomeAtor(
@@ -1381,6 +1504,16 @@ export function DetalhesVendas({
         ? 'bg-success'
         : 'bg-warning'
 
+  const temTaxaComValor = (venda?.taxasLancadas ?? []).some(taxa => {
+    if (taxa.dataRemocao?.trim()) return false
+    return (Number(taxa.valorCalculado) || 0) > 0
+  })
+
+  const rodizio = venda?.rodizioSessao
+  const faixasRodizio = (rodizio?.faixasLancadas ?? []).filter(faixa => faixa.removida !== true)
+  const rodadasRodizio = (rodizio?.rodadas ?? []).filter(rodada => !rodada.canceladaEm)
+  const transferencias = linhasTransferencia(venda?.movimentacoes)
+
   return (
     <Modal
       open={internalOpen}
@@ -1440,6 +1573,9 @@ export function DetalhesVendas({
                 Venda Nº. {venda?.numeroVenda}
               </span>
               <span className="text-lg text-white">#{venda?.codigoVenda}</span>
+              {venda?.senha ? (
+                <span className="text-sm text-white/90">Senha {venda.senha}</span>
+              ) : null}
             </div>
           </div>
           <button
@@ -1508,6 +1644,13 @@ export function DetalhesVendas({
                   >
                     Status: <span className="font-semibold">{statusVenda}</span>
                   </div>
+
+                  {venda.vendaCompartilhada ? (
+                    <div className="flex justify-between rounded-lg bg-white px-1 text-xs text-primary md:text-sm">
+                      <span>Mesa</span>
+                      <span className="font-semibold">Compartilhada</span>
+                    </div>
+                  ) : null}
 
                   {/* Aberto por */}
                   <div className="flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
@@ -1647,6 +1790,11 @@ export function DetalhesVendas({
                     const isVendaCancelada = statusVenda === 'CANCELADA'
                     // Se a venda está cancelada, todos os produtos são considerados cancelados
                     const isCancelado = isVendaCancelada || isRemovido
+                    const pizzaTexto =
+                      produto.tipoItem === 'pizza' ? textoPizza(produto.pizzaLancada) : null
+                    const observacoes = (produto.observacoes ?? []).filter(
+                      obs => obs.observacao && obs.observacao.trim() !== ''
+                    )
                     // Sempre exibe o valor total, mesmo quando removido (com risco)
 
                     // Debug: verifica se os campos de desconto/acréscimo estão presentes (apenas para produtos com modificações)
@@ -1786,19 +1934,23 @@ export function DetalhesVendas({
                             </div>
                           </div>
 
+                          {pizzaTexto ? (
+                            <p className="ml-2 text-xs text-secondary-text md:ml-7">{pizzaTexto}</p>
+                          ) : null}
+                          {produto.incidiuTaxa === true && temTaxaComValor ? (
+                            <p className="ml-2 text-xs text-secondary-text md:ml-7">
+                              Incide taxa de serviço
+                            </p>
+                          ) : null}
+
                           {/* Linhas dos complementos */}
                           {produto.complementos && produto.complementos.length > 0 ? (
                             <div className="ml-2 space-y-1 md:ml-7">
                               {produto.complementos.map((complemento, compIndex) => {
-                                console.log(
-                                  `  🎨 Renderizando complemento ${compIndex}:`,
-                                  complemento
-                                )
-
                                 const valorTotalComplemento = calcularValorComplemento(complemento)
                                 const temImpactoPreco = complemento.tipoImpactoPreco !== 'nenhum'
+                                const tipoComplemento = rotuloTipoComplemento(complemento.tipoComplemento)
 
-                                // Determina o prefixo baseado no tipo de impacto
                                 let prefix = ''
                                 if (temImpactoPreco) {
                                   prefix = complemento.tipoImpactoPreco === 'aumenta' ? '+ ' : '- '
@@ -1810,7 +1962,9 @@ export function DetalhesVendas({
                                     className="flex items-center justify-between gap-2"
                                   >
                                     <span className="text-xs text-secondary-text">
-                                      {complemento.quantidade}x {complemento.nomeComplemento}
+                                      {complemento.quantidade}x{' '}
+                                      {tipoComplemento ? `${tipoComplemento}: ` : ''}
+                                      {complemento.nomeComplemento}
                                       {temImpactoPreco &&
                                         ` (${formatNumber(complemento.valorUnitario)})`}
                                     </span>
@@ -1826,6 +1980,15 @@ export function DetalhesVendas({
                               })}
                             </div>
                           ) : null}
+
+                          {observacoes.map((obs, obsIndex) => (
+                            <div
+                              key={obs.id || obsIndex}
+                              className="ml-2 text-xs text-secondary-text md:ml-7"
+                            >
+                              Obs.: {obs.observacao}
+                            </div>
+                          ))}
 
                           {/* Informações de lançamento */}
                           <div className="mt-1 flex flex-col text-xs text-secondary-text md:ml-7 md:flex-row">
@@ -1847,6 +2010,11 @@ export function DetalhesVendas({
                               Removido em: {formatDateTime(produto.dataRemocao)}
                             </div>
                           )}
+                          {isRemovido && produto.motivoRemocao ? (
+                            <div className="ml-7 text-xs text-error">
+                              Motivo: {produto.motivoRemocao}
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     )
@@ -1973,6 +2141,63 @@ export function DetalhesVendas({
                 </div>
               </div>
 
+              {rodizio ? (
+                <div className="mb-2 p-2">
+                  <h2 className="text-lg font-semibold text-primary-text">Rodízio</h2>
+                  <div className="mb-2 border-t border-dashed border-gray-400" />
+                  <div className="space-y-2 md:px-2">
+                    <div className="flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
+                      <span>{rodizio.nomeRodizio || 'Rodízio'}</span>
+                      <span>{rodizio.status || (rodizio.encerradaEm ? 'Encerrado' : 'Aberto')}</span>
+                    </div>
+                    {faixasRodizio.map((faixa, index) => (
+                      <div
+                        key={faixa.id || index}
+                        className="flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm"
+                      >
+                        <span>
+                          {faixa.quantidade}x {faixa.nomeFaixa}
+                        </span>
+                        <span>{formatCurrency(faixa.valorUnitario * faixa.quantidade)}</span>
+                      </div>
+                    ))}
+                    {rodadasRodizio.map((rodada, index) => (
+                      <div
+                        key={rodada.id || index}
+                        className="rounded-lg bg-white px-1 py-1 text-xs text-primary-text md:text-sm"
+                      >
+                        <div className="flex justify-between">
+                          <span>Rodada {rodada.numeroRodada}</span>
+                          <span>{rodada.status || 'Aberta'}</span>
+                        </div>
+                        {(rodada.itens ?? []).map((item, itemIndex) => (
+                          <div key={item.id || itemIndex} className="text-secondary-text">
+                            {item.quantidade}x {item.nomeItem}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {transferencias.length > 0 ? (
+                <div className="mb-2 p-2">
+                  <h2 className="text-lg font-semibold text-primary-text">Transferências</h2>
+                  <div className="mb-2 border-t border-dashed border-gray-400" />
+                  <div className="space-y-1 md:px-2">
+                    {transferencias.map((linha, index) => (
+                      <div
+                        key={`${linha}-${index}`}
+                        className="rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm"
+                      >
+                        {linha}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
               {/* Card Pagamentos Realizados */}
               <div className="mb-4 px-2">
                 <h2 className="mb-2 text-lg font-semibold text-primary-text">
@@ -2047,6 +2272,15 @@ export function DetalhesVendas({
                             <div className="text-sm font-semibold text-primary-text">
                               {formatCurrency(pagamento.valor)}
                             </div>
+                            {pagamento.isTefUsed === true &&
+                            pagamento.isTefConfirmed === true &&
+                            (pagamento.bandeiraCartao || pagamento.codigoAutorizacao) ? (
+                              <div className="text-xs text-secondary-text">
+                                {[pagamento.bandeiraCartao, pagamento.codigoAutorizacao ? `Aut. ${pagamento.codigoAutorizacao}` : null]
+                                  .filter(Boolean)
+                                  .join(' · ')}
+                              </div>
+                            ) : null}
                             <div className="text-xs text-secondary-text">
                               PDV Resp.:{' '}
                               {nomeExibicaoUsuario(pagamento.realizadoPorId, nomesUsuarios)}

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import { MdAttachMoney, MdRestaurant, MdPrint } from 'react-icons/md'
+import { MdAttachMoney, MdRestaurant } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { DetalhesVendas } from './DetalhesVendas'
 import { CircularProgress } from '@mui/material'
@@ -24,12 +24,19 @@ interface Venda {
   dataCriacao: string
   dataUltimaModificacao?: string
   dataUltimoProdutoLancado?: string
-  dataUltimaMovimentacao?: string
   clienteId?: string
+  identificacao?: string | null
+  vendaCompartilhada?: boolean
   dataCancelamento?: string
   dataFinalizacao?: string
-  metodoPagamento?: string
-  status?: string
+}
+
+/** Dados do GET de detalhe que a grade já dispara para resolver o cliente. */
+interface MesaResumoDetalhe {
+  clienteId: string | null
+  identificacao: string | null
+  vendaCompartilhada: boolean
+  rodizioAberto: boolean
 }
 
 interface MetricasVendas {
@@ -57,12 +64,12 @@ const DUR_MAX_MS = 2 * 60 * 60 * 1000 // 2 horas
  * Componente de listagem de mesas em aberto
  * Exibe apenas mesas (não balcão) com scroll infinito e cards de métricas
  */
-export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
+export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
   const [vendas, setVendas] = useState<Venda[]>([])
   const [metricas, setMetricas] = useState<MetricasVendas | null>(null)
   const [usuariosPDV, setUsuariosPDV] = useState<UsuarioPDV[]>([])
   const [clienteNomeMap, setClienteNomeMap] = useState<Record<string, string | null>>({})
-  const [vendaClienteIdMap, setVendaClienteIdMap] = useState<Record<string, string | null>>({}) // Cache de clienteId por venda (fallback)
+  const [mesaResumoMap, setMesaResumoMap] = useState<Record<string, MesaResumoDetalhe>>({})
   const [apenasSemMovimentacao, setApenasSemMovimentacao] = useState(false)
   const [cachesHydrated, setCachesHydrated] = useState(false)
 
@@ -214,31 +221,21 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
   }
 
   /**
-   * Ordena vendas por data de criação (mais recente primeiro).
+   * Data que define mesa parada: última modificação, ou a abertura se ela não vier.
    */
-  const sortByDataCriacaoDesc = (items: Venda[]) =>
-    [...items].sort((a, b) => {
-      const aDate = parseDateLocalWallTime(a.dataCriacao).getTime()
-      const bDate = parseDateLocalWallTime(b.dataCriacao).getTime()
-      return bDate - aDate
-    })
+  const referenciaParada = (venda: Venda): string =>
+    venda.dataUltimaModificacao && venda.dataUltimaModificacao.length > 0
+      ? venda.dataUltimaModificacao
+      : venda.dataCriacao
+
+  const minutosDesde = (value: string): number =>
+    Math.max(0, Math.floor((Date.now() - toMs(value)) / (1000 * 60)))
 
   /**
-   * Ordena por tempo sem movimentação (mais recente primeiro: menor diff).
+   * Ordena pela mesa mexida por último (menor tempo parado primeiro).
    */
-  const sortByUltimaMovimentacaoAsc = (items: Venda[]) =>
-    [...items].sort(
-      (a, b) => diffMinutosDesdeUltimaMovimentacao(a) - diffMinutosDesdeUltimaMovimentacao(b)
-    )
-
-  /**
-   * Retorna o tempo em minutos desde a última movimentação conhecida.
-   */
-  const diffMinutosDesdeUltimaMovimentacao = (venda: Venda): number => {
-    const referencia = venda.dataUltimaModificacao
-    const ref = parseDateLocalWallTime(referencia || venda.dataCriacao)
-    return Math.floor((Date.now() - ref.getTime()) / (1000 * 60))
-  }
+  const sortByParadaAsc = (items: Venda[]) =>
+    [...items].sort((a, b) => minutosDesde(referenciaParada(a)) - minutosDesde(referenciaParada(b)))
 
   /**
    * Carrega todos os usuários PDV
@@ -317,15 +314,8 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
       setClienteNomeMap(prev => {
         const next = { ...prev }
         results.forEach(({ clienteId, nome }) => {
-          next[clienteId] = nome // nome pode ser null para evitar refetch
+          next[clienteId] = nome
         })
-        // Debug: verifica se os nomes foram salvos corretamente
-        if (process.env.NODE_ENV === 'development') {
-          console.log('MesasAbertas: Nomes de clientes atualizados:', {
-            resultados: results,
-            mapaAtualizado: next,
-          })
-        }
         return next
       })
     },
@@ -333,44 +323,74 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
   )
 
   /**
-   * Busca o clienteId a partir do detalhe da venda (endpoint de detalhes).
-   * Fallback temporário enquanto o clienteId não vem na resposta da listagem.
+   * Busca o detalhe da venda uma vez por mesa sem cliente na listagem.
+   * Aproveita a mesma resposta para identificação, compartilhamento e rodízio.
    */
-  const fetchClienteIdPorVenda = useCallback(
-    async (ids: string[]) => {
-      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-      if (!token || ids.length === 0) return
+  const fetchResumoDetalheMesa = useCallback(async (ids: string[]) => {
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+    if (!token || ids.length === 0) return
 
-      const results = await Promise.all(
-        ids.map(async id => {
-          try {
-            const response = await fetchGestorApi(`/api/vendas/${id}`, {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              },
-            })
-            if (!response.ok) return { id, clienteId: null }
-            const data = await response.json()
-            const clienteId = (data.clienteId as string | undefined) || null
-            return { id, clienteId }
-          } catch {
-            return { id, clienteId: null }
+    const results = await Promise.all(
+      ids.map(async id => {
+        try {
+          const response = await fetchGestorApi(`/api/vendas/${id}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          })
+          if (!response.ok) {
+            return {
+              id,
+              resumo: {
+                clienteId: null,
+                identificacao: null,
+                vendaCompartilhada: false,
+                rodizioAberto: false,
+              } satisfies MesaResumoDetalhe,
+            }
           }
-        })
-      )
-
-      setVendaClienteIdMap(prev => {
-        const next = { ...prev }
-        results.forEach(({ id, clienteId }) => {
-          // marca mesmo que null para evitar refetch infinito
-          next[id] = clienteId
-        })
-        return next
+          const data = await response.json()
+          const clienteId = typeof data.clienteId === 'string' ? data.clienteId : null
+          const identificacao =
+            typeof data.identificacao === 'string' && data.identificacao.trim() !== ''
+              ? data.identificacao.trim()
+              : null
+          const sessao = data.rodizioSessao
+          const encerradaEm =
+            sessao && typeof sessao === 'object' ? sessao.encerradaEm : undefined
+          const rodizioAberto = Boolean(sessao) && (encerradaEm == null || encerradaEm === '')
+          return {
+            id,
+            resumo: {
+              clienteId,
+              identificacao,
+              vendaCompartilhada: data.vendaCompartilhada === true,
+              rodizioAberto,
+            } satisfies MesaResumoDetalhe,
+          }
+        } catch {
+          return {
+            id,
+            resumo: {
+              clienteId: null,
+              identificacao: null,
+              vendaCompartilhada: false,
+              rodizioAberto: false,
+            } satisfies MesaResumoDetalhe,
+          }
+        }
       })
-    },
-    []
-  )
+    )
+
+    setMesaResumoMap(prev => {
+      const next = { ...prev }
+      results.forEach(({ id, resumo }) => {
+        next[id] = resumo
+      })
+      return next
+    })
+  }, [])
 
   /**
    * Busca apenas mesas em aberto
@@ -410,35 +430,13 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
         }
 
         const data = await response.json()
-        const totalCountFromApi = resolveTotalCountFromResponse(data)
 
-        // Debug: verifica se o clienteId está vindo na resposta da listagem
-        if (process.env.NODE_ENV === 'development') {
-          const itemsComClienteId = (data.items || []).filter(
-            (item: any) => item.clienteId && item.clienteId.trim() !== ''
-          )
-          console.log('MesasAbertas: Resposta da API de listagem:', {
-            totalItems: (data.items || []).length,
-            itemsComClienteId: itemsComClienteId.length,
-            exemplosClienteId: itemsComClienteId
-              .slice(0, 3)
-              .map((item: any) => ({ id: item.id, clienteId: item.clienteId })),
-            primeiroItem: data.items?.[0]
-              ? {
-                  id: data.items[0].id,
-                  clienteId: data.items[0].clienteId,
-                  campos: Object.keys(data.items[0]),
-                }
-              : null,
-          })
-        }
-
-        const filteredItems = sortByUltimaMovimentacaoAsc(
+        const filteredItems = sortByParadaAsc(
           (data.items || []).filter((item: Venda) => {
             if (item.dataCancelamento || item.dataFinalizacao) return false
 
             if (!filterWithoutMovement) return true
-            return diffMinutosDesdeUltimaMovimentacao(item) > 15
+            return minutosDesde(referenciaParada(item)) >= 15
           })
         )
 
@@ -450,14 +448,11 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
           setVendas(uniqueFirstPage)
           currentPageRef.current = 1
           setCurrentPage(1)
-          // A contagem exibida deve refletir o que está listado (cards) para manter consistência visual.
-          // A API pode retornar `count/metricas` divergente do payload de `items` em cenários de concorrência.
-          const nextCount = uniqueFirstPage.length
           if (data.metricas) {
-            setMetricas({ ...data.metricas, countVendasEfetivadas: nextCount })
+            setMetricas(data.metricas)
           } else {
             setMetricas({
-              countVendasEfetivadas: nextCount,
+              countVendasEfetivadas: 0,
               countVendasCanceladas: 0,
               countProdutosVendidos: 0,
               totalFaturado: 0,
@@ -478,20 +473,11 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
         } else {
           setVendas(prev => {
             const merged = [...prev, ...filteredItems]
-            const next = Array.from(new Map(merged.map(v => [v.id, v] as const)).values())
-            const nextCount = next.length
-            setMetricas(prevMetricas => {
-              const base = data.metricas ??
-                prevMetricas ?? {
-                  countVendasCanceladas: 0,
-                  countProdutosVendidos: 0,
-                  totalFaturado: 0,
-                  countVendasEfetivadas: 0,
-                }
-              return { ...base, countVendasEfetivadas: nextCount }
-            })
-            return next
+            return Array.from(new Map(merged.map(v => [v.id, v] as const)).values())
           })
+          if (data.metricas) {
+            setMetricas(data.metricas)
+          }
           currentPageRef.current += 1
           setCurrentPage(prev => prev + 1)
         }
@@ -527,71 +513,43 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
     return () => container.removeEventListener('scroll', handleScroll)
   }, [canLoadMore, isLoadingMore, isLoading, fetchVendas])
 
-  // Fallback: Buscar clienteId via detalhes da venda quando não estiver presente na listagem
+  // Detalhe da venda quando a listagem não traz clienteId. A mesma resposta alimenta o card.
   useEffect(() => {
     const idsParaBuscar = vendas
       .filter(v => {
-        // Busca apenas vendas que não têm clienteId na resposta da listagem
-        // e ainda não foram verificadas (não estão no cache)
         const temClienteIdNaListagem =
           v.clienteId && typeof v.clienteId === 'string' && v.clienteId.trim() !== ''
-        const jaVerificado = v.id in vendaClienteIdMap
+        const jaVerificado = v.id in mesaResumoMap
         return !temClienteIdNaListagem && !jaVerificado
       })
       .map(v => v.id)
 
     if (idsParaBuscar.length > 0) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('MesasAbertas: Buscando clienteId via detalhes para vendas:', idsParaBuscar)
-      }
-      fetchClienteIdPorVenda(idsParaBuscar)
+      fetchResumoDetalheMesa(idsParaBuscar)
     }
-  }, [vendas, vendaClienteIdMap, fetchClienteIdPorVenda])
+  }, [vendas, mesaResumoMap, fetchResumoDetalheMesa])
 
-  // Buscar nome do cliente para clienteIds das vendas listadas ou obtidos via fallback
+  // Buscar nome do cliente para clienteIds das vendas listadas ou obtidos via detalhe
   useEffect(() => {
-    // Coleta clienteIds de duas fontes:
-    // 1. Da resposta da listagem (venda.clienteId)
-    // 2. Do cache de fallback (vendaClienteIdMap)
     const clienteIds = new Set<string>()
 
     vendas.forEach(v => {
-      // Prioriza clienteId da listagem, se disponível
       if (v.clienteId && typeof v.clienteId === 'string' && v.clienteId.trim() !== '') {
         clienteIds.add(v.clienteId)
       } else if (
-        vendaClienteIdMap[v.id] &&
-        typeof vendaClienteIdMap[v.id] === 'string' &&
-        vendaClienteIdMap[v.id]!.trim() !== ''
+        mesaResumoMap[v.id]?.clienteId &&
+        mesaResumoMap[v.id]!.clienteId!.trim() !== ''
       ) {
-        // Fallback: usa clienteId do cache de detalhes
-        clienteIds.add(vendaClienteIdMap[v.id]!)
+        clienteIds.add(mesaResumoMap[v.id]!.clienteId!)
       }
     })
 
-    // Filtra apenas clienteIds que ainda não estão no cache de nomes
     const clienteIdsParaBuscar = Array.from(clienteIds).filter(cid => !(cid in clienteNomeMap))
 
     if (clienteIdsParaBuscar.length > 0) {
-      // Debug: verifica se os clienteIds estão sendo encontrados
-      if (process.env.NODE_ENV === 'development') {
-        console.log('MesasAbertas: Buscando nomes de clientes para IDs:', clienteIdsParaBuscar)
-        console.log(
-          'MesasAbertas: Vendas com clienteId (listagem):',
-          vendas
-            .filter(v => v.clienteId && v.clienteId.trim() !== '')
-            .map(v => ({ id: v.id, clienteId: v.clienteId }))
-        )
-        console.log(
-          'MesasAbertas: Vendas com clienteId (fallback):',
-          Object.entries(vendaClienteIdMap)
-            .filter(([id, cid]) => cid && cid.trim() !== '')
-            .map(([id, cid]) => ({ id, clienteId: cid }))
-        )
-      }
       fetchNomesClientes(clienteIdsParaBuscar)
     }
-  }, [vendas, vendaClienteIdMap, clienteNomeMap, fetchNomesClientes])
+  }, [vendas, mesaResumoMap, clienteNomeMap, fetchNomesClientes])
 
   // Efeito para carregar dados auxiliares e iniciar a busca de vendas
   useEffect(() => {
@@ -601,6 +559,25 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
     fetchVendas(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ cachesHydrated, apenasSemMovimentacao])
+
+  useEffect(() => {
+    const montadoEm = Date.now()
+    let ultimoPedido = 0
+    const aoVoltar = () => {
+      if (document.visibilityState !== 'visible') return
+      if (Date.now() - montadoEm < 2000) return
+      const agora = Date.now()
+      if (agora - ultimoPedido < 1500) return
+      ultimoPedido = agora
+      fetchVendas(true)
+    }
+    document.addEventListener('visibilitychange', aoVoltar)
+    window.addEventListener('focus', aoVoltar)
+    return () => {
+      document.removeEventListener('visibilitychange', aoVoltar)
+      window.removeEventListener('focus', aoVoltar)
+    }
+  }, [fetchVendas])
 
   return (
     <div className="flex h-full max-h-[calc(100vh-100px)] flex-col overflow-hidden">
@@ -634,7 +611,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
             <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full">
               <TipoVendaIcon
                 tipoVenda="mesa"
-                numeroMesa={metricas?.countVendasEfetivadas || 0}
+                numeroMesa={vendas.length}
                 size={60}
                 containerScale={0.9}
                 corTexto="var(--color-info)"
@@ -645,7 +622,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
                 Mesas Abertas
               </span>
               <span className="text-lg text-primary md:text-[22px]">
-                {metricas?.countVendasEfetivadas || 0}
+                {vendas.length}
               </span>
             </div>
           </div>
@@ -705,95 +682,47 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
             )}
 
             {vendas.map(venda => {
-              // Texto "Movimentado há" usa data de criação; cor/tooltip usam movimentações
-              const elapsedTime = formatElapsedTime(venda.dataCriacao)
+              void elapsedTimeUpdateTrigger
+              const resumo = mesaResumoMap[venda.id]
               const usuarioNome =
                 usuariosPDV.find(u => u.id === venda.abertoPorId)?.nome || venda.abertoPorId
-              // Obtém clienteId da listagem ou do fallback (detalhes)
               const resolvedClienteId =
                 venda.clienteId &&
                 typeof venda.clienteId === 'string' &&
                 venda.clienteId.trim() !== ''
                   ? venda.clienteId
-                  : vendaClienteIdMap[venda.id] &&
-                      typeof vendaClienteIdMap[venda.id] === 'string' &&
-                      vendaClienteIdMap[venda.id]!.trim() !== ''
-                    ? vendaClienteIdMap[venda.id]!
+                  : resumo?.clienteId && resumo.clienteId.trim() !== ''
+                    ? resumo.clienteId
                     : null
-
-              // Busca o nome do cliente usando o clienteId resolvido
               const clienteNome = resolvedClienteId
                 ? clienteNomeMap[resolvedClienteId] || null
                 : null
+              const identificacao =
+                (typeof venda.identificacao === 'string' && venda.identificacao.trim() !== ''
+                  ? venda.identificacao.trim()
+                  : null) || resumo?.identificacao || null
+              const nomesDiferentes = Boolean(
+                identificacao && clienteNome && identificacao !== clienteNome
+              )
+              const nomePrincipal = nomesDiferentes ? identificacao : identificacao || clienteNome
+              const nomeSecundario = nomesDiferentes ? clienteNome : null
+              const compartilhada = venda.vendaCompartilhada === true || resumo?.vendaCompartilhada === true
+              const rodizioAberto = resumo?.rodizioAberto === true
 
-              // Debug: verifica se o clienteId está presente e se o nome foi encontrado
-              if (process.env.NODE_ENV === 'development' && resolvedClienteId) {
-                console.log('MesasAbertas: Cliente info para venda', venda.id, {
-                  clienteIdListagem: venda.clienteId,
-                  clienteIdFallback: vendaClienteIdMap[venda.id],
-                  resolvedClienteId,
-                  clienteNome,
-                  clienteNomeMap: resolvedClienteId ? clienteNomeMap[resolvedClienteId] : null,
-                  todasChaves: Object.keys(clienteNomeMap),
-                })
-              }
-
-              // dataUltimoProdutoLancado já vem na resposta da listagem, não precisa buscar separadamente
-              const minutosUltimoProduto = venda.dataUltimoProdutoLancado
-                ? Math.floor((Date.now() - toMs(venda.dataUltimoProdutoLancado)) / 60000)
-                : Math.floor((Date.now() - toMs(venda.dataCriacao)) / 60000)
-
-              // Fallback para movimentação: dataUltimaMovimentacao -> dataUltimaModificacao -> dataUltimoProdutoLancado -> criação
-              const minutosUltimaMov =
-                venda.dataUltimaMovimentacao && venda.dataUltimaMovimentacao.length > 0
-                  ? Math.floor((Date.now() - toMs(venda.dataUltimaMovimentacao)) / 60000)
-                  : venda.dataUltimaModificacao && venda.dataUltimaModificacao.length > 0
-                    ? Math.floor((Date.now() - toMs(venda.dataUltimaModificacao)) / 60000)
-                    : venda.dataUltimoProdutoLancado && venda.dataUltimoProdutoLancado.length > 0
-                      ? Math.floor((Date.now() - toMs(venda.dataUltimoProdutoLancado)) / 60000)
-                      : Math.floor((Date.now() - toMs(venda.dataCriacao)) / 60000)
-
-              // Debug do tempo de movimentação
-              if (typeof window !== 'undefined') {
-                // eslint-disable-next-line no-console
-                console.log('mesas-abertas::ultima-mov', {
-                  id: venda.id,
-                  dataUltimaMovimentacao: venda.dataUltimaMovimentacao,
-                  minutosUltimaMov,
-                  dataUltimoProdutoLancado: venda.dataUltimoProdutoLancado,
-                  minutosUltimoProduto,
-                  dataCriacao: venda.dataCriacao,
-                })
-              }
-
-              // Debug: ver se estamos capturando os tempos corretamente
-              if (typeof window !== 'undefined') {
-                // eslint-disable-next-line no-console
-                console.log('mesas-abertas::tempos', {
-                  id: venda.id,
-                  minutosUltimoProduto,
-                  minutosUltimaMov,
-                  dataUltimoProdutoLancado: venda.dataUltimoProdutoLancado,
-                  dataUltimaMovimentacao: venda.dataUltimaMovimentacao,
-                  dataCriacao: venda.dataCriacao,
-                })
-              }
-
-              const movimentoTooltip =
-                `# Últ. prod. - ${formatDiffTooltip(minutosUltimoProduto)}` +
-                (minutosUltimaMov !== null && minutosUltimaMov !== undefined
-                  ? `\n\n# Últ. mov. - ${formatDiffTooltip(minutosUltimaMov)}`
-                  : '')
-
-              // Cor baseada no tempo de movimentação (15 min -> 2h)
-              let innerCircleColor = COR_FINAL
-              const minutosParaCor = minutosUltimoProduto
-              if (minutosParaCor < 15) {
-                innerCircleColor = COR_INICIAL
-              } else if (minutosParaCor < 120) {
-                const progresso = (minutosParaCor - 15) / (120 - 15)
-                innerCircleColor = lerpColor(COR_INICIAL, COR_FINAL, progresso)
-              }
+              const minutosAberta = minutosDesde(venda.dataCriacao)
+              const minutosParada = minutosDesde(referenciaParada(venda))
+              const minutosUltimoProduto = minutosDesde(
+                venda.dataUltimoProdutoLancado && venda.dataUltimoProdutoLancado.length > 0
+                  ? venda.dataUltimoProdutoLancado
+                  : venda.dataCriacao
+              )
+              const mesaParada = minutosParada >= 15
+              const rotuloTempo = mesaParada ? 'Parada há' : 'Aberta há'
+              const tempoExibido = formatElapsedTime(
+                mesaParada ? referenciaParada(venda) : venda.dataCriacao
+              )
+              const movimentoTooltip = `Aberta há ${formatDiffTooltip(minutosAberta)}\n\nÚltimo produto há ${formatDiffTooltip(minutosUltimoProduto)}`
+              const innerCircleColor = getCorMesaPorTempoJS(referenciaParada(venda))
 
               return (
                 <div
@@ -802,44 +731,61 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
                     setSelectedVendaId(venda.id)
                     setDetalhesVendaAberta(true)
                   }}
-                  className="relative flex h-[200px] cursor-pointer flex-col items-center justify-between rounded-lg bg-info shadow-sm shadow-primary-text/50 transition-all hover:bg-primary/5 md:h-[220px] md:w-[200px] md:px-2"
+                  className="relative flex min-h-[210px] cursor-pointer flex-col items-center justify-between rounded-lg bg-info px-1 shadow-sm shadow-primary-text/50 transition-all hover:bg-primary/5 md:w-[200px]"
                 >
-                  <div className="flex flex-grow flex-col items-center justify-center">
+                  <div className="flex w-full flex-grow flex-col items-center justify-center">
                     <TipoVendaIcon
                       tipoVenda={venda.tipoVenda}
                       numeroMesa={venda.numeroMesa}
-                      size={110} // Tamanho grande para o ícone
-                      containerScale={0.9} // Reduz espaço externo do ícone
-                      corTexto="var(--color-alternate)" // Cor do texto do número da mesa
-                      corCirculoInterno={innerCircleColor} // Fundo dinâmico: branco -> amarelo
-                      corBorda="var(--color-alternate)" // Borda sempre forte (roxo)
+                      size={96}
+                      containerScale={0.9}
+                      corTexto="var(--color-alternate)"
+                      corCirculoInterno={innerCircleColor}
+                      corBorda="var(--color-alternate)"
                       className="mb-0 mt-0"
                       title={movimentoTooltip}
                     />
-                    {clienteNome ? (
-                      <span className="text-xs font-semibold text-primary-text">
-                        {clienteNome}
+                    {nomePrincipal ? (
+                      <span className="max-w-full truncate px-1 text-center text-xs font-semibold text-primary-text">
+                        {nomePrincipal}
                       </span>
                     ) : (
                       <span className="text-xs text-info">-</span>
                     )}
+                    {nomeSecundario ? (
+                      <span className="max-w-full truncate px-1 text-center text-[10px] text-secondary-text">
+                        {nomeSecundario}
+                      </span>
+                    ) : null}
+                    {compartilhada || rodizioAberto ? (
+                      <div className="mt-1 flex flex-wrap items-center justify-center gap-1">
+                        {compartilhada ? (
+                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                            Compartilhada
+                          </span>
+                        ) : null}
+                        {rodizioAberto ? (
+                          <span className="rounded-full bg-warning/40 px-2 py-0.5 text-[10px] font-semibold text-primary-text">
+                            Rodízio
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
 
-                  <div className="mb-4 flex w-full flex-col items-start px-2">
-                    <div className="flex flex-col items-start md:flex-row md:items-center">
-                      <span className="text-xs font-semibold text-primary-text">
-                        Usuário
-                      </span>{' '}
-                      <span className="text-xs font-normal">: {usuarioNome}</span>
+                  <div className="mb-3 flex w-full flex-col items-start px-2">
+                    <div className="flex w-full flex-col items-start md:flex-row md:items-center">
+                      <span className="text-xs font-semibold text-primary-text">Usuário</span>{' '}
+                      <span className="max-w-full truncate text-xs font-normal">: {usuarioNome}</span>
                     </div>
                     <div className="mt-1 flex w-full justify-between text-xs text-primary-text">
                       <div className="flex flex-col items-start">
                         <span className="font-semibold">Valor atual</span>
                         <span>{formatCurrency(venda.valorFinal)}</span>
                       </div>
-                      <div className="flex flex-col items-start">
-                        <span className="font-semibold">Aberta há</span>
-                        <span>{elapsedTime}</span>
+                      <div className="flex flex-col items-end">
+                        <span className="font-semibold">{rotuloTempo}</span>
+                        <span>{tempoExibido}</span>
                       </div>
                     </div>
                   </div>
@@ -861,7 +807,10 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
         <DetalhesVendas
           vendaId={selectedVendaId}
           open={detalhesVendaAberta}
-          onClose={() => setDetalhesVendaAberta(false)}
+          onClose={() => {
+            setDetalhesVendaAberta(false)
+            fetchVendas(true)
+          }}
           onAfterClose={() => setSelectedVendaId(null)}
         />
       ) : null}
