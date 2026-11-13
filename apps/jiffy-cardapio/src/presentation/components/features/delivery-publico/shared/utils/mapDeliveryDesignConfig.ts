@@ -40,6 +40,7 @@ export function apiDesignConfigToUi(
       corBarraTitulo: config.categorias.corBarraTitulo,
       corTextoTitulo: config.categorias.corTextoTitulo,
       mostrarNomeTitulo: config.categorias.mostrarNomeTitulo,
+      mostrarSugestoesDaCasa: config.categorias.mostrarSugestoesDaCasa,
       sugestoesDaCasaImagemUrl: config.categorias.sugestoesDaCasaImagemUrl ?? null,
     },
   }

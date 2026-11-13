@@ -28,6 +28,7 @@ export type DeliveryPublicoDesignUiModel = {
     corBarraTitulo: string | null
     corTextoTitulo: string | null
     mostrarNomeTitulo: boolean
+    mostrarSugestoesDaCasa: boolean
     sugestoesDaCasaImagemUrl: string | null
   }
 }
@@ -64,6 +65,7 @@ export function apiDesignConfigToUi(
         corBarraTitulo: defaults.categorias.corBarraTitulo,
         corTextoTitulo: defaults.categorias.corTextoTitulo,
         mostrarNomeTitulo: defaults.categorias.mostrarNomeTitulo,
+        mostrarSugestoesDaCasa: defaults.categorias.mostrarSugestoesDaCasa,
         sugestoesDaCasaImagemUrl: defaults.categorias.sugestoesDaCasaImagemUrl ?? null,
       },
     }
@@ -92,6 +94,7 @@ export function apiDesignConfigToUi(
       corBarraTitulo: config.categorias.corBarraTitulo,
       corTextoTitulo: config.categorias.corTextoTitulo,
       mostrarNomeTitulo: config.categorias.mostrarNomeTitulo,
+      mostrarSugestoesDaCasa: config.categorias.mostrarSugestoesDaCasa,
       sugestoesDaCasaImagemUrl: config.categorias.sugestoesDaCasaImagemUrl ?? null,
     },
   }
@@ -101,7 +104,6 @@ export function apiDesignConfigToUi(
 export function uiDesignConfigToApi(
   ui: DeliveryPublicoDesignUiModel
 ): DeliveryPublicoDesignConfigDTO {
-  const defaults = createDefaultDeliveryPublicoDesignConfig(ui.cabecalho.nomeExibicao)
   return deliveryPublicoDesignConfigSchema.parse({
     schemaVersion: 1,
     layoutId: ui.layoutId,
@@ -121,9 +123,7 @@ export function uiDesignConfigToApi(
       corBarraTitulo: ui.categorias.corBarraTitulo,
       corTextoTitulo: ui.categorias.corTextoTitulo,
       mostrarNomeTitulo: ui.categorias.mostrarNomeTitulo,
-      mostrarSugestoesDaCasa:
-        (ui.categorias as { mostrarSugestoesDaCasa?: boolean }).mostrarSugestoesDaCasa ??
-        defaults.categorias.mostrarSugestoesDaCasa,
+      mostrarSugestoesDaCasa: ui.categorias.mostrarSugestoesDaCasa,
       sugestoesDaCasaImagemUrl:
         stripLocalPreviewUrl(ui.categorias.sugestoesDaCasaImagemUrl) ?? null,
     },

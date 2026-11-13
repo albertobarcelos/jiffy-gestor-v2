@@ -17,15 +17,12 @@ import {
   designSectionShowsPreview,
   type DesignSectionId,
 } from '../../shared/constants/designTabs'
+import { useMigrarDesignLocalParaApi } from '@/src/presentation/hooks/useDeliveryDesignMe'
+import { designConfigLocalStorage } from '@/src/infrastructure/composition/deliveryDesignUseCases'
 import { useDeliveryDesignDraft } from '../../shared/hooks/useDeliveryDesignDraft'
 import { useDesignCategoriaGrupos } from '../../shared/hooks/useDesignCategoriaGrupos'
 import type { DesignCategoriaGrupo } from '../../shared/types/designCategoriaGrupo'
 import { mergeDesignCategoriaGrupos } from '../../shared/utils/mergeDesignCategoriaGrupos'
-import {
-  getDesignMigrationMarker,
-  markDesignMigrated,
-} from '../../shared/utils/designConfigStorage'
-import { importDesignLocalToApi } from '../../shared/utils/importDesignLocalToApi'
 import {
   isDesignLocalMigrationEnabled,
   shouldOfferDesignLocalMigration,
@@ -52,6 +49,7 @@ export function DeliveryDesignCustomizerScreen() {
   const [activeTab, setActiveTab] = useState<DesignWorkspaceTabId>('home')
   const [migrationOpen, setMigrationOpen] = useState(false)
   const [migrationBusy, setMigrationBusy] = useState(false)
+  const migrarLocal = useMigrarDesignLocalParaApi()
 
   const nomeVitrineFallback =
     (empresaDelivery?.nomeExibicao?.trim() || empresa?.nomeExibicao || '').trim()
@@ -67,8 +65,6 @@ export function DeliveryDesignCustomizerScreen() {
     restore,
     applyDefaultDesign,
     replaceFromMe,
-    salvarDraftAsync,
-    publicarAsync,
     serverPublishedAt,
     isLoading: designLoading,
     isSavingDraft,
@@ -179,8 +175,8 @@ export function DeliveryDesignCustomizerScreen() {
 
   const handleMigrationDismiss = useCallback(() => {
     if (!empresa?.id || migrationBusy) return
-    if (getDesignMigrationMarker(empresa.id) !== 'imported') {
-      markDesignMigrated(empresa.id, 'dismissed')
+    if (designConfigLocalStorage.getMarker(empresa.id) !== 'imported') {
+      designConfigLocalStorage.mark(empresa.id, 'dismissed')
     }
     setMigrationOpen(false)
   }, [empresa?.id, migrationBusy])
@@ -189,12 +185,10 @@ export function DeliveryDesignCustomizerScreen() {
     if (!empresa?.id || migrationBusy) return
     setMigrationBusy(true)
     try {
-      const me = await importDesignLocalToApi({
+      const me = await migrarLocal.mutateAsync({
         empresaId: empresa.id,
         nomeExibicaoFallback: empresa.nomeExibicao ?? '',
         slug: empresaDelivery?.slug,
-        salvarDraft: salvarDraftAsync,
-        publicar: publicarAsync,
       })
       replaceFromMe(me)
       setMigrationOpen(false)
@@ -212,10 +206,9 @@ export function DeliveryDesignCustomizerScreen() {
     empresa?.id,
     empresa?.nomeExibicao,
     empresaDelivery?.slug,
+    migrarLocal,
     migrationBusy,
-    publicarAsync,
     replaceFromMe,
-    salvarDraftAsync,
   ])
 
   const selectTab = useCallback((tabId: DesignWorkspaceTabId) => {

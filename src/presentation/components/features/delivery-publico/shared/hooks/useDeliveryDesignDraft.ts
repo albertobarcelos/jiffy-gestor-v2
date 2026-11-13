@@ -2,31 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { DeliveryPublicoDesignMeResponseDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDesignDTO'
+import { montarDesignPadraoPreservandoCabecalho } from '@/src/application/services/delivery/lerDesignLocal'
 import type { DeliveryPublicoDesignConfig } from '../types/deliveryPublicoDesignConfig'
 import { createDefaultDesignConfig } from '../constants/defaultDesignConfig'
 import { canPublishDesign, getPublishDisabledReason } from '../constants/designPublishRules'
 import { isDesignConfigEqual } from '../utils/designConfigStorage'
 import { apiDesignConfigToUi, uiDesignConfigToApi } from '../utils/mapDeliveryDesignConfig'
-
-/** Factory default preservando nome e mídia já existentes no draft. */
-function applyFactoryThemePreservingCabecalho(
-  current: DeliveryPublicoDesignConfig,
-  nomeExibicaoFallback: string
-): DeliveryPublicoDesignConfig {
-  const defaults = createDefaultDesignConfig(nomeExibicaoFallback)
-  return {
-    ...defaults,
-    cabecalho: {
-      ...defaults.cabecalho,
-      nomeExibicao: current.cabecalho.nomeExibicao,
-      logoUrl: current.cabecalho.logoUrl,
-      capaUrl: current.cabecalho.capaUrl,
-    },
-  }
-}
 import {
+  useAplicarDesignPadraoDelivery,
   useDeliveryDesignMe,
-  usePublicarDesignDelivery,
+  usePublicarLayoutDesignDelivery,
+  useRestaurarDraftDesignDelivery,
   useSalvarDraftDesignDelivery,
 } from '@/src/presentation/hooks/useDeliveryDesignMe'
 
@@ -48,7 +34,9 @@ export function useDeliveryDesignDraft({
 }: UseDeliveryDesignDraftOptions) {
   const designQuery = useDeliveryDesignMe(Boolean(empresaId) && enabled)
   const salvarDraftMutation = useSalvarDraftDesignDelivery()
-  const publicarMutation = usePublicarDesignDelivery()
+  const publicarLayoutMutation = usePublicarLayoutDesignDelivery()
+  const restaurarMutation = useRestaurarDraftDesignDelivery()
+  const aplicarPadraoMutation = useAplicarDesignPadraoDelivery()
 
   const [draft, setDraft] = useState<DeliveryPublicoDesignConfig>(() =>
     createDefaultDesignConfig(nomeExibicaoFallback)
@@ -130,12 +118,10 @@ export function useDeliveryDesignDraft({
       )
     }
 
-    const payload = uiDesignConfigToApi(draft)
     lockAutosaveRef.current = true
 
     try {
-      await salvarDraftMutation.mutateAsync(payload)
-      const result = await publicarMutation.mutateAsync(payload)
+      const result = await publicarLayoutMutation.mutateAsync(uiDesignConfigToApi(draft))
 
       const uiPublished = apiDesignConfigToUi(result.published, nomeExibicaoFallback)
       const uiDraft = apiDesignConfigToUi(result.draft, nomeExibicaoFallback)
@@ -145,33 +131,35 @@ export function useDeliveryDesignDraft({
     } finally {
       lockAutosaveRef.current = false
     }
-  }, [draft, nomeExibicaoFallback, publicarMutation, salvarDraftMutation])
+  }, [draft, nomeExibicaoFallback, publicarLayoutMutation])
 
   const restore = useCallback(async () => {
     lockAutosaveRef.current = true
     try {
       skipAutosaveRef.current = true
       setDraft(published)
-      const payload = uiDesignConfigToApi(published)
-      await salvarDraftMutation.mutateAsync(payload)
+      await restaurarMutation.mutateAsync(published)
     } finally {
       lockAutosaveRef.current = false
     }
-  }, [published, salvarDraftMutation])
+  }, [published, restaurarMutation])
 
   const applyDefaultDesign = useCallback(async () => {
-    const next = applyFactoryThemePreservingCabecalho(draft, nomeExibicaoFallback)
+    const next = montarDesignPadraoPreservandoCabecalho(draft, nomeExibicaoFallback)
     if (isDesignConfigEqual(draft, next)) return
 
     lockAutosaveRef.current = true
     try {
       skipAutosaveRef.current = true
       setDraft(next)
-      await salvarDraftMutation.mutateAsync(uiDesignConfigToApi(next))
+      await aplicarPadraoMutation.mutateAsync({
+        draft,
+        nomeExibicaoFallback,
+      })
     } finally {
       lockAutosaveRef.current = false
     }
-  }, [draft, nomeExibicaoFallback, salvarDraftMutation])
+  }, [aplicarPadraoMutation, draft, nomeExibicaoFallback])
 
   const replaceFromMe = useCallback(
     (me: DeliveryPublicoDesignMeResponseDTO) => {
@@ -189,7 +177,7 @@ export function useDeliveryDesignDraft({
     () =>
       isDesignConfigEqual(
         draft,
-        applyFactoryThemePreservingCabecalho(draft, nomeExibicaoFallback)
+        montarDesignPadraoPreservandoCabecalho(draft, nomeExibicaoFallback)
       ),
     [draft, nomeExibicaoFallback]
   )
@@ -205,15 +193,16 @@ export function useDeliveryDesignDraft({
     restore,
     applyDefaultDesign,
     replaceFromMe,
-    salvarDraftAsync: salvarDraftMutation.mutateAsync,
-    publicarAsync: publicarMutation.mutateAsync,
     serverPublishedAt: designQuery.data?.publishedAt ?? null,
     isLoading:
       designQuery.isPending || (Boolean(empresaId) && !hydrated && !designQuery.isError),
     isError: designQuery.isError,
     error: designQuery.error,
     refetch: designQuery.refetch,
-    isSavingDraft: salvarDraftMutation.isPending,
-    isPublishing: publicarMutation.isPending,
+    isSavingDraft:
+      salvarDraftMutation.isPending ||
+      restaurarMutation.isPending ||
+      aplicarPadraoMutation.isPending,
+    isPublishing: publicarLayoutMutation.isPending,
   }
 }

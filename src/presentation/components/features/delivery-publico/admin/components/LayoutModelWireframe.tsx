@@ -87,7 +87,7 @@ function CatalogoWireframe() {
         <BlockSoft className="h-2 w-1/4" />
         <BlockSoft className="h-2 w-1/4" />
       </div>
-      {Array.from({ length: 2 }).map(row => (
+      {Array.from({ length: 2 }).map((_, row) => (
         <div key={row} className="space-y-1">
           <BlockSoft className="h-1.5 w-1/3" />
           <div className="flex gap-1 overflow-hidden">

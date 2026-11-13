@@ -2,13 +2,11 @@
 
 import { useCallback, useState } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { fetchEmpresaPublicaMidia } from '@/src/infrastructure/api/empresaDeliveryMidiaApi'
+import { mensagemLegivelDesignMidia } from '../../shared/utils/mensagemLegivelDesignMidia'
 import {
-  mensagemLegivelDeliveryMediaError,
-  uploadEmpresaDeliveryBanner,
-  uploadEmpresaDeliveryLogo,
-} from '@/src/infrastructure/api/deliveryMediaApi'
-import {
+  buscarMidiaPublicaDesignUseCase,
+  enviarCapaDesignDeliveryUseCase,
+  enviarLogoDesignDeliveryUseCase,
   limparBannerEmpresaDeliveryUseCase,
   limparLogoEmpresaDeliveryUseCase,
 } from '@/src/infrastructure/composition/deliveryDesignUseCases'
@@ -92,9 +90,9 @@ export function useDesignCabecalhoMidia({
 
       try {
         if (field === 'logoUrl') {
-          await uploadEmpresaDeliveryLogo(file, token)
+          await enviarLogoDesignDeliveryUseCase.execute(file, token)
         } else {
-          await uploadEmpresaDeliveryBanner(file, token)
+          await enviarCapaDesignDeliveryUseCase.execute(file, token)
         }
 
         let persistedUrl: string | null = null
@@ -103,7 +101,7 @@ export function useDesignCabecalhoMidia({
             await new Promise(resolve => window.setTimeout(resolve, 350 * attempt))
           }
           const { logoUrl: apiLogo, bannerUrl: apiBanner } =
-            await fetchEmpresaPublicaMidia(trimmedSlug)
+            await buscarMidiaPublicaDesignUseCase.execute(trimmedSlug)
           persistedUrl = field === 'logoUrl' ? apiLogo : apiBanner
           if (persistedUrl?.trim()) break
         }
@@ -126,7 +124,7 @@ export function useDesignCabecalhoMidia({
       } catch (error) {
         revokeBlobUrl(preview)
         updateCabecalhoField(field, previousUrl ?? null)
-        showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+        showToast.errorLoading(toastId, mensagemLegivelDesignMidia(error))
       } finally {
         setUploading(false)
       }
@@ -183,7 +181,7 @@ export function useDesignCabecalhoMidia({
           field === 'logoUrl' ? 'Logo removido.' : 'Capa removida.'
         )
       } catch (error) {
-        showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+        showToast.errorLoading(toastId, mensagemLegivelDesignMidia(error))
       } finally {
         setClearing(false)
       }

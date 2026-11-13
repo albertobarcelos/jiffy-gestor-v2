@@ -27,6 +27,7 @@ export function createDefaultDesignConfig(nomeExibicao = ''): DeliveryPublicoDes
       corBarraTitulo: null,
       corTextoTitulo: null,
       mostrarNomeTitulo: true,
+      mostrarSugestoesDaCasa: true,
       sugestoesDaCasaImagemUrl: null,
     },
   }

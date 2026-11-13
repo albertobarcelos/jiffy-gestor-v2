@@ -50,6 +50,20 @@ describe('DeliveryDesignConfigMapper', () => {
     expect(api.cabecalho.capaUrl).toBeNull()
   })
 
+  it('preserva mostrarSugestoesDaCasa false no round-trip', () => {
+    const dto = createDefaultDeliveryPublicoDesignConfig('Loja')
+    const withFlag = {
+      ...dto,
+      categorias: {
+        ...dto.categorias,
+        mostrarSugestoesDaCasa: false,
+      },
+    }
+    const ui = apiDesignConfigToUi(withFlag, 'Loja')
+    expect(ui.categorias.mostrarSugestoesDaCasa).toBe(false)
+    expect(uiDesignConfigToApi(ui).categorias.mostrarSugestoesDaCasa).toBe(false)
+  })
+
   it('preserva URL http no round-trip', () => {
     const dto = createDefaultDeliveryPublicoDesignConfig('Loja')
     const withUrl = {

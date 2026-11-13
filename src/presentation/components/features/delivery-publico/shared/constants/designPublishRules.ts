@@ -1,15 +1,14 @@
-import { validarPublicacaoDesign } from '@/src/application/services/delivery/validarPublicacaoDesign'
 import { uiDesignConfigToApi } from '@/src/application/mappers/DeliveryDesignConfigMapper'
+import { validarPublicacaoDesign } from '@/src/application/services/delivery/validarPublicacaoDesign'
+import { PodePublicarDesignDeliveryPolicy } from '@/src/domain/delivery/policies/PodePublicarDesignDeliveryPolicy'
 import type { DeliveryPublicoDesignConfig } from '../types/deliveryPublicoDesignConfig'
 
 /**
- * Gate de UX: delega para `validarPublicacaoDesign` (fonte única no FE).
- * Backend continua sendo a fonte da verdade no publish.
+ * Gate de UX. A policy de domínio decide; o backend continua sendo a fonte no publish.
  */
 export function canPublishDesign(config: DeliveryPublicoDesignConfig): boolean {
   try {
-    validarPublicacaoDesign(uiDesignConfigToApi(config))
-    return true
+    return PodePublicarDesignDeliveryPolicy.check(uiDesignConfigToApi(config))
   } catch {
     return false
   }

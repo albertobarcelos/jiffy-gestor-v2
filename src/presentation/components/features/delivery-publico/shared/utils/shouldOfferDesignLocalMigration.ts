@@ -1,10 +1,6 @@
+import { deveOferecerMigracaoDesignLocal } from '@/src/application/services/delivery/deveOferecerMigracaoDesignLocal'
+import { designConfigLocalStorage } from '@/src/infrastructure/composition/deliveryDesignUseCases'
 import type { DeliveryPublicoDesignConfig } from '../types/deliveryPublicoDesignConfig'
-import {
-  getDesignMigrationMarker,
-  hasDesignStorage,
-  isEssentiallyDefaultDesign,
-  readDesignStorage,
-} from './designConfigStorage'
 
 export type ShouldOfferDesignLocalMigrationInput = {
   empresaId: string
@@ -22,24 +18,7 @@ export type ShouldOfferDesignLocalMigrationInput = {
 export function shouldOfferDesignLocalMigration(
   input: ShouldOfferDesignLocalMigrationInput
 ): boolean {
-  if (typeof localStorage === 'undefined') return false
-  if (getDesignMigrationMarker(input.empresaId)) return false
-  if (!hasDesignStorage(input.empresaId)) return false
-  if (input.publishedAt != null) return false
-
-  const nome = input.nomeExibicaoFallback ?? ''
-  if (
-    !isEssentiallyDefaultDesign(input.serverDraft, nome) ||
-    !isEssentiallyDefaultDesign(input.serverPublished, nome)
-  ) {
-    return false
-  }
-
-  const local = readDesignStorage(input.empresaId, nome)
-  return (
-    !isEssentiallyDefaultDesign(local.draft, nome) ||
-    !isEssentiallyDefaultDesign(local.published, nome)
-  )
+  return deveOferecerMigracaoDesignLocal(designConfigLocalStorage, input)
 }
 
 /** Migração local ligada por padrão; `NEXT_PUBLIC_DESIGN_MIGRATE_LOCAL=0` desliga. */

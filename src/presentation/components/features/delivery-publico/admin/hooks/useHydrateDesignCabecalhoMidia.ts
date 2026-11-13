@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { fetchEmpresaPublicaMidia } from '@/src/infrastructure/api/empresaDeliveryMidiaApi'
+import { buscarMidiaPublicaDesignUseCase } from '@/src/infrastructure/composition/deliveryDesignUseCases'
 import type { DeliveryPublicoDesignConfig } from '../../shared/types/deliveryPublicoDesignConfig'
 
 function isPersistedImageUrl(url: string | null | undefined): url is string {
@@ -45,7 +45,7 @@ export function useHydrateDesignCabecalhoMidia({
 
     let cancelled = false
 
-    void fetchEmpresaPublicaMidia(trimmedSlug)
+    void buscarMidiaPublicaDesignUseCase.execute(trimmedSlug)
       .then(({ logoUrl: apiLogo, bannerUrl: apiBanner }) => {
         if (cancelled) return
 
