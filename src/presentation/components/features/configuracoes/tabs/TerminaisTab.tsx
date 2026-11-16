@@ -50,7 +50,7 @@ const TERMINAIS_COL_HEADER =
   'font-semibold text-[10px] leading-tight text-primary-text uppercase'
 
 const TERMINAIS_GRID =
-  'grid items-center gap-x-2 min-w-[98rem] [grid-template-columns:minmax(6.5rem,1.1fr)_minmax(7rem,1.3fr)_minmax(6rem,1fr)_3.5rem_minmax(7rem,1fr)_minmax(8.5rem,1.1fr)_repeat(9,5.5rem)_2.5rem]'
+  'grid items-center gap-x-2 min-w-[80rem] [grid-template-columns:minmax(6.5rem,1.1fr)_minmax(7rem,1.3fr)_minmax(6rem,1fr)_3.5rem_minmax(7rem,1fr)_minmax(8.5rem,1.1fr)_repeat(6,5.5rem)_2.5rem]'
 
 const OPCOES_TERMINAL_COLUNAS = [
   {
@@ -70,24 +70,6 @@ const OPCOES_TERMINAL_COLUNAS = [
     label: 'Leitor de barras',
     header: 'Leitor de\nbarras',
     hint: 'Liga ou desliga o leitor de código de barras',
-  },
-  {
-    key: 'finalizaDireto',
-    label: 'Finalização direta',
-    header: 'Finalização\ndireta',
-    hint: 'Finaliza sem abrir o modal de opções depois do pagamento',
-  },
-  {
-    key: 'imprimeFinalizacao',
-    label: 'Imprimir cupom',
-    header: 'Imprimir\ncupom',
-    hint: 'Com a finalização direta ligada, define se o cupom sai na hora',
-  },
-  {
-    key: 'finalizaAutomatico',
-    label: 'Finalização automática',
-    header: 'Finalização\nautomática',
-    hint: 'Finaliza sozinho depois do último pagamento no TEF',
   },
   {
     key: 'stoneTexto',
@@ -186,9 +168,6 @@ interface TerminalPreferenceData {
   impressoraFinalizacaoId?: string
   fiscalAtivo: boolean
   leitorHabilitado: boolean
-  finalizaDireto: boolean
-  finalizaAutomatico: boolean
-  imprimeFinalizacao: boolean
   finalizaUltimoTef: boolean
   remoteLoggingEnabled: boolean
   modoImpressaoFechamentoStone: string | null
@@ -220,9 +199,6 @@ function rawToPreferenceData(data: any): TerminalPreferenceData {
     impressoraFinalizacaoId: impressoraId,
     fiscalAtivo: !!data.fiscalAtivo,
     leitorHabilitado: !!data.leitorHabilitado,
-    finalizaDireto: !!data.finalizaDireto,
-    finalizaAutomatico: !!data.finalizaAutomatico,
-    imprimeFinalizacao: !!data.imprimeFinalizacao,
     finalizaUltimoTef:
       typeof data.finalizaUltimoTef === 'boolean'
         ? data.finalizaUltimoTef
@@ -239,9 +215,6 @@ const DEFAULT_TERMINAL_PREFERENCES: TerminalPreferenceData = {
   impressoraFinalizacaoId: undefined,
   fiscalAtivo: false,
   leitorHabilitado: false,
-  finalizaDireto: false,
-  finalizaAutomatico: false,
-  imprimeFinalizacao: false,
   finalizaUltimoTef: false,
   remoteLoggingEnabled: false,
   modoImpressaoFechamentoStone: null,
@@ -601,9 +574,6 @@ export function TerminaisTab() {
           impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId, // Preserva o ID da impressora
           fiscalAtivo: prev[terminalId]?.fiscalAtivo ?? false,
           leitorHabilitado: prev[terminalId]?.leitorHabilitado ?? false,
-          finalizaDireto: prev[terminalId]?.finalizaDireto ?? false,
-          finalizaAutomatico: prev[terminalId]?.finalizaAutomatico ?? false,
-          imprimeFinalizacao: prev[terminalId]?.imprimeFinalizacao ?? false,
           modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
           finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
           remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
@@ -651,9 +621,6 @@ export function TerminaisTab() {
             impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId, // Preserva o ID da impressora
             fiscalAtivo: prev[terminalId]?.fiscalAtivo ?? false,
             leitorHabilitado: prev[terminalId]?.leitorHabilitado ?? false,
-          finalizaDireto: prev[terminalId]?.finalizaDireto ?? false,
-          finalizaAutomatico: prev[terminalId]?.finalizaAutomatico ?? false,
-          imprimeFinalizacao: prev[terminalId]?.imprimeFinalizacao ?? false,
           modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
           finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
           remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
@@ -686,9 +653,6 @@ export function TerminaisTab() {
           impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId,
           fiscalAtivo: novoValor,
           leitorHabilitado: prev[terminalId]?.leitorHabilitado ?? false,
-          finalizaDireto: prev[terminalId]?.finalizaDireto ?? false,
-          finalizaAutomatico: prev[terminalId]?.finalizaAutomatico ?? false,
-          imprimeFinalizacao: prev[terminalId]?.imprimeFinalizacao ?? false,
           modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
           finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
           remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
@@ -733,9 +697,6 @@ export function TerminaisTab() {
             impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId,
             fiscalAtivo: !novoValor,
             leitorHabilitado: prev[terminalId]?.leitorHabilitado ?? false,
-          finalizaDireto: prev[terminalId]?.finalizaDireto ?? false,
-          finalizaAutomatico: prev[terminalId]?.finalizaAutomatico ?? false,
-          imprimeFinalizacao: prev[terminalId]?.imprimeFinalizacao ?? false,
           modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
           finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
           remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
@@ -768,9 +729,6 @@ export function TerminaisTab() {
           impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId,
           fiscalAtivo: prev[terminalId]?.fiscalAtivo ?? false,
           leitorHabilitado: novoValor,
-          finalizaDireto: prev[terminalId]?.finalizaDireto ?? false,
-          finalizaAutomatico: prev[terminalId]?.finalizaAutomatico ?? false,
-          imprimeFinalizacao: prev[terminalId]?.imprimeFinalizacao ?? false,
           modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
           finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
           remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
@@ -815,12 +773,9 @@ export function TerminaisTab() {
             impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId,
             fiscalAtivo: prev[terminalId]?.fiscalAtivo ?? false,
             leitorHabilitado: !novoValor,
-          finalizaDireto: prev[terminalId]?.finalizaDireto ?? false,
-          finalizaAutomatico: prev[terminalId]?.finalizaAutomatico ?? false,
-          imprimeFinalizacao: prev[terminalId]?.imprimeFinalizacao ?? false,
-          modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
-          finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
-          remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
+            modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
+            finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
+            remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
           },
         }))
       } finally {
@@ -920,9 +875,6 @@ export function TerminaisTab() {
           impressoraFinalizacaoId: impressoraId || undefined,
           fiscalAtivo: prev[terminalId]?.fiscalAtivo ?? false,
           leitorHabilitado: prev[terminalId]?.leitorHabilitado ?? false,
-          finalizaDireto: prev[terminalId]?.finalizaDireto ?? false,
-          finalizaAutomatico: prev[terminalId]?.finalizaAutomatico ?? false,
-          imprimeFinalizacao: prev[terminalId]?.imprimeFinalizacao ?? false,
           modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
           finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
           remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
@@ -957,9 +909,6 @@ export function TerminaisTab() {
             impressoraFinalizacaoId: prev[terminalId]?.impressoraFinalizacaoId,
             fiscalAtivo: prev[terminalId]?.fiscalAtivo ?? false,
             leitorHabilitado: prev[terminalId]?.leitorHabilitado ?? false,
-          finalizaDireto: prev[terminalId]?.finalizaDireto ?? false,
-          finalizaAutomatico: prev[terminalId]?.finalizaAutomatico ?? false,
-          imprimeFinalizacao: prev[terminalId]?.imprimeFinalizacao ?? false,
           modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
           finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
           remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
@@ -1329,51 +1278,6 @@ export function TerminaisTab() {
                 onChange={ligado => handleToggleLeitorCodigoBarras(terminal.getId(), ligado)}
               />
               <OpcaoTerminalColuna
-                label="Finalização direta"
-                hint="Finaliza sem abrir o modal de opções depois do pagamento"
-                checked={prefs.finalizaDireto}
-                disabled={finalizacaoOcupada('finalizaDireto')}
-                onChange={ligado =>
-                  void salvarCampoFinalizacao(
-                    terminal.getId(),
-                    'finalizaDireto',
-                    { finalizaDireto: ligado },
-                    { finalizaDireto: ligado },
-                    'Finalização direta atualizada!'
-                  )
-                }
-              />
-              <OpcaoTerminalColuna
-                label="Imprimir cupom"
-                hint="Com a finalização direta ligada, define se o cupom sai na hora"
-                checked={prefs.imprimeFinalizacao}
-                disabled={finalizacaoOcupada('imprimeFinalizacao')}
-                onChange={ligado =>
-                  void salvarCampoFinalizacao(
-                    terminal.getId(),
-                    'imprimeFinalizacao',
-                    { imprimeFinalizacao: ligado },
-                    { imprimeFinalizacao: ligado },
-                    'Impressão da finalização atualizada!'
-                  )
-                }
-              />
-              <OpcaoTerminalColuna
-                label="Finalização automática"
-                hint="Finaliza sozinho depois do último pagamento no TEF"
-                checked={prefs.finalizaAutomatico}
-                disabled={finalizacaoOcupada('finalizaAutomatico')}
-                onChange={ligado =>
-                  void salvarCampoFinalizacao(
-                    terminal.getId(),
-                    'finalizaAutomatico',
-                    { finalizaAutomatico: ligado, finalizaUltimoTef: ligado },
-                    { finalizaAutomatico: ligado },
-                    'Finalização automática atualizada!'
-                  )
-                }
-              />
-              <OpcaoTerminalColuna
                 label="Stone em texto"
                 hint={
                   stoneLigado
@@ -1404,7 +1308,7 @@ export function TerminaisTab() {
                   void salvarCampoFinalizacao(
                     terminal.getId(),
                     'finalizaUltimoTef',
-                    { finalizaUltimoTef: ligado, finalizaAutomatico: ligado },
+                    { finalizaUltimoTef: ligado },
                     { finalizaUltimoTef: ligado },
                     'Finalização no último TEF atualizada!'
                   )
