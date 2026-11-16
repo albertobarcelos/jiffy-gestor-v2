@@ -35,12 +35,12 @@ const sxOutlinedLabelTextoEscuro = {
 } as const
 
 const entradaCompactaInput = {
-  padding: '12px 10px',
+  padding: '8px 10px',
   fontSize: '0.875rem',
 } as const
 
 const entradaCompactaSelect = {
-  padding: '12px 10px',
+  padding: '8px 10px',
   fontSize: '0.875rem',
   minHeight: '1.5em',
   lineHeight: 1.4,
@@ -85,14 +85,34 @@ interface EditarTerminaisProps {
 /** Valor que o PDV trata como impressão Stone em texto na finalização. */
 const MODO_IMPRESSAO_STONE_TEXTO = 'texto'
 
+type ModoImpressaoFinalizacao = 'perguntar' | 'imprimir' | 'naoImprimir'
+
+const MODOS_IMPRESSAO_FINALIZACAO: { value: ModoImpressaoFinalizacao; label: string }[] = [
+  { value: 'perguntar', label: 'Perguntar' },
+  { value: 'imprimir', label: 'Imprimir' },
+  { value: 'naoImprimir', label: 'Não imprimir' },
+]
+
+function isModoImpressaoFinalizacao(valor: unknown): valor is ModoImpressaoFinalizacao {
+  return valor === 'perguntar' || valor === 'imprimir' || valor === 'naoImprimir'
+}
+
+function modoFromLegacy(
+  finalizaDireto: boolean,
+  imprimeFinalizacao: boolean
+): ModoImpressaoFinalizacao {
+  if (!finalizaDireto) return 'perguntar'
+  return imprimeFinalizacao ? 'imprimir' : 'naoImprimir'
+}
+
 /** Preferências padrão alinhadas ao CreateTerminalUseCase do backend. */
 const CREATE_DEFAULT_PREFS = {
   compartilharMesas: true,
   fiscalAtivo: true,
   leitorHabilitado: false,
-  finalizaDireto: false,
-  finalizaAutomatico: false,
-  imprimeFinalizacao: false,
+  modoImpressaoFinalizacao: 'perguntar' as ModoImpressaoFinalizacao,
+  finalizaUltimoTef: false,
+  remoteLoggingEnabled: false,
   modoImpressaoFechamentoStone: null as string | null,
   senhaNumeroMin: '1',
   senhaNumeroMax: '1000',
@@ -141,6 +161,9 @@ interface TerminalPreferences {
   finalizaDireto?: boolean
   finalizaAutomatico?: boolean
   imprimeFinalizacao?: boolean
+  modoImpressaoFinalizacao?: ModoImpressaoFinalizacao
+  finalizaUltimoTef?: boolean
+  remoteLoggingEnabled?: boolean
   modoImpressaoFechamentoStone?: string | null
   senhaNumeroMin?: number
   senhaNumeroMax?: number
@@ -201,14 +224,15 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
   const [leitorCodigoBarrasValue, setLeitorCodigoBarrasValue] = useState<boolean>(
     isCreate ? CREATE_DEFAULT_PREFS.leitorHabilitado : false
   )
-  const [finalizaDireto, setFinalizaDireto] = useState<boolean>(
-    isCreate ? CREATE_DEFAULT_PREFS.finalizaDireto : false
+  const [modoImpressaoFinalizacao, setModoImpressaoFinalizacao] =
+    useState<ModoImpressaoFinalizacao>(
+      isCreate ? CREATE_DEFAULT_PREFS.modoImpressaoFinalizacao : 'perguntar'
+    )
+  const [finalizaUltimoTef, setFinalizaUltimoTef] = useState<boolean>(
+    isCreate ? CREATE_DEFAULT_PREFS.finalizaUltimoTef : false
   )
-  const [finalizaAutomatico, setFinalizaAutomatico] = useState<boolean>(
-    isCreate ? CREATE_DEFAULT_PREFS.finalizaAutomatico : false
-  )
-  const [imprimeFinalizacao, setImprimeFinalizacao] = useState<boolean>(
-    isCreate ? CREATE_DEFAULT_PREFS.imprimeFinalizacao : false
+  const [remoteLoggingEnabled, setRemoteLoggingEnabled] = useState<boolean>(
+    isCreate ? CREATE_DEFAULT_PREFS.remoteLoggingEnabled : false
   )
   const [modoImpressaoFechamentoStone, setModoImpressaoFechamentoStone] = useState<string | null>(
     isCreate ? CREATE_DEFAULT_PREFS.modoImpressaoFechamentoStone : null
@@ -240,9 +264,9 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
       compartilhaValue,
       fiscalAtivoValue,
       leitorCodigoBarrasValue,
-      finalizaDireto,
-      finalizaAutomatico,
-      imprimeFinalizacao,
+      modoImpressaoFinalizacao,
+      finalizaUltimoTef,
+      remoteLoggingEnabled,
       modoImpressaoFechamentoStone,
       senhaNumeroMin,
       senhaNumeroMax,
@@ -257,9 +281,9 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
     compartilhaValue,
     fiscalAtivoValue,
     leitorCodigoBarrasValue,
-    finalizaDireto,
-    finalizaAutomatico,
-    imprimeFinalizacao,
+    modoImpressaoFinalizacao,
+    finalizaUltimoTef,
+    remoteLoggingEnabled,
     modoImpressaoFechamentoStone,
     senhaNumeroMin,
     senhaNumeroMax,
@@ -386,9 +410,16 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
       setCompartilhaValue(data.compartilharMesas || false)
       setFiscalAtivoValue(!!data.fiscalAtivo)
       setLeitorCodigoBarrasValue(!!data.leitorHabilitado)
-      setFinalizaDireto(!!data.finalizaDireto)
-      setFinalizaAutomatico(!!data.finalizaAutomatico)
-      setImprimeFinalizacao(!!data.imprimeFinalizacao)
+      const modo = isModoImpressaoFinalizacao(data.modoImpressaoFinalizacao)
+        ? data.modoImpressaoFinalizacao
+        : modoFromLegacy(!!data.finalizaDireto, !!data.imprimeFinalizacao)
+      const ultimoTef =
+        typeof data.finalizaUltimoTef === 'boolean'
+          ? data.finalizaUltimoTef
+          : !!data.finalizaAutomatico
+      setModoImpressaoFinalizacao(modo)
+      setFinalizaUltimoTef(ultimoTef)
+      setRemoteLoggingEnabled(!!data.remoteLoggingEnabled)
       setModoImpressaoFechamentoStone(modoStoneFromApi(data.modoImpressaoFechamentoStone))
       setSenhaNumeroMin(formatSenhaNumeroFromApi(data.senhaNumeroMin))
       setSenhaNumeroMax(formatSenhaNumeroFromApi(data.senhaNumeroMax))
@@ -453,9 +484,9 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
       compartilharMesas: compartilhaValue,
       fiscalAtivo: fiscalAtivoValue,
       leitorHabilitado: leitorCodigoBarrasValue,
-      finalizaDireto,
-      finalizaAutomatico,
-      imprimeFinalizacao,
+      modoImpressaoFinalizacao,
+      finalizaUltimoTef,
+      remoteLoggingEnabled,
       modoImpressaoFechamentoStone,
     }
     const min = parseSenhaNumeroInput(senhaNumeroMin)
@@ -513,9 +544,9 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
           compartilhaValue !== CREATE_DEFAULT_PREFS.compartilharMesas ||
           fiscalAtivoValue !== CREATE_DEFAULT_PREFS.fiscalAtivo ||
           leitorCodigoBarrasValue !== CREATE_DEFAULT_PREFS.leitorHabilitado ||
-          finalizaDireto !== CREATE_DEFAULT_PREFS.finalizaDireto ||
-          finalizaAutomatico !== CREATE_DEFAULT_PREFS.finalizaAutomatico ||
-          imprimeFinalizacao !== CREATE_DEFAULT_PREFS.imprimeFinalizacao ||
+          modoImpressaoFinalizacao !== CREATE_DEFAULT_PREFS.modoImpressaoFinalizacao ||
+          finalizaUltimoTef !== CREATE_DEFAULT_PREFS.finalizaUltimoTef ||
+          remoteLoggingEnabled !== CREATE_DEFAULT_PREFS.remoteLoggingEnabled ||
           modoImpressaoFechamentoStone !== CREATE_DEFAULT_PREFS.modoImpressaoFechamentoStone ||
           senhaNumeroMin !== CREATE_DEFAULT_PREFS.senhaNumeroMin ||
           senhaNumeroMax !== CREATE_DEFAULT_PREFS.senhaNumeroMax ||
@@ -646,15 +677,15 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
           {/* Conteúdo com scroll */}
           <div className="flex-1 overflow-y-auto px-[20px]">
             {/* Informações gerais — título com linha à direita (padrão NovoMeioPagamento) */}
-            <div className="mb-2 rounded-[12px] bg-info px-2 md:p-5">
-              <div className="mb-2 flex items-center gap-5">
+            <div className="mb-2 rounded-[12px] bg-info px-2 py-2 md:px-5 md:py-3">
+              <div className="mb-1.5 flex items-center gap-5">
                 <h2 className="shrink-0 text-sm font-semibold text-primary md:text-xl">
                   Informações Gerais
                 </h2>
                 <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
               </div>
 
-              <div className="mb-4 flex items-center gap-3">
+              <div className="mb-2 flex items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-custom-2">
                   <MdPhone className="text-primary" size={20} />
                 </div>
@@ -663,7 +694,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                 </span>
               </div>
 
-              <div className="space-y-5">
+              <div className="space-y-2">
                 <UppercaseLocaleInput
                   label="Nome do Terminal"
                   value={nomeTerminal}
@@ -687,7 +718,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                   onChange={setMenuPrincipalId}
                 />
 
-                <div className="flex flex-col gap-6 md:flex-row">
+                <div className="flex flex-col gap-2 md:flex-row md:gap-3">
                   <Input
                     label="Modelo do Dispositivo"
                     value={isCreate ? '' : modeloDispositivo}
@@ -711,17 +742,17 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
             </div>
 
             {/* Preferências — mesmo padrão de título + linha */}
-            <div className="mb-2 rounded-[12px] bg-info p-2 md:px-5">
-              <div className="mb-2 flex items-center gap-5">
+            <div className="mb-2 rounded-[12px] bg-info px-2 py-2 md:px-5 md:py-3">
+              <div className="mb-1.5 flex items-center gap-5">
                 <h2 className="shrink-0 text-sm font-semibold text-primary md:text-xl">
                   Preferências do Terminal
                 </h2>
                 <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
               </div>
 
-              <div className="flex flex-col gap-2 md:flex-row md:items-start">
-                <div className="flex-1 space-y-2">
-                  <div className="rounded-lg p-2">
+              <div className="flex flex-col gap-1 md:flex-row md:items-start">
+                <div className="flex-1 space-y-1">
+                  <div className="rounded-lg px-2 py-1">
                     <JiffyIconSwitch
                       checked={compartilhaValue}
                       onChange={e => setCompartilhaValue(e.target.checked)}
@@ -736,7 +767,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                         </span>
                       }
                       size="sm"
-                      className="w-full flex-row items-start justify-between gap-3"
+                      className="w-fit flex-row items-start gap-4"
                       inputProps={{ 'aria-label': 'Compartilhamento de mesas' }}
                     />
                   </div>
@@ -756,7 +787,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                   ) : null}
                 </div>
 
-                <div className="flex-1 rounded-lg p-2">
+                <div className="flex-1 rounded-lg px-2 py-1">
                   <JiffyIconSwitch
                     checked={fiscalAtivoValue}
                     onChange={e => setFiscalAtivoValue(e.target.checked)}
@@ -771,12 +802,12 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                       </span>
                     }
                     size="sm"
-                    className="w-full flex-row items-start justify-between gap-3"
+                    className="w-fit flex-row items-start gap-4"
                     inputProps={{ 'aria-label': 'Fiscal ativo no terminal PDV' }}
                   />
                 </div>
 
-                <div className="flex-1 rounded-lg p-2">
+                <div className="flex-1 rounded-lg px-2 py-1">
                   <JiffyIconSwitch
                     checked={leitorCodigoBarrasValue}
                     onChange={e => setLeitorCodigoBarrasValue(e.target.checked)}
@@ -791,78 +822,81 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                       </span>
                     }
                     size="sm"
-                    className="w-full flex-row items-start justify-between gap-3"
+                    className="w-fit flex-row items-start gap-4"
                     inputProps={{ 'aria-label': 'Leitor de código de barras no terminal' }}
                   />
                 </div>
               </div>
 
-              <div className="mt-6 w-full">
-                <div className="mb-3 flex items-center gap-5">
+              <div className="mt-3 w-full">
+                <div className="mb-1.5 flex items-center gap-5">
                   <h3 className="shrink-0 text-sm font-semibold text-primary-text">
                     Finalização da venda
                   </h3>
                   <div className="h-px min-w-0 flex-1 bg-primary/40" aria-hidden />
                 </div>
-                <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-start">
-                  <div className="min-w-[220px] flex-1 rounded-lg p-2">
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                  <Input
+                    select
+                    label="Modo de impressão na finalização"
+                    value={modoImpressaoFinalizacao}
+                    onChange={e => {
+                      const modo = e.target.value
+                      if (!isModoImpressaoFinalizacao(modo)) return
+                      setModoImpressaoFinalizacao(modo)
+                    }}
+                    size="small"
+                    className="bg-info"
+                    sx={sxEntradaTerminal}
+                    InputLabelProps={{ shrink: true }}
+                  >
+                    {MODOS_IMPRESSAO_FINALIZACAO.map(opcao => (
+                      <MenuItem key={opcao.value} value={opcao.value}>
+                        {opcao.label}
+                      </MenuItem>
+                    ))}
+                  </Input>
+                  <div className="rounded-lg px-2 py-1">
                     <JiffyIconSwitch
-                      checked={finalizaDireto}
-                      onChange={e => setFinalizaDireto(e.target.checked)}
+                      checked={finalizaUltimoTef}
+                      onChange={e => setFinalizaUltimoTef(e.target.checked)}
                       label={
                         <span className="flex max-w-[min(100%,20rem)] flex-col gap-0.5 text-left">
                           <span className="text-sm font-semibold text-primary-text">
-                            Finalização direta
+                            Finalizar no último TEF
                           </span>
                           <span className="text-xs font-normal text-secondary-text">
-                            Finaliza sem abrir o modal de opções depois do pagamento
+                            No último pagamento TEF que quita a venda, finaliza direto
                           </span>
                         </span>
                       }
                       size="sm"
-                      className="w-full flex-row items-start justify-between gap-3"
-                      inputProps={{ 'aria-label': 'Finalização direta' }}
+                      className="w-fit flex-row items-start gap-4"
+                      inputProps={{ 'aria-label': 'Finalizar no último TEF' }}
                     />
                   </div>
-                  <div className="min-w-[220px] flex-1 rounded-lg p-2">
+                  <div className="rounded-lg px-2 py-1">
                     <JiffyIconSwitch
-                      checked={imprimeFinalizacao}
-                      onChange={e => setImprimeFinalizacao(e.target.checked)}
+                      checked={remoteLoggingEnabled}
+                      onChange={e => setRemoteLoggingEnabled(e.target.checked)}
                       label={
                         <span className="flex max-w-[min(100%,20rem)] flex-col gap-0.5 text-left">
                           <span className="text-sm font-semibold text-primary-text">
-                            Imprimir finalização
+                            Log remoto
                           </span>
                           <span className="text-xs font-normal text-secondary-text">
-                            Com a finalização direta ligada, define se o cupom sai na hora
+                            Envia o log deste terminal
                           </span>
                         </span>
                       }
                       size="sm"
-                      className="w-full flex-row items-start justify-between gap-3"
-                      inputProps={{ 'aria-label': 'Imprimir finalização' }}
+                      className="w-fit flex-row items-start gap-4"
+                      inputProps={{ 'aria-label': 'Log remoto do terminal' }}
                     />
                   </div>
-                  <div className="min-w-[220px] flex-1 rounded-lg p-2">
-                    <JiffyIconSwitch
-                      checked={finalizaAutomatico}
-                      onChange={e => setFinalizaAutomatico(e.target.checked)}
-                      label={
-                        <span className="flex max-w-[min(100%,20rem)] flex-col gap-0.5 text-left">
-                          <span className="text-sm font-semibold text-primary-text">
-                            Finalização automática
-                          </span>
-                          <span className="text-xs font-normal text-secondary-text">
-                            Finaliza sozinho depois do último pagamento no TEF
-                          </span>
-                        </span>
-                      }
-                      size="sm"
-                      className="w-full flex-row items-start justify-between gap-3"
-                      inputProps={{ 'aria-label': 'Finalização automática' }}
-                    />
-                  </div>
-                  <div className="min-w-[220px] flex-1 rounded-lg p-2">
+                </div>
+                <div className="mt-1 flex flex-col gap-1 md:flex-row md:flex-wrap md:items-start">
+                  <div className="min-w-[220px] flex-1 rounded-lg px-2 py-1">
                     <JiffyIconSwitch
                       checked={Boolean(modoImpressaoFechamentoStone)}
                       onChange={e =>
@@ -886,21 +920,21 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                         </span>
                       }
                       size="sm"
-                      className="w-full flex-row items-start justify-between gap-3"
+                      className="w-fit flex-row items-start gap-4"
                       inputProps={{ 'aria-label': 'Stone em texto na finalização' }}
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="mt-6 w-full">
-                <div className="mb-3 flex items-center gap-5">
+              <div className="mt-3 w-full">
+                <div className="mb-1.5 flex items-center gap-5">
                   <h3 className="shrink-0 text-sm font-semibold text-primary-text">
                     Configurar senha
                   </h3>
                   <div className="h-px min-w-0 flex-1 bg-primary/40" aria-hidden />
                 </div>
-                <div className="flex flex-col gap-4 md:flex-row">
+                <div className="flex flex-col gap-2 md:flex-row md:gap-3">
                   <Input
                     label="Número Min"
                     type="number"
@@ -939,7 +973,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                 </div>
               </div>
 
-              <div className="mt-6 w-full">
+              <div className="mt-3 w-full">
                 {loadingImpressoras ? (
                   <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
                     <CircularProgress size={24} />
@@ -947,12 +981,13 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                 ) : (
                   <Input
                     select
+                    fullWidth={false}
                     label="Impressora de Finalização"
                     value={impressoraSelecionadaId}
                     onChange={e => setImpressoraSelecionadaId(e.target.value)}
                     size="small"
-                    className="bg-info"
-                    sx={sxEntradaTerminal}
+                    className="bg-info w-full max-w-[220px]"
+                    sx={{ ...sxEntradaTerminal, width: '100%', maxWidth: 220 }}
                     /* Com `value=""` + `displayEmpty`, o MUI não encolhe o label — sobrepõe ao texto */
                     InputLabelProps={{ shrink: true }}
                     SelectProps={{
