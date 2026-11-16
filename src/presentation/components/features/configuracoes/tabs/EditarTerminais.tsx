@@ -767,7 +767,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                         </span>
                       }
                       size="sm"
-                      className="w-full flex-row items-start justify-between gap-3"
+                      className="w-fit flex-row items-start gap-4"
                       inputProps={{ 'aria-label': 'Compartilhamento de mesas' }}
                     />
                   </div>
@@ -802,7 +802,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                       </span>
                     }
                     size="sm"
-                    className="w-full flex-row items-start justify-between gap-3"
+                    className="w-fit flex-row items-start gap-4"
                     inputProps={{ 'aria-label': 'Fiscal ativo no terminal PDV' }}
                   />
                 </div>
@@ -822,7 +822,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                       </span>
                     }
                     size="sm"
-                    className="w-full flex-row items-start justify-between gap-3"
+                    className="w-fit flex-row items-start gap-4"
                     inputProps={{ 'aria-label': 'Leitor de código de barras no terminal' }}
                   />
                 </div>
@@ -871,7 +871,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                         </span>
                       }
                       size="sm"
-                      className="w-full flex-row items-start justify-between gap-3"
+                      className="w-fit flex-row items-start gap-4"
                       inputProps={{ 'aria-label': 'Finalizar no último TEF' }}
                     />
                   </div>
@@ -890,7 +890,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                         </span>
                       }
                       size="sm"
-                      className="w-full flex-row items-start justify-between gap-3"
+                      className="w-fit flex-row items-start gap-4"
                       inputProps={{ 'aria-label': 'Log remoto do terminal' }}
                     />
                   </div>
@@ -920,7 +920,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                         </span>
                       }
                       size="sm"
-                      className="w-full flex-row items-start justify-between gap-3"
+                      className="w-fit flex-row items-start gap-4"
                       inputProps={{ 'aria-label': 'Stone em texto na finalização' }}
                     />
                   </div>
@@ -981,12 +981,13 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                 ) : (
                   <Input
                     select
+                    fullWidth={false}
                     label="Impressora de Finalização"
                     value={impressoraSelecionadaId}
                     onChange={e => setImpressoraSelecionadaId(e.target.value)}
                     size="small"
-                    className="bg-info"
-                    sx={sxEntradaTerminal}
+                    className="bg-info w-full max-w-[220px]"
+                    sx={{ ...sxEntradaTerminal, width: '100%', maxWidth: 220 }}
                     /* Com `value=""` + `displayEmpty`, o MUI não encolhe o label — sobrepõe ao texto */
                     InputLabelProps={{ shrink: true }}
                     SelectProps={{
