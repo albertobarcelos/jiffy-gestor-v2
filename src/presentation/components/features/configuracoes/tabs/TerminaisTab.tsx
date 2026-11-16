@@ -50,7 +50,7 @@ const TERMINAIS_COL_HEADER =
   'font-semibold text-[10px] leading-tight text-primary-text uppercase'
 
 const TERMINAIS_GRID =
-  'grid items-center gap-x-2 min-w-[80rem] [grid-template-columns:minmax(6.5rem,1.1fr)_minmax(7rem,1.3fr)_minmax(6rem,1fr)_3.5rem_minmax(7rem,1fr)_minmax(8.5rem,1.1fr)_repeat(6,5.5rem)_2.5rem]'
+  'grid items-center gap-x-2 min-w-[90rem] [grid-template-columns:minmax(6.5rem,1.1fr)_minmax(7rem,1.3fr)_minmax(6rem,1fr)_3.5rem_minmax(7rem,1fr)_minmax(8.5rem,1.1fr)_minmax(8.5rem,1.1fr)_repeat(6,5.5rem)_2.5rem]'
 
 const OPCOES_TERMINAL_COLUNAS = [
   {
@@ -132,6 +132,9 @@ function TerminaisListColumnHeader() {
       <div className={`text-center ${TERMINAIS_COL_HEADER}`}>Versão APK</div>
       <div className={`whitespace-pre-line ${TERMINAIS_COL_HEADER}`}>Data última{'\n'}venda</div>
       <div className={TERMINAIS_COL_HEADER}>Imp. Finalização</div>
+      <div className={`whitespace-pre-line ${TERMINAIS_COL_HEADER}`}>
+        Modo de{'\n'}impressão
+      </div>
       {OPCOES_TERMINAL_COLUNAS.map(coluna => (
         <div
           key={coluna.key}
@@ -162,6 +165,32 @@ interface TerminalData {
 /** Valor que o PDV trata como impressão Stone em texto na finalização. */
 const MODO_STONE_TEXTO = 'texto'
 
+type ModoImpressaoFinalizacao = 'perguntar' | 'imprimir' | 'naoImprimir'
+
+const MODOS_IMPRESSAO_FINALIZACAO: { value: ModoImpressaoFinalizacao; label: string }[] = [
+  { value: 'perguntar', label: 'Perguntar' },
+  { value: 'imprimir', label: 'Imprimir' },
+  { value: 'naoImprimir', label: 'Não imprimir' },
+]
+
+function modoFromLegacy(
+  finalizaDireto: boolean,
+  imprimeFinalizacao: boolean
+): ModoImpressaoFinalizacao {
+  if (!finalizaDireto) return 'perguntar'
+  return imprimeFinalizacao ? 'imprimir' : 'naoImprimir'
+}
+
+function modoImpressaoFromApi(data: {
+  modoImpressaoFinalizacao?: unknown
+  finalizaDireto?: unknown
+  imprimeFinalizacao?: unknown
+}): ModoImpressaoFinalizacao {
+  const modo = data.modoImpressaoFinalizacao
+  if (modo === 'perguntar' || modo === 'imprimir' || modo === 'naoImprimir') return modo
+  return modoFromLegacy(!!data.finalizaDireto, !!data.imprimeFinalizacao)
+}
+
 interface TerminalPreferenceData {
   compartilharMesas: boolean
   impressoraFinalizacaoNome: string
@@ -170,6 +199,7 @@ interface TerminalPreferenceData {
   leitorHabilitado: boolean
   finalizaUltimoTef: boolean
   remoteLoggingEnabled: boolean
+  modoImpressaoFinalizacao: ModoImpressaoFinalizacao
   modoImpressaoFechamentoStone: string | null
 }
 
@@ -204,6 +234,7 @@ function rawToPreferenceData(data: any): TerminalPreferenceData {
         ? data.finalizaUltimoTef
         : !!data.finalizaAutomatico,
     remoteLoggingEnabled: !!data.remoteLoggingEnabled,
+    modoImpressaoFinalizacao: modoImpressaoFromApi(data),
     modoImpressaoFechamentoStone: modoStoneFromApi(data.modoImpressaoFechamentoStone),
   }
 }
@@ -217,6 +248,7 @@ const DEFAULT_TERMINAL_PREFERENCES: TerminalPreferenceData = {
   leitorHabilitado: false,
   finalizaUltimoTef: false,
   remoteLoggingEnabled: false,
+  modoImpressaoFinalizacao: 'perguntar',
   modoImpressaoFechamentoStone: null,
 }
 
@@ -577,6 +609,7 @@ export function TerminaisTab() {
           modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
           finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
           remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
+          modoImpressaoFinalizacao: prev[terminalId]?.modoImpressaoFinalizacao ?? 'perguntar',
         },
       }))
 
@@ -624,6 +657,7 @@ export function TerminaisTab() {
           modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
           finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
           remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
+          modoImpressaoFinalizacao: prev[terminalId]?.modoImpressaoFinalizacao ?? 'perguntar',
           },
         }))
       } finally {
@@ -656,6 +690,7 @@ export function TerminaisTab() {
           modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
           finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
           remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
+          modoImpressaoFinalizacao: prev[terminalId]?.modoImpressaoFinalizacao ?? 'perguntar',
         },
       }))
 
@@ -700,6 +735,7 @@ export function TerminaisTab() {
           modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
           finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
           remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
+          modoImpressaoFinalizacao: prev[terminalId]?.modoImpressaoFinalizacao ?? 'perguntar',
           },
         }))
       } finally {
@@ -732,6 +768,7 @@ export function TerminaisTab() {
           modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
           finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
           remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
+          modoImpressaoFinalizacao: prev[terminalId]?.modoImpressaoFinalizacao ?? 'perguntar',
         },
       }))
 
@@ -776,6 +813,7 @@ export function TerminaisTab() {
             modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
             finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
             remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
+          modoImpressaoFinalizacao: prev[terminalId]?.modoImpressaoFinalizacao ?? 'perguntar',
           },
         }))
       } finally {
@@ -878,6 +916,7 @@ export function TerminaisTab() {
           modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
           finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
           remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
+          modoImpressaoFinalizacao: prev[terminalId]?.modoImpressaoFinalizacao ?? 'perguntar',
         },
       }))
 
@@ -912,6 +951,7 @@ export function TerminaisTab() {
           modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
           finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
           remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
+          modoImpressaoFinalizacao: prev[terminalId]?.modoImpressaoFinalizacao ?? 'perguntar',
           },
         }))
       } finally {
@@ -1235,6 +1275,41 @@ export function TerminaisTab() {
                 {impressoras.map(imp => (
                   <option key={imp.id} value={imp.id}>
                     {imp.nome}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="md:text-xs text-[10px] text-secondary-text">Carregando...</div>
+            )}
+          </div>
+          <div
+            className="md:text-sm text-[10px] text-secondary-text"
+            onClick={event => event.stopPropagation()}
+            onMouseDown={event => event.stopPropagation()}
+          >
+            {preferencesLoaded ? (
+              <select
+                value={prefs.modoImpressaoFinalizacao}
+                onChange={event => {
+                  event.stopPropagation()
+                  const modo = event.target.value
+                  if (modo !== 'perguntar' && modo !== 'imprimir' && modo !== 'naoImprimir') return
+                  void salvarCampoFinalizacao(
+                    terminal.getId(),
+                    'modoImpressaoFinalizacao',
+                    { modoImpressaoFinalizacao: modo },
+                    { modoImpressaoFinalizacao: modo },
+                    'Modo de impressão atualizado!'
+                  )
+                }}
+                onClick={event => event.stopPropagation()}
+                disabled={finalizacaoOcupada('modoImpressaoFinalizacao')}
+                aria-label={`Modo de impressão — ${nome}`}
+                className="w-full max-w-[220px] h-8 rounded-lg border border-gray-200 bg-white md:text-sm text-xs text-primary-text px-2 focus:outline-none focus:border-primary"
+              >
+                {MODOS_IMPRESSAO_FINALIZACAO.map(opcao => (
+                  <option key={opcao.value} value={opcao.value}>
+                    {opcao.label}
                   </option>
                 ))}
               </select>
