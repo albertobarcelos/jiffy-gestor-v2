@@ -50,7 +50,7 @@ const TERMINAIS_COL_HEADER =
   'font-semibold text-[10px] leading-tight text-primary-text uppercase'
 
 const TERMINAIS_GRID =
-  'grid items-center gap-x-2 min-w-[86rem] [grid-template-columns:minmax(6.5rem,1.1fr)_minmax(7rem,1.3fr)_minmax(6rem,1fr)_3.5rem_minmax(7rem,1fr)_minmax(8.5rem,1.1fr)_repeat(7,5.5rem)_2.5rem]'
+  'grid items-center gap-x-2 min-w-[98rem] [grid-template-columns:minmax(6.5rem,1.1fr)_minmax(7rem,1.3fr)_minmax(6rem,1fr)_3.5rem_minmax(7rem,1fr)_minmax(8.5rem,1.1fr)_repeat(9,5.5rem)_2.5rem]'
 
 const OPCOES_TERMINAL_COLUNAS = [
   {
@@ -94,6 +94,18 @@ const OPCOES_TERMINAL_COLUNAS = [
     label: 'Stone em texto',
     header: 'Stone em\ntexto',
     hint: 'Stone imprime em texto; desligado segue no modo padrão, por arquivo',
+  },
+  {
+    key: 'finalizaUltimoTef',
+    label: 'Fin. Ulti. TEF',
+    header: 'Fin. Ulti.\nTEF',
+    hint: 'No último pagamento TEF que quita a venda, finaliza direto',
+  },
+  {
+    key: 'remoteLoggingEnabled',
+    label: 'Log remoto',
+    header: 'Log\nremoto',
+    hint: 'Envia o log deste terminal',
   },
 ] as const
 
@@ -177,6 +189,8 @@ interface TerminalPreferenceData {
   finalizaDireto: boolean
   finalizaAutomatico: boolean
   imprimeFinalizacao: boolean
+  finalizaUltimoTef: boolean
+  remoteLoggingEnabled: boolean
   modoImpressaoFechamentoStone: string | null
 }
 
@@ -209,6 +223,11 @@ function rawToPreferenceData(data: any): TerminalPreferenceData {
     finalizaDireto: !!data.finalizaDireto,
     finalizaAutomatico: !!data.finalizaAutomatico,
     imprimeFinalizacao: !!data.imprimeFinalizacao,
+    finalizaUltimoTef:
+      typeof data.finalizaUltimoTef === 'boolean'
+        ? data.finalizaUltimoTef
+        : !!data.finalizaAutomatico,
+    remoteLoggingEnabled: !!data.remoteLoggingEnabled,
     modoImpressaoFechamentoStone: modoStoneFromApi(data.modoImpressaoFechamentoStone),
   }
 }
@@ -223,6 +242,8 @@ const DEFAULT_TERMINAL_PREFERENCES: TerminalPreferenceData = {
   finalizaDireto: false,
   finalizaAutomatico: false,
   imprimeFinalizacao: false,
+  finalizaUltimoTef: false,
+  remoteLoggingEnabled: false,
   modoImpressaoFechamentoStone: null,
 }
 
@@ -584,6 +605,8 @@ export function TerminaisTab() {
           finalizaAutomatico: prev[terminalId]?.finalizaAutomatico ?? false,
           imprimeFinalizacao: prev[terminalId]?.imprimeFinalizacao ?? false,
           modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
+          finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
+          remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
         },
       }))
 
@@ -632,6 +655,8 @@ export function TerminaisTab() {
           finalizaAutomatico: prev[terminalId]?.finalizaAutomatico ?? false,
           imprimeFinalizacao: prev[terminalId]?.imprimeFinalizacao ?? false,
           modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
+          finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
+          remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
           },
         }))
       } finally {
@@ -665,6 +690,8 @@ export function TerminaisTab() {
           finalizaAutomatico: prev[terminalId]?.finalizaAutomatico ?? false,
           imprimeFinalizacao: prev[terminalId]?.imprimeFinalizacao ?? false,
           modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
+          finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
+          remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
         },
       }))
 
@@ -710,6 +737,8 @@ export function TerminaisTab() {
           finalizaAutomatico: prev[terminalId]?.finalizaAutomatico ?? false,
           imprimeFinalizacao: prev[terminalId]?.imprimeFinalizacao ?? false,
           modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
+          finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
+          remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
           },
         }))
       } finally {
@@ -743,6 +772,8 @@ export function TerminaisTab() {
           finalizaAutomatico: prev[terminalId]?.finalizaAutomatico ?? false,
           imprimeFinalizacao: prev[terminalId]?.imprimeFinalizacao ?? false,
           modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
+          finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
+          remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
         },
       }))
 
@@ -788,6 +819,8 @@ export function TerminaisTab() {
           finalizaAutomatico: prev[terminalId]?.finalizaAutomatico ?? false,
           imprimeFinalizacao: prev[terminalId]?.imprimeFinalizacao ?? false,
           modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
+          finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
+          remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
           },
         }))
       } finally {
@@ -891,6 +924,8 @@ export function TerminaisTab() {
           finalizaAutomatico: prev[terminalId]?.finalizaAutomatico ?? false,
           imprimeFinalizacao: prev[terminalId]?.imprimeFinalizacao ?? false,
           modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
+          finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
+          remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
         },
       }))
 
@@ -926,6 +961,8 @@ export function TerminaisTab() {
           finalizaAutomatico: prev[terminalId]?.finalizaAutomatico ?? false,
           imprimeFinalizacao: prev[terminalId]?.imprimeFinalizacao ?? false,
           modoImpressaoFechamentoStone: prev[terminalId]?.modoImpressaoFechamentoStone ?? null,
+          finalizaUltimoTef: prev[terminalId]?.finalizaUltimoTef ?? false,
+          remoteLoggingEnabled: prev[terminalId]?.remoteLoggingEnabled ?? false,
           },
         }))
       } finally {
@@ -1330,7 +1367,7 @@ export function TerminaisTab() {
                   void salvarCampoFinalizacao(
                     terminal.getId(),
                     'finalizaAutomatico',
-                    { finalizaAutomatico: ligado },
+                    { finalizaAutomatico: ligado, finalizaUltimoTef: ligado },
                     { finalizaAutomatico: ligado },
                     'Finalização automática atualizada!'
                   )
@@ -1357,6 +1394,36 @@ export function TerminaisTab() {
                     ligado ? 'Stone em texto ligada!' : 'Stone em texto desligada!'
                   )
                 }}
+              />
+              <OpcaoTerminalColuna
+                label="Fin. Ulti. TEF"
+                hint="No último pagamento TEF que quita a venda, finaliza direto"
+                checked={prefs.finalizaUltimoTef}
+                disabled={finalizacaoOcupada('finalizaUltimoTef')}
+                onChange={ligado =>
+                  void salvarCampoFinalizacao(
+                    terminal.getId(),
+                    'finalizaUltimoTef',
+                    { finalizaUltimoTef: ligado, finalizaAutomatico: ligado },
+                    { finalizaUltimoTef: ligado },
+                    'Finalização no último TEF atualizada!'
+                  )
+                }
+              />
+              <OpcaoTerminalColuna
+                label="Log remoto"
+                hint="Envia o log deste terminal"
+                checked={prefs.remoteLoggingEnabled}
+                disabled={finalizacaoOcupada('remoteLoggingEnabled')}
+                onChange={ligado =>
+                  void salvarCampoFinalizacao(
+                    terminal.getId(),
+                    'remoteLoggingEnabled',
+                    { remoteLoggingEnabled: ligado },
+                    { remoteLoggingEnabled: ligado },
+                    ligado ? 'Log remoto ligado!' : 'Log remoto desligado!'
+                  )
+                }
               />
             </>
           ) : (
