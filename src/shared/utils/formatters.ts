@@ -81,6 +81,17 @@ export function brToEUA(valorBr: string): number {
 }
 
 /**
+ * Instantâneo de uma data vinda da API.
+ * Com `Z` ou offset, usa o instante real. Sem fuso, o relógio vale como horário local.
+ */
+export function parseApiDateMs(value: Date | string | null | undefined): number {
+  if (value instanceof Date) return value.getTime()
+  const raw = typeof value === 'string' ? value.trim() : ''
+  if (!raw) return Number.NaN
+  return new Date(raw).getTime()
+}
+
+/**
  * Formata o tempo decorrido desde uma data inicial de forma dinâmica.
  * - Até 10 minutos: "agora"
  * - De 11 a 59 minutos: "X min" (arredondado para o múltiplo de 10 minutos mais próximo)
@@ -88,26 +99,9 @@ export function brToEUA(valorBr: string): number {
  * - A partir de 24 horas: "X dias" (arredondado para o dia mais próximo)
  */
 export function formatElapsedTime(initialDate: Date | string): string {
-  const parseAsLocalWallTime = (value: Date | string): number => {
-    if (value instanceof Date) return value.getTime()
-
-    const raw = value || ''
-    // Remove sufixo de fuso (Z ou ±hh:mm) para interpretar como horário local "puro"
-    const stripped = raw.replace(/([+-]\d{2}:\d{2}|[zZ])$/, '')
-    const localParsed = new Date(stripped)
-
-    if (!Number.isNaN(localParsed.getTime())) {
-      return localParsed.getTime()
-    }
-
-    // Fallback para parsing padrão caso a limpeza falhe
-    const fallback = new Date(raw)
-    return fallback.getTime()
-  }
-
-  const startMs = parseAsLocalWallTime(initialDate)
+  const startMs = parseApiDateMs(initialDate)
   const nowMs = Date.now()
-  const diffMs = nowMs - startMs
+  const diffMs = nowMs - (Number.isNaN(startMs) ? nowMs : startMs)
   const diffMinutes = Math.floor(diffMs / (1000 * 60));
 
   if (diffMinutes <= 10) {

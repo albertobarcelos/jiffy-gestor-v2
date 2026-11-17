@@ -57,6 +57,8 @@ interface VendaDetalhes {
   codigoTerminal: string
   terminalId: string
   dataCriacao: string
+  dataUltimaModificacao?: string
+  dataUltimoProdutoLancado?: string
   dataCancelamento?: string
   dataFinalizacao?: string
   canceladoPorId?: string
@@ -64,6 +66,7 @@ interface VendaDetalhes {
   statusMesa?: string
   clienteId?: string
   identificacao?: string
+  documentoCpfCnpj?: string | null
   troco?: number
   produtosLancados: ProdutoLancado[]
   /** Taxas aplicadas na venda (ex.: serviço, couvert) — exibidas após os produtos. */
@@ -293,6 +296,19 @@ function textoPizza(pizza: PizzaLancadaDetalhe | null | undefined): string | nul
     .filter(Boolean)
   if (sabores.length > 0) partes.push(sabores.join(', '))
   return partes.length > 0 ? partes.join(' · ') : null
+}
+
+function textoDocumentoCpfCnpj(valor: string | null | undefined): string | null {
+  if (typeof valor !== 'string') return null
+  const digits = valor.replace(/\D/g, '')
+  if (!digits) return null
+  if (digits.length === 11) {
+    return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
+  }
+  if (digits.length === 14) {
+    return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')
+  }
+  return valor.trim() || null
 }
 
 function linhasTransferencia(movimentacoes: MovimentacaoVendaDetalhe[] | undefined): string[] {
@@ -1714,6 +1730,20 @@ export function DetalhesVendas({
                     <span>{formatDateTime(venda.dataCriacao)}</span>
                   </div>
 
+                  {venda.dataUltimaModificacao && (
+                    <div className="flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
+                      <span>Última alteração:</span>
+                      <span>{formatDateTime(venda.dataUltimaModificacao)}</span>
+                    </div>
+                  )}
+
+                  {venda.dataUltimoProdutoLancado && (
+                    <div className="flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
+                      <span>Último produto lançado:</span>
+                      <span>{formatDateTime(venda.dataUltimoProdutoLancado)}</span>
+                    </div>
+                  )}
+
                   {/* Data/Hora de Finalização */}
                   {venda.dataFinalizacao && (
                     <div className="flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
@@ -1727,6 +1757,13 @@ export function DetalhesVendas({
                     <div className="flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
                       <span>Cliente Vinculado:</span>
                       <span>{nomeCliente}</span>
+                    </div>
+                  )}
+
+                  {textoDocumentoCpfCnpj(venda.documentoCpfCnpj) && (
+                    <div className="flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
+                      <span>CPF/CNPJ:</span>
+                      <span>{textoDocumentoCpfCnpj(venda.documentoCpfCnpj)}</span>
                     </div>
                   )}
 

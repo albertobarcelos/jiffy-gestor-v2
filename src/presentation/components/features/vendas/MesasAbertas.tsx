@@ -9,7 +9,7 @@ import { DetalhesVendas } from './DetalhesVendas'
 import { CircularProgress } from '@mui/material'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { TipoVendaIcon } from './TipoVendaIcon'
-import { formatElapsedTime } from '@/src/shared/utils/formatters'
+import { formatElapsedTime, parseApiDateMs } from '@/src/shared/utils/formatters'
 // Tipos
 interface Venda {
   id: string
@@ -29,6 +29,12 @@ interface Venda {
   vendaCompartilhada?: boolean
   dataCancelamento?: string
   dataFinalizacao?: string
+  senha?: string | null
+  tipoDesconto?: string | null
+  valorDesconto?: number | null
+  tipoAcrescimo?: string | null
+  valorAcrescimo?: number | null
+  totalValorProdutosRemovidos?: number | null
 }
 
 /** Dados do GET de detalhe que a grade já dispara para resolver o cliente. */
@@ -156,26 +162,11 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
   }
 
   /**
-   * Parser alinhado ao formatElapsedTime:
-   * - Se string, remove offset/Z para tratar como horário local "puro"
-   * - Se falhar, tenta parse padrão
-   */
-  const parseDateLocalWallTime = (value: string): Date => {
-    const raw = value || ''
-    const stripped = raw.replace(/([+-]\d{2}:\d{2}|[zZ])$/, '')
-    const localParsed = new Date(stripped)
-    if (!Number.isNaN(localParsed.getTime())) return localParsed
-    const fallback = new Date(raw)
-    if (!Number.isNaN(fallback.getTime())) return fallback
-    return new Date()
-  }
-
-  /**
-   * Converte Date|string em timestamp ms, usando o mesmo parser de cima.
+   * Instantâneo da data da API, respeitando Z e offset.
    */
   const toMs = (value: Date | string): number => {
-    if (value instanceof Date) return value.getTime()
-    return parseDateLocalWallTime(value).getTime()
+    const ms = parseApiDateMs(value)
+    return Number.isNaN(ms) ? Date.now() : ms
   }
 
   /**
@@ -708,19 +699,33 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
               const nomeSecundario = nomesDiferentes ? clienteNome : null
               const compartilhada = venda.vendaCompartilhada === true || resumo?.vendaCompartilhada === true
               const rodizioAberto = resumo?.rodizioAberto === true
-
-              const minutosAberta = minutosDesde(venda.dataCriacao)
-              const minutosParada = minutosDesde(referenciaParada(venda))
-              const minutosUltimoProduto = minutosDesde(
+              const senhaExibir =
+                typeof venda.senha === 'string' && venda.senha.trim() !== ''
+                  ? venda.senha.trim()
+                  : null
+              const codigoTerminalExibir =
+                typeof venda.codigoTerminal === 'string' && venda.codigoTerminal.trim() !== ''
+                  ? venda.codigoTerminal.trim()
+                  : null
+              const temDescontoVenda =
+                venda.valorDesconto != null && Number(venda.valorDesconto) > 0
+              const temAcrescimoVenda =
+                venda.valorAcrescimo != null && Number(venda.valorAcrescimo) > 0
+              const totalRemovidos = Number(venda.totalValorProdutosRemovidos ?? 0)
+              const ultimoLancamentoRef =
                 venda.dataUltimoProdutoLancado && venda.dataUltimoProdutoLancado.length > 0
                   ? venda.dataUltimoProdutoLancado
                   : venda.dataCriacao
-              )
+
+              const minutosAberta = minutosDesde(venda.dataCriacao)
+              const minutosParada = minutosDesde(referenciaParada(venda))
+              const minutosUltimoProduto = minutosDesde(ultimoLancamentoRef)
               const mesaParada = minutosParada >= 15
               const rotuloTempo = mesaParada ? 'Parada há' : 'Aberta há'
               const tempoExibido = formatElapsedTime(
                 mesaParada ? referenciaParada(venda) : venda.dataCriacao
               )
+              const ultimoLancamentoTime = formatElapsedTime(ultimoLancamentoRef)
               const movimentoTooltip = `Aberta há ${formatDiffTooltip(minutosAberta)}\n\nÚltimo produto há ${formatDiffTooltip(minutosUltimoProduto)}`
               const innerCircleColor = getCorMesaPorTempoJS(referenciaParada(venda))
 
@@ -757,6 +762,14 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
                         {nomeSecundario}
                       </span>
                     ) : null}
+                    {senhaExibir ? (
+                      <span className="text-[10px] text-secondary-text">Senha: {senhaExibir}</span>
+                    ) : null}
+                    {codigoTerminalExibir ? (
+                      <span className="text-[10px] text-secondary-text">
+                        Terminal #{codigoTerminalExibir}
+                      </span>
+                    ) : null}
                     {compartilhada || rodizioAberto ? (
                       <div className="mt-1 flex flex-wrap items-center justify-center gap-1">
                         {compartilhada ? (
@@ -782,10 +795,20 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
                       <div className="flex flex-col items-start">
                         <span className="font-semibold">Valor atual</span>
                         <span>{formatCurrency(venda.valorFinal)}</span>
+                        {(temDescontoVenda || temAcrescimoVenda || totalRemovidos > 0) && (
+                          <span className="mt-0.5 flex flex-wrap gap-1 text-[10px] font-normal text-secondary-text">
+                            {temDescontoVenda ? <span>Desc.</span> : null}
+                            {temAcrescimoVenda ? <span>Acrésc.</span> : null}
+                            {totalRemovidos > 0 ? <span>Removidos</span> : null}
+                          </span>
+                        )}
                       </div>
                       <div className="flex flex-col items-end">
                         <span className="font-semibold">{rotuloTempo}</span>
                         <span>{tempoExibido}</span>
+                        <span className="mt-0.5 text-[10px] font-normal text-secondary-text">
+                          Últ. lanç. {ultimoLancamentoTime}
+                        </span>
                       </div>
                     </div>
                   </div>
