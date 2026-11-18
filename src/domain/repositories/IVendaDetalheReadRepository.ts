@@ -26,4 +26,11 @@ export interface IVendaDetalheReadRepository {
     telefone: string,
     token: string
   ): Promise<Record<string, unknown> | null>
+
+  fetchTerminalDetalhes(
+    terminalId: string,
+    token: string
+  ): Promise<Record<string, unknown> | null>
+
+  fetchEmpresa(empresaId: string, token: string): Promise<Record<string, unknown> | null>
 }

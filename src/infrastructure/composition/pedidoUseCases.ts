@@ -11,6 +11,7 @@ import { SalvarTaxaPedidoDeliveryUseCase } from '@/src/application/use-cases/del
 import { BuscarClienteParaEntregaUseCase } from '@/src/application/use-cases/clientes/BuscarClienteParaEntregaUseCase'
 import { AtualizarPagamentoEntregaGestorUseCase } from '@/src/application/use-cases/vendas/AtualizarPagamentoEntregaGestorUseCase'
 import { CarregarPedidoKanbanQuickViewUseCase } from '@/src/application/use-cases/vendas/CarregarPedidoKanbanQuickViewUseCase'
+import { CarregarPainelDetalheVendaUseCase } from '@/src/application/use-cases/vendas/CarregarPainelDetalheVendaUseCase'
 import { CarregarVendaDetalheUseCase } from '@/src/application/use-cases/vendas/CarregarVendaDetalheUseCase'
 import { ResolverEstacaoIdParaCriarVendaGestorUseCase } from '@/src/application/use-cases/vendas/ResolverEstacaoIdParaCriarVendaGestorUseCase'
 import { estacaoParaCriarVendaPort } from '@/src/infrastructure/api/EstacaoParaCriarVendaAdapter'
@@ -75,6 +76,9 @@ export const invalidarCatalogoVendaUseCase = new InvalidarCatalogoVendaUseCase(
   grupoComplementoCatalogoCache
 )
 export const carregarVendaDetalheUseCase = new CarregarVendaDetalheUseCase(
+  vendaDetalheReadRepository
+)
+export const carregarPainelDetalheVendaUseCase = new CarregarPainelDetalheVendaUseCase(
   vendaDetalheReadRepository
 )
 export const carregarPedidoKanbanQuickViewUseCase = new CarregarPedidoKanbanQuickViewUseCase(
