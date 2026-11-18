@@ -15,7 +15,7 @@ import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import Modal from '@mui/material/Modal'
 import Slide from '@mui/material/Slide'
 import type { TransitionProps } from '@mui/material/transitions'
-import { MdClose, MdRestaurant, MdAttachMoney, MdCancel } from 'react-icons/md'
+import { MdClose, MdRestaurant, MdAttachMoney, MdCancel, MdShare } from 'react-icons/md'
 import {
   CircularProgress,
   TextField,
@@ -1648,8 +1648,20 @@ export function DetalhesVendas({
                 <>
                   {/* Card Informações da Venda */}
                   <div className="mb-2 p-2">
-                    <h2 className="text-lg font-semibold text-primary-text">
-                      Informações da Venda
+                    <h2 className="flex items-center justify-between text-lg font-semibold text-primary-text">
+                      <span>Informações da Venda</span>
+                      {venda.vendaCompartilhada ? (
+                        <span
+                          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-primary/40 text-primary/70"
+                          title="Compartilhamento ativo"
+                          aria-label="Compartilhamento ativo"
+                        >
+                          <MdShare
+                            size={12}
+                            className="relative -translate-x-[1px] shrink-0 leading-none"
+                          />
+                        </span>
+                      ) : null}
                     </h2>
                 <div className="mb-2 border-t border-dashed border-gray-400"></div>
 
@@ -1660,13 +1672,6 @@ export function DetalhesVendas({
                   >
                     Status: <span className="font-semibold">{statusVenda}</span>
                   </div>
-
-                  {venda.vendaCompartilhada ? (
-                    <div className="flex justify-between rounded-lg bg-white px-1 text-xs text-primary md:text-sm">
-                      <span>Mesa</span>
-                      <span className="font-semibold">Compartilhada</span>
-                    </div>
-                  ) : null}
 
                   {/* Aberto por */}
                   <div className="flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
@@ -2036,17 +2041,17 @@ export function DetalhesVendas({
                           </div>
 
                           {/* Informações de remoção (se produto foi removido) */}
-                          {isRemovido && produto.removidoPorId && (
+                          {isRemovido && (produto.dataRemocao || produto.removidoPorId) ? (
                             <div className="ml-7 mt-1 text-xs text-error">
-                              Removido por:{' '}
-                              {nomeExibicaoUsuario(produto.removidoPorId, nomesUsuarios)}
+                              {produto.dataRemocao
+                                ? `Removido em: ${formatDateTime(produto.dataRemocao)}`
+                                : null}
+                              {produto.dataRemocao && produto.removidoPorId ? ' | ' : null}
+                              {produto.removidoPorId
+                                ? `Removido por: ${nomeExibicaoUsuario(produto.removidoPorId, nomesUsuarios)}`
+                                : null}
                             </div>
-                          )}
-                          {isRemovido && produto.dataRemocao && (
-                            <div className="ml-7 text-xs text-error">
-                              Removido em: {formatDateTime(produto.dataRemocao)}
-                            </div>
-                          )}
+                          ) : null}
                           {isRemovido && produto.motivoRemocao ? (
                             <div className="ml-7 text-xs text-error">
                               Motivo: {produto.motivoRemocao}

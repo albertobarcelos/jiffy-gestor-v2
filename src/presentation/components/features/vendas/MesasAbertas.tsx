@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import { MdAttachMoney, MdRestaurant } from 'react-icons/md'
+import { MdAttachMoney, MdDeleteOutline, MdRestaurant, MdShare } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { DetalhesVendas } from './DetalhesVendas'
 import { CircularProgress } from '@mui/material'
@@ -24,9 +24,11 @@ interface Venda {
   dataCriacao: string
   dataUltimaModificacao?: string
   dataUltimoProdutoLancado?: string
-  clienteId?: string
+  clienteId?: string | null
+  clienteNome?: string | null
   identificacao?: string | null
   vendaCompartilhada?: boolean
+  rodizioAberto?: boolean
   dataCancelamento?: string
   dataFinalizacao?: string
   senha?: string | null
@@ -35,14 +37,6 @@ interface Venda {
   tipoAcrescimo?: string | null
   valorAcrescimo?: number | null
   totalValorProdutosRemovidos?: number | null
-}
-
-/** Dados do GET de detalhe que a grade já dispara para resolver o cliente. */
-interface MesaResumoDetalhe {
-  clienteId: string | null
-  identificacao: string | null
-  vendaCompartilhada: boolean
-  rodizioAberto: boolean
 }
 
 interface MetricasVendas {
@@ -74,33 +68,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
   const [vendas, setVendas] = useState<Venda[]>([])
   const [metricas, setMetricas] = useState<MetricasVendas | null>(null)
   const [usuariosPDV, setUsuariosPDV] = useState<UsuarioPDV[]>([])
-  const [clienteNomeMap, setClienteNomeMap] = useState<Record<string, string | null>>({})
-  const [mesaResumoMap, setMesaResumoMap] = useState<Record<string, MesaResumoDetalhe>>({})
   const [apenasSemMovimentacao, setApenasSemMovimentacao] = useState(false)
-  const [cachesHydrated, setCachesHydrated] = useState(false)
-
-  // Hidrata cache de nomes de clientes a partir da sessionStorage para evitar refetch após reload
-  useEffect(() => {
-    try {
-      const storedClienteNome = sessionStorage.getItem('mesasAbertas_clienteNomeMap')
-      if (storedClienteNome) {
-        setClienteNomeMap(JSON.parse(storedClienteNome))
-      }
-      setCachesHydrated(true)
-    } catch (err) {
-      console.warn('Não foi possível ler cache de nomes de clientes da sessão', err)
-      setCachesHydrated(true)
-    }
-  }, [])
-
-  // Persiste cache de nomes de clientes na sessionStorage para reaproveitar após reload
-  useEffect(() => {
-    try {
-      sessionStorage.setItem('mesasAbertas_clienteNomeMap', JSON.stringify(clienteNomeMap))
-    } catch (err) {
-      console.warn('Não foi possível salvar cache de nomes de clientes na sessão', err)
-    }
-  }, [clienteNomeMap])
 
   // Estados de UI
   const [isLoading, setIsLoading] = useState(false)
@@ -276,114 +244,6 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
   }, [])
 
   /**
-   * Busca nome do cliente dado o clienteId (usa mesmo endpoint de VisualizarCliente).
-   */
-  const fetchNomesClientes = useCallback(
-    async (clienteIds: string[]) => {
-      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-      if (!token || clienteIds.length === 0) return
-
-      const results = await Promise.all(
-        clienteIds.map(async clienteId => {
-          try {
-            const response = await fetchGestorApi(`/api/clientes/${clienteId}`, {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              },
-            })
-            if (!response.ok) return { clienteId, nome: null }
-            const data = await response.json()
-            const nome = (data?.nome || data?.razaoSocial || '').trim()
-            return { clienteId, nome: nome || null }
-          } catch {
-            return { clienteId, nome: null }
-          }
-        })
-      )
-
-      setClienteNomeMap(prev => {
-        const next = { ...prev }
-        results.forEach(({ clienteId, nome }) => {
-          next[clienteId] = nome
-        })
-        return next
-      })
-    },
-    []
-  )
-
-  /**
-   * Busca o detalhe da venda uma vez por mesa sem cliente na listagem.
-   * Aproveita a mesma resposta para identificação, compartilhamento e rodízio.
-   */
-  const fetchResumoDetalheMesa = useCallback(async (ids: string[]) => {
-    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-    if (!token || ids.length === 0) return
-
-    const results = await Promise.all(
-      ids.map(async id => {
-        try {
-          const response = await fetchGestorApi(`/api/vendas/${id}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          })
-          if (!response.ok) {
-            return {
-              id,
-              resumo: {
-                clienteId: null,
-                identificacao: null,
-                vendaCompartilhada: false,
-                rodizioAberto: false,
-              } satisfies MesaResumoDetalhe,
-            }
-          }
-          const data = await response.json()
-          const clienteId = typeof data.clienteId === 'string' ? data.clienteId : null
-          const identificacao =
-            typeof data.identificacao === 'string' && data.identificacao.trim() !== ''
-              ? data.identificacao.trim()
-              : null
-          const sessao = data.rodizioSessao
-          const encerradaEm =
-            sessao && typeof sessao === 'object' ? sessao.encerradaEm : undefined
-          const rodizioAberto = Boolean(sessao) && (encerradaEm == null || encerradaEm === '')
-          return {
-            id,
-            resumo: {
-              clienteId,
-              identificacao,
-              vendaCompartilhada: data.vendaCompartilhada === true,
-              rodizioAberto,
-            } satisfies MesaResumoDetalhe,
-          }
-        } catch {
-          return {
-            id,
-            resumo: {
-              clienteId: null,
-              identificacao: null,
-              vendaCompartilhada: false,
-              rodizioAberto: false,
-            } satisfies MesaResumoDetalhe,
-          }
-        }
-      })
-    )
-
-    setMesaResumoMap(prev => {
-      const next = { ...prev }
-      results.forEach(({ id, resumo }) => {
-        next[id] = resumo
-      })
-      return next
-    })
-  }, [])
-
-  /**
    * Busca apenas mesas em aberto
    */
   const fetchVendas = useCallback(
@@ -504,52 +364,14 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
     return () => container.removeEventListener('scroll', handleScroll)
   }, [canLoadMore, isLoadingMore, isLoading, fetchVendas])
 
-  // Detalhe da venda quando a listagem não traz clienteId. A mesma resposta alimenta o card.
-  useEffect(() => {
-    const idsParaBuscar = vendas
-      .filter(v => {
-        const temClienteIdNaListagem =
-          v.clienteId && typeof v.clienteId === 'string' && v.clienteId.trim() !== ''
-        const jaVerificado = v.id in mesaResumoMap
-        return !temClienteIdNaListagem && !jaVerificado
-      })
-      .map(v => v.id)
-
-    if (idsParaBuscar.length > 0) {
-      fetchResumoDetalheMesa(idsParaBuscar)
-    }
-  }, [vendas, mesaResumoMap, fetchResumoDetalheMesa])
-
-  // Buscar nome do cliente para clienteIds das vendas listadas ou obtidos via detalhe
-  useEffect(() => {
-    const clienteIds = new Set<string>()
-
-    vendas.forEach(v => {
-      if (v.clienteId && typeof v.clienteId === 'string' && v.clienteId.trim() !== '') {
-        clienteIds.add(v.clienteId)
-      } else if (
-        mesaResumoMap[v.id]?.clienteId &&
-        mesaResumoMap[v.id]!.clienteId!.trim() !== ''
-      ) {
-        clienteIds.add(mesaResumoMap[v.id]!.clienteId!)
-      }
-    })
-
-    const clienteIdsParaBuscar = Array.from(clienteIds).filter(cid => !(cid in clienteNomeMap))
-
-    if (clienteIdsParaBuscar.length > 0) {
-      fetchNomesClientes(clienteIdsParaBuscar)
-    }
-  }, [vendas, mesaResumoMap, clienteNomeMap, fetchNomesClientes])
-
   // Efeito para carregar dados auxiliares e iniciar a busca de vendas
   useEffect(() => {
-    if (!useAuthStore.getState().tenantAuth || !cachesHydrated) return
+    if (!useAuthStore.getState().tenantAuth) return
 
     loadAllUsuariosPDV()
     fetchVendas(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ cachesHydrated, apenasSemMovimentacao])
+  }, [apenasSemMovimentacao])
 
   useEffect(() => {
     const montadoEm = Date.now()
@@ -674,31 +496,23 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
 
             {vendas.map(venda => {
               void elapsedTimeUpdateTrigger
-              const resumo = mesaResumoMap[venda.id]
               const usuarioNome =
                 usuariosPDV.find(u => u.id === venda.abertoPorId)?.nome || venda.abertoPorId
-              const resolvedClienteId =
-                venda.clienteId &&
-                typeof venda.clienteId === 'string' &&
-                venda.clienteId.trim() !== ''
-                  ? venda.clienteId
-                  : resumo?.clienteId && resumo.clienteId.trim() !== ''
-                    ? resumo.clienteId
-                    : null
-              const clienteNome = resolvedClienteId
-                ? clienteNomeMap[resolvedClienteId] || null
-                : null
+              const clienteNome =
+                typeof venda.clienteNome === 'string' && venda.clienteNome.trim() !== ''
+                  ? venda.clienteNome.trim()
+                  : null
               const identificacao =
-                (typeof venda.identificacao === 'string' && venda.identificacao.trim() !== ''
+                typeof venda.identificacao === 'string' && venda.identificacao.trim() !== ''
                   ? venda.identificacao.trim()
-                  : null) || resumo?.identificacao || null
+                  : null
               const nomesDiferentes = Boolean(
                 identificacao && clienteNome && identificacao !== clienteNome
               )
               const nomePrincipal = nomesDiferentes ? identificacao : identificacao || clienteNome
               const nomeSecundario = nomesDiferentes ? clienteNome : null
-              const compartilhada = venda.vendaCompartilhada === true || resumo?.vendaCompartilhada === true
-              const rodizioAberto = resumo?.rodizioAberto === true
+              const compartilhada = venda.vendaCompartilhada === true
+              const rodizioAberto = venda.rodizioAberto === true
               const senhaExibir =
                 typeof venda.senha === 'string' && venda.senha.trim() !== ''
                   ? venda.senha.trim()
@@ -725,7 +539,6 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
               const tempoExibido = formatElapsedTime(
                 mesaParada ? referenciaParada(venda) : venda.dataCriacao
               )
-              const ultimoLancamentoTime = formatElapsedTime(ultimoLancamentoRef)
               const movimentoTooltip = `Aberta há ${formatDiffTooltip(minutosAberta)}\n\nÚltimo produto há ${formatDiffTooltip(minutosUltimoProduto)}`
               const innerCircleColor = getCorMesaPorTempoJS(referenciaParada(venda))
 
@@ -738,6 +551,27 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
                   }}
                   className="relative flex min-h-[210px] cursor-pointer flex-col items-center justify-between rounded-lg bg-info px-1 shadow-sm shadow-primary-text/50 transition-all hover:bg-primary/5 md:w-[200px]"
                 >
+                  {compartilhada ? (
+                    <span
+                      className="absolute left-1.5 top-1.5 z-[1] flex h-5 w-5 items-center justify-center rounded-full border border-primary/40 text-primary/70"
+                      title="Compartilhamento ativo"
+                      aria-label="Compartilhamento ativo"
+                    >
+                      <MdShare
+                        size={12}
+                        className="relative -translate-x-[1px] shrink-0 leading-none"
+                      />
+                    </span>
+                  ) : null}
+                  {totalRemovidos > 0 ? (
+                    <span
+                      className="absolute right-1.5 top-1.5 z-[1] flex h-5 w-5 items-center justify-center rounded-full border border-error/50 text-error"
+                      title="Possui itens removidos"
+                      aria-label="Possui itens removidos"
+                    >
+                      <MdDeleteOutline size={12} className="shrink-0 leading-none" />
+                    </span>
+                  ) : null}
                   <div className="flex w-full flex-grow flex-col items-center justify-center">
                     <TipoVendaIcon
                       tipoVenda={venda.tipoVenda}
@@ -770,18 +604,11 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
                         Terminal #{codigoTerminalExibir}
                       </span>
                     ) : null}
-                    {compartilhada || rodizioAberto ? (
+                    {rodizioAberto ? (
                       <div className="mt-1 flex flex-wrap items-center justify-center gap-1">
-                        {compartilhada ? (
-                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                            Compartilhada
-                          </span>
-                        ) : null}
-                        {rodizioAberto ? (
-                          <span className="rounded-full bg-warning/40 px-2 py-0.5 text-[10px] font-semibold text-primary-text">
-                            Rodízio
-                          </span>
-                        ) : null}
+                        <span className="rounded-full bg-warning/40 px-2 py-0.5 text-[10px] font-semibold text-primary-text">
+                          Rodízio
+                        </span>
                       </div>
                     ) : null}
                   </div>
@@ -795,20 +622,16 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
                       <div className="flex flex-col items-start">
                         <span className="font-semibold">Valor atual</span>
                         <span>{formatCurrency(venda.valorFinal)}</span>
-                        {(temDescontoVenda || temAcrescimoVenda || totalRemovidos > 0) && (
+                        {(temDescontoVenda || temAcrescimoVenda) && (
                           <span className="mt-0.5 flex flex-wrap gap-1 text-[10px] font-normal text-secondary-text">
                             {temDescontoVenda ? <span>Desc.</span> : null}
                             {temAcrescimoVenda ? <span>Acrésc.</span> : null}
-                            {totalRemovidos > 0 ? <span>Removidos</span> : null}
                           </span>
                         )}
                       </div>
                       <div className="flex flex-col items-end">
                         <span className="font-semibold">{rotuloTempo}</span>
                         <span>{tempoExibido}</span>
-                        <span className="mt-0.5 text-[10px] font-normal text-secondary-text">
-                          Últ. lanç. {ultimoLancamentoTime}
-                        </span>
                       </div>
                     </div>
                   </div>
