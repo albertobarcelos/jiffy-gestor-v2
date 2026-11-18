@@ -536,6 +536,14 @@ html.expedicao-app-viewport [role='tab'] {
   touch-action: manipulation;
 }
 
+/* Botão na lista (meios de pagamento, pedido) precisa pan-y; senão o gesto não rola. */
+html.expedicao-app-viewport [data-expedicao-scroll] button,
+html.expedicao-app-viewport [data-expedicao-scroll] a,
+html.expedicao-app-viewport [data-expedicao-scroll] [role='button'],
+html.expedicao-app-viewport [data-expedicao-scroll] [role='tab'] {
+  touch-action: pan-y;
+}
+
 html.expedicao-app-viewport input,
 html.expedicao-app-viewport textarea,
 html.expedicao-app-viewport select {
