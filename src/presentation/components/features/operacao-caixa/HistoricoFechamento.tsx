@@ -3,9 +3,20 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import { MdSearch, MdCalendarToday, MdFilterAltOff, MdFilterList, MdClose } from 'react-icons/md'
+import {
+  MdSearch,
+  MdCalendarToday,
+  MdFilterAltOff,
+  MdFilterList,
+  MdClose,
+  MdPrint,
+} from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
+import { useEstacaoImpressaoDestePc } from '@/src/presentation/hooks/useEstacaoImpressaoQueries'
+import { criarEstacaoImpressaoUseCases } from '@/src/presentation/hooks/estacao-impressao/criarEstacaoDestePcUseCases'
+import { imprimirFechamentoCaixaTerminalPorId } from '@/src/infrastructure/printing/imprimirCupomFechamentoCaixaTerminal'
 import {
   FormControl,
   InputAdornment,
@@ -195,6 +206,8 @@ const sxHistoricoFiltroTextFieldDate = {
  */
 export function HistoricoFechamento() {
   const { timezoneAgregacao } = useEmpresaMe()
+  const { preferenciasImpressaoDelivery } = usePreferenciasImpressaoDelivery()
+  const estacaoImpressaoQuery = useEstacaoImpressaoDestePc(true)
 
   // Estados de filtros
   const [searchQuery, setSearchQuery] = useState('')
@@ -219,6 +232,7 @@ export function HistoricoFechamento() {
   // Estados de dados
   const [operacoesCaixa, setOperacoesCaixa] = useState<OperacaoCaixa[]>([])
   const [terminais, setTerminais] = useState<Terminal[]>([])
+  const [nomesUsuariosPdvPorId, setNomesUsuariosPdvPorId] = useState<Record<string, string>>({})
 
   // Estados de UI
   const [isLoading, setIsLoading] = useState(false)
@@ -228,6 +242,7 @@ export function HistoricoFechamento() {
   const [isLoadingTerminais, setIsLoadingTerminais] = useState(false)
   const [selectedOperacaoId, setSelectedOperacaoId] = useState<string | null>(null)
   const [isDetalhesModalOpen, setIsDetalhesModalOpen] = useState(false)
+  const [imprimindoOperacaoId, setImprimindoOperacaoId] = useState<string | null>(null)
   const [filtrosVisiveis, setFiltrosVisiveis] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true
     return window.innerWidth >= 768 // md breakpoint
@@ -556,6 +571,48 @@ export function HistoricoFechamento() {
     }
   }, [])
 
+  /** Resolve `abertoPorId` → nome (API da lista não envia nome de quem abriu). */
+  const loadAllUsuariosPdv = useCallback(async () => {
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+    if (!token) return
+
+    try {
+      const nomes: Record<string, string> = {}
+      let offset = 0
+      let hasMore = true
+      const limit = 100
+
+      while (hasMore) {
+        const params = new URLSearchParams({
+          limit: String(limit),
+          offset: String(offset),
+        })
+        const response = await fetchGestorApi(`/api/usuarios?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+        if (!response.ok) break
+
+        const data = await response.json()
+        const items = Array.isArray(data.items) ? data.items : []
+        for (const item of items) {
+          const id = String(item?.id ?? '').trim()
+          if (!id || nomes[id]) continue
+          const nome = String(item?.nome || item?.name || '').trim()
+          if (nome) nomes[id] = nome
+        }
+        hasMore = items.length === limit
+        offset += items.length
+      }
+
+      setNomesUsuariosPdvPorId(nomes)
+    } catch (error) {
+      console.error('Erro ao carregar usuários PDV:', error)
+    }
+  }, [])
+
   // Debounce para busca
   useEffect(() => {
     if (debounceTimerRef.current) {
@@ -722,9 +779,63 @@ export function HistoricoFechamento() {
   // Carrega dados iniciais
   useEffect(() => {
     loadAllTerminais()
+    void loadAllUsuariosPdv()
     fetchOperacoesCaixa(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const handleImprimirOperacao = useCallback(
+    async (operacaoId: string) => {
+      if (!operacaoId.trim() || imprimindoOperacaoId) return
+
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!token) {
+        showToast.error('Sessão expirada. Faça login novamente.')
+        return
+      }
+
+      setImprimindoOperacaoId(operacaoId)
+      try {
+        let mapeamentos = estacaoImpressaoQuery.data?.mapeamentos ?? []
+        if (mapeamentos.length === 0) {
+          const refetch = await estacaoImpressaoQuery.refetch()
+          mapeamentos = refetch.data?.mapeamentos ?? []
+        }
+        if (mapeamentos.length === 0) {
+          const config = await criarEstacaoImpressaoUseCases(token).resolverDestePc.execute()
+          mapeamentos = config.mapeamentos
+        }
+
+        const resultado = await imprimirFechamentoCaixaTerminalPorId({
+          token,
+          operacaoCaixaId: operacaoId,
+          impressoraExpedicaoId: preferenciasImpressaoDelivery.impressoraExpedicaoId,
+          mapeamentos,
+          reprintKey: `lista-${Date.now()}`,
+        })
+
+        if (resultado.ok) {
+          showToast.success('Cupom enviado à impressora de expedição.')
+          return
+        }
+
+        showToast.error(
+          resultado.mensagem?.trim() || 'Não foi possível enviar o cupom para impressão.'
+        )
+      } catch (error) {
+        showToast.error(
+          error instanceof Error ? error.message : 'Não foi possível enviar o cupom para impressão.'
+        )
+      } finally {
+        setImprimindoOperacaoId(null)
+      }
+    },
+    [
+      imprimindoOperacaoId,
+      estacaoImpressaoQuery,
+      preferenciasImpressaoDelivery.impressoraExpedicaoId,
+    ]
+  )
 
   /**
    * Limpa todos os filtros
@@ -990,11 +1101,15 @@ export function HistoricoFechamento() {
         <div className="mt-2 flex items-center bg-custom-2 px-3 py-2 text-sm font-semibold text-primary-text">
           <div className="hidden flex-1 md:flex">Cód. Terminal</div>
           <div className="flex-[1.5] text-[11px] md:text-sm">Terminal</div>
-          <div className="hidden flex-[2] md:block">Fechado por</div>
+          <div className="hidden flex-[1.5] md:block">Aberto por</div>
+          <div className="hidden flex-[1.5] md:block">Fechado por</div>
           <div className="flex-1 text-[11px] md:text-sm">Dt. Aberto</div>
           <div className="flex-1 text-[11px] md:text-sm">Dt. Fechado</div>
           <div className="hidden flex-1 text-center md:block">Período Aberto</div>
-          <div className="flex-1 text-right text-[11px] md:text-center md:text-sm">Status</div>
+          <div className="flex flex-1 items-center justify-end gap-2 text-[11px] md:justify-center md:text-sm">
+            <span>Status</span>
+            <span className="inline-flex w-8 shrink-0" aria-hidden />
+          </div>
         </div>
 
         {/* Lista de Operações */}
@@ -1023,6 +1138,9 @@ export function HistoricoFechamento() {
                   operacao.dataFechamento
                 )
                 const isZebraEven = index % 2 === 0
+                const abertoPorId = operacao.abertoPorId?.trim() || ''
+                const nomeAbertoPor =
+                  (abertoPorId && nomesUsuariosPdvPorId[abertoPorId]) || '-'
 
                 return (
                   <div
@@ -1038,7 +1156,10 @@ export function HistoricoFechamento() {
                       <div className="flex-[1.5] text-[11px] md:text-sm">
                         {operacao.nomeTerminal || '-'}
                       </div>
-                      <div className="hidden flex-[2] md:block">
+                      <div className="hidden flex-[1.5] truncate md:block" title={nomeAbertoPor}>
+                        {nomeAbertoPor}
+                      </div>
+                      <div className="hidden flex-[1.5] truncate md:block">
                         {operacao.nomeResponsavelFechamento || '-'}
                       </div>
                       <div className="flex flex-1 flex-col items-center text-center text-[11px] md:items-start md:text-left md:text-sm">
@@ -1050,7 +1171,7 @@ export function HistoricoFechamento() {
                         <span className="">{dataFechamento ? dataFechamento.time : ''}</span>
                       </div>
                       <div className="hidden flex-1 text-center md:block">{periodoAberto}</div>
-                      <div className="flex flex-1 items-end justify-end md:justify-center">
+                      <div className="flex flex-1 items-center justify-end gap-2 md:justify-center">
                         <span
                           className={`rounded px-1 py-1 text-[10px] md:px-3 md:text-xs md:font-semibold ${
                             operacao.status === 'aberto'
@@ -1060,6 +1181,27 @@ export function HistoricoFechamento() {
                         >
                           {operacao.status === 'aberto' ? 'Aberto' : 'Fechado'}
                         </span>
+                        {operacao.status === 'fechado' ? (
+                          <button
+                            type="button"
+                            title="Imprimir fechamento"
+                            aria-label="Imprimir fechamento"
+                            disabled={imprimindoOperacaoId === operacao.id}
+                            onClick={event => {
+                              event.stopPropagation()
+                              void handleImprimirOperacao(operacao.id)
+                            }}
+                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {imprimindoOperacaoId === operacao.id ? (
+                              <CircularProgress size={16} color="inherit" />
+                            ) : (
+                              <MdPrint size={18} />
+                            )}
+                          </button>
+                        ) : (
+                          <span className="inline-flex h-8 w-8 shrink-0" aria-hidden />
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1124,6 +1266,11 @@ export function HistoricoFechamento() {
           onClose={() => {
             setIsDetalhesModalOpen(false)
             setSelectedOperacaoId(null)
+          }}
+          onFechado={() => {
+            setIsDetalhesModalOpen(false)
+            setSelectedOperacaoId(null)
+            void fetchOperacoesCaixa(true)
           }}
         />
       )}
