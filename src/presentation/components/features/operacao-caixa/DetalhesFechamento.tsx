@@ -5,9 +5,16 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
 import { MdClose } from 'react-icons/md'
-import { CircularProgress } from '@mui/material'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { FecharCaixaTerminalSidePanel } from './FecharCaixaTerminalSidePanel'
+import { MovimentacaoCaixaTerminalSidePanel } from './MovimentacaoCaixaTerminalSidePanel'
+import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
+import { useEstacaoImpressaoDestePc } from '@/src/presentation/hooks/useEstacaoImpressaoQueries'
+import { criarEstacaoImpressaoUseCases } from '@/src/presentation/hooks/estacao-impressao/criarEstacaoDestePcUseCases'
+import {
+  imprimirCupomFechamentoCaixaTerminal,
+} from '@/src/infrastructure/printing/imprimirCupomFechamentoCaixaTerminal'
 
 // Tipos
 interface OperacaoCaixaDetalhada {
@@ -70,14 +77,26 @@ interface DetalhesFechamentoProps {
   idOperacaoCaixa: string
   open: boolean
   onClose: () => void
+  onFechado?: () => void
 }
 
 /**
  * Modal de detalhes de fechamento de caixa
  * Exibe informações completas em formato de cupom fiscal
  */
-export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesFechamentoProps) {  const [operacaoCaixa, setOperacaoCaixa] = useState<OperacaoCaixaDetalhada | null>(null)
+export function DetalhesFechamento({
+  idOperacaoCaixa,
+  open,
+  onClose,
+  onFechado,
+}: DetalhesFechamentoProps) {
+  const [operacaoCaixa, setOperacaoCaixa] = useState<OperacaoCaixaDetalhada | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [painelAberto, setPainelAberto] = useState<'fechar' | 'sangria' | 'suprimento' | null>(null)
+  const [imprimindo, setImprimindo] = useState(false)
+  const [erroImpressao, setErroImpressao] = useState<string | null>(null)
+  const { preferenciasImpressaoDelivery } = usePreferenciasImpressaoDelivery()
+  const estacaoImpressaoQuery = useEstacaoImpressaoDestePc(open)
 
   /**
    * Formata valor como moeda brasileira
@@ -189,16 +208,72 @@ export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesF
       fetchDetalhesOperacaoCaixa()
     } else {
       setOperacaoCaixa(null)
+      setPainelAberto(null)
+      setErroImpressao(null)
     }
   }, [open, idOperacaoCaixa])
 
+  async function handleImprimir() {
+    if (!operacaoCaixa || imprimindo) return
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+    if (!token) {
+      setErroImpressao('Sessão expirada. Faça login novamente.')
+      showToast.error('Sessão expirada.')
+      return
+    }
+
+    setImprimindo(true)
+    setErroImpressao(null)
+    try {
+      let mapeamentos = estacaoImpressaoQuery.data?.mapeamentos ?? []
+      if (mapeamentos.length === 0) {
+        const refetch = await estacaoImpressaoQuery.refetch()
+        mapeamentos = refetch.data?.mapeamentos ?? []
+      }
+      if (mapeamentos.length === 0) {
+        const config = await criarEstacaoImpressaoUseCases(token).resolverDestePc.execute()
+        mapeamentos = config.mapeamentos
+      }
+
+      const resultado = await imprimirCupomFechamentoCaixaTerminal({
+        operacao: operacaoCaixa,
+        impressoraExpedicaoId: preferenciasImpressaoDelivery.impressoraExpedicaoId,
+        mapeamentos,
+        reprintKey: `modal-${Date.now()}`,
+      })
+
+      if (resultado.ok) {
+        showToast.success('Cupom enviado à impressora de expedição.')
+        return
+      }
+
+      const mensagem =
+        resultado.mensagem?.trim() || 'Não foi possível enviar o cupom para impressão.'
+      setErroImpressao(mensagem)
+      showToast.error(mensagem)
+    } catch (error) {
+      const mensagem =
+        error instanceof Error ? error.message : 'Não foi possível enviar o cupom para impressão.'
+      setErroImpressao(mensagem)
+      showToast.error(mensagem)
+    } finally {
+      setImprimindo(false)
+    }
+  }
+
   if (!open) return null
 
+  const podeFechar =
+    operacaoCaixa?.status === 'aberto' && Boolean(operacaoCaixa.terminalId?.trim())
+  const valorEsperado = operacaoCaixa?.resumoCaixa?.valorLiquidoDinheiroCaixa ?? 0
+
   return (
+    <>
     <Dialog
       open={open}
       onOpenChange={(isOpen) => {
         if (!isOpen) {
+          setPainelAberto(null)
           onClose()
         }
       }}
@@ -493,8 +568,96 @@ export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesF
             </div>
           )}
         </div>
+
+        {operacaoCaixa && !isLoading ? (
+          <div className="border-t border-black/10 bg-[#FFFFD9] px-4 py-3">
+            {erroImpressao ? (
+              <p className="mb-2 text-xs leading-relaxed text-red-700">{erroImpressao}</p>
+            ) : null}
+            {podeFechar ? (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <button
+                  type="button"
+                  onClick={() => setPainelAberto('suprimento')}
+                  className="flex h-11 items-center justify-center rounded-xl border border-primary/30 bg-white text-sm font-semibold text-primary transition-colors hover:bg-primary/[0.03]"
+                >
+                  Suprimento
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPainelAberto('sangria')}
+                  className="flex h-11 items-center justify-center rounded-xl border border-primary/30 bg-white text-sm font-semibold text-primary transition-colors hover:bg-primary/[0.03]"
+                >
+                  Sangria
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPainelAberto('fechar')}
+                  className="flex h-11 items-center justify-center rounded-xl bg-primary text-sm font-semibold text-white transition-colors hover:brightness-95"
+                >
+                  Fechar caixa
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                disabled={imprimindo}
+                onClick={() => void handleImprimir()}
+                className="flex h-11 w-full items-center justify-center rounded-full bg-primary text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+              >
+                {imprimindo ? 'Enviando…' : 'Imprimir'}
+              </button>
+            )}
+          </div>
+        ) : null}
       </DialogContent>
     </Dialog>
+
+    {podeFechar && operacaoCaixa?.terminalId ? (
+      <>
+        <FecharCaixaTerminalSidePanel
+          open={painelAberto === 'fechar'}
+          onClose={() => setPainelAberto(null)}
+          onFechado={() => {
+            setPainelAberto(null)
+            onFechado?.()
+            onClose()
+          }}
+          terminalId={operacaoCaixa.terminalId}
+          codigoTerminal={operacaoCaixa.codigoTerminal}
+          nomeTerminal={operacaoCaixa.nomeTerminal}
+          valorEsperado={valorEsperado}
+          abertoPorId={operacaoCaixa.abertoPorId}
+        />
+        <MovimentacaoCaixaTerminalSidePanel
+          open={painelAberto === 'sangria'}
+          onClose={() => setPainelAberto(null)}
+          onRegistrado={() => {
+            void fetchDetalhesOperacaoCaixa()
+          }}
+          tipo="sangria"
+          terminalId={operacaoCaixa.terminalId}
+          codigoTerminal={operacaoCaixa.codigoTerminal}
+          nomeTerminal={operacaoCaixa.nomeTerminal}
+          saldoDisponivel={valorEsperado}
+          abertoPorId={operacaoCaixa.abertoPorId}
+        />
+        <MovimentacaoCaixaTerminalSidePanel
+          open={painelAberto === 'suprimento'}
+          onClose={() => setPainelAberto(null)}
+          onRegistrado={() => {
+            void fetchDetalhesOperacaoCaixa()
+          }}
+          tipo="suprimento"
+          terminalId={operacaoCaixa.terminalId}
+          codigoTerminal={operacaoCaixa.codigoTerminal}
+          nomeTerminal={operacaoCaixa.nomeTerminal}
+          saldoDisponivel={valorEsperado}
+          abertoPorId={operacaoCaixa.abertoPorId}
+        />
+      </>
+    ) : null}
+    </>
   )
 }
 
