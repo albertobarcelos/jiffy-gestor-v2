@@ -150,6 +150,20 @@ export class VendaDetalheReadRepository implements IVendaDetalheReadRepository {
   fetchMeioPagamento(meioId: string, token: string) {
     return fetchJson<Record<string, unknown>>(`/api/meios-pagamentos/${meioId}`, token)
   }
+
+  fetchTerminalDetalhes(terminalId: string, token: string) {
+    return fetchJson<Record<string, unknown>>(
+      `/api/terminais/${encodeURIComponent(terminalId)}/detalhes`,
+      token
+    )
+  }
+
+  fetchEmpresa(empresaId: string, token: string) {
+    return fetchJson<Record<string, unknown>>(
+      `/api/empresas/${encodeURIComponent(empresaId)}`,
+      token
+    )
+  }
 }
 
 export const vendaDetalheReadRepository = new VendaDetalheReadRepository()

@@ -80,6 +80,38 @@ export function brToEUA(valorBr: string): number {
   return parseFloat(valor) || 0.0
 }
 
+export type ParseApiDateOptions = {
+  /**
+   * Workaround homolog/PowerSync: datas com `Z`/offset que na verdade são
+   * horário de parede da loja. Ignora o fuso e interpreta no fuso local do browser.
+   */
+  asLocalWallClock?: boolean
+}
+
+const API_DATE_TZ_SUFFIX = /([zZ]|[+-]\d{2}(?::?\d{2})?)$/
+
+/**
+ * Instantâneo de uma data vinda da API.
+ * - Com `Z` ou offset: instante UTC real.
+ * - Sem fuso (ex.: compartilhador): horário local do browser.
+ * - `asLocalWallClock`: força ignorar `Z`/offset (paliativo legado; preferir o padrão acima).
+ */
+export function parseApiDateMs(
+  value: Date | string | null | undefined,
+  options?: ParseApiDateOptions
+): number {
+  if (value instanceof Date) return value.getTime()
+  const raw = typeof value === 'string' ? value.trim() : ''
+  if (!raw) return Number.NaN
+
+  if (options?.asLocalWallClock) {
+    const wallClock = raw.replace(API_DATE_TZ_SUFFIX, '')
+    return new Date(wallClock).getTime()
+  }
+
+  return new Date(raw).getTime()
+}
+
 /**
  * Formata o tempo decorrido desde uma data inicial de forma dinâmica.
  * - Até 10 minutos: "agora"
@@ -87,27 +119,13 @@ export function brToEUA(valorBr: string): number {
  * - De 1 hora a 23 horas e 59 minutos: "Xh Y min" (arredondado para o múltiplo de 10 minutos mais próximo)
  * - A partir de 24 horas: "X dias" (arredondado para o dia mais próximo)
  */
-export function formatElapsedTime(initialDate: Date | string): string {
-  const parseAsLocalWallTime = (value: Date | string): number => {
-    if (value instanceof Date) return value.getTime()
-
-    const raw = value || ''
-    // Remove sufixo de fuso (Z ou ±hh:mm) para interpretar como horário local "puro"
-    const stripped = raw.replace(/([+-]\d{2}:\d{2}|[zZ])$/, '')
-    const localParsed = new Date(stripped)
-
-    if (!Number.isNaN(localParsed.getTime())) {
-      return localParsed.getTime()
-    }
-
-    // Fallback para parsing padrão caso a limpeza falhe
-    const fallback = new Date(raw)
-    return fallback.getTime()
-  }
-
-  const startMs = parseAsLocalWallTime(initialDate)
+export function formatElapsedTime(
+  initialDate: Date | string,
+  options?: ParseApiDateOptions
+): string {
+  const startMs = parseApiDateMs(initialDate, options)
   const nowMs = Date.now()
-  const diffMs = nowMs - startMs
+  const diffMs = nowMs - (Number.isNaN(startMs) ? nowMs : startMs)
   const diffMinutes = Math.floor(diffMs / (1000 * 60));
 
   if (diffMinutes <= 10) {
