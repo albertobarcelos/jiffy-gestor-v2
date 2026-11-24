@@ -7,8 +7,11 @@ export const COR_MESA_FINAL = '#E6AA37'
 export const COR_MESA_DUR_MIN_MS = MESA_PARADA_MINUTOS * 60 * 1000
 export const COR_MESA_DUR_MAX_MS = 2 * 60 * 60 * 1000
 
+/** Datas de mesa na homolog costumam vir com Z falso (hora local etiquetada como UTC). */
+export const MESA_API_DATE_PARSE = { asLocalWallClock: true } as const
+
 export function toMsApiDate(value: Date | string): number {
-  const ms = parseApiDateMs(value)
+  const ms = parseApiDateMs(value, MESA_API_DATE_PARSE)
   return Number.isNaN(ms) ? Date.now() : ms
 }
 

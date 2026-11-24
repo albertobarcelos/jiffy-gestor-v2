@@ -2,6 +2,10 @@ import type {
   MovimentacaoVendaPainelDTO,
   PizzaLancadaPainelDTO,
 } from '@/src/application/dto/VendaPainelDetalheDTO'
+import {
+  parseApiDateMs,
+  type ParseApiDateOptions,
+} from '@/src/shared/utils/formatters'
 
 export function nomeExibicaoUsuario(
   id: string | undefined,
@@ -95,8 +99,12 @@ export function formatNumberPtBr(value: number): string {
   }).format(value)
 }
 
-export function formatDateTimePtBr(dateString: string): string {
-  const date = new Date(dateString)
+export function formatDateTimePtBr(
+  dateString: string,
+  options?: ParseApiDateOptions
+): string {
+  const ms = parseApiDateMs(dateString, options)
+  const date = Number.isNaN(ms) ? new Date(dateString) : new Date(ms)
   return date.toLocaleString('pt-BR', {
     day: '2-digit',
     month: 'short',

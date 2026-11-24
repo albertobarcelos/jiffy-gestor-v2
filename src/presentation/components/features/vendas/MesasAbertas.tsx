@@ -161,6 +161,8 @@ export function MesasAbertas() {
             void refetch()
           }}
           onAfterClose={() => setSelectedVendaId(null)}
+          tipoVendaLista="mesa"
+          datasComoHorarioLocalWallClock
         />
       ) : null}
     </div>

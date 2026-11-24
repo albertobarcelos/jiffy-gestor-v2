@@ -80,14 +80,34 @@ export function brToEUA(valorBr: string): number {
   return parseFloat(valor) || 0.0
 }
 
+export type ParseApiDateOptions = {
+  /**
+   * Workaround homolog/PowerSync: datas com `Z`/offset que na verdade são
+   * horário de parede da loja. Ignora o fuso e interpreta no fuso local do browser.
+   */
+  asLocalWallClock?: boolean
+}
+
+const API_DATE_TZ_SUFFIX = /([zZ]|[+-]\d{2}(?::?\d{2})?)$/
+
 /**
  * Instantâneo de uma data vinda da API.
  * Com `Z` ou offset, usa o instante real. Sem fuso, o relógio vale como horário local.
+ * Com `asLocalWallClock`, descarta `Z`/offset e trata o relógio como local.
  */
-export function parseApiDateMs(value: Date | string | null | undefined): number {
+export function parseApiDateMs(
+  value: Date | string | null | undefined,
+  options?: ParseApiDateOptions
+): number {
   if (value instanceof Date) return value.getTime()
   const raw = typeof value === 'string' ? value.trim() : ''
   if (!raw) return Number.NaN
+
+  if (options?.asLocalWallClock) {
+    const wallClock = raw.replace(API_DATE_TZ_SUFFIX, '')
+    return new Date(wallClock).getTime()
+  }
+
   return new Date(raw).getTime()
 }
 
@@ -98,8 +118,11 @@ export function parseApiDateMs(value: Date | string | null | undefined): number 
  * - De 1 hora a 23 horas e 59 minutos: "Xh Y min" (arredondado para o múltiplo de 10 minutos mais próximo)
  * - A partir de 24 horas: "X dias" (arredondado para o dia mais próximo)
  */
-export function formatElapsedTime(initialDate: Date | string): string {
-  const startMs = parseApiDateMs(initialDate)
+export function formatElapsedTime(
+  initialDate: Date | string,
+  options?: ParseApiDateOptions
+): string {
+  const startMs = parseApiDateMs(initialDate, options)
   const nowMs = Date.now()
   const diffMs = nowMs - (Number.isNaN(startMs) ? nowMs : startMs)
   const diffMinutes = Math.floor(diffMs / (1000 * 60));
