@@ -162,7 +162,6 @@ export function MesasAbertas() {
           }}
           onAfterClose={() => setSelectedVendaId(null)}
           tipoVendaLista="mesa"
-          datasComoHorarioLocalWallClock
         />
       ) : null}
     </div>

@@ -49,8 +49,6 @@ interface DetalhesVendasProps {
   tipoVendaLista?: string
   tipoEntregaLista?: 'entrega' | 'retirada' | null
   numeroMesaLista?: number
-  /** Workaround homolog: datas de mesa com Z falso. */
-  datasComoHorarioLocalWallClock?: boolean
 }
 
 const PANEL_MS_DETALHES = { enter: 420, exit: 380 } as const
@@ -75,7 +73,6 @@ export function DetalhesVendas({
   tipoVendaLista,
   tipoEntregaLista,
   numeroMesaLista,
-  datasComoHorarioLocalWallClock = false,
 }: DetalhesVendasProps) {
   const {
     venda,
@@ -285,7 +282,6 @@ export function DetalhesVendas({
                         venda={venda}
                         nomesUsuarios={nomesUsuarios}
                         nomeCliente={nomeCliente}
-                        datasComoHorarioLocalWallClock={datasComoHorarioLocalWallClock}
                       />
                       <DetalhesVendaProdutosSection
                         venda={venda}
@@ -293,7 +289,6 @@ export function DetalhesVendas({
                         ajustesTotaisVenda={ajustesTotaisVenda}
                         totalVendaCalculado={totalVendaCalculado}
                         temTaxaComValor={temTaxaComValor}
-                        datasComoHorarioLocalWallClock={datasComoHorarioLocalWallClock}
                       />
                       <DetalhesVendaRodizioSection venda={venda} />
                       <DetalhesVendaTransferenciasSection transferencias={transferencias} />

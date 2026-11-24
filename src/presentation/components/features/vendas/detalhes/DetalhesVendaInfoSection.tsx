@@ -17,22 +17,12 @@ type Props = {
   venda: VendaPainelDetalheDTO
   nomesUsuarios: Record<string, string>
   nomeCliente: string | null
-  /** Workaround sync: datas com Z falso (hora local etiquetada como UTC). */
-  datasComoHorarioLocalWallClock?: boolean
 }
 
-export function DetalhesVendaInfoSection({
-  venda,
-  nomesUsuarios,
-  nomeCliente,
-  datasComoHorarioLocalWallClock = false,
-}: Props) {
+export function DetalhesVendaInfoSection({ venda, nomesUsuarios, nomeCliente }: Props) {
   const statusVenda = statusVendaPainel(venda)
   const statusColor = statusVendaPainelColor(statusVenda)
-  const dateOpts = datasComoHorarioLocalWallClock
-    ? { asLocalWallClock: true as const }
-    : undefined
-  const formatDateTime = (value: string) => formatDateTimePtBr(value, dateOpts)
+  const formatDateTime = formatDateTimePtBr
 
   return (
                   <div className="mb-2 p-2">

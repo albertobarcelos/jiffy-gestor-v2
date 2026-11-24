@@ -23,7 +23,6 @@ type Props = {
   ajustesTotaisVenda: AjustesTotaisVendaPainel
   totalVendaCalculado: number
   temTaxaComValor: boolean
-  datasComoHorarioLocalWallClock?: boolean
 }
 
 export function DetalhesVendaProdutosSection({
@@ -32,15 +31,11 @@ export function DetalhesVendaProdutosSection({
   ajustesTotaisVenda,
   totalVendaCalculado,
   temTaxaComValor,
-  datasComoHorarioLocalWallClock = false,
 }: Props) {
   const statusVenda = statusVendaPainel(venda)
   const formatCurrency = formatCurrencyBrl
   const formatNumber = formatNumberPtBr
-  const dateOpts = datasComoHorarioLocalWallClock
-    ? { asLocalWallClock: true as const }
-    : undefined
-  const formatDateTime = (value: string) => formatDateTimePtBr(value, dateOpts)
+  const formatDateTime = formatDateTimePtBr
 
   return (
               <div className="mb-2 p-2">

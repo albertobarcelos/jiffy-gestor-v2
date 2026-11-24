@@ -8,7 +8,6 @@ import {
   formatDiffTooltipMinutos,
   getCorMesaPorTempo,
   isMesaParada,
-  MESA_API_DATE_PARSE,
   minutosDesdeApiDate,
   referenciaParadaMesa,
 } from '@/src/shared/helpers/mesasAbertas'
@@ -55,10 +54,7 @@ export function MesaAbertaCard({ venda, usuarioNome, onClick }: MesaAbertaCardPr
   const minutosUltimoProduto = minutosDesdeApiDate(ultimoLancamentoRef)
   const mesaParada = isMesaParada(venda)
   const rotuloTempo = mesaParada ? 'Parada há' : 'Aberta há'
-  const tempoExibido = formatElapsedTime(
-    mesaParada ? refParada : venda.dataCriacao,
-    MESA_API_DATE_PARSE
-  )
+  const tempoExibido = formatElapsedTime(mesaParada ? refParada : venda.dataCriacao)
   const movimentoTooltip = `Aberta há ${formatDiffTooltipMinutos(minutosAberta)}\n\nÚltimo produto há ${formatDiffTooltipMinutos(minutosUltimoProduto)}`
   const innerCircleColor = getCorMesaPorTempo(refParada)
 

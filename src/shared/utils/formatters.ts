@@ -92,8 +92,9 @@ const API_DATE_TZ_SUFFIX = /([zZ]|[+-]\d{2}(?::?\d{2})?)$/
 
 /**
  * Instantâneo de uma data vinda da API.
- * Com `Z` ou offset, usa o instante real. Sem fuso, o relógio vale como horário local.
- * Com `asLocalWallClock`, descarta `Z`/offset e trata o relógio como local.
+ * - Com `Z` ou offset: instante UTC real.
+ * - Sem fuso (ex.: compartilhador): horário local do browser.
+ * - `asLocalWallClock`: força ignorar `Z`/offset (paliativo legado; preferir o padrão acima).
  */
 export function parseApiDateMs(
   value: Date | string | null | undefined,
