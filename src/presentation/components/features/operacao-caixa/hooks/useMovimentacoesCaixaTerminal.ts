@@ -18,26 +18,26 @@ function mapMovimentacoes(body: unknown): MovimentacaoCaixaTerminalDTO[] {
       ? (body as { items: unknown[] }).items
       : []
 
-  return list
-    .map(item => {
-      if (!item || typeof item !== 'object') return null
-      const raw = item as Record<string, unknown>
-      const id = String(raw.id ?? '').trim()
-      if (!id) return null
-      return {
-        id,
-        valor: Number(raw.valor ?? 0),
-        descricao: raw.descricao == null ? null : String(raw.descricao),
-        operacaoCaixaId: raw.operacaoCaixaId ? String(raw.operacaoCaixaId) : undefined,
-        realizadoPorId: raw.realizadoPorId ? String(raw.realizadoPorId) : undefined,
-        nomeResponsavel:
-          raw.nomeResponsavel == null
-            ? (raw as { realizadoPor?: { nome?: string } }).realizadoPor?.nome ?? null
-            : String(raw.nomeResponsavel),
-        dataCriacao: String(raw.dataCriacao ?? ''),
-      } satisfies MovimentacaoCaixaTerminalDTO
+  const mapped: MovimentacaoCaixaTerminalDTO[] = []
+  for (const item of list) {
+    if (!item || typeof item !== 'object') continue
+    const raw = item as Record<string, unknown>
+    const id = String(raw.id ?? '').trim()
+    if (!id) continue
+    mapped.push({
+      id,
+      valor: Number(raw.valor ?? 0),
+      descricao: raw.descricao == null ? null : String(raw.descricao),
+      operacaoCaixaId: raw.operacaoCaixaId ? String(raw.operacaoCaixaId) : undefined,
+      realizadoPorId: raw.realizadoPorId ? String(raw.realizadoPorId) : undefined,
+      nomeResponsavel:
+        raw.nomeResponsavel == null
+          ? (raw as { realizadoPor?: { nome?: string } }).realizadoPor?.nome ?? null
+          : String(raw.nomeResponsavel),
+      dataCriacao: String(raw.dataCriacao ?? ''),
     })
-    .filter((item): item is MovimentacaoCaixaTerminalDTO => item != null)
+  }
+  return mapped
 }
 
 export function useHistoricoMovimentacoesCaixaTerminal(
