@@ -81,7 +81,7 @@ export const MenuCategoriaNesteCardapioCampos = forwardRef<
 
   return (
     <>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+      <div className="flex flex-col gap-4">
         <div className="flex min-w-0 items-center gap-2 md:gap-3">
           <button
             type="button"
@@ -95,54 +95,64 @@ export const MenuCategoriaNesteCardapioCampos = forwardRef<
               <DinamicIcon iconName={iconName} color={corHex} size={28} />
             ) : null}
           </button>
-          {editandoNome ? (
-            <input
-              ref={inputRef}
-              type="text"
-              aria-label="Nome da categoria neste cardápio"
-              value={nome}
-              disabled={saving}
-              onChange={handleNomeChange}
-              onBlur={() => {
-                if (saving) return
-                if (nome.trim() === nomeSalvo.trim() || !nome.trim()) {
-                  cancelarEdicaoNome()
-                  return
-                }
-                void save()
-              }}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  void save()
-                }
-                if (e.key === 'Escape') {
-                  e.preventDefault()
-                  cancelarEdicaoNome()
-                }
-              }}
-              className="min-w-0 max-w-[18rem] flex-1 border-0 bg-transparent text-sm font-semibold text-primary-text outline-none ring-1 ring-primary/40 md:text-lg"
-            />
-          ) : (
-            <p className="min-w-0 max-w-[18rem] truncate text-sm font-semibold tracking-wide text-primary-text md:text-lg">
-              {nome.trim() ? nome : 'Nome da Categoria'}
+          <div className="min-w-0 flex-1">
+            <p className="mb-0.5 text-[11px] font-medium text-secondary-text">
+              Nome neste cardápio
             </p>
-          )}
-          <button
-            type="button"
-            title="Editar nome neste cardápio"
-            disabled={saving || editandoNome}
-            onClick={iniciarEdicaoNome}
-            className={cn(
-              'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-gray-200 text-primary-text transition-colors hover:bg-primary/10',
-              (saving || editandoNome) && 'cursor-not-allowed opacity-50'
-            )}
-          >
-            <MdModeEdit size={14} />
-          </button>
+            <div className="flex min-w-0 items-center gap-2">
+              {editandoNome ? (
+                <input
+                  ref={inputRef}
+                  type="text"
+                  aria-label="Nome da categoria neste cardápio"
+                  value={nome}
+                  disabled={saving}
+                  onChange={handleNomeChange}
+                  onBlur={() => {
+                    if (saving) return
+                    if (nome.trim() === nomeSalvo.trim() || !nome.trim()) {
+                      cancelarEdicaoNome()
+                      return
+                    }
+                    void save()
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      void save()
+                    }
+                    if (e.key === 'Escape') {
+                      e.preventDefault()
+                      cancelarEdicaoNome()
+                    }
+                  }}
+                  className="min-w-0 w-full border-0 bg-transparent text-sm font-semibold text-primary-text outline-none ring-1 ring-primary/40 md:text-lg"
+                />
+              ) : (
+                <p
+                  className="min-w-0 flex-1 break-words text-sm font-semibold tracking-wide text-primary-text md:text-lg"
+                  title={nome.trim() || undefined}
+                >
+                  {nome.trim() ? nome : 'Nome da Categoria'}
+                </p>
+              )}
+              <button
+                type="button"
+                title="Editar nome neste cardápio"
+                disabled={saving || editandoNome}
+                onClick={iniciarEdicaoNome}
+                className={cn(
+                  'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-gray-200 text-primary-text transition-colors hover:bg-primary/10',
+                  (saving || editandoNome) && 'cursor-not-allowed opacity-50'
+                )}
+              >
+                <MdModeEdit size={14} />
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="w-full max-w-[13rem] shrink-0 sm:w-[13rem]">
+        <div className="w-full max-w-md">
           <Autocomplete<MenuGrupoProduto, false, true, false>
             size="small"
             disableClearable
@@ -152,7 +162,9 @@ export const MenuCategoriaNesteCardapioCampos = forwardRef<
             loading={loadingGrupos}
             loadingText="Carregando..."
             noOptionsText="Nenhuma categoria"
-            getOptionLabel={g => g.nome || g.grupoBase.nome}
+            getOptionLabel={g =>
+              g.grupoBase.nome?.trim() || g.nome?.trim() || 'Categoria base'
+            }
             getOptionKey={g => g.grupoBase.id}
             isOptionEqualToValue={(a, b) => a.grupoBase.id === b.grupoBase.id}
             value={
@@ -191,7 +203,7 @@ export const MenuCategoriaNesteCardapioCampos = forwardRef<
               const { key, ...rest } = props
               const cor = g.grupoBase.corHex?.trim() || '#530CA3'
               const icone = g.grupoBase.iconName?.trim()
-              const label = g.nome || g.grupoBase.nome
+              const label = g.grupoBase.nome?.trim() || g.nome?.trim() || 'Categoria base'
               const desativada = g.grupoBase.ativo === false
               return (
                 <li key={key} {...rest}>
@@ -229,7 +241,7 @@ export const MenuCategoriaNesteCardapioCampos = forwardRef<
             renderInput={params => (
               <TextField
                 {...params}
-                label="Categoria"
+                label="Categoria base"
                 placeholder="Pesquisar"
                 InputLabelProps={{ shrink: true }}
                 sx={{
@@ -259,10 +271,6 @@ export const MenuCategoriaNesteCardapioCampos = forwardRef<
             )}
           />
         </div>
-
-        <p className="max-w-[13.5rem] text-[11px] leading-snug text-secondary-text">
-          No ícone você muda a cor e o desenho. O lápis muda só o nome aqui nesse MENU.
-        </p>
       </div>
 
       <Popover
