@@ -65,8 +65,8 @@ export function MenuReorderCardapioModal({ open, menuId, onClose }: MenuReorderC
       title="Reordenar cardápio"
       subtitle={
         <span className="font-normal text-secondary-text">
-          Para alterar a ordem dos itens ou categorias do seu cardápio, clique na opção desejada,
-          segure e arraste.
+          Categorias e produtos: arraste e clique em Salvar. Grupos de complementos e complementos:
+          a ordem grava ao soltar.
         </span>
       }
       scrollableBody={false}

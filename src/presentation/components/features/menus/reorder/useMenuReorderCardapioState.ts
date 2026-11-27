@@ -4,11 +4,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { arrayMove } from '@dnd-kit/sortable'
 import type { DragEndEvent } from '@dnd-kit/core'
 import { aplicarReordenacaoMenuUseCase } from '@/src/application/use-cases/menus/AplicarReordenacaoMenuUseCase'
+import { buscarMenuProdutoViaBffUseCase } from '@/src/application/use-cases/menus/menuBffUseCases'
+import { ordenarComplementosResumoCatalogo } from '@/src/application/mappers/MenuProdutoCatalogMapper'
+import {
+  reordenarComplementoNoMenu,
+  reordenarGrupoComplementoNoMenu,
+} from '@/src/presentation/components/features/complementos/complementoOverrideApi'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { hasReorderChanged } from '@/src/shared/utils/computeReorderPatches'
-import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
+import { showToast } from '@/src/shared/utils/toast'
+import type {
+  MenuGrupoProduto,
+  MenuProduto,
+  MenuProdutoComplementoItemResumo,
+  MenuProdutoComplementoResumo,
+} from '@/src/shared/types/menus'
 import {
   categoriaLabel,
   fetchAllMenuGrupos,
@@ -17,44 +28,23 @@ import {
   produtoLabel,
 } from './menuReorderCatalogLoad'
 
-export type MenuReorderComplementoItem = {
-  id: string
-  nome: string
-}
+export type MenuReorderComplementoItem = MenuProdutoComplementoItemResumo
 
 type ProdutosPorGrupoState = Record<string, MenuProduto[]>
 
-function sortComplementos(list: MenuReorderComplementoItem[]): MenuReorderComplementoItem[] {
-  return [...list].sort((a, b) =>
-    a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' })
-  )
-}
-
-function mapComplementosFromGrupoApi(data: unknown): MenuReorderComplementoItem[] {
-  const root = data as { complementos?: unknown; data?: { complementos?: unknown } }
-  const raw = Array.isArray(root.complementos)
-    ? root.complementos
-    : Array.isArray(root.data?.complementos)
-      ? root.data.complementos
-      : []
-
-  return sortComplementos(
-    raw
-      .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
-      .map(item => ({
-        id: String(item.id ?? ''),
-        nome: String(item.nome ?? 'Complemento').trim() || 'Complemento',
-      }))
-      .filter(item => item.id)
-  )
+function aplicarOrdemComplementos(
+  lista: MenuProdutoComplementoItemResumo[]
+): MenuProdutoComplementoItemResumo[] {
+  return lista.map((item, index) => ({ ...item, ordem: index + 1 }))
 }
 
 export function useMenuReorderCardapioState(menuId: string, open: boolean) {
   const invalidate = useInvalidateTenantQueries()
   const [loadingCatalog, setLoadingCatalog] = useState(false)
   const [loadingProdutos, setLoadingProdutos] = useState(false)
-  const [loadingComplementos, setLoadingComplementos] = useState(false)
+  const [loadingGruposComplemento, setLoadingGruposComplemento] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [reordenandoChave, setReordenandoChave] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const [categorias, setCategorias] = useState<MenuGrupoProduto[]>([])
@@ -62,24 +52,25 @@ export function useMenuReorderCardapioState(menuId: string, open: boolean) {
 
   const [produtosPorGrupo, setProdutosPorGrupo] = useState<ProdutosPorGrupoState>({})
   const initialProdutoIdsRef = useRef<Record<string, string[]>>({})
+  const hydratedProdutoIdsRef = useRef<Set<string>>(new Set())
 
   const [selectedGrupoId, setSelectedGrupoId] = useState<string | null>(null)
   const [selectedProdutoId, setSelectedProdutoId] = useState<string | null>(null)
   const [selectedGrupoComplementoId, setSelectedGrupoComplementoId] = useState<string | null>(
     null
   )
-  const [complementosDoGrupo, setComplementosDoGrupo] = useState<MenuReorderComplementoItem[]>([])
 
   const resetState = useCallback(() => {
     setCategorias([])
     initialCategoriaIdsRef.current = []
     setProdutosPorGrupo({})
     initialProdutoIdsRef.current = {}
+    hydratedProdutoIdsRef.current = new Set()
     setSelectedGrupoId(null)
     setSelectedProdutoId(null)
     setSelectedGrupoComplementoId(null)
-    setComplementosDoGrupo([])
     setLoadError(null)
+    setReordenandoChave(null)
   }, [])
 
   const loadCatalog = useCallback(async () => {
@@ -94,10 +85,10 @@ export function useMenuReorderCardapioState(menuId: string, open: boolean) {
       initialCategoriaIdsRef.current = grupos.map(grupoBaseId)
       setProdutosPorGrupo({})
       initialProdutoIdsRef.current = {}
+      hydratedProdutoIdsRef.current = new Set()
       setSelectedGrupoId(grupos[0] ? grupoBaseId(grupos[0]) : null)
       setSelectedProdutoId(null)
       setSelectedGrupoComplementoId(null)
-      setComplementosDoGrupo([])
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Erro ao carregar cardápio')
     } finally {
@@ -154,6 +145,53 @@ export function useMenuReorderCardapioState(menuId: string, open: boolean) {
     [produtosAtivos, selectedProdutoId]
   )
 
+  const hydrateProdutoComplementos = useCallback(
+    async (produtoId: string) => {
+      if (!menuId || hydratedProdutoIdsRef.current.has(produtoId)) return
+
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!token) return
+
+      setLoadingGruposComplemento(true)
+      try {
+        const detalhe = await buscarMenuProdutoViaBffUseCase.execute({
+          token,
+          menuId,
+          produtoId,
+        })
+        hydratedProdutoIdsRef.current.add(produtoId)
+        setProdutosPorGrupo(prev => {
+          const next: ProdutosPorGrupoState = {}
+          for (const [grupoId, list] of Object.entries(prev)) {
+            next[grupoId] = list.map(produto =>
+              produto.produtoId === produtoId
+                ? {
+                    ...produto,
+                    gruposComplementos: Array.isArray(detalhe.gruposComplementos)
+                      ? detalhe.gruposComplementos
+                      : produto.gruposComplementos,
+                  }
+                : produto
+            )
+          }
+          return next
+        })
+      } catch (err) {
+        showToast.error(
+          err instanceof Error ? err.message : 'Erro ao carregar grupos de complementos'
+        )
+      } finally {
+        setLoadingGruposComplemento(false)
+      }
+    },
+    [menuId]
+  )
+
+  useEffect(() => {
+    if (!open || !selectedProdutoId) return
+    void hydrateProdutoComplementos(selectedProdutoId)
+  }, [open, selectedProdutoId, hydrateProdutoComplementos])
+
   const gruposComplemento = useMemo(
     () => selectedProduto?.gruposComplementos ?? [],
     [selectedProduto]
@@ -172,47 +210,10 @@ export function useMenuReorderCardapioState(menuId: string, open: boolean) {
     }
   }, [selectedProduto, gruposComplemento, selectedGrupoComplementoId])
 
-  useEffect(() => {
-    if (!open || !selectedGrupoComplementoId) {
-      setComplementosDoGrupo([])
-      return
-    }
-
-    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-    if (!token) return
-
-    let cancelled = false
-    setLoadingComplementos(true)
-    void (async () => {
-      try {
-        const response = await fetchGestorApi(
-          `/api/grupos-complementos/${encodeURIComponent(selectedGrupoComplementoId)}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            cache: 'no-store',
-          }
-        )
-        if (!response.ok) {
-          throw new Error('Erro ao carregar complementos')
-        }
-        const data = await response.json()
-        if (!cancelled) {
-          setComplementosDoGrupo(mapComplementosFromGrupoApi(data))
-        }
-      } catch {
-        if (!cancelled) setComplementosDoGrupo([])
-      } finally {
-        if (!cancelled) setLoadingComplementos(false)
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [open, selectedGrupoComplementoId])
+  const complementosDoGrupo = useMemo(() => {
+    const grupo = gruposComplemento.find(g => g.id === selectedGrupoComplementoId)
+    return ordenarComplementosResumoCatalogo(grupo?.complementos ?? [])
+  }, [gruposComplemento, selectedGrupoComplementoId])
 
   const categoriasDirty = useMemo(
     () =>
@@ -233,18 +234,34 @@ export function useMenuReorderCardapioState(menuId: string, open: boolean) {
   }, [produtosPorGrupo])
 
   const isDirty = categoriasDirty || produtosDirty
+  const dragBloqueado = saving || reordenandoChave !== null
+
+  const atualizarGruposComplementoDoProduto = useCallback(
+    (produtoId: string, grupos: MenuProdutoComplementoResumo[]) => {
+      setProdutosPorGrupo(prev => {
+        const next: ProdutosPorGrupoState = {}
+        for (const [grupoId, list] of Object.entries(prev)) {
+          next[grupoId] = list.map(produto =>
+            produto.produtoId === produtoId
+              ? { ...produto, gruposComplementos: grupos }
+              : produto
+          )
+        }
+        return next
+      })
+    },
+    []
+  )
 
   const handleSelectGrupo = useCallback((grupoId: string) => {
     setSelectedGrupoId(grupoId)
     setSelectedProdutoId(null)
     setSelectedGrupoComplementoId(null)
-    setComplementosDoGrupo([])
   }, [])
 
   const handleSelectProduto = useCallback((produtoId: string) => {
     setSelectedProdutoId(produtoId)
     setSelectedGrupoComplementoId(null)
-    setComplementosDoGrupo([])
   }, [])
 
   const handleSelectGrupoComplemento = useCallback((grupoComplementoId: string) => {
@@ -281,6 +298,102 @@ export function useMenuReorderCardapioState(menuId: string, open: boolean) {
       })
     },
     [selectedGrupoId]
+  )
+
+  const handleDragEndGruposComplemento = useCallback(
+    async (event: DragEndEvent) => {
+      const produtoId = selectedProdutoId?.trim()
+      if (!produtoId || !menuId || dragBloqueado) return
+
+      const { active, over } = event
+      if (!over || active.id === over.id) return
+
+      const anterior = gruposComplemento
+      const oldIndex = anterior.findIndex(g => g.id === active.id)
+      const newIndex = anterior.findIndex(g => g.id === over.id)
+      if (oldIndex === -1 || newIndex === -1) return
+
+      const reordenados = arrayMove(anterior, oldIndex, newIndex)
+      atualizarGruposComplementoDoProduto(produtoId, reordenados)
+
+      const chave = `grupo:${String(active.id)}`
+      setReordenandoChave(chave)
+      try {
+        await reordenarGrupoComplementoNoMenu({
+          menuId,
+          produtoId,
+          grupoComplementoId: String(active.id),
+          novaPosicao: newIndex + 1,
+        })
+        await invalidate(['menu-produtos', menuId])
+      } catch (err) {
+        atualizarGruposComplementoDoProduto(produtoId, anterior)
+        showToast.error(err instanceof Error ? err.message : 'Erro ao reordenar grupo')
+      } finally {
+        setReordenandoChave(null)
+      }
+    },
+    [
+      atualizarGruposComplementoDoProduto,
+      dragBloqueado,
+      gruposComplemento,
+      invalidate,
+      menuId,
+      selectedProdutoId,
+    ]
+  )
+
+  const handleDragEndComplementos = useCallback(
+    async (event: DragEndEvent) => {
+      const produtoId = selectedProdutoId?.trim()
+      const grupoComplementoId = selectedGrupoComplementoId?.trim()
+      if (!produtoId || !grupoComplementoId || !menuId || dragBloqueado) return
+
+      const { active, over } = event
+      if (!over || active.id === over.id) return
+
+      const anterior = complementosDoGrupo
+      const oldIndex = anterior.findIndex(c => c.id === active.id)
+      const newIndex = anterior.findIndex(c => c.id === over.id)
+      if (oldIndex === -1 || newIndex === -1) return
+
+      const reordenados = aplicarOrdemComplementos(arrayMove(anterior, oldIndex, newIndex))
+      const gruposAtualizados = gruposComplemento.map(grupo =>
+        grupo.id === grupoComplementoId ? { ...grupo, complementos: reordenados } : grupo
+      )
+      atualizarGruposComplementoDoProduto(produtoId, gruposAtualizados)
+
+      const chave = `comp:${String(active.id)}`
+      setReordenandoChave(chave)
+      try {
+        await reordenarComplementoNoMenu({
+          menuId,
+          produtoId,
+          grupoComplementoId,
+          complementoId: String(active.id),
+          novaPosicao: newIndex + 1,
+        })
+        await invalidate(['menu-produtos', menuId])
+      } catch (err) {
+        const gruposRollback = gruposComplemento.map(grupo =>
+          grupo.id === grupoComplementoId ? { ...grupo, complementos: anterior } : grupo
+        )
+        atualizarGruposComplementoDoProduto(produtoId, gruposRollback)
+        showToast.error(err instanceof Error ? err.message : 'Erro ao reordenar complemento')
+      } finally {
+        setReordenandoChave(null)
+      }
+    },
+    [
+      atualizarGruposComplementoDoProduto,
+      complementosDoGrupo,
+      dragBloqueado,
+      gruposComplemento,
+      invalidate,
+      menuId,
+      selectedGrupoComplementoId,
+      selectedProdutoId,
+    ]
   )
 
   const cancelChanges = useCallback(() => {
@@ -356,8 +469,11 @@ export function useMenuReorderCardapioState(menuId: string, open: boolean) {
   return {
     loadingCatalog,
     loadingProdutos,
-    loadingComplementos,
+    loadingGruposComplemento,
+    loadingComplementos: loadingGruposComplemento,
     saving,
+    reordenandoChave,
+    dragBloqueado,
     loadError,
     categorias,
     produtosAtivos,
@@ -375,6 +491,8 @@ export function useMenuReorderCardapioState(menuId: string, open: boolean) {
     handleSelectGrupoComplemento,
     handleDragEndCategorias,
     handleDragEndProdutos,
+    handleDragEndGruposComplemento,
+    handleDragEndComplementos,
     cancelChanges,
     save,
   }
