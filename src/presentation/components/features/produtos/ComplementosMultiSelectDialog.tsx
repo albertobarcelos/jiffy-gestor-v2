@@ -377,7 +377,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
   )
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  /** Salvando todos os vínculos pendentes (botão Salvar). */
+  /** Salvando vínculo (switch) ou flush residual do botão Salvar. */
   const [isSaving, setIsSaving] = useState(false)
   /** IDs persistidos no backend — comparação define dirty. */
   const baselineInicial = mapResumoToGrupos(initialGruposResumo).map(g => g.id)
@@ -1242,16 +1242,22 @@ export const ComplementosMultiSelectDialog = forwardRef<
     [rascunho, produtoId, menuId, groups, fetchGrupoComplementoPorId, loadGroups, invalidate]
   )
 
-  /** Liga/desliga vínculo só no estado local — PATCH ocorre no Salvar. */
+  /** Liga/desliga vínculo e persiste na hora (exceto rascunho do wizard). */
   const handleToggleCatalogGrupo = useCallback(
-    (id: string) => {
+    async (id: string) => {
       if (isSaving) return
 
       const antesIds = groups.map(g => g.id)
       const newIds = antesIds.includes(id) ? antesIds.filter(x => x !== id) : [...antesIds, id]
+      if (sameIdSet(antesIds, newIds)) return
 
       const removedIds = antesIds.filter(x => !newIds.includes(x))
       const addedIds = newIds.filter(x => !antesIds.includes(x))
+      const groupsSnapshot = groups
+      const cacheSnapshot = detalhesComplementosCache
+      const sessionOrderSnapshot = sessionCatalogOrderRef.current
+        ? [...sessionCatalogOrderRef.current]
+        : null
 
       if (removedIds.length > 0) {
         setGroups(prev => prev.filter(g => !removedIds.includes(g.id)))
@@ -1298,10 +1304,62 @@ export const ComplementosMultiSelectDialog = forwardRef<
         }
       }
 
-      isDirtyRef.current = !sameIdSet(newIds, baselineGruposIdsRef.current)
-      onEmbedStateChange?.({ isDirty: isDirtyRef.current, isSaving: false })
+      // Wizard: vínculo só no rascunho local até criar o produto.
+      if (rascunho) {
+        isDirtyRef.current = !sameIdSet(newIds, baselineGruposIdsRef.current)
+        onEmbedStateChange?.({ isDirty: isDirtyRef.current, isSaving: false })
+        return
+      }
+
+      setIsSaving(true)
+      onEmbedStateChange?.({ isDirty: true, isSaving: true })
+      try {
+        const ok = await persistGruposSelection(
+          newIds,
+          addedIds.length > 0
+            ? vinculoNoMenu
+              ? 'Grupo vinculado a este cardápio'
+              : 'Grupo vinculado ao produto'
+            : vinculoNoMenu
+              ? 'Grupo desvinculado deste cardápio'
+              : 'Grupo desvinculado do produto',
+          {
+            optimisticPreApplied: true,
+            antesIdsSnapshot: antesIds,
+          }
+        )
+        if (ok) {
+          const idsPersistidos = [...newIds]
+          baselineGruposIdsRef.current = idsPersistidos
+          setGruposPersistidosIds(idsPersistidos)
+          isDirtyRef.current = false
+          onEmbedStateChange?.({ isDirty: false, isSaving: false })
+          return
+        }
+
+        setGroups(groupsSnapshot)
+        setDetalhesComplementosCache(cacheSnapshot)
+        sessionCatalogOrderRef.current = sessionOrderSnapshot
+        setSessionOrderTick(t => t + 1)
+        isDirtyRef.current = !sameIdSet(
+          groupsSnapshot.map(g => g.id),
+          baselineGruposIdsRef.current
+        )
+        onEmbedStateChange?.({ isDirty: isDirtyRef.current, isSaving: false })
+      } finally {
+        setIsSaving(false)
+      }
     },
-    [isSaving, groups, allSelectableGroups, onEmbedStateChange]
+    [
+      isSaving,
+      groups,
+      detalhesComplementosCache,
+      allSelectableGroups,
+      onEmbedStateChange,
+      rascunho,
+      persistGruposSelection,
+      vinculoNoMenu,
+    ]
   )
 
   const savePendingGrupos = useCallback(async (): Promise<boolean> => {
@@ -1825,6 +1883,14 @@ export const ComplementosMultiSelectDialog = forwardRef<
                         )}
                       >
                         <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden">
+                          {arrasteGrupo ? (
+                            <AlcaArraste
+                              label={grupo.nome || 'Grupo'}
+                              attributes={arrasteGrupo.attributes}
+                              listeners={arrasteGrupo.listeners}
+                              disabled={reordenandoChave !== null}
+                            />
+                          ) : null}
                           <button
                             type="button"
                             onClick={() => toggleGrupoExpanded(grupo.id)}
@@ -1868,14 +1934,6 @@ export const ComplementosMultiSelectDialog = forwardRef<
                           </button>
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
-                          {arrasteGrupo ? (
-                            <AlcaArraste
-                              label={grupo.nome || 'Grupo'}
-                              attributes={arrasteGrupo.attributes}
-                              listeners={arrasteGrupo.listeners}
-                              disabled={reordenandoChave !== null}
-                            />
-                          ) : null}
                           <div
                             className="shrink-0 self-center"
                             onClick={e => e.stopPropagation()}
@@ -1885,7 +1943,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
                             checked={vinculado}
                             onChange={e => {
                               e.stopPropagation()
-                              handleToggleCatalogGrupo(grupo.id)
+                              void handleToggleCatalogGrupo(grupo.id)
                             }}
                             label="Vínculo"
                             labelPosition="start"
@@ -2029,12 +2087,12 @@ export const ComplementosMultiSelectDialog = forwardRef<
                                               ? valorRiscado
                                                 ? 'Impacto nenhum: este valor não altera o preço'
                                                 : undefined
-                                              : 'Salve o grupo para alterar este valor.'
+                                              : 'Vincule o grupo para alterar este valor.'
                                           }
                                           aria-label={
                                             gruposPersistidosIds.includes(grupo.id)
                                               ? `Valor de ${comp.getNome()} em ${grupo.nome || 'grupo'}`
-                                              : `Valor de ${comp.getNome()} em ${grupo.nome || 'grupo'}. Salve o grupo para editar.`
+                                              : `Valor de ${comp.getNome()} em ${grupo.nome || 'grupo'}. Vincule o grupo para editar.`
                                           }
                                           className={cn(
                                             'w-[8.5rem] rounded border border-gray-200 bg-white px-2 py-1 text-right text-xs font-normal tabular-nums text-primary-text focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-50',
@@ -2076,7 +2134,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
                                         title={
                                           gruposPersistidosIds.includes(grupo.id)
                                             ? undefined
-                                            : 'Salve o grupo para pausar ou ativar este complemento.'
+                                            : 'Vincule o grupo para pausar ou ativar este complemento.'
                                         }
                                         onToggle={() => void gravarAtivoNoMenu(grupo.id, comp)}
                                       />
@@ -2231,15 +2289,15 @@ export const ComplementosMultiSelectDialog = forwardRef<
             </div>
             {vinculoNoMenu ? (
               <p className="mt-2 text-xs text-secondary-text">
-                Os grupos marcados valem só neste cardápio. Salve o grupo para alterar o valor de
-                cada complemento; esse valor vale só neste produto e neste grupo. O nome continua
-                no cadastro do complemento.
+                Os grupos vinculados valem só neste cardápio. O vínculo é salvo ao marcar o switch.
+                O valor de cada complemento vale só neste produto e neste grupo; o nome continua no
+                cadastro do complemento.
               </p>
             ) : (
               <p className="mt-2 text-xs text-secondary-text">
                 {rascunho
                   ? 'Marque os grupos deste produto. Novos grupos e complementos salvam na hora; o produto só é criado ao concluir o passo a passo.'
-                  : 'Vincule grupos existentes ou crie um novo. Ao expandir um grupo, dá para criar um complemento sem sair deste fluxo.'}
+                  : 'O vínculo é salvo ao marcar o switch. Ao expandir um grupo, dá para criar um complemento sem sair deste fluxo.'}
               </p>
             )}
           </div>

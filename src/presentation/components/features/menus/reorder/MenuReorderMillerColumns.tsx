@@ -14,6 +14,7 @@ export function MenuReorderMillerColumns({ state }: MenuReorderMillerColumnsProp
   const categoriaIds = state.categorias.map(g => state.grupoBaseId(g))
   const produtoIds = state.produtosAtivos.map(p => p.produtoId)
   const grupoComplementoIds = state.gruposComplemento.map(g => g.id)
+  const complementoIds = state.complementosDoGrupo.map(c => c.id)
 
   if (state.loadError) {
     return (
@@ -42,6 +43,7 @@ export function MenuReorderMillerColumns({ state }: MenuReorderMillerColumnsProp
                   id={id}
                   label={state.categoriaLabel(grupo)}
                   isSelected={state.selectedGrupoId === id}
+                  disabled={state.dragBloqueado}
                   onSelect={state.handleSelectGrupo}
                 />
               )
@@ -49,7 +51,7 @@ export function MenuReorderMillerColumns({ state }: MenuReorderMillerColumnsProp
           </MenuReorderSortableColumn>
 
           <MenuReorderSortableColumn
-            title="Items"
+            title="Produtos"
             itemIds={produtoIds}
             isLoading={state.loadingCatalog || state.loadingProdutos}
             emptyLabel={
@@ -63,6 +65,7 @@ export function MenuReorderMillerColumns({ state }: MenuReorderMillerColumnsProp
                 id={produto.produtoId}
                 label={state.produtoLabel(produto)}
                 isSelected={state.selectedProdutoId === produto.produtoId}
+                disabled={state.dragBloqueado}
                 onSelect={state.handleSelectProduto}
               />
             ))}
@@ -71,12 +74,13 @@ export function MenuReorderMillerColumns({ state }: MenuReorderMillerColumnsProp
           <MenuReorderSortableColumn
             title="Grupos de complementos"
             itemIds={grupoComplementoIds}
+            isLoading={state.loadingGruposComplemento}
             emptyLabel={
               state.selectedProdutoId
                 ? 'Nenhum grupo de complemento neste produto'
                 : 'Selecione um produto'
             }
-            readOnly
+            onDragEnd={event => void state.handleDragEndGruposComplemento(event)}
           >
             {state.gruposComplemento.map(grupo => (
               <MenuReorderSortableRow
@@ -84,7 +88,7 @@ export function MenuReorderMillerColumns({ state }: MenuReorderMillerColumnsProp
                 id={grupo.id}
                 label={grupo.nome}
                 isSelected={state.selectedGrupoComplementoId === grupo.id}
-                disabled
+                disabled={state.dragBloqueado || !state.selectedProdutoId}
                 onSelect={state.handleSelectGrupoComplemento}
               />
             ))}
@@ -92,14 +96,14 @@ export function MenuReorderMillerColumns({ state }: MenuReorderMillerColumnsProp
 
           <MenuReorderSortableColumn
             title="Complementos"
-            itemIds={state.complementosDoGrupo.map(c => c.id)}
-            isLoading={state.loadingComplementos}
+            itemIds={complementoIds}
+            isLoading={state.loadingGruposComplemento}
             emptyLabel={
               state.selectedGrupoComplementoId
                 ? 'Nenhum complemento neste grupo'
                 : 'Selecione um grupo de complementos'
             }
-            readOnly
+            onDragEnd={event => void state.handleDragEndComplementos(event)}
           >
             {state.complementosDoGrupo.map(complemento => (
               <MenuReorderSortableRow
@@ -107,7 +111,7 @@ export function MenuReorderMillerColumns({ state }: MenuReorderMillerColumnsProp
                 id={complemento.id}
                 label={complemento.nome}
                 isSelected={false}
-                disabled
+                disabled={state.dragBloqueado || !state.selectedGrupoComplementoId}
                 onSelect={() => {}}
               />
             ))}

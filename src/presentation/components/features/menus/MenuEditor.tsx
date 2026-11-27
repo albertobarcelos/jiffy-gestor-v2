@@ -311,18 +311,9 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       if (!grupoId) return
       const grupo = findGrupo(grupoId)
       if (!grupo) return
-      const primeiro = produtosPorGrupo.get(grupoId)?.[0] ?? null
-      if (primeiro) {
-        openTabs({
-          tab: 'produto',
-          grupo,
-          produto: primeiro,
-        })
-        return
-      }
       setCategoriaPanelGrupo(grupo)
     },
-    [findGrupo, produtosPorGrupo, openTabs]
+    [findGrupo]
   )
 
   const handleAddProduto = useCallback(
